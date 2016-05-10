@@ -32,7 +32,9 @@ import Nirum.Constructs.Module (Module(Module, types))
 import Nirum.Constructs.Name (Name(Name))
 import qualified Nirum.Constructs.Name as N
 import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
-                                        , Type(Alias, BoxedType, EnumType)
+                                        , Field(Field)
+                                        , Type(Alias, BoxedType, EnumType,
+                                               RecordType)
                                         , TypeDeclaration(TypeDeclaration)
                                         )
 import Nirum.Constructs.TypeExpression ( TypeExpression( ListModifier
@@ -204,6 +206,33 @@ class $className(enum.Enum):
     def __nirum_deserialize__(cls: type, value: str) -> '{className}':
         return cls(value.replace('-', '_'))  # FIXME: validate input
     |]
+compileTypeDeclaration (TypeDeclaration typename (RecordType fields) _) = do
+    let fieldNames = map nameToText $ [ name
+                                      |(Field name _ _) <- toList fields
+                                      ]
+    let initialArgs = intercalate ", " $ map fieldToargNameWithTypeVarText $ toList fields
+    let initialValues = intercalate "\n        " $ [ [qq|self.{name} = {name}|]
+                                                   | name <- fieldNames
+                                                   ]
+    let facialName' = nameToText typename
+    return [qq|
+class $facialName':
+    # TODO: docstring
+
+    __slots__ = ()
+    __slot_types = ()
+
+    def __init__(self, $initialArgs) -> None:
+        $initialValues
+
+    def __repr__(self) -> str:
+        return '\{0.__module__\}.\{0.__qualname__\}'.format(type(self))
+    |]
+  where
+      nameToText :: Name -> Text
+      nameToText = toText . N.facialName
+      fieldToargNameWithTypeVarText :: Field -> Text
+      fieldToargNameWithTypeVarText (Field name typeExpr _) = [qq|{nameToText name}: {code $ compileTypeExpression typeExpr}|]
 
 compileTypeDeclaration TypeDeclaration {} =
     return "# TODO"
