@@ -44,6 +44,28 @@ It's represented in JSON to:
         "behind_name": "data goes here."
     }
 
+
+Enum type
+---------
+
+Enum type is equivalent to union type of unary tags in runtime
+(although it might differ if the runtime language has native enum types),
+but it's equivalent to string in JSON representation.  For example:
+
+    enum gender = male | female;
+
+    record payload (
+        gender gender,
+    );
+
+It's represented in JSON to:
+
+    {
+        "_type": "payload",
+        "gender": "female"
+    }
+
+
 Boxed type
 ----------
 
@@ -51,6 +73,7 @@ Boxed type is equivalent to 1-member record type in runtime, but it's equivalent
 to its internal type in JSON representation.  For example:
 
     boxed offset (float64);
+
     record payload (
         offset left,
     );
