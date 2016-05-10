@@ -2,6 +2,7 @@
 module Nirum.Constructs.IdentifierSpec where
 
 import Control.Exception (evaluate)
+import Control.Monad (forM_)
 import Data.Maybe (fromJust)
 
 import Data.Text (Text)
@@ -10,12 +11,16 @@ import Test.Hspec.Meta
 import Nirum.Constructs.Identifier ( Identifier
                                    , fromText
                                    , normalize
+                                   , toCamelCaseText
                                    , toCode
-                                   , tokens
+                                   , toLispCaseText
                                    , toNormalizedString
                                    , toNormalizedText
+                                   , toPascalCaseText
+                                   , toSnakeCaseText
                                    , toString
                                    , toText
+                                   , tokens
                                    )
 
 fromText' :: Text -> Identifier
@@ -102,12 +107,16 @@ spec = do
         it "behaves same as toText except its return type is [Char]" $
             toString (fromText' "asdf") `shouldBe` ("asdf" :: String)
     describe "toNormalizedText Identifier" $ do
-        it "returns lowercased identifier text" $ do
-            toNormalizedText "IDENTIFIER" `shouldBe` "identifier"
-            toNormalizedText "Identifier" `shouldBe` "identifier"
-        it "replaces underscores with hyphens" $ do
-            toNormalizedText "valid_identifier" `shouldBe` "valid-identifier"
-            toNormalizedText "Valid_Identifier" `shouldBe` "valid-identifier"
+        let normalizers = [ toNormalizedText
+                          , toLispCaseText
+                          ] :: [Identifier -> Text]
+        forM_ normalizers $ \normalizer -> do
+            it "returns lowercased identifier text" $ do
+                normalizer "IDENTIFIER" `shouldBe` "identifier"
+                normalizer "Identifier" `shouldBe` "identifier"
+            it "replaces underscores with hyphens" $ do
+                normalizer "valid_identifier" `shouldBe` "valid-identifier"
+                normalizer "Valid_Identifier" `shouldBe` "valid-identifier"
     describe "toNormalizedString Identifier" $ do
         it "returns lowercased identifier string" $ do
             toNormalizedString "IDENTIFIER" `shouldBe` "identifier"
@@ -115,3 +124,21 @@ spec = do
         it "replaces underscores with hyphens" $ do
             toNormalizedString "valid_identifier" `shouldBe` "valid-identifier"
             toNormalizedString "Valid_Identifier" `shouldBe` "valid-identifier"
+    describe "toPascalCaseText Identifier" $
+        it "returns PascalCase-ed identifier string" $ do
+            toPascalCaseText (fromText' "pascal-case") `shouldBe` "PascalCase"
+            toPascalCaseText (fromText' "PASCAL-CASE") `shouldBe` "PascalCase"
+            toPascalCaseText (fromText' "pascal_case") `shouldBe` "PascalCase"
+            toPascalCaseText (fromText' "PASCAL_CASE") `shouldBe` "PascalCase"
+    describe "toCamelCaseText Identifier" $
+        it "returns camelCase-ed identifier string" $ do
+            toCamelCaseText (fromText' "camel-case") `shouldBe` "camelCase"
+            toCamelCaseText (fromText' "CAMEL-CASE") `shouldBe` "camelCase"
+            toCamelCaseText (fromText' "camel_case") `shouldBe` "camelCase"
+            toCamelCaseText (fromText' "CAMEL_CASE") `shouldBe` "camelCase"
+    describe "toSnakeCaseText Identifier" $
+        it "returns snake_case-ed identifier string" $ do
+            toSnakeCaseText (fromText' "snake-case") `shouldBe` "snake_case"
+            toSnakeCaseText (fromText' "SNAKE-CASE") `shouldBe` "snake_case"
+            toSnakeCaseText (fromText' "snake_case") `shouldBe` "snake_case"
+            toSnakeCaseText (fromText' "SNAKE_CASE") `shouldBe` "snake_case"

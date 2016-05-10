@@ -8,14 +8,18 @@ module Nirum.Constructs.Identifier ( Identifier
                                    , show
                                    , toCode
                                    , tokens
+                                   , toCamelCaseText
                                    , toNormalizedString
                                    , toNormalizedText
                                    , toString
+                                   , toSnakeCaseText
                                    , toText
+                                   , toPascalCaseText
+                                   , toLispCaseText
                                    , (==)
                                    ) where
 
-import Data.Char (toLower)
+import Data.Char (toLower, toUpper)
 import Data.Maybe (fromMaybe)
 import Data.String (IsString(fromString))
 
@@ -118,3 +122,23 @@ toString = T.unpack . toText
 
 toNormalizedString :: Identifier -> String
 toNormalizedString = T.unpack . toNormalizedText
+
+toPascalCaseText :: Identifier -> T.Text
+toPascalCaseText identifier =
+    T.concat $ fmap makeFirstUpper (tokens identifier)
+  where
+    makeFirstUpper :: T.Text -> T.Text
+    makeFirstUpper t = toUpper (T.head t) `T.cons` T.tail t
+
+toCamelCaseText :: Identifier -> T.Text
+toCamelCaseText identifier =
+    toLower (T.head pascalCased) `T.cons` T.tail pascalCased
+  where
+    pascalCased :: T.Text
+    pascalCased = toPascalCaseText identifier
+
+toSnakeCaseText :: Identifier -> T.Text
+toSnakeCaseText identifier = T.intercalate "_" $ tokens identifier
+
+toLispCaseText :: Identifier -> T.Text
+toLispCaseText = toNormalizedText
