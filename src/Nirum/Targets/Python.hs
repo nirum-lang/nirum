@@ -7,6 +7,7 @@ module Nirum.Targets.Python ( Code
                                      , standardImports
                                      , thirdPartyImports
                                      )
+                            , compileModule
                             , compileTypeDeclaration
                             , compileTypeExpression
                             , withLocalImport
@@ -17,11 +18,14 @@ module Nirum.Targets.Python ( Code
 
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
-import Data.Text (Text)
+import Data.Text (Text, intercalate, append)
 import Text.InterpolatedString.Perl6 (qq)
 
+import Nirum.Constructs.DeclarationSet (toList)
 import Nirum.Constructs.Identifier (toText)
+import Nirum.Constructs.Module (Module(Module, types))
 import Nirum.Constructs.Name (Name(Name))
+import qualified Nirum.Constructs.Name as N
 import Nirum.Constructs.TypeDeclaration ( Type(Alias, BoxedType, EnumType)
                                         , TypeDeclaration(TypeDeclaration)
                                         )
@@ -108,39 +112,88 @@ compileTypeDeclaration (TypeDeclaration (Name typename _) (Alias ctype) _) = do
         $typename = $ctypeExpr
     |]
 compileTypeDeclaration (TypeDeclaration typename (BoxedType itype) _) = do
-    let Name facialName' _ = typename
+    let facialName' = toText $ N.facialName typename
     itypeExpr <- compileTypeExpression itype
-    withThirdPartyImport "nirum" "serialize_boxed_type" $ return [qq|
-        class $facialName':
-            # TODO: docstring
+    withThirdPartyImport "nirum.validate" "validate_boxed_type" $
+        withThirdPartyImport "nirum.serialize" "serialize_boxed_type" $
+            withThirdPartyImport "nirum.deserialize" "deserialize_boxed_type" $
+                return [qq|
+class $facialName':
+    # TODO: docstring
 
-            def __init__(self, value: $itypeExpr) -> None:
-                self.value = value  # type: $itypeExpr
+    def __init__(self, value: $itypeExpr) -> None:
+        validate_boxed_type(value, $itypeExpr)
+        self.value = value  # type: $itypeExpr
 
-            def __eq__(self, other) -> bool:
-                return (isinstance(other, $facialName') and
-                        self.value == other.value)
+    def __eq__(self, other) -> bool:
+        return (isinstance(other, $facialName') and
+                self.value == other.value)
 
-            def _hash__(self) -> int:
-                return hash(self.value)
+    def __hash__(self) -> int:
+        return hash(self.value)
 
-            def __nirum_serialize__(self) -> typing.Mapping[str, typing.Any]:
-                return serialize_boxed_type()
+    def __nirum_serialize__(self) -> typing.Mapping[str, typing.Any]:
+        return serialize_boxed_type(self)
 
-            @classmethod
-            def __nirum_deserialize__(
-                cls: type, value: typing.Mapping[str, typing.Any]
-            ) -> '{facialName'}':
-                return
-    |]
+    @classmethod
+    def __nirum_deserialize__(
+        cls: type, value: typing.Mapping[str, typing.Any]
+    ) -> '{facialName'}':
+        return deserialize_boxed_type(cls, value)
+
+    def __repr__(self) -> str:
+        return '\{0.__module__\}.\{0.__qualname__\}(\{1!r\})'.format(
+            type(self), self.value
+        )
+                |]
 compileTypeDeclaration (TypeDeclaration typename (EnumType _) _) = do
     let Name facialName _ = typename
     withStandardImport "enum" $ return [qq|
-        class $facialName(enum.Enum):
-            # TODO: docstring
+class $facialName(enum.Enum):
+    # TODO: docstring
 
-            ...
+    ...
     |]
 
 compileTypeDeclaration TypeDeclaration {} =
     return "# TODO"
+
+compileModuleBody :: Module -> CodeGen Text
+compileModuleBody Module { types = types' } = do
+    typeCodes <- mapM compileTypeDeclaration (toList types')
+    let moduleCode = intercalate "\n\n" typeCodes
+    return [qq|
+# TODO: docs
+$moduleCode
+    |]
+
+compileModule :: Module -> Text
+compileModule module' =
+    [qq|
+# FIXME
+import typing
+{imports $ standardImports code'}
+
+{fromImports $ localImports code'}
+
+{fromImports $ thirdPartyImports code'}
+
+float64 = float  # FIXME
+text = str
+
+{code code'}
+    |]
+  where
+    code' :: CodeGen Text
+    code' = compileModuleBody module'
+    imports :: S.Set Text -> Text
+    imports importSet =
+        if S.null importSet
+        then ""
+        else "import " `append` (intercalate "," $ S.elems importSet)
+    fromImports :: M.Map Text (S.Set Text) -> Text
+    fromImports importMap =
+        intercalate "\n"
+            [ [qq|from $from import {intercalate ", " $ S.elems vars}|]
+            | (from, vars) <- M.assocs importMap
+            ]
