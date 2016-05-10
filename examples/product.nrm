@@ -1,0 +1,19 @@
+enum currency = krw
+              | jpy
+              | usd
+              ;
+
+record money (
+    currency currency,
+    decimal amount
+);
+
+record product (
+    text name,
+    money? price
+);
+
+record order (
+    {product: bigint} items,
+    datetime ordered-at
+);

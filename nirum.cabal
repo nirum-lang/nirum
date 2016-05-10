@@ -1,0 +1,72 @@
+name:                nirum
+version:             0.1.0
+synopsis:            Distributed object framework built on top of
+                     REST HTTP and JSON
+description:         Distributed object framework for microservices,
+                     built on top of RESTful HTTP and JSON
+homepage:            https://bitbucket.org/dahlia/nirum
+bug-reports:         https://bitbucket.org/dahlia/nirum/issues
+license:             GPL-3
+license-file:        LICENSE
+author:              Hong Minhee
+maintainer:          hongminhee@member.fsf.org
+copyright:           (c) 2016 Hong Minhee
+stability:           alpha
+category:            Language
+build-type:          Simple
+extra-source-files:  README.md
+cabal-version:       >=1.10
+
+library
+  exposed-modules:     Nirum.Constructs
+                 ,     Nirum.Constructs.Declaration
+                 ,     Nirum.Constructs.DeclarationSet
+                 ,     Nirum.Constructs.Identifier
+                 ,     Nirum.Constructs.Module
+                 ,     Nirum.Constructs.Name
+                 ,     Nirum.Constructs.TypeDeclaration
+                 ,     Nirum.Constructs.TypeExpression
+                 ,     Nirum.Parser
+                 ,     Nirum.Targets.Python
+  build-depends:       base                     >=4.7     && <5
+               ,       containers               >=0.5.6.2 && <0.6
+               ,       interpolatedstring-perl6 >=1.0.0   && <1.1.0
+               ,       megaparsec               >=4.4.0   && <5.0.0
+               ,       text                     >=0.9.1.0 && <1.3
+  hs-source-dirs:      src
+  default-language:    Haskell2010
+  ghc-options:         -Wall -Werror -fwarn-incomplete-uni-patterns
+
+test-suite spec
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  main-is:             Spec.hs
+  other-modules:       Nirum.Constructs.DeclarationSpec
+               ,       Nirum.Constructs.DeclarationSetSpec
+               ,       Nirum.Constructs.IdentifierSpec
+               ,       Nirum.Constructs.ModuleSpec
+               ,       Nirum.Constructs.NameSpec
+               ,       Nirum.Constructs.TypeDeclarationSpec
+               ,       Nirum.Constructs.TypeExpressionSpec
+               ,       Nirum.ParserSpec
+               ,       Nirum.Targets.PythonSpec
+  default-language:    Haskell2010
+  build-depends:       base            >=4.7     && <5
+               ,       directory
+               ,       hspec
+               ,       hspec-core
+               ,       hspec-meta
+               ,       megaparsec      >=4.4.0   && <5.0.0
+               ,       nirum
+               ,       text            >=0.9.1.0 && <1.3
+  ghc-options:         -Wall -Werror
+                       -fno-warn-incomplete-uni-patterns
+                       -fno-warn-missing-signatures
+
+test-suite hlint
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  main-is:             HLint.hs
+  default-language:    Haskell2010
+  build-depends:       base        >=4.7     && <5
+               ,       hlint       >=1.9     && <2

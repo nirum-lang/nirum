@@ -1,0 +1,73 @@
+# Introducing built-in types.
+
+record number-types (
+    bigint a,
+    # `bigint` stores an arbitrary integer.  Represented as a string in JSON.
+
+    decimal b,
+    # `decimal` stores an arbitrary real number.
+    # Represented as a string in JSON.
+
+    int32 c,
+    # `int32` stores a 32-bit signed integer.  Represented as a number in JSON.
+
+    int64 d,
+    # `int64` stores a 64-bit signed integer.  Represented as a number in JSON.
+
+    float32 e,
+    # `float32` stores a 32-bit signed floating number.
+    # Represented as a number in JSON.
+
+    float64 f,
+    # `float64` stores a 64-bit signed floating number.
+    # Represented as a number in JSON.
+);
+
+record string-types (
+    text a,
+    # `text` stores an arbitrary size of Unicode string.
+    # Represented as a string in JSON.
+
+    binary b,
+    # `binary` stores an arbitrary size of byte string.
+    # Represented as a base64 string in JSON.
+);
+
+record time-types (
+    date a,
+    # `date` stores a date assuming the Gregorian calendar.
+    # Represented as an ISO 8601 string in JSON.
+
+    datetime b,
+    # `datetime` stores a UTC date and time assuming the Gregorian calendar.
+    # Represented as an RFC 3339 string in JSON.
+);
+
+record et-cetera (
+    bool a,
+    # `bool` stores a boolean value.  Represented as `true`/`false` in JSON.
+
+    uuid b,
+    # `uuid` stores a UUID.  Represented as a string in JSON.
+
+    uri c,
+    # `uri` stores a URI.  Represented as a string in JSON.
+);
+
+record containers (
+    bigint? a,
+    # Option stores an any value of the specified type, or an empty state
+    # i.e. null, nil, none.  An empty state is represented as a `null` in JSON.
+
+    {bigint} b,
+    # Set stores an unordered set of unique elements.
+    # Represented as an array in JSON.
+
+    [bigint] c,
+    # List stores an ordered list of elements that some of them might be
+    # duplicated.  Represented as an array in JSON.
+
+    {text: bigint} d,
+    # Map stores a map of unique keys to values.
+    # Represented as an array of arrays in JSON e.g. `[[k, v], [k2, v2], ...]`.
+);
