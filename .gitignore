@@ -1,0 +1,6 @@
+.*.swp
+.cabal-sandbox
+.git
+.stack-work
+cabal.sandbox.config
+dist
