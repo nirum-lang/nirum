@@ -114,10 +114,11 @@ compileTypeDeclaration (TypeDeclaration (Name typename _) (Alias ctype) _) = do
 compileTypeDeclaration (TypeDeclaration typename (BoxedType itype) _) = do
     let facialName' = toText $ N.facialName typename
     itypeExpr <- compileTypeExpression itype
-    withThirdPartyImport "nirum.validate" "validate_boxed_type" $
-        withThirdPartyImport "nirum.serialize" "serialize_boxed_type" $
-            withThirdPartyImport "nirum.deserialize" "deserialize_boxed_type" $
-                return [qq|
+    withStandardImport "typing" $
+        withThirdPartyImport "nirum.validate" "validate_boxed_type" $
+            withThirdPartyImport "nirum.serialize" "serialize_boxed_type" $
+                withThirdPartyImport "nirum.deserialize" "deserialize_boxed_type" $
+                    return [qq|
 class $facialName':
     # TODO: docstring
 
@@ -170,8 +171,6 @@ $moduleCode
 compileModule :: Module -> Text
 compileModule module' =
     [qq|
-# FIXME
-import typing
 {imports $ standardImports code'}
 
 {fromImports $ localImports code'}
