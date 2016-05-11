@@ -18,7 +18,7 @@ main = do
     prog <- getProgName
     args <- getArgs
     case args of
-        inputFilename : outputFilename : [] -> do
+        [inputFilename, outputFilename] -> do
             result <- parseFile inputFilename
             case result of
                 Left error' -> putStrLn [qq|$prog: error: {showError error'}|]

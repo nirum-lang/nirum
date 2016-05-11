@@ -189,7 +189,7 @@ text = str
     imports importSet =
         if S.null importSet
         then ""
-        else "import " `append` (intercalate "," $ S.elems importSet)
+        else "import " `append` intercalate "," (S.elems importSet)
     fromImports :: M.Map Text (S.Set Text) -> Text
     fromImports importMap =
         intercalate "\n"
