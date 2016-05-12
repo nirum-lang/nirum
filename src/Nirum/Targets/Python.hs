@@ -26,7 +26,8 @@ import Nirum.Constructs.Identifier (toText)
 import Nirum.Constructs.Module (Module(Module, types))
 import Nirum.Constructs.Name (Name(Name))
 import qualified Nirum.Constructs.Name as N
-import Nirum.Constructs.TypeDeclaration ( Type(Alias, BoxedType, EnumType)
+import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
+                                        , Type(Alias, BoxedType, EnumType)
                                         , TypeDeclaration(TypeDeclaration)
                                         )
 import Nirum.Constructs.TypeExpression ( TypeExpression( ListModifier
@@ -147,13 +148,17 @@ class $facialName':
             type(self), self.value
         )
                 |]
-compileTypeDeclaration (TypeDeclaration typename (EnumType _) _) = do
+compileTypeDeclaration (TypeDeclaration typename (EnumType members) _) = do
     let Name facialName _ = typename
+        memberNames = intercalate "\n    "
+                                  [ [qq|{toText fn} = '{toText bn}'|]
+                                  | EnumMember (Name fn bn) _ <- toList members
+                                  ]
     withStandardImport "enum" $ return [qq|
-class $facialName(enum.Enum):
+class {toText facialName}(enum.Enum):
     # TODO: docstring
 
-    ...
+    $memberNames
     |]
 
 compileTypeDeclaration TypeDeclaration {} =
