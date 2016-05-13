@@ -207,32 +207,57 @@ class $className(enum.Enum):
         return cls(value.replace('-', '_'))  # FIXME: validate input
     |]
 compileTypeDeclaration (TypeDeclaration typename (RecordType fields) _) = do
-    let fieldNames = map nameToText $ [ name
-                                      |(Field name _ _) <- toList fields
-                                      ]
-    let initialArgs = intercalate ", " $ map fieldToargNameWithTypeVarText $ toList fields
-    let initialValues = intercalate "\n        " $ [ [qq|self.{name} = {name}|]
-                                                   | name <- fieldNames
-                                                   ]
+    typeExprCodes <- mapM compileTypeExpression $ [typeExpr | (Field _ typeExpr _) <- toList fields]
     let facialName' = nameToText typename
-    return [qq|
-class $facialName':
+        fieldNames = map nameToText $ [name |(Field name _ _) <- toList fields]
+        nameNTypes = zip fieldNames typeExprCodes
+        slotTypes =
+            createCodes (\(n, t) -> [qq|'{n}': {t}|]) nameNTypes ",\n        "
+        slots = createCodes (\n -> [qq|'{n}'|]) fieldNames ",\n        "
+        initialArgs = createCodes (\(n, t) -> [qq|{n}: {t}|]) nameNTypes ", "
+        initialValues =
+            createCodes (\n -> [qq|self.{n} = {n}|]) fieldNames "\n        "
+    withStandardImport "typing" $
+        withThirdPartyImport "nirum.validate" "validate_record_type" $
+            withThirdPartyImport "nirum.serialize" "serialize_record_type" $
+                withThirdPartyImport "nirum.deserialize" "deserialize_record_type" $
+                    return [qq|
+class {facialName'}:
     # TODO: docstring
 
-    __slots__ = ()
-    __slot_types = ()
+    __slots__ = (
+        $slots
+    )
+    __slot_types = \{
+        $slotTypes
+    \}
 
     def __init__(self, $initialArgs) -> None:
         $initialValues
+        validate_record_type(self)
 
     def __repr__(self) -> str:
-        return '\{0.__module__\}.\{0.__qualname__\}'.format(type(self))
-    |]
+        return '\{0.__module__\}.\{0.__qualname__\}(\{1\})'.format(
+            type(self),
+            ', '.join('\{\}=\{\}'.format(attr, getattr(self, attr))
+                      for attr in self.__slots__)
+        )
+
+    def __nirum_serialize__(self) -> typing.Mapping[str, typing.Any]:
+        return serialize_record_type(self)
+
+    @classmethod
+    def __nirum_deserialize__(
+        cls: type, **values
+    ) -> '{facialName'}':
+        return deserialize_record_type(cls, values)
+                    |]
   where
       nameToText :: Name -> Text
       nameToText = toText . N.facialName
-      fieldToargNameWithTypeVarText :: Field -> Text
-      fieldToargNameWithTypeVarText (Field name typeExpr _) = [qq|{nameToText name}: {code $ compileTypeExpression typeExpr}|]
+      createCodes :: (a -> Text) -> [a] -> Text -> Text
+      createCodes f traversable concatenator =
+          intercalate concatenator $ map f traversable
 
 compileTypeDeclaration TypeDeclaration {} =
     return "# TODO"
