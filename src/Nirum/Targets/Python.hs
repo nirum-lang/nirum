@@ -207,9 +207,10 @@ class $className(enum.Enum):
         return cls(value.replace('-', '_'))  # FIXME: validate input
     |]
 compileTypeDeclaration (TypeDeclaration typename (RecordType fields) _) = do
-    typeExprCodes <- mapM compileTypeExpression $ [typeExpr | (Field _ typeExpr _) <- toList fields]
+    typeExprCodes <- mapM compileTypeExpression
+        [typeExpr | (Field _ typeExpr _) <- toList fields]
     let facialName' = nameToText typename
-        fieldNames = map nameToText $ [name |(Field name _ _) <- toList fields]
+        fieldNames = map nameToText [name |(Field name _ _) <- toList fields]
         nameNTypes = zip fieldNames typeExprCodes
         slotTypes =
             createCodes (\(n, t) -> [qq|'{n}': {t}|]) nameNTypes ",\n        "
