@@ -33,8 +33,9 @@ import Text.Megaparsec.String (Parser)
 import Nirum.Constructs.DeclarationSet (DeclarationSet)
 import Nirum.Constructs.Module (Module(Module))
 import Nirum.Constructs.Name (Name(Name))
-import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
-                                        , Type(BoxedType, EnumType)
+import Nirum.Constructs.TypeDeclaration ( Field(Field)
+                                        , EnumMember(EnumMember)
+                                        , Type(BoxedType, RecordType)
                                         , TypeDeclaration(TypeDeclaration)
                                         )
 import Nirum.Constructs.TypeExpression ( TypeExpression( ListModifier
@@ -324,6 +325,22 @@ spec = do
                      \ EvaChar.soryu_asuka_langley"
             tT decl' "EvaChar.__nirum_deserialize__('soryu-asuka-langley') == \
                      \ EvaChar.soryu_asuka_langley"  -- to be robust
+        specify "record type" $ do
+            let fields = [ Field "left" "int" Nothing
+                         , Field "top" "int" Nothing
+                         ]
+                decl = TypeDeclaration "point" (RecordType fields) Nothing
+            tT decl "isinstance(point, type)"
+            tT decl "point(left=3, top=14).left == 3"
+            tT decl "point(left=3, top=14).top == 14"
+            tT decl "point(left=3, top=14) == point(left=3, top=14)"
+            tT decl "point(left=3, top=14) != point(left=3, top=15)"
+            tT decl "point(left=3, top=14) != point(left=4, top=14)"
+            tT decl "point(left=3, top=14) != point(left=4, top=15)"
+            tT decl [q|point(left=3, top=14).__nirum_serialize__() ==
+                       {'left': 3, 'top': 14}|]
+            tT decl [q|point.__nirum_deserialize__(left=3, top=14) ==
+                       point(left=3, top=14)|]
 
 {-# ANN module ("HLint: ignore Functor law" :: String) #-}
 {-# ANN module ("HLint: ignore Monad law, left identity" :: String) #-}
