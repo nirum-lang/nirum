@@ -258,7 +258,7 @@ class {facialName'}:
     def __nirum_deserialize__(
         cls: type, **values
     ) -> '{facialName'}':
-        return deserialize_record_type(cls, values)
+        return deserialize_record_type(cls, **values)
                     |]
   where
       nameToText :: Name -> Text
