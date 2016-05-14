@@ -1,8 +1,39 @@
-{-# LANGUAGE OverloadedLists, OverloadedStrings, ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedLists, OverloadedStrings, QuasiQuotes,
+             ScopedTypeVariables #-}
+{-|
+This unit test module optionally depends on Python interpreter.
+It internally tries to popen python3 executable, and import nirum Python
+package.  If any of these prerequisites are not satisfied, tests depending
+on Python interpreter are skipped instead of marked failed.
+
+To make Python interpreter possible to import nirum package, you need to
+install the nirum package to your Python site-packages using pip command.
+We recommend to install the package inside a virtualenv (pyvenv) and
+run this unit test in the virtualenv (pyvenv).  E.g.:
+
+> $ pyvenv env
+> $ . env/bin/activate
+> (env)$ pip install git+git://github.com/spoqa/nirum-python.git
+> (env)$ cabal test  # or: stack test
+-}
 module Nirum.Targets.PythonSpec where
 
-import Test.Hspec.Meta
+import Control.Monad (void, unless)
+import Data.Char (isSpace)
 
+import Data.List (dropWhileEnd)
+import qualified Data.Text as T
+import System.Info (os)
+import System.Process (readProcess)
+import Test.Hspec.Meta
+import Text.InterpolatedString.Perl6 (q, qq)
+import Text.Megaparsec (char, digitChar, runParser, some, space, string')
+import Text.Megaparsec.String (Parser)
+
+import Nirum.Constructs.Module (Module(Module))
+import Nirum.Constructs.TypeDeclaration ( Type(BoxedType)
+                                        , TypeDeclaration(TypeDeclaration)
+                                        )
 import Nirum.Constructs.TypeExpression ( TypeExpression( ListModifier
                                                        , MapModifier
                                                        , OptionModifier
@@ -16,6 +47,7 @@ import Nirum.Targets.Python ( CodeGen( code
                                      , standardImports
                                      , thirdPartyImports
                                      )
+                            , compileModule
                             , compileTypeExpression
                             , withLocalImport
                             , withPackage
@@ -25,6 +57,93 @@ import Nirum.Targets.Python ( CodeGen( code
 
 codeGen :: a -> CodeGen a
 codeGen = return
+
+windows :: Bool
+windows = os `elem` (["mingw32", "cygwin32", "win32"] :: [String])
+
+data PyVersion = PyVersion Int Int Int deriving (Eq, Ord, Show)
+
+isPythonInstalled :: IO Bool
+isPythonInstalled = do
+    pyExist <- readProcess which ["python3"] ""
+    return $ not $ all isSpace pyExist
+  where
+    which :: String
+    which = if windows then "where" else "which"
+
+getPythonVersion :: IO (Maybe PyVersion)
+getPythonVersion = do
+    installed <- isPythonInstalled
+    if installed then do
+        pyVersionStr <- readProcess "python3" ["-V"] ""
+        return $ case runParser pyVersionParser "<python3>" pyVersionStr of
+             Left _ -> Nothing
+             Right v -> Just v
+    else do
+        putStrLn "Python 3 seems not installed; skipping..."
+        return Nothing
+  where
+    pyVersionParser :: Parser PyVersion
+    pyVersionParser = do
+        void $ string' "python"
+        space
+        major <- integer
+        void $ char '.'
+        minor <- integer
+        void $ char '.'
+        micro <- integer
+        return $ PyVersion major minor micro
+    integer :: Parser Int
+    integer = do
+        digits <- some digitChar
+        return (read digits :: Int)
+
+runPython :: String -> IO (Maybe String)
+runPython code' = do
+    pyVerM <- getPythonVersion
+    case pyVerM of
+        Nothing -> do
+            putStrLn "Can't determine Python version; skipping..."
+            return Nothing
+        Just version ->
+            if version < PyVersion 3 3 0 then do
+                putStrLn "Python seems below 3.3; skipping..."
+                return Nothing
+            else do
+                result <- readProcess "python3" [] code'
+                return $ Just result
+
+testPython :: T.Text -> T.Text -> IO ()
+testPython defCode testCode = do
+    nirumPackageInstalledM <-
+        runPython [q|
+try: import nirum
+except ImportError: print('F')
+else: print('T')
+            |]
+    case nirumPackageInstalledM of
+        Just nirumPackageInstalled ->
+            case strip nirumPackageInstalled of
+                "T" -> do
+                    resultM <- runPython code'
+                    case resultM of
+                        Just result ->
+                            unless (strip result == "True") $
+                                expectationFailure $
+                                T.unpack ("Test failed: " `T.append` testCode)
+                        Nothing -> return ()
+                _ -> putStrLn "The nirum Python package cannot be imported; \
+                              \skipped..."
+        Nothing -> return ()
+  where
+    code' :: String
+    code' = [qq|$defCode
+
+if __name__ == '__main__':
+    print(bool($testCode))
+|]
+    strip :: String -> String
+    strip = dropWhile isSpace . dropWhileEnd isSpace
 
 spec :: Spec
 spec = do
@@ -134,6 +253,20 @@ spec = do
             localImports c'''' `shouldBe` []
             code c'''' `shouldBe` "typing.Mapping[uuid, text]"
             -- FIXME: typing.Mapping[uuid.UUID, str]
+
+    describe "compileModule" $ do
+        let tM module' = testPython $ compileModule module'
+            tT typeDecl = tM $ Module [typeDecl] Nothing
+        specify "boxed type" $ do
+            let decl = TypeDeclaration "offset" (BoxedType "float64") Nothing
+            tT decl "isinstance(offset, type)"
+            tT decl "offset(3.14).value == 3.14"
+            tT decl "offset(3.14) == offset(3.14)"
+            tT decl "offset(3.14) != offset(1.0)"
+            tT decl [q|{offset(3.14), offset(3.14), offset(1.0)} ==
+                       {offset(3.14), offset(1.0)}|]
+            tT decl "offset(3.14).__nirum_serialize__() == 3.14"
+            tT decl "offset.__nirum_deserialize__(3.14) == offset(3.14)"
 
 {-# ANN module ("HLint: ignore Functor law" :: String) #-}
 {-# ANN module ("HLint: ignore Monad law, left identity" :: String) #-}

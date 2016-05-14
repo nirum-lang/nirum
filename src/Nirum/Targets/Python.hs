@@ -164,7 +164,7 @@ class {toText facialName}(enum.Enum):
 compileTypeDeclaration TypeDeclaration {} =
     return "# TODO"
 
-compileModuleBody :: Module -> CodeGen Text
+compileModuleBody :: Module -> CodeGen Code
 compileModuleBody Module { types = types' } = do
     typeCodes <- mapM compileTypeDeclaration (toList types')
     let moduleCode = intercalate "\n\n" typeCodes
@@ -173,7 +173,7 @@ compileModuleBody Module { types = types' } = do
 $moduleCode
     |]
 
-compileModule :: Module -> Text
+compileModule :: Module -> Code
 compileModule module' =
     [qq|
 {imports $ standardImports code'}
