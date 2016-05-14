@@ -150,15 +150,23 @@ class $facialName':
                 |]
 compileTypeDeclaration (TypeDeclaration typename (EnumType members) _) = do
     let Name facialName _ = typename
+        facialName' = toText facialName
         memberNames = intercalate "\n    "
                                   [ [qq|{toText fn} = '{toText bn}'|]
                                   | EnumMember (Name fn bn) _ <- toList members
                                   ]
     withStandardImport "enum" $ return [qq|
-class {toText facialName}(enum.Enum):
+class $facialName'(enum.Enum):
     # TODO: docstring
 
     $memberNames
+
+    def __nirum_serialize__(self) -> str:
+        return self.value
+
+    @classmethod
+    def __nirum_deserialize__(cls: type, value: str) -> '{facialName'}':
+        return cls(value)  # FIXME: validate input
     |]
 
 compileTypeDeclaration TypeDeclaration {} =
