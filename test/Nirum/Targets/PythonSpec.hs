@@ -30,8 +30,11 @@ import Text.InterpolatedString.Perl6 (q, qq)
 import Text.Megaparsec (char, digitChar, runParser, some, space, string')
 import Text.Megaparsec.String (Parser)
 
+import Nirum.Constructs.DeclarationSet (DeclarationSet)
 import Nirum.Constructs.Module (Module(Module))
-import Nirum.Constructs.TypeDeclaration ( Type(BoxedType)
+import Nirum.Constructs.Name (Name(Name))
+import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
+                                        , Type(BoxedType, EnumType)
                                         , TypeDeclaration(TypeDeclaration)
                                         )
 import Nirum.Constructs.TypeExpression ( TypeExpression( ListModifier
@@ -267,6 +270,22 @@ spec = do
                        {offset(3.14), offset(1.0)}|]
             tT decl "offset(3.14).__nirum_serialize__() == 3.14"
             tT decl "offset.__nirum_deserialize__(3.14) == offset(3.14)"
+        specify "enum type" $ do
+            let members = [ "male"
+                          , EnumMember (Name "female" "yeoseong") Nothing
+                          ] :: DeclarationSet EnumMember
+                decl = TypeDeclaration "gender"
+                                       (EnumType members)
+                                       Nothing
+            tT decl "type(gender) is enum.EnumMeta"
+            tT decl "set(gender) == {gender.male, gender.female}"
+            tT decl "gender.male.value == 'male'"
+            tT decl "gender.female.value == 'yeoseong'"
+            tT decl "gender.__nirum_deserialize__('male') == gender.male"
+            tT decl "gender.__nirum_deserialize__('yeoseong') == gender.female"
+            -- TODO: test deserializer with invalid input
+            tT decl "gender.male.__nirum_serialize__() == 'male'"
+            tT decl "gender.female.__nirum_serialize__() == 'yeoseong'"
 
 {-# ANN module ("HLint: ignore Functor law" :: String) #-}
 {-# ANN module ("HLint: ignore Monad law, left identity" :: String) #-}
