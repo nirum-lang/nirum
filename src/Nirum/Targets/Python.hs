@@ -10,6 +10,8 @@ module Nirum.Targets.Python ( Code
                             , compileModule
                             , compileTypeDeclaration
                             , compileTypeExpression
+                            , toAttributeName
+                            , toClassName
                             , withLocalImport
                             , withPackage
                             , withStandardImport
@@ -22,7 +24,10 @@ import qualified Data.Text as T
 import Text.InterpolatedString.Perl6 (qq)
 
 import Nirum.Constructs.DeclarationSet (toList)
-import Nirum.Constructs.Identifier (toText)
+import Nirum.Constructs.Identifier ( Identifier
+                                   , toPascalCaseText
+                                   , toSnakeCaseText
+                                   )
 import Nirum.Constructs.Module (Module(Module, types))
 import Nirum.Constructs.Name (Name(Name))
 import qualified Nirum.Constructs.Name as N
@@ -86,8 +91,39 @@ withLocalImport :: T.Text -> T.Text -> CodeGen a -> CodeGen a
 withLocalImport module' object c@CodeGen { localImports = li } =
     c { localImports = M.insertWith S.union module' [object] li }
 
+-- | The set of Python reserved keywords.
+-- See also: https://docs.python.org/3/reference/lexical_analysis.html#keywords
+keywords :: S.Set T.Text
+keywords = [ "False", "None", "True"
+           , "and", "as", "assert", "break", "class", "continue"
+           , "def", "del" , "elif", "else", "except", "finally"
+           , "for", "from", "global", "if", "import", "in", "is"
+           , "lambda", "nonlocal", "not", "or", "pass", "raise"
+           , "return", "try", "while", "with", "yield"
+           ]
+
+toClassName :: Identifier -> T.Text
+toClassName identifier =
+    if className `S.member` keywords then className `T.snoc` '_' else className
+  where
+    className :: T.Text
+    className = toPascalCaseText identifier
+
+toClassName' :: Name -> T.Text
+toClassName' = toClassName . N.facialName
+
+toAttributeName :: Identifier -> T.Text
+toAttributeName identifier =
+    if attrName `S.member` keywords then attrName `T.snoc` '_' else attrName
+  where
+    attrName :: T.Text
+    attrName = toSnakeCaseText identifier
+
+toAttributeName' :: Name -> T.Text
+toAttributeName' = toAttributeName . N.facialName
+
 compileTypeExpression :: TypeExpression -> CodeGen Code
-compileTypeExpression (TypeIdentifier i) = return $ toText i
+compileTypeExpression (TypeIdentifier i) = return $ toClassName i
 compileTypeExpression (MapModifier k v) = do
     kExpr <- compileTypeExpression k
     vExpr <- compileTypeExpression v
@@ -106,21 +142,21 @@ compileTypeExpression modifier = do
         MapModifier _ _ -> undefined  -- never happen!
 
 compileTypeDeclaration :: TypeDeclaration -> CodeGen Code
-compileTypeDeclaration (TypeDeclaration (Name typename _) (Alias ctype) _) = do
+compileTypeDeclaration (TypeDeclaration typename (Alias ctype) _) = do
     ctypeExpr <- compileTypeExpression ctype
     return [qq|
         # TODO: docstring
-        $typename = $ctypeExpr
+        {toClassName' typename} = $ctypeExpr
     |]
 compileTypeDeclaration (TypeDeclaration typename (BoxedType itype) _) = do
-    let facialName' = toText $ N.facialName typename
+    let className = toClassName' typename
     itypeExpr <- compileTypeExpression itype
     withStandardImport "typing" $
         withThirdPartyImport "nirum.validate" "validate_boxed_type" $
             withThirdPartyImport "nirum.serialize" "serialize_boxed_type" $
                 withThirdPartyImport "nirum.deserialize" "deserialize_boxed_type" $
                     return [qq|
-class $facialName':
+class $className:
     # TODO: docstring
 
     def __init__(self, value: $itypeExpr) -> None:
@@ -128,7 +164,7 @@ class $facialName':
         self.value = value  # type: $itypeExpr
 
     def __eq__(self, other) -> bool:
-        return (isinstance(other, $facialName') and
+        return (isinstance(other, $className) and
                 self.value == other.value)
 
     def __hash__(self) -> int:
@@ -140,7 +176,7 @@ class $facialName':
     @classmethod
     def __nirum_deserialize__(
         cls: type, value: typing.Mapping[str, typing.Any]
-    ) -> '{facialName'}':
+    ) -> '{className}':
         return deserialize_boxed_type(cls, value)
 
     def __repr__(self) -> str:
@@ -149,15 +185,14 @@ class $facialName':
         )
                 |]
 compileTypeDeclaration (TypeDeclaration typename (EnumType members) _) = do
-    let Name facialName _ = typename
-        facialName' = toText facialName
+    let className = toClassName' typename
         memberNames = T.intercalate
             "\n    "
-            [ [qq|{toText fn} = '{toText bn}'|]
-            | EnumMember (Name fn bn) _ <- toList members
+            [ [qq|{toAttributeName' memberName} = '{toSnakeCaseText bn}'|]
+            | EnumMember memberName@(Name _ bn) _ <- toList members
             ]
     withStandardImport "enum" $ return [qq|
-class $facialName'(enum.Enum):
+class $className(enum.Enum):
     # TODO: docstring
 
     $memberNames
@@ -166,8 +201,8 @@ class $facialName'(enum.Enum):
         return self.value
 
     @classmethod
-    def __nirum_deserialize__(cls: type, value: str) -> '{facialName'}':
-        return cls(value)  # FIXME: validate input
+    def __nirum_deserialize__(cls: type, value: str) -> '{className}':
+        return cls(value.replace('-', '_'))  # FIXME: validate input
     |]
 
 compileTypeDeclaration TypeDeclaration {} =
@@ -191,8 +226,8 @@ compileModule module' =
 
 {fromImports $ thirdPartyImports code'}
 
-float64 = float  # FIXME
-text = str
+Float64 = float  # FIXME
+Text = str
 
 {code code'}
     |]
@@ -203,10 +238,10 @@ text = str
     imports importSet =
         if S.null importSet
         then ""
-        else "import " `T.append` T.intersperse ',' (S.elems importSet)
+        else "import " `T.append` T.intercalate "," (S.elems importSet)
     fromImports :: M.Map T.Text (S.Set T.Text) -> T.Text
     fromImports importMap =
-        T.intersperse '\n'
+        T.intercalate "\n"
             [ [qq|from $from import {T.intercalate ", " $ S.elems vars}|]
             | (from, vars) <- M.assocs importMap
             ]

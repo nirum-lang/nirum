@@ -45,6 +45,26 @@ It's represented in JSON to:
     }
 
 
+Identifier normalization
+------------------------
+
+Every identifiers (e.g. behind names) has to be normalized in JSON
+representation.  Although we recommend to use hyphens to separate words
+when declare names in Nirum code, these hyphens must be replaced by underscores
+in JSON.  The following are normalization rules:
+
+ -  Use lowercase alphabets instead of uppercases.
+ -  Use underscores instead of hyphens.
+    This rule may help to implement a runtime library for programming languages
+    disallowing hyphens for identifiers.
+
+Although all serializers must to normalize names when they serialize Nirum
+objects, we recommend deserializers to accept denormalized names as well
+to follow a [general principle of robustness][1].
+
+[1]: https://en.wikipedia.org/wiki/Robustness_principle
+
+
 Enum type
 ---------
 

@@ -52,6 +52,8 @@ import Nirum.Targets.Python ( CodeGen( code
                                      )
                             , compileModule
                             , compileTypeExpression
+                            , toAttributeName
+                            , toClassName
                             , withLocalImport
                             , withPackage
                             , withStandardImport
@@ -227,65 +229,101 @@ spec = do
             packages c `shouldBe` []
             standardImports c `shouldBe` []
             localImports c `shouldBe` []
-            code c `shouldBe` "bigint"  -- FIXME: numbers.Integral
+            code c `shouldBe` "Bigint"  -- FIXME: numbers.Integral
         specify "OptionModifier" $ do
             let c' = compileTypeExpression (OptionModifier "text")
             packages c' `shouldBe` []
             standardImports c' `shouldBe` ["typing"]
             localImports c' `shouldBe` []
-            code c' `shouldBe` "typing.Optional[text]"
+            code c' `shouldBe` "typing.Optional[Text]"
             -- FIXME: typing.Optional[str]
         specify "SetModifier" $ do
             let c'' = compileTypeExpression (SetModifier "text")
             packages c'' `shouldBe` []
             standardImports c'' `shouldBe` ["typing"]
             localImports c'' `shouldBe` []
-            code c'' `shouldBe` "typing.AbstractSet[text]"
+            code c'' `shouldBe` "typing.AbstractSet[Text]"
             -- FIXME: typing.AbstractSet[str]
         specify "ListModifier" $ do
             let c''' = compileTypeExpression (ListModifier "text")
             packages c''' `shouldBe` []
             standardImports c''' `shouldBe` ["typing"]
             localImports c''' `shouldBe` []
-            code c''' `shouldBe` "typing.Sequence[text]"
+            code c''' `shouldBe` "typing.Sequence[Text]"
             -- FIXME: typing.Sequence[str]
         specify "MapModifier" $ do
             let c'''' = compileTypeExpression (MapModifier "uuid" "text")
             packages c'''' `shouldBe` []
             standardImports c'''' `shouldBe` ["typing"]
             localImports c'''' `shouldBe` []
-            code c'''' `shouldBe` "typing.Mapping[uuid, text]"
+            code c'''' `shouldBe` "typing.Mapping[Uuid, Text]"
             -- FIXME: typing.Mapping[uuid.UUID, str]
+
+    describe "toClassName" $ do
+        it "transform the facial name of the argument into PascalCase" $ do
+            toClassName "test" `shouldBe` "Test"
+            toClassName "hello-world" `shouldBe` "HelloWorld"
+        it "appends an underscore to the result if it's a reserved keyword" $ do
+            toClassName "true" `shouldBe` "True_"
+            toClassName "false" `shouldBe` "False_"
+            toClassName "none" `shouldBe` "None_"
+
+    describe "toAttributeName" $ do
+        it "transform the facial name of the argument into snake_case" $ do
+            toAttributeName "test" `shouldBe` "test"
+            toAttributeName "hello-world" `shouldBe` "hello_world"
+        it "appends an underscore to the result if it's a reserved keyword" $ do
+            toAttributeName "def" `shouldBe` "def_"
+            toAttributeName "lambda" `shouldBe` "lambda_"
+            toAttributeName "nonlocal" `shouldBe` "nonlocal_"
 
     describe "compileModule" $ do
         let tM module' = testPython $ compileModule module'
             tT typeDecl = tM $ Module [typeDecl] Nothing
         specify "boxed type" $ do
-            let decl = TypeDeclaration "offset" (BoxedType "float64") Nothing
-            tT decl "isinstance(offset, type)"
-            tT decl "offset(3.14).value == 3.14"
-            tT decl "offset(3.14) == offset(3.14)"
-            tT decl "offset(3.14) != offset(1.0)"
-            tT decl [q|{offset(3.14), offset(3.14), offset(1.0)} ==
-                       {offset(3.14), offset(1.0)}|]
-            tT decl "offset(3.14).__nirum_serialize__() == 3.14"
-            tT decl "offset.__nirum_deserialize__(3.14) == offset(3.14)"
+            let decl = TypeDeclaration "float-box" (BoxedType "float64") Nothing
+            tT decl "isinstance(FloatBox, type)"
+            tT decl "FloatBox(3.14).value == 3.14"
+            tT decl "FloatBox(3.14) == FloatBox(3.14)"
+            tT decl "FloatBox(3.14) != FloatBox(1.0)"
+            tT decl [q|{FloatBox(3.14), FloatBox(3.14), FloatBox(1.0)} ==
+                       {FloatBox(3.14), FloatBox(1.0)}|]
+            tT decl "FloatBox(3.14).__nirum_serialize__() == 3.14"
+            tT decl "FloatBox.__nirum_deserialize__(3.14) == FloatBox(3.14)"
         specify "enum type" $ do
             let members = [ "male"
                           , EnumMember (Name "female" "yeoseong") Nothing
                           ] :: DeclarationSet EnumMember
-                decl = TypeDeclaration "gender"
-                                       (EnumType members)
-                                       Nothing
-            tT decl "type(gender) is enum.EnumMeta"
-            tT decl "set(gender) == {gender.male, gender.female}"
-            tT decl "gender.male.value == 'male'"
-            tT decl "gender.female.value == 'yeoseong'"
-            tT decl "gender.__nirum_deserialize__('male') == gender.male"
-            tT decl "gender.__nirum_deserialize__('yeoseong') == gender.female"
+                decl = TypeDeclaration "gender" (EnumType members) Nothing
+            tT decl "type(Gender) is enum.EnumMeta"
+            tT decl "set(Gender) == {Gender.male, Gender.female}"
+            tT decl "Gender.male.value == 'male'"
+            tT decl "Gender.female.value == 'yeoseong'"
+            tT decl "Gender.__nirum_deserialize__('male') == Gender.male"
+            tT decl "Gender.__nirum_deserialize__('yeoseong') == Gender.female"
             -- TODO: test deserializer with invalid input
-            tT decl "gender.male.__nirum_serialize__() == 'male'"
-            tT decl "gender.female.__nirum_serialize__() == 'yeoseong'"
+            tT decl "Gender.male.__nirum_serialize__() == 'male'"
+            tT decl "Gender.female.__nirum_serialize__() == 'yeoseong'"
+            let members' = [ "soryu-asuka-langley"
+                           , "ayanami-rei"
+                           , "ikari-shinji"
+                           , "katsuragi-misato"
+                           , "nagisa-kaworu"
+                           ] :: DeclarationSet EnumMember
+                decl' = TypeDeclaration "eva-char" (EnumType members') Nothing
+            tT decl' "type(EvaChar) is enum.EnumMeta"
+            tT decl' "set(EvaChar) == {EvaChar.soryu_asuka_langley, \
+                                     \ EvaChar.ayanami_rei, \
+                                     \ EvaChar.ikari_shinji, \
+                                     \ EvaChar.katsuragi_misato, \
+                                     \ EvaChar.nagisa_kaworu}"
+            tT decl' "EvaChar.soryu_asuka_langley.value=='soryu_asuka_langley'"
+            tT decl' "EvaChar.soryu_asuka_langley.__nirum_serialize__() == \
+                     \ 'soryu_asuka_langley'"
+            tT decl' "EvaChar.__nirum_deserialize__('soryu_asuka_langley') == \
+                     \ EvaChar.soryu_asuka_langley"
+            tT decl' "EvaChar.__nirum_deserialize__('soryu-asuka-langley') == \
+                     \ EvaChar.soryu_asuka_langley"  -- to be robust
 
 {-# ANN module ("HLint: ignore Functor law" :: String) #-}
 {-# ANN module ("HLint: ignore Monad law, left identity" :: String) #-}
