@@ -18,7 +18,7 @@ module Nirum.Targets.Python ( Code
 
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
-import Data.Text (Text, intercalate, append)
+import qualified Data.Text as T
 import Text.InterpolatedString.Perl6 (qq)
 
 import Nirum.Constructs.DeclarationSet (toList)
@@ -38,12 +38,12 @@ import Nirum.Constructs.TypeExpression ( TypeExpression( ListModifier
                                                        )
                                        )
 
-type Code = Text
+type Code = T.Text
 
-data CodeGen a = CodeGen { packages :: S.Set Text
-                         , standardImports :: S.Set Text
-                         , thirdPartyImports :: M.Map Text (S.Set Text)
-                         , localImports :: M.Map Text (S.Set Text)
+data CodeGen a = CodeGen { packages :: S.Set T.Text
+                         , standardImports :: S.Set T.Text
+                         , thirdPartyImports :: M.Map T.Text (S.Set T.Text)
+                         , localImports :: M.Map T.Text (S.Set T.Text)
                          , code :: a
                          } deriving (Eq, Ord, Show)
 
@@ -70,19 +70,19 @@ instance Monad CodeGen where
         thirdPartyImports' = M.unionWith S.union ti ti'
         localImports' = M.unionWith S.union li li'
 
-withPackage :: Text -> CodeGen a -> CodeGen a
+withPackage :: T.Text -> CodeGen a -> CodeGen a
 withPackage package c@CodeGen { packages = p } =
     c { packages = S.insert package p }
 
-withStandardImport :: Text -> CodeGen a -> CodeGen a
+withStandardImport :: T.Text -> CodeGen a -> CodeGen a
 withStandardImport module' c@CodeGen { standardImports = si } =
     c { standardImports = S.insert module' si }
 
-withThirdPartyImport :: Text -> Text -> CodeGen a -> CodeGen a
+withThirdPartyImport :: T.Text -> T.Text -> CodeGen a -> CodeGen a
 withThirdPartyImport module' object c@CodeGen { thirdPartyImports = ti } =
     c { thirdPartyImports = M.insertWith S.union module' [object] ti }
 
-withLocalImport :: Text -> Text -> CodeGen a -> CodeGen a
+withLocalImport :: T.Text -> T.Text -> CodeGen a -> CodeGen a
 withLocalImport module' object c@CodeGen { localImports = li } =
     c { localImports = M.insertWith S.union module' [object] li }
 
@@ -97,7 +97,7 @@ compileTypeExpression modifier = do
     withStandardImport "typing" $ return [qq|typing.$className[$expr]|]
   where
     typeExpr :: TypeExpression
-    className :: Text
+    className :: T.Text
     (typeExpr, className) = case modifier of
         OptionModifier t' -> (t', "Optional")
         SetModifier t' -> (t', "AbstractSet")
@@ -151,10 +151,11 @@ class $facialName':
 compileTypeDeclaration (TypeDeclaration typename (EnumType members) _) = do
     let Name facialName _ = typename
         facialName' = toText facialName
-        memberNames = intercalate "\n    "
-                                  [ [qq|{toText fn} = '{toText bn}'|]
-                                  | EnumMember (Name fn bn) _ <- toList members
-                                  ]
+        memberNames = T.intercalate
+            "\n    "
+            [ [qq|{toText fn} = '{toText bn}'|]
+            | EnumMember (Name fn bn) _ <- toList members
+            ]
     withStandardImport "enum" $ return [qq|
 class $facialName'(enum.Enum):
     # TODO: docstring
@@ -175,7 +176,7 @@ compileTypeDeclaration TypeDeclaration {} =
 compileModuleBody :: Module -> CodeGen Code
 compileModuleBody Module { types = types' } = do
     typeCodes <- mapM compileTypeDeclaration (toList types')
-    let moduleCode = intercalate "\n\n" typeCodes
+    let moduleCode = T.intercalate "\n\n" typeCodes
     return [qq|
 # TODO: docs
 $moduleCode
@@ -196,16 +197,16 @@ text = str
 {code code'}
     |]
   where
-    code' :: CodeGen Text
+    code' :: CodeGen T.Text
     code' = compileModuleBody module'
-    imports :: S.Set Text -> Text
+    imports :: S.Set T.Text -> T.Text
     imports importSet =
         if S.null importSet
         then ""
-        else "import " `append` intercalate "," (S.elems importSet)
-    fromImports :: M.Map Text (S.Set Text) -> Text
+        else "import " `T.append` T.intersperse ',' (S.elems importSet)
+    fromImports :: M.Map T.Text (S.Set T.Text) -> T.Text
     fromImports importMap =
-        intercalate "\n"
-            [ [qq|from $from import {intercalate ", " $ S.elems vars}|]
+        T.intersperse '\n'
+            [ [qq|from $from import {T.intercalate ", " $ S.elems vars}|]
             | (from, vars) <- M.assocs importMap
             ]
