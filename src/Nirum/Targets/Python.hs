@@ -295,6 +295,7 @@ compileModule module' =
 {fromImports $ thirdPartyImports code'}
 
 Float64 = float  # FIXME
+Bigint = int
 Text = str
 
 {code code'}

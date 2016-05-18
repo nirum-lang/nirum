@@ -328,21 +328,21 @@ spec = do
             tT decl' "EvaChar.__nirum_deserialize__('soryu-asuka-langley') == \
                      \ EvaChar.soryu_asuka_langley"  -- to be robust
         specify "record type" $ do
-            let fields = [ Field "left" "int" Nothing
-                         , Field "top" "int" Nothing
+            let fields = [ Field "left" "bigint" Nothing
+                         , Field "top" "bigint" Nothing
                          ]
                 decl = TypeDeclaration "point" (RecordType fields) Nothing
-            tT decl "isinstance(point, type)"
-            tT decl "point(left=3, top=14).left == 3"
-            tT decl "point(left=3, top=14).top == 14"
-            tT decl "point(left=3, top=14) == point(left=3, top=14)"
-            tT decl "point(left=3, top=14) != point(left=3, top=15)"
-            tT decl "point(left=3, top=14) != point(left=4, top=14)"
-            tT decl "point(left=3, top=14) != point(left=4, top=15)"
-            tT decl [q|point(left=3, top=14).__nirum_serialize__() ==
+            tT decl "isinstance(Point, type)"
+            tT decl "Point(left=3, top=14).left == 3"
+            tT decl "Point(left=3, top=14).top == 14"
+            tT decl "Point(left=3, top=14) == Point(left=3, top=14)"
+            tT decl "Point(left=3, top=14) != Point(left=3, top=15)"
+            tT decl "Point(left=3, top=14) != Point(left=4, top=14)"
+            tT decl "Point(left=3, top=14) != Point(left=4, top=15)"
+            tT decl [q|Point(left=3, top=14).__nirum_serialize__() ==
                        {'left': 3, 'top': 14}|]
-            tT decl [q|point.__nirum_deserialize__(left=3, top=14) ==
-                       point(left=3, top=14)|]
+            tT decl [q|Point.__nirum_deserialize__(left=3, top=14) ==
+                       Point(left=3, top=14)|]
 
 {-# ANN module ("HLint: ignore Functor law" :: String) #-}
 {-# ANN module ("HLint: ignore Monad law, left identity" :: String) #-}
