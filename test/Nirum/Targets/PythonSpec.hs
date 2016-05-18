@@ -35,7 +35,7 @@ import Nirum.Constructs.Module (Module(Module))
 import Nirum.Constructs.Name (Name(Name))
 import Nirum.Constructs.TypeDeclaration ( Field(Field)
                                         , EnumMember(EnumMember)
-                                        , Type(BoxedType, RecordType)
+                                        , Type(BoxedType, EnumType, RecordType)
                                         , TypeDeclaration(TypeDeclaration)
                                         )
 import Nirum.Constructs.TypeExpression ( TypeExpression( ListModifier
@@ -58,7 +58,7 @@ import Nirum.Targets.Python ( CodeGen( code
                             , withLocalImport
                             , withPackage
                             , withStandardImport
-                            , withThirdPartyImport
+                            , withThirdPartyImports
                             )
 
 codeGen :: a -> CodeGen a
@@ -195,13 +195,15 @@ spec = do
                 let (c :: CodeGen Int) = do
                         a <- withStandardImport "sys" cg
                         b <- withPackage "nirum" cg
-                        c' <- withThirdPartyImport "nirum"
-                                                   "serialize_boxed_type" cg
+                        c' <- withThirdPartyImports
+                            [("nirum", ["serialize_boxed_type"])]
+                            cg
                         d <- withLocalImport ".." "Gender" cg
                         e <- withStandardImport "os" cg
                         f'' <- withPackage "nirum" cg
-                        g'' <- withThirdPartyImport "nirum"
-                                                    "serialize_enum_type" cg
+                        g'' <- withThirdPartyImports
+                            [("nirum", ["serialize_enum_type"])]
+                            cg
                         h'' <- withLocalImport ".." "Path" cg
                         return $ sum ([a, b, c', d, e, f'', g'', h''] :: [Int])
                 packages c `shouldBe` ["nirum"]

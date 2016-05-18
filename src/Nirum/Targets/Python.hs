@@ -15,9 +15,10 @@ module Nirum.Targets.Python ( Code
                             , withLocalImport
                             , withPackage
                             , withStandardImport
-                            , withThirdPartyImport
+                            , withThirdPartyImports
                             ) where
 
+import qualified Data.List as L
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -85,9 +86,12 @@ withStandardImport :: T.Text -> CodeGen a -> CodeGen a
 withStandardImport module' c@CodeGen { standardImports = si } =
     c { standardImports = S.insert module' si }
 
-withThirdPartyImport :: T.Text -> T.Text -> CodeGen a -> CodeGen a
-withThirdPartyImport module' object c@CodeGen { thirdPartyImports = ti } =
-    c { thirdPartyImports = M.insertWith S.union module' [object] ti }
+withThirdPartyImports :: [(T.Text, S.Set T.Text)] -> CodeGen a -> CodeGen a
+withThirdPartyImports imports c@CodeGen { thirdPartyImports = ti } =
+    c { thirdPartyImports = L.foldl (M.unionWith S.union) ti importList }
+  where
+    importList :: [M.Map T.Text (S.Set T.Text)]
+    importList = map (uncurry M.singleton) imports
 
 withLocalImport :: T.Text -> T.Text -> CodeGen a -> CodeGen a
 withLocalImport module' object c@CodeGen { localImports = li } =
@@ -154,10 +158,11 @@ compileTypeDeclaration (TypeDeclaration typename (BoxedType itype) _) = do
     let className = toClassName' typename
     itypeExpr <- compileTypeExpression itype
     withStandardImport "typing" $
-        withThirdPartyImport "nirum.validate" "validate_boxed_type" $
-            withThirdPartyImport "nirum.serialize" "serialize_boxed_type" $
-                withThirdPartyImport "nirum.deserialize" "deserialize_boxed_type" $
-                    return [qq|
+        withThirdPartyImports [ ("nirum.validate", ["validate_boxed_type"])
+                              , ("nirum.serialize", ["serialize_boxed_type"])
+                              , ("nirum.deserialize", ["deserialize_boxed_type"])
+                              ] $
+            return [qq|
 class $className:
     # TODO: docstring
 
@@ -185,7 +190,7 @@ class $className:
         return '\{0.__module__\}.\{0.__qualname__\}(\{1!r\})'.format(
             type(self), self.value
         )
-                |]
+            |]
 compileTypeDeclaration (TypeDeclaration typename (EnumType members) _) = do
     let className = toClassName' typename
         memberNames = T.intercalate
@@ -209,8 +214,10 @@ class $className(enum.Enum):
 compileTypeDeclaration (TypeDeclaration typename (RecordType fields) _) = do
     typeExprCodes <- mapM compileTypeExpression
         [typeExpr | (Field _ typeExpr _) <- toList fields]
-    let facialName' = nameToText typename
-        fieldNames = map nameToText [name |(Field name _ _) <- toList fields]
+    let className = toClassName' typename
+        fieldNames = map toAttributeName' [ name
+                                          | (Field name _ _) <- toList fields
+                                          ]
         nameNTypes = zip fieldNames typeExprCodes
         slotTypes =
             createCodes (\(n, t) -> [qq|'{n}': {t}|]) nameNTypes ",\n        "
@@ -219,11 +226,12 @@ compileTypeDeclaration (TypeDeclaration typename (RecordType fields) _) = do
         initialValues =
             createCodes (\n -> [qq|self.{n} = {n}|]) fieldNames "\n        "
     withStandardImport "typing" $
-        withThirdPartyImport "nirum.validate" "validate_record_type" $
-            withThirdPartyImport "nirum.serialize" "serialize_record_type" $
-                withThirdPartyImport "nirum.deserialize" "deserialize_record_type" $
-                    return [qq|
-class {facialName'}:
+        withThirdPartyImports [ ("nirum.validate", ["validate_record_type"])
+                              , ("nirum.serialize", ["serialize_record_type"])
+                              , ("nirum.deserialize", ["deserialize_record_type"])
+                              ] $
+            return [qq|
+class $className:
     # TODO: docstring
 
     __slots__ = (
@@ -249,7 +257,7 @@ class {facialName'}:
             getattr(self, attr) == getattr(other, attr)
             for attr in self.__slots__
         )
-        return isinstance(other, $facialName') and attr_matched
+        return isinstance(other, $className) and attr_matched
 
     def __nirum_serialize__(self) -> typing.Mapping[str, typing.Any]:
         return serialize_record_type(self)
@@ -257,15 +265,13 @@ class {facialName'}:
     @classmethod
     def __nirum_deserialize__(
         cls: type, **values
-    ) -> '{facialName'}':
+    ) -> '{className}':
         return deserialize_record_type(cls, **values)
-                    |]
+                        |]
   where
-      nameToText :: Name -> Text
-      nameToText = toText . N.facialName
-      createCodes :: (a -> Text) -> [a] -> Text -> Text
+      createCodes :: (a -> T.Text) -> [a] -> T.Text -> T.Text
       createCodes f traversable concatenator =
-          intercalate concatenator $ map f traversable
+          T.intercalate concatenator $ map f traversable
 
 compileTypeDeclaration TypeDeclaration {} =
     return "# TODO"
