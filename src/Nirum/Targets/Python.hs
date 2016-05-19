@@ -225,10 +225,16 @@ compileTypeDeclaration (TypeDeclaration typename (RecordType fields) _) = do
         initialArgs = createCodes (\(n, t) -> [qq|{n}: {t}|]) nameNTypes ", "
         initialValues =
             createCodes (\n -> [qq|self.{n} = {n}|]) fieldNames "\n        "
+        nameMaps =
+            createCodes
+                (\(Name f b) -> [qq|('{toAttributeName f}', '{toSnakeCaseText b}')|])
+                [name | Field name _ _ <- toList fields, N.isComplex name]
+                ",\n        "
     withStandardImport "typing" $
         withThirdPartyImports [ ("nirum.validate", ["validate_record_type"])
                               , ("nirum.serialize", ["serialize_record_type"])
                               , ("nirum.deserialize", ["deserialize_record_type"])
+                              , ("nirum.types", ["NameDict"])
                               ] $
             return [qq|
 class $className:
@@ -237,9 +243,13 @@ class $className:
     __slots__ = (
         $slots
     )
-    __slot_types = \{
+    __nirum_record_behind_name__ = '{toSnakeCaseText $ N.behindName typename}'
+    __nirum_field_types__ = \{
         $slotTypes
     \}
+    __nirum_field_names__ = NameDict([
+        $nameMaps
+    ])
 
     def __init__(self, $initialArgs) -> None:
         $initialValues

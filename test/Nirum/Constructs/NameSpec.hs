@@ -3,7 +3,7 @@ module Nirum.Constructs.NameSpec where
 
 import Test.Hspec.Meta
 
-import Nirum.Constructs.Name (Name(Name), toCode)
+import Nirum.Constructs.Name (Name(Name), isComplex, isSimple, toCode)
 
 spec :: Spec
 spec =
@@ -15,3 +15,9 @@ spec =
                 toCode (Name "a" "b") `shouldBe` "a/b"
         specify "fromString" $
             ("foo" :: Name) `shouldBe` Name "foo" "foo"
+        specify "isSimple" $ do
+            Name "foo" "foo" `shouldSatisfy` isSimple
+            Name "foo" "bar" `shouldNotSatisfy` isSimple
+        specify "isComplex" $ do
+            Name "foo" "bar" `shouldSatisfy` isComplex
+            Name "foo" "foo" `shouldNotSatisfy` isComplex
