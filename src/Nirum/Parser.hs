@@ -194,7 +194,8 @@ boxedTypeDeclaration :: Parser TypeDeclaration
 boxedTypeDeclaration = do
     string' "boxed" <?> "boxed type keyword"
     spaces
-    typename <- name <?> "boxed type name"
+    typename <- identifier <?> "boxed type name"
+    let name' = Name typename typename
     spaces
     char '('
     spaces
@@ -204,7 +205,7 @@ boxedTypeDeclaration = do
     spaces
     char ';'
     docs' <- optional $ try $ spaces >> (docs <?> "boed type docs")
-    return $ TypeDeclaration typename (BoxedType innerType) docs'
+    return $ TypeDeclaration name' (BoxedType innerType) docs'
 
 enumMember :: Parser EnumMember
 enumMember = do

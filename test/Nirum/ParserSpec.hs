@@ -300,7 +300,7 @@ spec = do
             expectError "type path/error = text;" 1 10
 
     descTypeDecl "boxedTypeDeclaration" P.boxedTypeDeclaration $ \helpers -> do
-        let (parse', _) = helpers
+        let (parse', expectError) = helpers
         it "emits (TypeDeclaration (BoxedType ...)) if succeeded to parse" $ do
             parse' "boxed offset (float64);" `shouldBe`
                 Right (TypeDeclaration "offset" (BoxedType "float64") Nothing)
@@ -310,6 +310,8 @@ spec = do
             parse' "boxed offset (float64);\n# docs\n# docs..." `shouldBe`
                 Right (TypeDeclaration "offset" (BoxedType "float64") $
                                        Just $ Docs "docs\ndocs...\n")
+        it "cannot have behind name" $
+            expectError "boxed offset/behind (float64);" 1 13
 
     descTypeDecl "enumTypeDeclaration" P.enumTypeDeclaration $ \helpers -> do
         let (parse', expectError) = helpers
