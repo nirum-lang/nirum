@@ -15,9 +15,10 @@ module Nirum.Targets.Python ( Code
                             , withLocalImport
                             , withPackage
                             , withStandardImport
-                            , withThirdPartyImport
+                            , withThirdPartyImports
                             ) where
 
+import qualified Data.List as L
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -32,7 +33,9 @@ import Nirum.Constructs.Module (Module(Module, types))
 import Nirum.Constructs.Name (Name(Name))
 import qualified Nirum.Constructs.Name as N
 import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
-                                        , Type(Alias, BoxedType, EnumType)
+                                        , Field(Field)
+                                        , Type(Alias, BoxedType, EnumType,
+                                               RecordType)
                                         , TypeDeclaration(TypeDeclaration)
                                         )
 import Nirum.Constructs.TypeExpression ( TypeExpression( ListModifier
@@ -83,9 +86,12 @@ withStandardImport :: T.Text -> CodeGen a -> CodeGen a
 withStandardImport module' c@CodeGen { standardImports = si } =
     c { standardImports = S.insert module' si }
 
-withThirdPartyImport :: T.Text -> T.Text -> CodeGen a -> CodeGen a
-withThirdPartyImport module' object c@CodeGen { thirdPartyImports = ti } =
-    c { thirdPartyImports = M.insertWith S.union module' [object] ti }
+withThirdPartyImports :: [(T.Text, S.Set T.Text)] -> CodeGen a -> CodeGen a
+withThirdPartyImports imports c@CodeGen { thirdPartyImports = ti } =
+    c { thirdPartyImports = L.foldl (M.unionWith S.union) ti importList }
+  where
+    importList :: [M.Map T.Text (S.Set T.Text)]
+    importList = map (uncurry M.singleton) imports
 
 withLocalImport :: T.Text -> T.Text -> CodeGen a -> CodeGen a
 withLocalImport module' object c@CodeGen { localImports = li } =
@@ -152,10 +158,11 @@ compileTypeDeclaration (TypeDeclaration typename (BoxedType itype) _) = do
     let className = toClassName' typename
     itypeExpr <- compileTypeExpression itype
     withStandardImport "typing" $
-        withThirdPartyImport "nirum.validate" "validate_boxed_type" $
-            withThirdPartyImport "nirum.serialize" "serialize_boxed_type" $
-                withThirdPartyImport "nirum.deserialize" "deserialize_boxed_type" $
-                    return [qq|
+        withThirdPartyImports [ ("nirum.validate", ["validate_boxed_type"])
+                              , ("nirum.serialize", ["serialize_boxed_type"])
+                              , ("nirum.deserialize", ["deserialize_boxed_type"])
+                              ] $
+            return [qq|
 class $className:
     # TODO: docstring
 
@@ -183,7 +190,7 @@ class $className:
         return '\{0.__module__\}.\{0.__qualname__\}(\{1!r\})'.format(
             type(self), self.value
         )
-                |]
+            |]
 compileTypeDeclaration (TypeDeclaration typename (EnumType members) _) = do
     let className = toClassName' typename
         memberNames = T.intercalate
@@ -204,6 +211,74 @@ class $className(enum.Enum):
     def __nirum_deserialize__(cls: type, value: str) -> '{className}':
         return cls(value.replace('-', '_'))  # FIXME: validate input
     |]
+compileTypeDeclaration (TypeDeclaration typename (RecordType fields) _) = do
+    typeExprCodes <- mapM compileTypeExpression
+        [typeExpr | (Field _ typeExpr _) <- toList fields]
+    let className = toClassName' typename
+        fieldNames = map toAttributeName' [ name
+                                          | (Field name _ _) <- toList fields
+                                          ]
+        nameNTypes = zip fieldNames typeExprCodes
+        slotTypes =
+            createCodes (\(n, t) -> [qq|'{n}': {t}|]) nameNTypes ",\n        "
+        slots = createCodes (\n -> [qq|'{n}'|]) fieldNames ",\n        "
+        initialArgs = createCodes (\(n, t) -> [qq|{n}: {t}|]) nameNTypes ", "
+        initialValues =
+            createCodes (\n -> [qq|self.{n} = {n}|]) fieldNames "\n        "
+        nameMaps =
+            createCodes
+                (\(Name f b) -> [qq|('{toAttributeName f}', '{toSnakeCaseText b}')|])
+                [name | Field name _ _ <- toList fields, N.isComplex name]
+                ",\n        "
+    withStandardImport "typing" $
+        withThirdPartyImports [ ("nirum.validate", ["validate_record_type"])
+                              , ("nirum.serialize", ["serialize_record_type"])
+                              , ("nirum.deserialize", ["deserialize_record_type"])
+                              , ("nirum.constructs", ["NameDict"])
+                              ] $
+            return [qq|
+class $className:
+    # TODO: docstring
+
+    __slots__ = (
+        $slots
+    )
+    __nirum_record_behind_name__ = '{toSnakeCaseText $ N.behindName typename}'
+    __nirum_field_types__ = \{
+        $slotTypes
+    \}
+    __nirum_field_names__ = NameDict([
+        $nameMaps
+    ])
+
+    def __init__(self, $initialArgs) -> None:
+        $initialValues
+        validate_record_type(self)
+
+    def __repr__(self) -> str:
+        return '\{0.__module__\}.\{0.__qualname__\}(\{1\})'.format(
+            type(self),
+            ', '.join('\{\}=\{\}'.format(attr, getattr(self, attr))
+                      for attr in self.__slots__)
+        )
+
+    def __eq__(self, other) -> bool:
+        return isinstance(other, $className) and all(
+            getattr(self, attr) == getattr(other, attr)
+            for attr in self.__slots__
+        )
+
+    def __nirum_serialize__(self) -> typing.Mapping[str, typing.Any]:
+        return serialize_record_type(self)
+
+    @classmethod
+    def __nirum_deserialize__(cls: type, value) -> '{className}':
+        return deserialize_record_type(cls, value)
+                        |]
+  where
+      createCodes :: (a -> T.Text) -> [a] -> T.Text -> T.Text
+      createCodes f traversable concatenator =
+          T.intercalate concatenator $ map f traversable
 
 compileTypeDeclaration TypeDeclaration {} =
     return "# TODO"
@@ -227,6 +302,7 @@ compileModule module' =
 {fromImports $ thirdPartyImports code'}
 
 Float64 = float  # FIXME
+Bigint = int
 Text = str
 
 {code code'}

@@ -33,8 +33,9 @@ import Text.Megaparsec.String (Parser)
 import Nirum.Constructs.DeclarationSet (DeclarationSet)
 import Nirum.Constructs.Module (Module(Module))
 import Nirum.Constructs.Name (Name(Name))
-import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
-                                        , Type(BoxedType, EnumType)
+import Nirum.Constructs.TypeDeclaration ( Field(Field)
+                                        , EnumMember(EnumMember)
+                                        , Type(BoxedType, EnumType, RecordType)
                                         , TypeDeclaration(TypeDeclaration)
                                         )
 import Nirum.Constructs.TypeExpression ( TypeExpression( ListModifier
@@ -57,7 +58,7 @@ import Nirum.Targets.Python ( CodeGen( code
                             , withLocalImport
                             , withPackage
                             , withStandardImport
-                            , withThirdPartyImport
+                            , withThirdPartyImports
                             )
 
 codeGen :: a -> CodeGen a
@@ -194,13 +195,15 @@ spec = do
                 let (c :: CodeGen Int) = do
                         a <- withStandardImport "sys" cg
                         b <- withPackage "nirum" cg
-                        c' <- withThirdPartyImport "nirum"
-                                                   "serialize_boxed_type" cg
+                        c' <- withThirdPartyImports
+                            [("nirum", ["serialize_boxed_type"])]
+                            cg
                         d <- withLocalImport ".." "Gender" cg
                         e <- withStandardImport "os" cg
                         f'' <- withPackage "nirum" cg
-                        g'' <- withThirdPartyImport "nirum"
-                                                    "serialize_enum_type" cg
+                        g'' <- withThirdPartyImports
+                            [("nirum", ["serialize_enum_type"])]
+                            cg
                         h'' <- withLocalImport ".." "Path" cg
                         return $ sum ([a, b, c', d, e, f'', g'', h''] :: [Int])
                 packages c `shouldBe` ["nirum"]
@@ -324,6 +327,25 @@ spec = do
                      \ EvaChar.soryu_asuka_langley"
             tT decl' "EvaChar.__nirum_deserialize__('soryu-asuka-langley') == \
                      \ EvaChar.soryu_asuka_langley"  -- to be robust
+        specify "record type" $ do
+            let fields = [ Field (Name "left" "x") "bigint" Nothing
+                         , Field "top" "bigint" Nothing
+                         ]
+                decl = TypeDeclaration "point" (RecordType fields) Nothing
+            tT decl "isinstance(Point, type)"
+            tT decl "Point(left=3, top=14).left == 3"
+            tT decl "Point(left=3, top=14).top == 14"
+            tT decl "Point(left=3, top=14) == Point(left=3, top=14)"
+            tT decl "Point(left=3, top=14) != Point(left=3, top=15)"
+            tT decl "Point(left=3, top=14) != Point(left=4, top=14)"
+            tT decl "Point(left=3, top=14) != Point(left=4, top=15)"
+            tT decl "Point(left=3, top=14) != 'foo'"
+            tT decl [q|Point(left=3, top=14).__nirum_serialize__() ==
+                       {'_type': 'point', 'x': 3, 'top': 14}|]
+            tT decl [qq|Point.__nirum_deserialize__($payload) ==
+                        Point(left=3, top=14)|]
+         where
+            payload = "{'_type': 'point', 'x': 3, 'top': 14}" :: T.Text
 
 {-# ANN module ("HLint: ignore Functor law" :: String) #-}
 {-# ANN module ("HLint: ignore Monad law, left identity" :: String) #-}

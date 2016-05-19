@@ -1,5 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Nirum.Constructs.Name (Name(Name), behindName, facialName, toCode) where
+module Nirum.Constructs.Name ( Name(Name)
+                             , behindName
+                             , facialName
+                             , isComplex
+                             , isSimple
+                             , toCode
+                             ) where
 
 import Data.String (IsString(fromString))
 
@@ -19,9 +25,15 @@ data Name = Name { facialName :: Identifier
                  , behindName :: Identifier
                  } deriving (Eq, Ord, Show)
 
+isSimple :: Name -> Bool
+isSimple (Name f b) = f == b
+
+isComplex :: Name -> Bool
+isComplex = not . isSimple
+
 instance Construct Name where
-    toCode (Name facial behind)
-        | facial == behind = toCode facial
+    toCode name@(Name facial behind)
+        | isSimple name = toCode facial
         | otherwise = (toCode facial `snoc` '/') `append` toCode behind
 
 instance IsString Name where
