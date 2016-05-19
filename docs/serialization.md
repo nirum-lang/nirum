@@ -202,6 +202,48 @@ It's represented in JSON to:
     }
 
 
+Union type
+----------
+
+Union type can be understood as combination of record type and enum type.
+It consists of one or more *tags* and each tag has zero or more fields.
+So each tag of union type is equivalent to each member of enum type,
+and each field of tag is equivalent to each field of record type.
+
+For example, let's adjust `name` record in the above example to be
+a union type instead of a record type:
+
+    union name
+        = watern-name (text first-name, text? middle-name, text last-name)
+        | east-asian-name (text family-name, text given-name)
+        | culture-agnostic-name (text fullname)
+        ;
+
+    enum gender = male | female;
+
+    record person (
+        name name,
+        date? dob,
+        gender? gender,
+        uri? website-uri
+    );
+
+It's represented in JSON to:
+
+    {
+        "_type": "person",
+        "name": {
+            "_type": "name",
+            "_tag": "east-asian-name",
+            "family_name": "Hong",
+            "given_name": "Minhee"
+        },
+        "dob": null,
+        "gender": "male",
+        "uri": null
+    }
+
+
 Option type
 -----------
 
