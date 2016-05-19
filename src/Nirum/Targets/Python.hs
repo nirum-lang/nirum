@@ -273,10 +273,8 @@ class $className:
         return serialize_record_type(self)
 
     @classmethod
-    def __nirum_deserialize__(
-        cls: type, **values
-    ) -> '{className}':
-        return deserialize_record_type(cls, **values)
+    def __nirum_deserialize__(cls: type, value) -> '{className}':
+        return deserialize_record_type(cls, value)
                         |]
   where
       createCodes :: (a -> T.Text) -> [a] -> T.Text -> T.Text
