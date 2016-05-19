@@ -167,6 +167,41 @@ It's represented in JSON to:
     }
 
 
+Record type
+-----------
+
+As `payload` records in the above example codes show, reocrd type defines
+a structure consists of fields which have their name and type.  For example:
+
+    record name (
+        text given-name,
+        text family-name,
+    );
+
+    enum gender = male | female;
+
+    record person (
+        name name,
+        date? dob,
+        gender? gender,
+        uri? website-uri
+    );
+
+It's represented in JSON to:
+
+    {
+        "_type": "person",
+        "name": {
+            "_type": "name",
+            "family_name": "Hong",
+            "given_name": "Minhee"
+        },
+        "dob": null,
+        "gender": "male",
+        "uri": null
+    }
+
+
 Option type
 -----------
 
