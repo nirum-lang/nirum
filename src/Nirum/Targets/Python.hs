@@ -234,7 +234,7 @@ compileTypeDeclaration (TypeDeclaration typename (RecordType fields) _) = do
         withThirdPartyImports [ ("nirum.validate", ["validate_record_type"])
                               , ("nirum.serialize", ["serialize_record_type"])
                               , ("nirum.deserialize", ["deserialize_record_type"])
-                              , ("nirum.types", ["NameDict"])
+                              , ("nirum.constructs", ["NameDict"])
                               ] $
             return [qq|
 class $className:
