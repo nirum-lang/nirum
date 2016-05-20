@@ -262,8 +262,7 @@ spec = do
             let codeGen' = do
                     val <- withStandardImport "sys" (pure True)
                     _ <- fail "test"
-                    val2 <- withStandardImport "sys" (pure val)
-                    return val2
+                    withStandardImport "sys" (pure val)
             errorMessage codeGen' `shouldBe` Just "test"
 
     describe "compileTypeExpression" $ do

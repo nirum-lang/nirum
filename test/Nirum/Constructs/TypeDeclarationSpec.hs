@@ -1,12 +1,15 @@
 {-# LANGUAGE OverloadedLists, OverloadedStrings #-}
 module Nirum.Constructs.TypeDeclarationSpec where
 
+import qualified Data.Text as T
 import Test.Hspec.Meta
 
 import Nirum.Constructs (Construct(toCode))
 import Nirum.Constructs.DeclarationSet (DeclarationSet)
 import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
                                         , Field(Field)
+                                        , JsonType(String)
+                                        , PrimitiveTypeIdentifier(Text)
                                         , Tag(Tag)
                                         , Type(..)
                                         , TypeDeclaration(..)
@@ -132,6 +135,12 @@ spec = do
                                                      \point lower-right,)\n\
                                     \    | none\n\
                                     \    ;"
+        context "PrimitiveType" $ do
+            let primitiveType = PrimitiveType Text String
+                decl = TypeDeclaration "text" primitiveType Nothing
+            specify "toCode" $
+                T.lines (toCode decl) `shouldSatisfy`
+                    all (T.isPrefixOf "//" . T.stripStart)
     describe "EnumMember" $ do
         let kr = EnumMember "kr" Nothing
             jp = EnumMember "jp" $ Just "Japan"
