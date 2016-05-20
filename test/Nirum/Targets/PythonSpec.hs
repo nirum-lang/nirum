@@ -119,8 +119,8 @@ runPython code' = do
                 result <- readProcess "python3" [] code'
                 return $ Just result
 
-testPython :: T.Text -> T.Text -> IO ()
-testPython defCode testCode = do
+testPythonSuit :: String -> T.Text -> IO ()
+testPythonSuit suitCode testCode = do
     nirumPackageInstalledM <-
         runPython [q|
 try: import nirum
@@ -131,7 +131,7 @@ else: print('T')
         Just nirumPackageInstalled ->
             case strip nirumPackageInstalled of
                 "T" -> do
-                    resultM <- runPython code'
+                    resultM <- runPython suitCode
                     case resultM of
                         Just result ->
                             unless (strip result == "True") $
@@ -142,14 +142,42 @@ else: print('T')
                               \skipped..."
         Nothing -> return ()
   where
+    strip :: String -> String
+    strip = dropWhile isSpace . dropWhileEnd isSpace
+
+testPython :: T.Text -> T.Text -> IO ()
+testPython defCode testCode = testPythonSuit code' testCode'
+  where
+    -- to workaround hlint's "Eta reduce" warning
+    -- hlint seems unable to look inside qq string literal...
+    testCode' :: T.Text
+    testCode' = testCode
     code' :: String
     code' = [qq|$defCode
 
 if __name__ == '__main__':
-    print(bool($testCode))
+    print(bool($testCode'))
 |]
-    strip :: String -> String
-    strip = dropWhile isSpace . dropWhileEnd isSpace
+
+testRaisePython :: T.Text -> T.Text -> T.Text -> IO ()
+testRaisePython defCode errorClassName testCode =
+    testPythonSuit code' testCode''
+  where
+    -- to workaround hlint's "Eta reduce" warning
+    -- hlint seems unable to look inside qq string literal...
+    testCode'' :: T.Text
+    testCode'' = testCode
+    code' :: String
+    code' = [qq|$defCode
+
+if __name__ == '__main__':
+    try:
+        $testCode''
+    except $errorClassName:
+        print(True)
+    else:
+        print(False)
+|]
 
 spec :: Spec
 spec = do
@@ -283,6 +311,8 @@ spec = do
     describe "compileModule" $ do
         let tM module' = testPython $ compileModule module'
             tT typeDecl = tM $ Module [typeDecl] Nothing
+            tR module' = testRaisePython $ compileModule module'
+            tR' typeDecl = tR $ Module [typeDecl] Nothing
         specify "boxed type" $ do
             let decl = TypeDeclaration "float-box" (BoxedType "float64") Nothing
             tT decl "isinstance(FloatBox, type)"
@@ -293,6 +323,9 @@ spec = do
                        {FloatBox(3.14), FloatBox(1.0)}|]
             tT decl "FloatBox(3.14).__nirum_serialize__() == 3.14"
             tT decl "FloatBox.__nirum_deserialize__(3.14) == FloatBox(3.14)"
+            tT decl "FloatBox.__nirum_deserialize__(3.14) == FloatBox(3.14)"
+            tR' decl "TypeError" "FloatBox.__nirum_deserialize__('a')"
+            tR' decl "TypeError" "FloatBox('a')"
         specify "enum type" $ do
             let members = [ "male"
                           , EnumMember (Name "female" "yeoseong") Nothing
@@ -304,7 +337,7 @@ spec = do
             tT decl "Gender.female.value == 'yeoseong'"
             tT decl "Gender.__nirum_deserialize__('male') == Gender.male"
             tT decl "Gender.__nirum_deserialize__('yeoseong') == Gender.female"
-            -- TODO: test deserializer with invalid input
+            tR' decl "ValueError" "Gender.__nirum_deserialize__('namja')"
             tT decl "Gender.male.__nirum_serialize__() == 'male'"
             tT decl "Gender.female.__nirum_serialize__() == 'yeoseong'"
             let members' = [ "soryu-asuka-langley"
@@ -344,6 +377,13 @@ spec = do
                        {'_type': 'point', 'x': 3, 'top': 14}|]
             tT decl [qq|Point.__nirum_deserialize__($payload) ==
                         Point(left=3, top=14)|]
+            tR' decl "ValueError"
+                "Point.__nirum_deserialize__({'x': 3, 'top': 14})"
+            tR' decl "ValueError"
+                "Point.__nirum_deserialize__({'_type': 'foo'})"
+            tR' decl "TypeError" "Point(left=1, top='a')"
+            tR' decl "TypeError" "Point(left='a', top=1)"
+            tR' decl "TypeError" "Point(left='a', top='b')"
          where
             payload = "{'_type': 'point', 'x': 3, 'top': 14}" :: T.Text
 
