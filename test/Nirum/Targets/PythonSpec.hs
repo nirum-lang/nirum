@@ -55,6 +55,7 @@ import Nirum.Targets.Python ( CodeGen( code
                                      )
                             , compileModule
                             , compileTypeExpression
+                            , errorMessage
                             , toAttributeName
                             , toClassName
                             , withLocalImport
@@ -249,12 +250,21 @@ spec = do
             thirdPartyImports codeGen1 `shouldBe` []
             localImports codeGen1 `shouldBe` []
             code codeGen1 `shouldBe` True
+            errorMessage codeGen1 `shouldBe` Nothing
             let codeGen2 = withStandardImport "os" codeGen1
             packages codeGen2 `shouldBe` []
             standardImports codeGen2 `shouldBe` ["os", "sys"]
             thirdPartyImports codeGen2 `shouldBe` []
             localImports codeGen2 `shouldBe` []
             code codeGen2 `shouldBe` True
+            errorMessage codeGen2 `shouldBe` Nothing
+        specify "fail" $ do
+            let codeGen' = do
+                    val <- withStandardImport "sys" (pure True)
+                    _ <- fail "test"
+                    val2 <- withStandardImport "sys" (pure val)
+                    return val2
+            errorMessage codeGen' `shouldBe` Just "test"
 
     describe "compileTypeExpression" $ do
         specify "TypeIdentifier" $ do

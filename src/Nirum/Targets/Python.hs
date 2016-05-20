@@ -10,6 +10,7 @@ module Nirum.Targets.Python ( Code
                             , compileModule
                             , compileTypeDeclaration
                             , compileTypeExpression
+                            , errorMessage
                             , toAttributeName
                             , toClassName
                             , withLocalImport
@@ -19,6 +20,7 @@ module Nirum.Targets.Python ( Code
                             ) where
 
 import qualified Data.List as L
+
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -54,7 +56,9 @@ data CodeGen a = CodeGen { packages :: S.Set T.Text
                          , thirdPartyImports :: M.Map T.Text (S.Set T.Text)
                          , localImports :: M.Map T.Text (S.Set T.Text)
                          , code :: a
-                         } deriving (Eq, Ord, Show)
+                         }
+               | CodeGenError T.Text
+               deriving (Eq, Ord, Show)
 
 instance Functor CodeGen where
     fmap f codeGen = pure f <*> codeGen
@@ -62,6 +66,7 @@ instance Functor CodeGen where
 instance Applicative CodeGen where
     pure = return
     c@CodeGen { code = f } <*> codeGen = codeGen >>= \x -> c { code = f x }
+    (CodeGenError m) <*> _ = CodeGenError m
 
 instance Monad CodeGen where
     return code' = CodeGen { packages = []
@@ -70,22 +75,33 @@ instance Monad CodeGen where
                            , localImports = []
                            , code = code'
                            }
-    (CodeGen p si ti li c) >>= f =
-        CodeGen packages' stdImports thirdPartyImports' localImports' code'
-      where
-        (CodeGen p' si' ti' li' code') = f c
-        packages' = S.union p p'
-        stdImports = S.union si si'
-        thirdPartyImports' = M.unionWith S.union ti ti'
-        localImports' = M.unionWith S.union li li'
+    (CodeGen p si ti li c) >>= f = case f c of
+        (CodeGen p' si' ti' li' code') ->
+            let packages' = S.union p p'
+                stdImports = S.union si si'
+                thirdPartyImports' = M.unionWith S.union ti ti'
+                localImports' = M.unionWith S.union li li'
+            in
+                CodeGen packages' stdImports thirdPartyImports'
+                        localImports' code'
+        (CodeGenError m) -> CodeGenError m
+    (CodeGenError m) >>= _ = CodeGenError m
+
+    fail = CodeGenError . T.pack
+
+errorMessage :: CodeGen a -> Maybe T.Text
+errorMessage CodeGen {} = Nothing
+errorMessage (CodeGenError m) = Just m
 
 withPackage :: T.Text -> CodeGen a -> CodeGen a
 withPackage package c@CodeGen { packages = p } =
     c { packages = S.insert package p }
+withPackage _ c@(CodeGenError _) = c
 
 withStandardImport :: T.Text -> CodeGen a -> CodeGen a
 withStandardImport module' c@CodeGen { standardImports = si } =
     c { standardImports = S.insert module' si }
+withStandardImport _ c@(CodeGenError _) = c
 
 withThirdPartyImports :: [(T.Text, S.Set T.Text)] -> CodeGen a -> CodeGen a
 withThirdPartyImports imports c@CodeGen { thirdPartyImports = ti } =
@@ -93,10 +109,12 @@ withThirdPartyImports imports c@CodeGen { thirdPartyImports = ti } =
   where
     importList :: [M.Map T.Text (S.Set T.Text)]
     importList = map (uncurry M.singleton) imports
+withThirdPartyImports _ c@(CodeGenError _) = c
 
 withLocalImport :: T.Text -> T.Text -> CodeGen a -> CodeGen a
 withLocalImport module' object c@CodeGen { localImports = li } =
     c { localImports = M.insertWith S.union module' [object] li }
+withLocalImport _ _ c@(CodeGenError _) = c
 
 -- | The set of Python reserved keywords.
 -- See also: https://docs.python.org/3/reference/lexical_analysis.html#keywords
