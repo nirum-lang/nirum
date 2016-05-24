@@ -24,7 +24,7 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import Text.InterpolatedString.Perl6 (qq)
 
-import Nirum.Constructs.DeclarationSet (toList)
+import Nirum.Constructs.DeclarationSet (DeclarationSet, toList)
 import Nirum.Constructs.Identifier ( Identifier
                                    , toPascalCaseText
                                    , toSnakeCaseText
@@ -34,8 +34,9 @@ import Nirum.Constructs.Name (Name(Name))
 import qualified Nirum.Constructs.Name as N
 import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
                                         , Field(Field)
+                                        , Tag(Tag)
                                         , Type(Alias, BoxedType, EnumType,
-                                               RecordType)
+                                               RecordType, UnionType)
                                         , TypeDeclaration(TypeDeclaration)
                                         )
 import Nirum.Constructs.TypeExpression ( TypeExpression( ListModifier
@@ -127,6 +128,66 @@ toAttributeName identifier =
 
 toAttributeName' :: Name -> T.Text
 toAttributeName' = toAttributeName . N.facialName
+
+compileUnionTag :: Name -> Name -> DeclarationSet Field -> CodeGen Code
+compileUnionTag parentname typename fields = do
+    typeExprCodes <- mapM compileTypeExpression
+        [typeExpr | (Field _ typeExpr _) <- toList fields]
+    let className = toClassName' typename
+        tagNames = map toAttributeName' [ name
+                                          | (Field name _ _) <- toList fields
+                                          ]
+        nameNTypes = zip tagNames typeExprCodes
+        slotTypes =
+            createCodes (\(n, t) -> [qq|'{n}': {t}|]) nameNTypes ",\n        "
+        slots = createCodes (\n -> [qq|'{n}'|]) tagNames ",\n        "
+        initialArgs = createCodes (\(n, t) -> [qq|{n}: {t}|]) nameNTypes ", "
+        initialValues =
+            createCodes (\n -> [qq|self.{n} = {n}|]) tagNames "\n        "
+        nameMaps =
+            createCodes
+                (\(Name f b) -> [qq|('{toAttributeName f}', '{toSnakeCaseText b}')|])
+                [name | Field name _ _ <- toList fields, N.isComplex name]
+                ",\n        "
+    withStandardImport "typing" $
+        withThirdPartyImports
+            [("nirum.validate", ["validate_union_type"])] $
+            return [qq|
+class $className({toClassName' parentname}):
+    # TODO: docstring
+
+    __slots__ = (
+        $slots,
+    )
+    __nirum_tag_behind_name__ = '{toSnakeCaseText $ N.behindName typename}'
+    __nirum_tag_types__ = \{
+        $slotTypes
+    \}
+    __nirum_tag_names__ = NameDict([
+        $nameMaps
+    ])
+
+    def __init__(self, $initialArgs) -> None:
+        $initialValues
+        validate_union_type(self)
+
+    def __repr__(self) -> str:
+        return '\{0.__module__\}.\{0.__qualname__\}(\{1\})'.format(
+            type(self),
+            ', '.join('\{\}=\{\}'.format(attr, getattr(self, attr))
+                      for attr in self.__slots__)
+        )
+
+    def __eq__(self, other) -> bool:
+        return isinstance(other, $className) and all(
+            getattr(self, attr) == getattr(other, attr)
+            for attr in self.__slots__
+        )
+            |]
+  where
+      createCodes :: (a -> T.Text) -> [a] -> T.Text -> T.Text
+      createCodes f traversable concatenator =
+          T.intercalate concatenator $ map f traversable
 
 compileTypeExpression :: TypeExpression -> CodeGen Code
 compileTypeExpression (TypeIdentifier i) = return $ toClassName i
@@ -241,7 +302,7 @@ class $className:
     # TODO: docstring
 
     __slots__ = (
-        $slots
+        $slots,
     )
     __nirum_record_behind_name__ = '{toSnakeCaseText $ N.behindName typename}'
     __nirum_field_types__ = \{
@@ -279,9 +340,44 @@ class $className:
       createCodes :: (a -> T.Text) -> [a] -> T.Text -> T.Text
       createCodes f traversable concatenator =
           T.intercalate concatenator $ map f traversable
+compileTypeDeclaration (TypeDeclaration typename (UnionType tags) _) = do
+    fieldCodes <- mapM (uncurry (compileUnionTag typename)) tagNameNFields
+    let className = toClassName' typename
+        fieldCodes' = T.intercalate "\n\n" fieldCodes
+    withStandardImport "typing" $
+        withThirdPartyImports [ ("nirum.serialize", ["serialize_union_type"])
+                              , ("nirum.deserialize", ["deserialize_union_type"])
+                              , ("nirum.constructs", ["NameDict"])
+                              ] $
+            return [qq|
+class $className:
 
-compileTypeDeclaration TypeDeclaration {} =
-    return "# TODO"
+    __nirum_union_behind_name__ = '{toSnakeCaseText $ N.behindName typename}'
+
+    def __init__(self, *args, **kwargs):
+        raise NotImplementedError(
+            "\{0.__module__\}.\{0.__qualname__\} cannot be instantiated "
+            "since it is an abstract class.  Instantiate a concrete subtype "
+            "of it instead.".format(
+                type(self)
+            )
+        )
+
+    def __nirum_serialize__(self) -> typing.Mapping[str, typing.Any]:
+        return serialize_union_type(self)
+
+    @classmethod
+    def __nirum_deserialize__(cls: type, value) -> '{className}':
+        return deserialize_union_type(cls, value)
+
+
+$fieldCodes'
+            |]
+  where
+    tagNameNFields :: [(Name, DeclarationSet Field)]
+    tagNameNFields = [ (tagName, fields)
+                     | (Tag tagName fields _) <- toList tags
+                     ]
 
 compileModuleBody :: Module -> CodeGen Code
 compileModuleBody Module { types = types' } = do

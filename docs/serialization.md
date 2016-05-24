@@ -214,7 +214,7 @@ For example, let's adjust `name` record in the above example to be
 a union type instead of a record type:
 
     union name
-        = watern-name (text first-name, text? middle-name, text last-name)
+        = western-name (text first-name, text? middle-name, text last-name)
         | east-asian-name (text family-name, text given-name)
         | culture-agnostic-name (text fullname)
         ;
