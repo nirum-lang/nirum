@@ -135,8 +135,8 @@ compileUnionTag parentname typename fields = do
         [typeExpr | (Field _ typeExpr _) <- toList fields]
     let className = toClassName' typename
         tagNames = map toAttributeName' [ name
-                                          | (Field name _ _) <- toList fields
-                                          ]
+                                        | (Field name _ _) <- toList fields
+                                        ]
         nameNTypes = zip tagNames typeExprCodes
         slotTypes =
             createCodes (\(n, t) -> [qq|'{n}': {t}|]) nameNTypes ",\n        "

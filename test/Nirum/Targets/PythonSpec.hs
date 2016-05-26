@@ -410,32 +410,77 @@ spec = do
             tT decl "isinstance(WesternName, type)"
             tT decl "issubclass(WesternName, Name)"
             tR' decl "NotImplementedError" "Name()"
-            tT decl "WesternName(first_name='foo', middle_name='bar', last_name='baz').first_name == 'foo'"
-            tT decl "WesternName(first_name='foo', middle_name='bar', last_name='baz').middle_name == 'bar'"
-            tT decl "WesternName(first_name='foo', middle_name='bar', last_name='baz').last_name == 'baz'"
-            tR' decl "TypeError" "WesternName(first_name=1, middle_name='bar', last_name='baz')"
-            tR' decl "TypeError" "WesternName(first_name='foo', middle_name=1, last_name='baz')"
-            tR' decl "TypeError" "WesternName(first_name='foo', middle_name='bar', last_name=1)"
-            tT decl "WesternName(first_name='foo', middle_name='bar', last_name='baz') == WesternName(first_name='foo', middle_name='bar', last_name='baz')"
-            tT decl "WesternName(first_name='wrong', middle_name='bar', last_name='baz') != WesternName(first_name='foo', middle_name='bar', last_name='baz')"
-            tT decl "WesternName(first_name='foo', middle_name='wrong', last_name='baz') != WesternName(first_name='foo', middle_name='bar', last_name='baz')"
-            tT decl "WesternName(first_name='foo', middle_name='bar', last_name='wrong') != WesternName(first_name='foo', middle_name='bar', last_name='baz')"
-            tT decl "WesternName(first_name='wrong', middle_name='wrong', last_name='wrong') != WesternName(first_name='foo', middle_name='bar', last_name='baz')"
+            tT decl [q|WesternName(first_name='foo', middle_name='bar',
+                                   last_name='baz').first_name == 'foo'|]
+            tT decl [q|WesternName(first_name='foo', middle_name='bar',
+                                   last_name='baz').middle_name == 'bar'|]
+            tT decl [q|WesternName(first_name='foo', middle_name='bar',
+                                   last_name='baz').last_name == 'baz'|]
+            tR' decl "TypeError" [q|WesternName(first_name=1,middle_name='bar',
+                                                last_name='baz')|]
+            tR' decl "TypeError" [q|WesternName(first_name='foo',
+                                                middle_name=1,
+                                                last_name='baz')|]
+            tR' decl "TypeError" [q|WesternName(first_name='foo',
+                                                middle_name='bar',
+                                                last_name=1)|]
+            tT decl [q|WesternName(first_name='foo', middle_name='bar',
+                                   last_name='baz') ==
+                       WesternName(first_name='foo', middle_name='bar',
+                                   last_name='baz')
+                    |]
+            tT decl [q|WesternName(first_name='wrong',
+                                   middle_name='bar', last_name='baz') !=
+                       WesternName(first_name='foo', middle_name='bar',
+                                   last_name='baz')
+                    |]
+            tT decl [q|WesternName(first_name='foo', middle_name='wrong',
+                                    last_name='baz') !=
+                       WesternName(first_name='foo', middle_name='bar',
+                                   last_name='baz')
+                    |]
+            tT decl [q|WesternName(first_name='foo', middle_name='bar',
+                                   last_name='wrong') !=
+                       WesternName(first_name='foo', middle_name='bar',
+                                   last_name='baz')
+                    |]
+            tT decl [q|WesternName(first_name='wrong', middle_name='wrong',
+                                   last_name='wrong') !=
+                       WesternName(first_name='foo', middle_name='bar',
+                                   last_name='baz')|]
             tT decl "isinstance(EastAsianName, type)"
             tT decl "issubclass(EastAsianName, Name)"
-            tT decl "EastAsianName(family_name='foo', given_name='baz').family_name == 'foo'"
-            tT decl "EastAsianName(family_name='foo', given_name='baz').given_name == 'baz'"
-            tT decl "EastAsianName(family_name='foo', given_name='baz') == EastAsianName(family_name='foo', given_name='baz')"
-            tT decl "EastAsianName(family_name='foo', given_name='wrong') != EastAsianName(family_name='foo', given_name='baz')"
-            tT decl "EastAsianName(family_name='wrong', given_name='baz') != EastAsianName(family_name='foo', given_name='baz')"
-            tT decl "EastAsianName(family_name='wrong', given_name='wrong') != EastAsianName(family_name='foo', given_name='baz')"
-            tR' decl "TypeError" "EastAsianName(family_name=1, given_name='baz')"
-            tR' decl "TypeError" "EastAsianName(family_name='foo', given_name=2)"
+            tT decl [q|EastAsianName(family_name='foo',
+                                     given_name='baz').family_name == 'foo'|]
+            tT decl [q|EastAsianName(family_name='foo',
+                                     given_name='baz').given_name == 'baz'|]
+            tT decl [q|EastAsianName(family_name='foo', given_name='baz') ==
+                       EastAsianName(family_name='foo', given_name='baz')|]
+            tT decl [q|EastAsianName(family_name='foo',
+                                     given_name='wrong') !=
+                       EastAsianName(family_name='foo', given_name='baz')|]
+            tT decl [q|EastAsianName(family_name='wrong', given_name='baz') !=
+                       EastAsianName(family_name='foo', given_name='baz')|]
+            tT decl [q|EastAsianName(family_name='wrong',
+                                     given_name='wrong') !=
+                       EastAsianName(family_name='foo', given_name='baz')|]
+            tR'
+                decl
+                "TypeError"
+                "EastAsianName(family_name=1, given_name='baz')"
+            tR'
+                decl
+                "TypeError"
+                "EastAsianName(family_name='foo', given_name=2)"
             tT decl "isinstance(CultureAgnosticName, type)"
             tT decl "issubclass(CultureAgnosticName, Name)"
-            tT decl "CultureAgnosticName(fullname='foobar').fullname == 'foobar'"
-            tT decl "CultureAgnosticName(fullname='foobar') == CultureAgnosticName(fullname='foobar')"
-            tT decl "CultureAgnosticName(fullname='wrong') != CultureAgnosticName(fullname='foobar')"
+            tT
+                decl
+                "CultureAgnosticName(fullname='foobar').fullname == 'foobar'"
+            tT decl [q|CultureAgnosticName(fullname='foobar') ==
+                       CultureAgnosticName(fullname='foobar')|]
+            tT decl [q|CultureAgnosticName(fullname='wrong') !=
+                       CultureAgnosticName(fullname='foobar')|]
             tR' decl "TypeError" "CultureAgnosticName(fullname=1)"
 
 
