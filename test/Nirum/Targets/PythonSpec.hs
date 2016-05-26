@@ -387,6 +387,14 @@ spec = do
             tR' decl "TypeError" "Point(left=1, top='a')"
             tR' decl "TypeError" "Point(left='a', top=1)"
             tR' decl "TypeError" "Point(left='a', top='b')"
+        specify "record type with one field" $ do
+            let fields = [ Field "length" "bigint" Nothing ]
+                payload = "{'_type': 'line', 'length': 3}" :: T.Text
+                decl = TypeDeclaration "line" (RecordType fields) Nothing
+            tT decl "isinstance(Line, type)"
+            tT decl "Line(length=10).length == 10"
+            tT decl "Line.__slots__ == ('length', )"
+            tT decl [qq|Line(length=3).__nirum_serialize__() == $payload|]
         specify "union type" $ do
             let wasternNameTag =
                     Tag "western-name" [ Field "first-name" "text" Nothing
@@ -482,6 +490,18 @@ spec = do
             tT decl [q|CultureAgnosticName(fullname='wrong') !=
                        CultureAgnosticName(fullname='foobar')|]
             tR' decl "TypeError" "CultureAgnosticName(fullname=1)"
+        specify "union type with one tag" $ do
+            let cultureAgnosticNameTag =
+                    Tag "pop"
+                        [ Field "country" "text" Nothing ]
+                        Nothing
+                tags = [cultureAgnosticNameTag]
+                decl = TypeDeclaration "music" (UnionType tags) Nothing
+            tT decl "Pop(country='KR').country == 'KR'"
+            tT decl "Pop(country='KR') == Pop(country='KR')"
+            tT decl "Pop(country='US') != Pop(country='KR')"
+            tR' decl "TypeError" "Pop(country=1)"
+            tT decl "Pop.__slots__ == ('country', )"
 
 
 {-# ANN module ("HLint: ignore Functor law" :: String) #-}
