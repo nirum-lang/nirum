@@ -35,7 +35,9 @@ import Nirum.Constructs.Module (Module(Module))
 import Nirum.Constructs.Name (Name(Name))
 import Nirum.Constructs.TypeDeclaration ( Field(Field)
                                         , EnumMember(EnumMember)
-                                        , Type(BoxedType, EnumType, RecordType)
+                                        , Tag(Tag)
+                                        , Type(BoxedType, EnumType, RecordType,
+                                               UnionType)
                                         , TypeDeclaration(TypeDeclaration)
                                         )
 import Nirum.Constructs.TypeExpression ( TypeExpression( ListModifier
@@ -364,6 +366,7 @@ spec = do
             let fields = [ Field (Name "left" "x") "bigint" Nothing
                          , Field "top" "bigint" Nothing
                          ]
+                payload = "{'_type': 'point', 'x': 3, 'top': 14}" :: T.Text
                 decl = TypeDeclaration "point" (RecordType fields) Nothing
             tT decl "isinstance(Point, type)"
             tT decl "Point(left=3, top=14).left == 3"
@@ -384,8 +387,122 @@ spec = do
             tR' decl "TypeError" "Point(left=1, top='a')"
             tR' decl "TypeError" "Point(left='a', top=1)"
             tR' decl "TypeError" "Point(left='a', top='b')"
-         where
-            payload = "{'_type': 'point', 'x': 3, 'top': 14}" :: T.Text
+        specify "record type with one field" $ do
+            let fields = [ Field "length" "bigint" Nothing ]
+                payload = "{'_type': 'line', 'length': 3}" :: T.Text
+                decl = TypeDeclaration "line" (RecordType fields) Nothing
+            tT decl "isinstance(Line, type)"
+            tT decl "Line(length=10).length == 10"
+            tT decl "Line.__slots__ == ('length', )"
+            tT decl [qq|Line(length=3).__nirum_serialize__() == $payload|]
+        specify "union type" $ do
+            let wasternNameTag =
+                    Tag "western-name" [ Field "first-name" "text" Nothing
+                                       , Field "middle-name" "text" Nothing
+                                       , Field "last-name" "text" Nothing
+                                       ] Nothing
+                eastAsianNameTag =
+                    Tag "east-asian-name" [ Field "family-name" "text" Nothing
+                                          , Field "given-name" "text" Nothing
+                                          ] Nothing
+                cultureAgnosticNameTag =
+                    Tag "culture-agnostic-name"
+                        [ Field "fullname" "text" Nothing ]
+                        Nothing
+                tags = [ wasternNameTag
+                       , eastAsianNameTag
+                       , cultureAgnosticNameTag
+                       ]
+                decl = TypeDeclaration "name" (UnionType tags) Nothing
+            tT decl "isinstance(Name, type)"
+            tT decl "isinstance(WesternName, type)"
+            tT decl "issubclass(WesternName, Name)"
+            tR' decl "NotImplementedError" "Name()"
+            tT decl [q|WesternName(first_name='foo', middle_name='bar',
+                                   last_name='baz').first_name == 'foo'|]
+            tT decl [q|WesternName(first_name='foo', middle_name='bar',
+                                   last_name='baz').middle_name == 'bar'|]
+            tT decl [q|WesternName(first_name='foo', middle_name='bar',
+                                   last_name='baz').last_name == 'baz'|]
+            tR' decl "TypeError" [q|WesternName(first_name=1,middle_name='bar',
+                                                last_name='baz')|]
+            tR' decl "TypeError" [q|WesternName(first_name='foo',
+                                                middle_name=1,
+                                                last_name='baz')|]
+            tR' decl "TypeError" [q|WesternName(first_name='foo',
+                                                middle_name='bar',
+                                                last_name=1)|]
+            tT decl [q|WesternName(first_name='foo', middle_name='bar',
+                                   last_name='baz') ==
+                       WesternName(first_name='foo', middle_name='bar',
+                                   last_name='baz')
+                    |]
+            tT decl [q|WesternName(first_name='wrong',
+                                   middle_name='bar', last_name='baz') !=
+                       WesternName(first_name='foo', middle_name='bar',
+                                   last_name='baz')
+                    |]
+            tT decl [q|WesternName(first_name='foo', middle_name='wrong',
+                                    last_name='baz') !=
+                       WesternName(first_name='foo', middle_name='bar',
+                                   last_name='baz')
+                    |]
+            tT decl [q|WesternName(first_name='foo', middle_name='bar',
+                                   last_name='wrong') !=
+                       WesternName(first_name='foo', middle_name='bar',
+                                   last_name='baz')
+                    |]
+            tT decl [q|WesternName(first_name='wrong', middle_name='wrong',
+                                   last_name='wrong') !=
+                       WesternName(first_name='foo', middle_name='bar',
+                                   last_name='baz')|]
+            tT decl "isinstance(EastAsianName, type)"
+            tT decl "issubclass(EastAsianName, Name)"
+            tT decl [q|EastAsianName(family_name='foo',
+                                     given_name='baz').family_name == 'foo'|]
+            tT decl [q|EastAsianName(family_name='foo',
+                                     given_name='baz').given_name == 'baz'|]
+            tT decl [q|EastAsianName(family_name='foo', given_name='baz') ==
+                       EastAsianName(family_name='foo', given_name='baz')|]
+            tT decl [q|EastAsianName(family_name='foo',
+                                     given_name='wrong') !=
+                       EastAsianName(family_name='foo', given_name='baz')|]
+            tT decl [q|EastAsianName(family_name='wrong', given_name='baz') !=
+                       EastAsianName(family_name='foo', given_name='baz')|]
+            tT decl [q|EastAsianName(family_name='wrong',
+                                     given_name='wrong') !=
+                       EastAsianName(family_name='foo', given_name='baz')|]
+            tR'
+                decl
+                "TypeError"
+                "EastAsianName(family_name=1, given_name='baz')"
+            tR'
+                decl
+                "TypeError"
+                "EastAsianName(family_name='foo', given_name=2)"
+            tT decl "isinstance(CultureAgnosticName, type)"
+            tT decl "issubclass(CultureAgnosticName, Name)"
+            tT
+                decl
+                "CultureAgnosticName(fullname='foobar').fullname == 'foobar'"
+            tT decl [q|CultureAgnosticName(fullname='foobar') ==
+                       CultureAgnosticName(fullname='foobar')|]
+            tT decl [q|CultureAgnosticName(fullname='wrong') !=
+                       CultureAgnosticName(fullname='foobar')|]
+            tR' decl "TypeError" "CultureAgnosticName(fullname=1)"
+        specify "union type with one tag" $ do
+            let cultureAgnosticNameTag =
+                    Tag "pop"
+                        [ Field "country" "text" Nothing ]
+                        Nothing
+                tags = [cultureAgnosticNameTag]
+                decl = TypeDeclaration "music" (UnionType tags) Nothing
+            tT decl "Pop(country='KR').country == 'KR'"
+            tT decl "Pop(country='KR') == Pop(country='KR')"
+            tT decl "Pop(country='US') != Pop(country='KR')"
+            tR' decl "TypeError" "Pop(country=1)"
+            tT decl "Pop.__slots__ == ('country', )"
+
 
 {-# ANN module ("HLint: ignore Functor law" :: String) #-}
 {-# ANN module ("HLint: ignore Monad law, left identity" :: String) #-}
