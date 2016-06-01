@@ -458,7 +458,7 @@ spec = do
                         ] :: [(String, Parser Module)]
     forM_ moduleParsers $ \(label, parser') ->
         describe label $ do
-            let (parse', _) = helperFuncs parser'
+            let (parse', expectError) = helperFuncs parser'
             it "emits Module if succeeded to parse" $ do
                 let decls = [ TypeDeclaration "path" (Alias "text") Nothing
                             , TypeDeclaration "offset"
@@ -471,6 +471,10 @@ spec = do
             it "may have no type declarations" $ do
                 parse' "" `shouldBe` Right (Module [] Nothing)
                 parse' "# docs" `shouldBe` Right (Module [] $ Just "docs")
+            it "errors if there are any duplicated facial names" $
+                expectError "type a = text;\ntype a/b = text;" 2 7
+            it "errors if there are any duplicated behind names" $
+                expectError "type b = text;\ntype a/b = text;" 2 7
 
     specify "parse & parseFile" $ do
         files <- getDirectoryContents "examples"
