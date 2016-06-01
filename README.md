@@ -10,6 +10,27 @@ WIP.
 [1]: https://en.wikipedia.org/wiki/Distributed_object
 
 
+Getting Started
+---------------
+
+In order to compile `examples/shapes.nrm` file to python in `out` directory:
+
+    $ nirum --python -d=./out ./examples/shapes.nrm
+
+For more infomration, type `--help`:
+
+    $ nirum --help
+    Nirum Compiler CLI
+
+    nirum [OPTIONS] FILE
+
+    Common flags:
+      -p --python            python
+      -d --destination=DEST  Write generated file to DEST
+      -? --help              Display help message
+      -V --version           Print version information
+
+
 Etymology
 ---------
 
