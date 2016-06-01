@@ -11,6 +11,7 @@ module Nirum.Constructs.DeclarationSet ( DeclarationSet()
                                        , null'
                                        , size
                                        , toList
+                                       , union
                                        , (!)
                                        ) where
 
@@ -89,6 +90,12 @@ lookup' facialName' (DeclarationSet declarations' _) =
 
 (!) :: Declaration a => DeclarationSet a -> Identifier -> a
 declarationSet ! facialName' = fromJust $ lookup' facialName' declarationSet
+
+union :: Declaration a
+      => DeclarationSet a
+      -> DeclarationSet a
+      -> Either NameDuplication (DeclarationSet a)
+union a b = fromList $ toList a ++ toList b
 
 instance (Declaration a) => L.IsList (DeclarationSet a) where
     type Item (DeclarationSet a) = a
