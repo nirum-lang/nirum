@@ -13,9 +13,9 @@ import Nirum.Constructs.TypeDeclaration ( Type(..)
 spec :: Spec
 spec =
     describe "Module" $ do
-        let decls = [ TypeDeclaration "path" (Alias "text") $ Just "path string"
-                    , TypeDeclaration "offset" (BoxedType "float64") Nothing
-                    ] :: DeclarationSet TypeDeclaration
+        let pathT = TypeDeclaration "path" (Alias "text") $ Just "path string"
+            offsetT = TypeDeclaration "offset" (BoxedType "float64") Nothing
+            decls = [pathT, offsetT] :: DeclarationSet TypeDeclaration
             mod1 = Module decls Nothing
             mod2 = Module decls $ Just "module level docs...\nblahblah"
         specify "toCode" $ do
