@@ -476,6 +476,25 @@ spec = do
             it "errors if there are any duplicated behind names" $
                 expectError "type b = text;\ntype a/b = text;" 2 7
 
+    describe "modulePath" $ do
+        let (parse', expectError) = helperFuncs P.modulePath
+        it "emits ModulePath if succeeded to parse" $ do
+            parse' "foo" `shouldBe` Right ["foo"]
+            parse' "foo.bar" `shouldBe` Right ["foo", "bar"]
+            parse' "foo.bar.baz" `shouldBe` Right ["foo", "bar", "baz"]
+        it "errors if it's empty" $
+            expectError "" 1 1
+        it "errors if it starts with period" $ do
+            expectError "." 1 1
+            expectError ".foo" 1 1
+            expectError ".foo.bar" 1 1
+            expectError ".foo.bar.baz" 1 1
+        it "errors if it ends with period" $ do
+            expectError "." 1 1
+            expectError "foo." 1 5
+            expectError "foo.bar." 1 9
+            expectError "foo.bar.baz." 1 13
+
     specify "parse & parseFile" $ do
         files <- getDirectoryContents "examples"
         let examples = map ("examples/" ++) $ filter (isSuffixOf ".nrm") files

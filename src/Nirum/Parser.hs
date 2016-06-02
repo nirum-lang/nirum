@@ -10,6 +10,7 @@ module Nirum.Parser ( Parser
                     , listModifier
                     , mapModifier
                     , module'
+                    , modulePath
                     , name
                     , optionModifier
                     , parse
@@ -61,6 +62,7 @@ import Nirum.Constructs.Identifier ( Identifier
                                    , toString
                                    )
 import Nirum.Constructs.Module (Module(Module))
+import Nirum.Constructs.ModulePath (ModulePath(ModulePath, ModuleName))
 import Nirum.Constructs.Name (Name(Name))
 import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
                                         , Field(Field)
@@ -349,6 +351,21 @@ typeDeclaration =
       recordTypeDeclaration <|>
       unionTypeDeclaration
     ) <?> "type declaration (e.g. boxed, enum, record, union)"
+
+modulePath :: Parser ModulePath
+modulePath = do
+    idents <- sepBy1 (identifier <?> "module identifier")
+                     (spaces >> char '.' >> spaces)
+              <?> "module path"
+    case makePath idents of
+        Nothing -> unexpected "module path cannot be empty"
+        Just path -> return path
+  where
+    makePath :: [Identifier] -> Maybe ModulePath
+    makePath = foldl f Nothing
+    f :: Maybe ModulePath -> Identifier -> Maybe ModulePath
+    f Nothing i = Just $ ModuleName i
+    f (Just p) i = Just $ ModulePath p i
 
 module' :: Parser Module
 module' = do

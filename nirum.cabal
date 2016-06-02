@@ -24,6 +24,7 @@ library
                  ,     Nirum.Constructs.DeclarationSet
                  ,     Nirum.Constructs.Identifier
                  ,     Nirum.Constructs.Module
+                 ,     Nirum.Constructs.ModulePath
                  ,     Nirum.Constructs.Name
                  ,     Nirum.Constructs.TypeDeclaration
                  ,     Nirum.Constructs.TypeExpression
@@ -55,6 +56,7 @@ test-suite spec
                ,       Nirum.Constructs.DeclarationSetSpec
                ,       Nirum.Constructs.IdentifierSpec
                ,       Nirum.Constructs.ModuleSpec
+               ,       Nirum.Constructs.ModulePathSpec
                ,       Nirum.Constructs.NameSpec
                ,       Nirum.Constructs.TypeDeclarationSpec
                ,       Nirum.Constructs.TypeExpressionSpec

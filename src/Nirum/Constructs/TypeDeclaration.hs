@@ -10,6 +10,7 @@ module Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
 
 import Data.Maybe (isJust)
 import Data.String (IsString(fromString))
+
 import qualified Data.Text as T
 
 import Nirum.Constructs (Construct(toCode))
@@ -18,7 +19,8 @@ import Nirum.Constructs.Declaration ( Declaration(..)
                                     , toCodeWithPrefix
                                     )
 import Nirum.Constructs.DeclarationSet (DeclarationSet, null', toList)
-import Nirum.Constructs.Name (Name)
+import Nirum.Constructs.Identifier (Identifier)
+import Nirum.Constructs.Name (Name(Name))
 import Nirum.Constructs.TypeExpression (TypeExpression)
 
 data Type
