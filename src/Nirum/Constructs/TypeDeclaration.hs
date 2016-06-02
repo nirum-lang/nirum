@@ -80,20 +80,22 @@ instance Declaration Tag where
     name (Tag name' _ _) = name'
     docs (Tag _ _ docs') = docs'
 
--- Primitive type identifiers.
+-- | Primitive type identifiers.
 data PrimitiveTypeIdentifier
     = Bigint | Decimal | Int32 | Int64 | Float32 | Float64 | Text | Binary
     | Date | Datetime | Bool | Uuid | Uri
     deriving (Eq, Ord, Show)
 
--- Possible coded types of 'PrimitiveType' in JSON representation.
+-- | Possible coded types of 'PrimitiveType' in JSON representation.
 data JsonType = Boolean | Number | String deriving (Eq, Ord, Show)
 
 -- Top-level 'Declaration' of type.
-data TypeDeclaration = TypeDeclaration { name :: Name
-                                       , type' :: Type
-                                       , docs :: Maybe Docs
-                                       } deriving (Eq, Ord, Show)
+data TypeDeclaration
+    = TypeDeclaration { typename :: Name
+                      , type' :: Type
+                      , typeDocs :: Maybe Docs
+                      }
+    deriving (Eq, Ord, Show)
 
 instance Construct TypeDeclaration where
     toCode (TypeDeclaration name' (Alias cname) docs') =
@@ -135,9 +137,9 @@ instance Construct TypeDeclaration where
                                  [ T.replace "\n" "\n    " (toCode t)
                                  | t <- toList tags'
                                  ]
-    toCode (TypeDeclaration name' (PrimitiveType typename jsonType') docs') =
+    toCode (TypeDeclaration name' (PrimitiveType typename' jsonType') docs') =
         T.concat [ "// primitive type `", toCode name', "`\n"
-                 , "//     internal type identifier: ", showT typename, "\n"
+                 , "//     internal type identifier: ", showT typename', "\n"
                  , "//     coded to json ", showT jsonType', " type\n"
                  , docString docs'
                  ]

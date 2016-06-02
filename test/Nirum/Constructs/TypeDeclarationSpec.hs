@@ -5,6 +5,7 @@ import qualified Data.Text as T
 import Test.Hspec.Meta
 
 import Nirum.Constructs (Construct(toCode))
+import Nirum.Constructs.Declaration (Declaration(name, docs))
 import Nirum.Constructs.DeclarationSet (DeclarationSet)
 import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
                                         , Field(Field)
@@ -20,11 +21,11 @@ spec = do
     describe "TypeDeclaration" $ do
         context "Alias" $ do
             let alias = Alias "text"
-                a = TypeDeclaration { name = "path"
+                a = TypeDeclaration { typename = "path"
                                     , type' = alias
-                                    , docs = Nothing
+                                    , typeDocs = Nothing
                                     }
-                b = a { docs = Just "docs"}
+                b = a { typeDocs = Just "docs"}
             specify "name" $ do
                 name a `shouldBe` "path"
                 name b `shouldBe` "path"
@@ -36,11 +37,11 @@ spec = do
                 toCode b `shouldBe` "type path = text;\n# docs"
         context "BoxedType" $ do
             let boxed = BoxedType "float64"
-                a = TypeDeclaration { name = "offset"
+                a = TypeDeclaration { typename = "offset"
                                     , type' = boxed
-                                    , docs = Nothing
+                                    , typeDocs = Nothing
                                     }
-                b = a { docs = Just "docs" }
+                b = a { typeDocs = Just "docs" }
             specify "name" $ do
                 name a `shouldBe` "offset"
                 name b `shouldBe` "offset"
@@ -56,11 +57,11 @@ spec = do
                               , EnumMember "us" $ Just "United States"
                               ] :: DeclarationSet EnumMember
                 enum = EnumType enumMembers
-                a = TypeDeclaration { name = "country"
+                a = TypeDeclaration { typename = "country"
                                     , type' = enum
-                                    , docs = Nothing
+                                    , typeDocs = Nothing
                                     }
-                b = a { docs = Just "country codes" }
+                b = a { typeDocs = Just "country codes" }
             specify "toCode" $ do
                 toCode a `shouldBe` "enum country\n\
                                     \    = kr\n\
@@ -83,11 +84,11 @@ spec = do
                           , Field "gender" "gender" Nothing
                           ] :: DeclarationSet Field
                 record = RecordType fields'
-                a = TypeDeclaration { name = "person"
+                a = TypeDeclaration { typename = "person"
                                     , type' = record
-                                    , docs = Nothing
+                                    , typeDocs = Nothing
                                     }
-                b = a { docs = Just "person record type" }
+                b = a { typeDocs = Just "person record type" }
             specify "toCode" $ do
                 toCode a `shouldBe` "record person (\n\
                                     \    text name,\n\
@@ -114,11 +115,11 @@ spec = do
                         , Tag "none" [] Nothing
                         ]
                 union = UnionType tags'
-                a = TypeDeclaration { name = "shape"
+                a = TypeDeclaration { typename = "shape"
                                     , type' = union
-                                    , docs = Nothing
+                                    , typeDocs = Nothing
                                     }
-                b = a { docs = Just "shape type" }
+                b = a { typeDocs = Just "shape type" }
             specify "toCode" $ do
                 toCode a `shouldBe` "union shape\n\
                                     \    = circle (point origin, \

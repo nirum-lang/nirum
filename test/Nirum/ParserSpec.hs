@@ -329,7 +329,7 @@ spec = do
                 Right expected
             parse' "enum gender=male|female|unknown;" `shouldBe` Right expected
             parse' "enum gender =\n# gender type\nmale | female | unknown;"
-                `shouldBe` Right (expected { docs = Just "gender type\n" })
+                `shouldBe` Right (expected { typeDocs = Just "gender type\n" })
             parse' "enum gender = male # docs\n| female | unknown # docs2\n;"
                 `shouldBe` Right (TypeDeclaration "gender"
                                                   (EnumType membersWithDocs)
@@ -354,7 +354,7 @@ spec = do
                           ] :: DeclarationSet Field
                 record = RecordType fields'
                 a = TypeDeclaration "person" record Nothing
-                b = a { docs = Just "person record type" }
+                b = a { typeDocs = Just "person record type" }
             -- without docs, last field with trailing comma
             parse' "record person (\n\
                    \    text name,\n\
@@ -416,7 +416,7 @@ spec = do
                         ]
                 union = UnionType tags'
                 a = TypeDeclaration "shape" union Nothing
-                b = a { docs = Just "shape type" }
+                b = a { typeDocs = Just "shape type" }
             parse' "union shape\n\
                    \    = circle (point origin, \
                                  \offset radius,)\n\
