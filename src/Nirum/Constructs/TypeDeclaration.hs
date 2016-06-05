@@ -19,8 +19,7 @@ import Nirum.Constructs.Declaration ( Declaration(..)
                                     , toCodeWithPrefix
                                     )
 import Nirum.Constructs.DeclarationSet (DeclarationSet, null', toList)
-import Nirum.Constructs.Identifier (Identifier)
-import Nirum.Constructs.Name (Name(Name))
+import Nirum.Constructs.Name (Name)
 import Nirum.Constructs.TypeExpression (TypeExpression)
 
 data Type

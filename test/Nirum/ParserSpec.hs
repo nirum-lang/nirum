@@ -8,12 +8,13 @@ import Data.Maybe (fromJust)
 import Prelude hiding (readFile)
 import System.Directory (getDirectoryContents)
 
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Text as T
 import Data.Text.IO (readFile)
 import Test.Hspec.Meta
 import Text.Megaparsec (eof, runParser)
-import Text.Megaparsec.Error (ParseError, errorPos)
-import Text.Megaparsec.Pos (SourcePos, sourceColumn, sourceLine)
+import Text.Megaparsec.Error (errorPos)
+import Text.Megaparsec.Pos (Pos, SourcePos(sourceColumn, sourceLine), mkPos)
 import Text.Megaparsec.Text (Parser)
 
 import qualified Nirum.Parser as P
@@ -31,16 +32,16 @@ import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
                                         )
 import Nirum.Constructs.TypeExpression (TypeExpression(..))
 
-erroredPos :: Either ParseError a -> (Int, Int)
+erroredPos :: Either P.ParseError a -> (Pos, Pos)
 erroredPos left =
     (sourceLine pos, sourceColumn pos)
   where
-    error' = head $ lefts [left] :: ParseError
-    pos = errorPos error' :: SourcePos
+    error' = head $ lefts [left] :: P.ParseError
+    pos = NE.head (errorPos error') :: SourcePos
 
 helperFuncs :: (Show a)
             => Parser a
-            -> ( T.Text -> Either ParseError a
+            -> ( T.Text -> Either P.ParseError a
                , T.Text -> Int -> Int -> Expectation
                )
 helperFuncs parser =
@@ -52,8 +53,10 @@ helperFuncs parser =
         return r
     parse' = runParser parserAndEof ""
     expectError string line col = do
+        line' <- mkPos line
+        col' <- mkPos col
         parse' string `shouldSatisfy` isLeft
-        erroredPos (parse' string) `shouldBe` (line, col)
+        erroredPos (parse' string) `shouldBe` (line', col')
 
 spec :: Spec
 spec = do

@@ -59,7 +59,7 @@ identifierRule = do
     firstChar <- satisfy isAlpha
     restChars <- P.many $ satisfy isAlnum
     restWords <- P.many $ do
-        sep <- oneOf "-_"
+        sep <- oneOf ("-_" :: String)
         chars <- P.some $ satisfy isAlnum
         return $ T.pack $ sep:chars
     return $ Identifier $ T.concat $ T.pack (firstChar : restChars) : restWords

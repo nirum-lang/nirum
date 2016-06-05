@@ -37,8 +37,13 @@ import qualified Nirum.Constructs.Name as N
 import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
                                         , Field(Field)
                                         , Tag(Tag)
-                                        , Type(Alias, BoxedType, EnumType,
-                                               RecordType, UnionType)
+                                        , Type( Alias
+                                              , BoxedType
+                                              , EnumType
+                                              , PrimitiveType
+                                              , RecordType
+                                              , UnionType
+                                              )
                                         , TypeDeclaration(TypeDeclaration)
                                         )
 import Nirum.Constructs.TypeExpression ( TypeExpression( ListModifier
@@ -228,6 +233,8 @@ compileTypeExpression modifier = do
         MapModifier _ _ -> undefined  -- never happen!
 
 compileTypeDeclaration :: TypeDeclaration -> CodeGen Code
+compileTypeDeclaration (TypeDeclaration _ (PrimitiveType _ _) _) =
+    return "" -- never used
 compileTypeDeclaration (TypeDeclaration typename (Alias ctype) _) = do
     ctypeExpr <- compileTypeExpression ctype
     return [qq|

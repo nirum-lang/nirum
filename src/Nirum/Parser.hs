@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 module Nirum.Parser ( Parser
+                    , ParseError
                     , aliasTypeDeclaration 
                     , boxedTypeDeclaration 
                     , docs
@@ -26,26 +27,27 @@ module Nirum.Parser ( Parser
 
 import Control.Monad (void)
 import Data.List (foldl1')
+import Prelude hiding (readFile)
 
 import Data.Set (elems)
 import qualified Data.Text as T
-import Text.Megaparsec ( eof
+import Data.Text.IO (readFile)
+import Text.Megaparsec ( Token
+                       , eof
                        , many
                        , notFollowedBy
                        , option
                        , optional
-                       , parseFromFile
                        , runParser
                        , sepBy1
                        , sepEndBy1
                        , skipMany
                        , try
-                       , unexpected
                        , (<|>)
                        , (<?>)
                        )
 import Text.Megaparsec.Char (char, eol, noneOf, spaceChar, string, string')
-import Text.Megaparsec.Error (ParseError)
+import qualified Text.Megaparsec.Error as E
 import Text.Megaparsec.Text (Parser)
 
 import Nirum.Constructs.Declaration (Docs(Docs))
@@ -83,8 +85,10 @@ import Nirum.Constructs.TypeExpression ( TypeExpression( ListModifier
                                                        )
                                        )
 
+type ParseError = E.ParseError (Token T.Text) E.Dec
+
 comment :: Parser ()
-comment = string "//" >> void (many $ noneOf "\n") <?> "comment"
+comment = string "//" >> void (many $ noneOf ("\n" :: String)) <?> "comment"
 
 spaces :: Parser ()
 spaces = skipMany $ void spaceChar <|> comment
@@ -172,7 +176,7 @@ docs :: Parser Docs
 docs = do
     comments <- sepEndBy1 (do { char '#'
                               ; void $ optional $ char ' '
-                              ; line <- many $ noneOf "\r\n"
+                              ; line <- many $ noneOf ("\r\n" :: String)
                               ; return $ T.pack line
                               }) (eol >> spaces) <?> "comments"
     return $ Docs $ T.unlines comments
@@ -235,11 +239,11 @@ enumTypeDeclaration = do
                    <?> "enum members"
     case fromList members of
         Left (BehindNameDuplication (Name _ bname)) ->
-            unexpected ("the behind member name `" ++ toString bname ++
-                        "` is duplicated")
+            fail ("the behind member name `" ++ toString bname ++
+                  "` is duplicated")
         Left (FacialNameDuplication (Name fname _)) ->
-            unexpected ("the facial member name `" ++ toString fname ++
-                        "` is duplicated")
+            fail ("the facial member name `" ++ toString fname ++
+                  "` is duplicated")
         Right memberSet -> do
             spaces
             char ';'
@@ -274,11 +278,11 @@ fieldSet = do
     fields' <- fields <?> "fields"
     case fromList fields' of
         Left (BehindNameDuplication (Name _ bname)) ->
-            unexpected ("the behind field name `" ++ toString bname ++
-                        "` is duplicated")
+            fail ("the behind field name `" ++ toString bname ++
+                  "` is duplicated")
         Left (FacialNameDuplication (Name fname _)) ->
-            unexpected ("the facial field name `" ++ toString fname ++
-                        "` is duplicated")
+            fail ("the facial field name `" ++ toString fname ++
+                  "` is duplicated")
         Right set -> return set
 
 recordTypeDeclaration :: Parser TypeDeclaration
@@ -335,11 +339,11 @@ unionTypeDeclaration = do
     char ';'
     case fromList tags' of
         Left (BehindNameDuplication (Name _ bname)) ->
-            unexpected ("the behind tag name `" ++ toString bname ++
-                        "` is duplicated")
+            fail ("the behind tag name `" ++ toString bname ++
+                  "` is duplicated")
         Left (FacialNameDuplication (Name fname _)) ->
-            unexpected ("the facial tag name `" ++ toString fname ++
-                        "` is duplicated")
+            fail ("the facial tag name `" ++ toString fname ++
+                  "` is duplicated")
         Right tagSet ->
             return $ TypeDeclaration typename (UnionType tagSet) docs'
 
@@ -358,7 +362,7 @@ modulePath = do
                      (spaces >> char '.' >> spaces)
               <?> "module path"
     case makePath idents of
-        Nothing -> unexpected "module path cannot be empty"
+        Nothing -> fail "module path cannot be empty"
         Just path -> return path
   where
     makePath :: [Identifier] -> Maybe ModulePath
@@ -380,11 +384,11 @@ module' = do
         return typeDecl
     case fromList types of
         Left (BehindNameDuplication (Name _ bname)) ->
-            unexpected ("the behind type name `" ++ toString bname ++
-                        "` is duplicated")
+            fail ("the behind type name `" ++ toString bname ++
+                  "` is duplicated")
         Left (FacialNameDuplication (Name fname _)) ->
-            unexpected ("the facial type name `" ++ toString fname ++
-                        "` is duplicated")
+            fail ("the facial type name `" ++ toString fname ++
+                  "` is duplicated")
         Right typeSet -> return $ Module typeSet docs'
 
 file :: Parser Module
@@ -400,6 +404,8 @@ parse = runParser file
 
 parseFile :: FilePath -- | Source path
           -> IO (Either ParseError Module)
-parseFile = parseFromFile file
+parseFile path = do
+    code <- readFile path
+    return $ runParser file path code
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}

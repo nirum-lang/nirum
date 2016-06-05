@@ -2,6 +2,8 @@
              DeriveDataTypeable #-}
 module Nirum.Cli (main) where
 
+import GHC.Exts (IsList(toList))
+
 import qualified Data.Text as T
 import qualified Data.Text.IO as TI
 import System.Console.CmdArgs.Implicit ( Data
@@ -21,12 +23,12 @@ import System.FilePath ( replaceDirectory
                        , replaceExtension
                        )
 import Text.InterpolatedString.Perl6 (qq)
-import Text.Megaparsec.Error ( ParseError
-                             , errorMessages
-                             , errorPos
-                             , showMessages
+import Text.Megaparsec (Token)
+import Text.Megaparsec.Error ( Dec
+                             , ParseError(errorPos)
+                             , parseErrorPretty
                              )
-import Text.Megaparsec.Pos (SourcePos(sourceName, sourceLine, sourceColumn))
+import Text.Megaparsec.Pos (SourcePos(sourceLine, sourceColumn), unPos)
 
 import Nirum.Parser (parseFile)
 import Nirum.Targets.Python (compileModule)
@@ -38,24 +40,23 @@ data NirumCli = NirumCli { targetLanguage :: TargetLanguage
                          , destination :: FilePath
                          } deriving (Show, Data, Typeable)
 
-toErrorMessage :: ParseError -> FilePath -> IO String
+toErrorMessage :: ParseError (Token T.Text) Dec -> FilePath -> IO String
 toErrorMessage parseError' filePath' = do
     sourceCode <- readFile filePath'
     let sourceLines = lines sourceCode
     return [qq|
-File: "{sourceName error'}", line $errorLine column $errorColumn
+{parseErrorPretty $ parseError'}
 
 {sourceLines !! (errorLine - 1)}
 {arrow}
-
-{showMessages . errorMessages $ parseError'}|]
+|]
   where
     error' :: SourcePos
-    error' = errorPos parseError'
+    error' = head $ toList $ errorPos parseError'
     errorLine :: Int
-    errorLine = sourceLine error'
+    errorLine = fromEnum $ unPos $ sourceLine error'
     errorColumn :: Int
-    errorColumn = sourceColumn error'
+    errorColumn = fromEnum $ unPos $ sourceColumn error'
     arrow :: T.Text
     arrow = T.snoc (T.concat (replicate (errorColumn - 1) (T.pack " "))) '^'
 
@@ -76,14 +77,15 @@ main = do
         Python -> do
             result <- parseFile nirumSourceFilePath
             case result of
-              Left error' -> do
-                  m <- toErrorMessage error' nirumSourceFilePath
-                  putStrLn m
-              Right module' -> do
-                  let code = compileModule module'
-                      outputFilename = toOutputFilename nirumSourceFilePath $
-                          destination argument
-                  TI.writeFile outputFilename code
+                Left error' -> do
+                    m <- toErrorMessage error' nirumSourceFilePath
+                    putStrLn m
+                    putStrLn [qq|error: {parseErrorPretty error'}|]
+                Right module' -> do
+                    let code = compileModule module'
+                        outputFilename = toOutputFilename nirumSourceFilePath $
+                            destination argument
+                    TI.writeFile outputFilename code
   where
     toOutputFilename :: FilePath -> FilePath -> String
     toOutputFilename source dest =
