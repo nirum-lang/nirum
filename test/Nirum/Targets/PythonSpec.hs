@@ -49,7 +49,6 @@ import Nirum.Constructs.TypeExpression ( TypeExpression( ListModifier
                                        )
 import Nirum.Targets.Python ( CodeGen( code
                                      , localImports
-                                     , packages
                                      , standardImports
                                      , thirdPartyImports
                                      )
@@ -59,7 +58,6 @@ import Nirum.Targets.Python ( CodeGen( code
                             , toAttributeName
                             , toClassName
                             , withLocalImport
-                            , withPackage
                             , withStandardImport
                             , withThirdPartyImports
                             )
@@ -225,34 +223,29 @@ spec = do
             specify "packages and imports" $ do
                 let (c :: CodeGen Int) = do
                         a <- withStandardImport "sys" cg
-                        b <- withPackage "nirum" cg
-                        c' <- withThirdPartyImports
+                        b <- withThirdPartyImports
                             [("nirum", ["serialize_boxed_type"])]
                             cg
-                        d <- withLocalImport ".." "Gender" cg
-                        e <- withStandardImport "os" cg
-                        f'' <- withPackage "nirum" cg
-                        g'' <- withThirdPartyImports
+                        c' <- withLocalImport ".." "Gender" cg
+                        d <- withStandardImport "os" cg
+                        e <- withThirdPartyImports
                             [("nirum", ["serialize_enum_type"])]
                             cg
-                        h'' <- withLocalImport ".." "Path" cg
-                        return $ sum ([a, b, c', d, e, f'', g'', h''] :: [Int])
-                packages c `shouldBe` ["nirum"]
+                        f'' <- withLocalImport ".." "Path" cg
+                        return $ sum ([a, b, c', d, e, f''] :: [Int])
                 standardImports c `shouldBe` ["os", "sys"]
                 thirdPartyImports c `shouldBe`
                     [("nirum", ["serialize_boxed_type", "serialize_enum_type"])]
                 localImports c `shouldBe` [("..", ["Gender", "Path"])]
-                code c `shouldBe` (123 * 8)
+                code c `shouldBe` (123 * 6)
         specify "withStandardImport" $ do
             let codeGen1 = withStandardImport "sys" (pure True)
-            packages codeGen1 `shouldBe` []
             standardImports codeGen1 `shouldBe` ["sys"]
             thirdPartyImports codeGen1 `shouldBe` []
             localImports codeGen1 `shouldBe` []
             code codeGen1 `shouldBe` True
             errorMessage codeGen1 `shouldBe` Nothing
             let codeGen2 = withStandardImport "os" codeGen1
-            packages codeGen2 `shouldBe` []
             standardImports codeGen2 `shouldBe` ["os", "sys"]
             thirdPartyImports codeGen2 `shouldBe` []
             localImports codeGen2 `shouldBe` []
@@ -268,34 +261,29 @@ spec = do
     describe "compileTypeExpression" $ do
         specify "TypeIdentifier" $ do
             let c = compileTypeExpression (TypeIdentifier "bigint")
-            packages c `shouldBe` []
             standardImports c `shouldBe` []
             localImports c `shouldBe` []
             code c `shouldBe` "Bigint"  -- FIXME: numbers.Integral
         specify "OptionModifier" $ do
             let c' = compileTypeExpression (OptionModifier "text")
-            packages c' `shouldBe` []
             standardImports c' `shouldBe` ["typing"]
             localImports c' `shouldBe` []
             code c' `shouldBe` "typing.Optional[Text]"
             -- FIXME: typing.Optional[str]
         specify "SetModifier" $ do
             let c'' = compileTypeExpression (SetModifier "text")
-            packages c'' `shouldBe` []
             standardImports c'' `shouldBe` ["typing"]
             localImports c'' `shouldBe` []
             code c'' `shouldBe` "typing.AbstractSet[Text]"
             -- FIXME: typing.AbstractSet[str]
         specify "ListModifier" $ do
             let c''' = compileTypeExpression (ListModifier "text")
-            packages c''' `shouldBe` []
             standardImports c''' `shouldBe` ["typing"]
             localImports c''' `shouldBe` []
             code c''' `shouldBe` "typing.Sequence[Text]"
             -- FIXME: typing.Sequence[str]
         specify "MapModifier" $ do
             let c'''' = compileTypeExpression (MapModifier "uuid" "text")
-            packages c'''' `shouldBe` []
             standardImports c'''' `shouldBe` ["typing"]
             localImports c'''' `shouldBe` []
             code c'''' `shouldBe` "typing.Mapping[Uuid, Text]"

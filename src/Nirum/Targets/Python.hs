@@ -3,7 +3,6 @@
 module Nirum.Targets.Python ( Code
                             , CodeGen( code
                                      , localImports
-                                     , packages
                                      , standardImports
                                      , thirdPartyImports
                                      )
@@ -14,7 +13,6 @@ module Nirum.Targets.Python ( Code
                             , toAttributeName
                             , toClassName
                             , withLocalImport
-                            , withPackage
                             , withStandardImport
                             , withThirdPartyImports
                             ) where
@@ -56,8 +54,7 @@ import Nirum.Constructs.TypeExpression ( TypeExpression( ListModifier
 
 type Code = T.Text
 
-data CodeGen a = CodeGen { packages :: S.Set T.Text
-                         , standardImports :: S.Set T.Text
+data CodeGen a = CodeGen { standardImports :: S.Set T.Text
                          , thirdPartyImports :: M.Map T.Text (S.Set T.Text)
                          , localImports :: M.Map T.Text (S.Set T.Text)
                          , code :: a
@@ -74,21 +71,18 @@ instance Applicative CodeGen where
     (CodeGenError m) <*> _ = CodeGenError m
 
 instance Monad CodeGen where
-    return code' = CodeGen { packages = []
-                           , standardImports = []
+    return code' = CodeGen { standardImports = []
                            , thirdPartyImports = []
                            , localImports = []
                            , code = code'
                            }
-    (CodeGen p si ti li c) >>= f = case f c of
-        (CodeGen p' si' ti' li' code') ->
-            let packages' = S.union p p'
-                stdImports = S.union si si'
+    (CodeGen si ti li c) >>= f = case f c of
+        (CodeGen si' ti' li' code') ->
+            let stdImports = S.union si si'
                 thirdPartyImports' = M.unionWith S.union ti ti'
                 localImports' = M.unionWith S.union li li'
             in
-                CodeGen packages' stdImports thirdPartyImports'
-                        localImports' code'
+                CodeGen stdImports thirdPartyImports' localImports' code'
         (CodeGenError m) -> CodeGenError m
     (CodeGenError m) >>= _ = CodeGenError m
 
@@ -97,11 +91,6 @@ instance Monad CodeGen where
 errorMessage :: CodeGen a -> Maybe T.Text
 errorMessage CodeGen {} = Nothing
 errorMessage (CodeGenError m) = Just m
-
-withPackage :: T.Text -> CodeGen a -> CodeGen a
-withPackage package c@CodeGen { packages = p } =
-    c { packages = S.insert package p }
-withPackage _ c@(CodeGenError _) = c
 
 withStandardImport :: T.Text -> CodeGen a -> CodeGen a
 withStandardImport module' c@CodeGen { standardImports = si } =
