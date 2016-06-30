@@ -142,17 +142,18 @@ compileUnionTag parentname typename fields = do
                                         | (Field name _ _) <- toList fields
                                         ]
         nameNTypes = zip tagNames typeExprCodes
-        slotTypes =
-            toIndentedCodes (\(n, t) -> [qq|'{n}': {t}|]) nameNTypes ",\n        "
+        slotTypes = toIndentedCodes
+            (\(n, t) -> [qq|'{n}': {t}|]) nameNTypes ",\n        "
         slots = toIndentedCodes (\n -> [qq|'{n}'|]) tagNames ",\n        "
-        initialArgs = toIndentedCodes (\(n, t) -> [qq|{n}: {t}|]) nameNTypes ", "
+        initialArgs = toIndentedCodes
+            (\(n, t) -> [qq|{n}: {t}|]) nameNTypes ", "
         initialValues =
             toIndentedCodes (\n -> [qq|self.{n} = {n}|]) tagNames "\n        "
-        nameMaps =
-            toIndentedCodes
-                (\(Name f b) -> [qq|('{toAttributeName f}', '{toSnakeCaseText b}')|])
-                [name | Field name _ _ <- toList fields, N.isComplex name]
-                ",\n        "
+        nameMaps = toIndentedCodes
+            (\(Name f b) ->
+                [qq|('{toAttributeName f}', '{toSnakeCaseText b}')|])
+            [name | Field name _ _ <- toList fields, N.isComplex name]
+            ",\n        "
         parentClass = toClassName' parentname
     withStandardImport "typing" $
         withThirdPartyImports
@@ -219,9 +220,13 @@ compileTypeDeclaration (TypeDeclaration typename (BoxedType itype) _) = do
     let className = toClassName' typename
     itypeExpr <- compileTypeExpression itype
     withStandardImport "typing" $
-        withThirdPartyImports [ ("nirum.validate", ["validate_boxed_type"])
+        withThirdPartyImports [ ( "nirum.validate"
+                                , ["validate_boxed_type"]
+                                )
                               , ("nirum.serialize", ["serialize_boxed_type"])
-                              , ("nirum.deserialize", ["deserialize_boxed_type"])
+                              , ( "nirum.deserialize"
+                                , ["deserialize_boxed_type"]
+                                )
                               ] $
             return [qq|
 class $className:
@@ -280,21 +285,25 @@ compileTypeDeclaration (TypeDeclaration typename (RecordType fields) _) = do
                                           | (Field name _ _) <- toList fields
                                           ]
         nameNTypes = zip fieldNames typeExprCodes
-        slotTypes =
-            toIndentedCodes (\(n, t) -> [qq|'{n}': {t}|]) nameNTypes ",\n        "
+        slotTypes = toIndentedCodes
+            (\(n, t) -> [qq|'{n}': {t}|]) nameNTypes ",\n        "
         slots = toIndentedCodes (\n -> [qq|'{n}'|]) fieldNames ",\n        "
-        initialArgs = toIndentedCodes (\(n, t) -> [qq|{n}: {t}|]) nameNTypes ", "
-        initialValues =
-            toIndentedCodes (\n -> [qq|self.{n} = {n}|]) fieldNames "\n        "
-        nameMaps =
-            toIndentedCodes
-                (\(Name f b) -> [qq|('{toAttributeName f}', '{toSnakeCaseText b}')|])
-                [name | Field name _ _ <- toList fields, N.isComplex name]
-                ",\n        "
+        initialArgs = toIndentedCodes
+            (\(n, t) -> [qq|{n}: {t}|]) nameNTypes ", "
+        initialValues = toIndentedCodes
+            (\n -> [qq|self.{n} = {n}|]) fieldNames "\n        "
+        nameMaps = toIndentedCodes
+            (\(Name f b) ->
+                [qq|('{toAttributeName f}', '{toSnakeCaseText b}')|])
+            [name | Field name _ _ <- toList fields, N.isComplex name]
+            ",\n        "
     withStandardImport "typing" $
-        withThirdPartyImports [ ("nirum.validate", ["validate_record_type"])
+        withThirdPartyImports [ ( "nirum.validate"
+                                , ["validate_record_type"]
+                                )
                               , ("nirum.serialize", ["serialize_record_type"])
-                              , ("nirum.deserialize", ["deserialize_record_type"])
+                              , ( "nirum.deserialize"
+                                , ["deserialize_record_type"])
                               , ("nirum.constructs", ["NameDict"])
                               ] $
             return [qq|
@@ -340,11 +349,14 @@ compileTypeDeclaration (TypeDeclaration typename (UnionType tags) _) = do
     fieldCodes <- mapM (uncurry (compileUnionTag typename)) tagNameNFields
     let className = toClassName' typename
         fieldCodes' = T.intercalate "\n\n" fieldCodes
-        enumMembers = toIndentedCodes (\(t, b) -> [qq|$t = '{b}'|]) enumMembers' "\n        "
+        enumMembers = toIndentedCodes
+            (\(t, b) -> [qq|$t = '{b}'|]) enumMembers' "\n        "
     withStandardImport "typing" $
         withStandardImport "enum" $
-            withThirdPartyImports [ ("nirum.serialize", ["serialize_union_type"])
-                                  , ("nirum.deserialize", ["deserialize_union_type"])
+            withThirdPartyImports [ ( "nirum.serialize"
+                                    , ["serialize_union_type"])
+                                  , ( "nirum.deserialize"
+                                    , ["deserialize_union_type"])
                                   , ("nirum.constructs", ["NameDict"])
                                   ] $
                 return [qq|
@@ -389,11 +401,10 @@ $fieldCodes'
                    | (Tag tagName _ _) <- toList tags
                    ]
     nameMaps :: T.Text
-    nameMaps =
-        toIndentedCodes
-            (\(Name f b) -> [qq|('{toAttributeName f}', '{toSnakeCaseText b}')|])
-            [name | (name, _) <- tagNameNFields, N.isComplex name]
-            ",\n        "
+    nameMaps = toIndentedCodes
+        (\(Name f b) -> [qq|('{toAttributeName f}', '{toSnakeCaseText b}')|])
+        [name | (name, _) <- tagNameNFields, N.isComplex name]
+        ",\n        "
 
 compileModuleBody :: Module -> CodeGen Code
 compileModuleBody Module { types = types' } = do
