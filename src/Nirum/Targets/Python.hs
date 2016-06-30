@@ -165,7 +165,6 @@ class $className($parentClass):
         $slots,
     )
     __nirum_tag__ = $parentClass.Tag.{toAttributeName' typename}
-    __nirum_tag_behind_name__ = '{toSnakeCaseText $ N.behindName typename}'
     __nirum_tag_types__ = \{
         $slotTypes
     \}
@@ -341,7 +340,7 @@ compileTypeDeclaration (TypeDeclaration typename (UnionType tags) _) = do
     fieldCodes <- mapM (uncurry (compileUnionTag typename)) tagNameNFields
     let className = toClassName' typename
         fieldCodes' = T.intercalate "\n\n" fieldCodes
-        enumMembers = toIndentedCodes (\t -> [qq|$t = '{t}'|]) enumMembers' "\n        "
+        enumMembers = toIndentedCodes (\(t, b) -> [qq|$t = '{b}'|]) enumMembers' "\n        "
     withStandardImport "typing" $
         withStandardImport "enum" $
             withThirdPartyImports [ ("nirum.serialize", ["serialize_union_type"])
@@ -383,8 +382,10 @@ $fieldCodes'
     tagNameNFields = [ (tagName, fields)
                      | (Tag tagName fields _) <- toList tags
                      ]
-    enumMembers' :: [T.Text]
-    enumMembers' = [ toAttributeName' tagName
+    enumMembers' :: [(T.Text, T.Text)]
+    enumMembers' = [ ( toAttributeName' tagName
+                     , toSnakeCaseText $ N.behindName tagName
+                     )
                    | (Tag tagName _ _) <- toList tags
                    ]
     nameMaps :: T.Text

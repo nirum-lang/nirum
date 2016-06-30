@@ -506,6 +506,15 @@ spec = do
             tT decl "Pop(country='US') != Pop(country='KR')"
             tR' decl "TypeError" "Pop(country=1)"
             tT decl "Pop.__slots__ == ('country', )"
+        specify "union type with behind names" $ do
+            let pop =
+                    Tag (Name "pop" "popular_music")
+                        [ Field "country" "text" Nothing ]
+                        Nothing
+                tags = [pop]
+                decl = TypeDeclaration "music" (UnionType tags) Nothing
+            tT decl "Pop(country='KR').__nirum_tag__.value == 'popular_music'"
+
 
 
 {-# ANN module ("HLint: ignore Functor law" :: String) #-}
