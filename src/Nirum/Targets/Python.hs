@@ -129,6 +129,10 @@ toAttributeName identifier =
 toAttributeName' :: Name -> T.Text
 toAttributeName' = toAttributeName . N.facialName
 
+toIndentedCodes :: (a -> T.Text) -> [a] -> T.Text -> T.Text
+toIndentedCodes f traversable concatenator =
+    T.intercalate concatenator $ map f traversable
+
 compileUnionTag :: Name -> Name -> DeclarationSet Field -> CodeGen Code
 compileUnionTag parentname typename fields = do
     typeExprCodes <- mapM compileTypeExpression
@@ -139,26 +143,28 @@ compileUnionTag parentname typename fields = do
                                         ]
         nameNTypes = zip tagNames typeExprCodes
         slotTypes =
-            createCodes (\(n, t) -> [qq|'{n}': {t}|]) nameNTypes ",\n        "
-        slots = createCodes (\n -> [qq|'{n}'|]) tagNames ",\n        "
-        initialArgs = createCodes (\(n, t) -> [qq|{n}: {t}|]) nameNTypes ", "
+            toIndentedCodes (\(n, t) -> [qq|'{n}': {t}|]) nameNTypes ",\n        "
+        slots = toIndentedCodes (\n -> [qq|'{n}'|]) tagNames ",\n        "
+        initialArgs = toIndentedCodes (\(n, t) -> [qq|{n}: {t}|]) nameNTypes ", "
         initialValues =
-            createCodes (\n -> [qq|self.{n} = {n}|]) tagNames "\n        "
+            toIndentedCodes (\n -> [qq|self.{n} = {n}|]) tagNames "\n        "
         nameMaps =
-            createCodes
+            toIndentedCodes
                 (\(Name f b) -> [qq|('{toAttributeName f}', '{toSnakeCaseText b}')|])
                 [name | Field name _ _ <- toList fields, N.isComplex name]
                 ",\n        "
+        parentClass = toClassName' parentname
     withStandardImport "typing" $
         withThirdPartyImports
             [("nirum.validate", ["validate_union_type"])] $
             return [qq|
-class $className({toClassName' parentname}):
+class $className($parentClass):
     # TODO: docstring
 
     __slots__ = (
         $slots,
     )
+    __nirum_tag__ = $parentClass.Tag.{toAttributeName' typename}
     __nirum_tag_behind_name__ = '{toSnakeCaseText $ N.behindName typename}'
     __nirum_tag_types__ = \{
         $slotTypes
@@ -184,11 +190,6 @@ class $className({toClassName' parentname}):
             for attr in self.__slots__
         )
             |]
-  where
-      createCodes :: (a -> T.Text) -> [a] -> T.Text -> T.Text
-      createCodes f traversable concatenator =
-          T.intercalate concatenator $ map f traversable
-
 compileTypeExpression :: TypeExpression -> CodeGen Code
 compileTypeExpression (TypeIdentifier i) = return $ toClassName i
 compileTypeExpression (MapModifier k v) = do
@@ -281,13 +282,13 @@ compileTypeDeclaration (TypeDeclaration typename (RecordType fields) _) = do
                                           ]
         nameNTypes = zip fieldNames typeExprCodes
         slotTypes =
-            createCodes (\(n, t) -> [qq|'{n}': {t}|]) nameNTypes ",\n        "
-        slots = createCodes (\n -> [qq|'{n}'|]) fieldNames ",\n        "
-        initialArgs = createCodes (\(n, t) -> [qq|{n}: {t}|]) nameNTypes ", "
+            toIndentedCodes (\(n, t) -> [qq|'{n}': {t}|]) nameNTypes ",\n        "
+        slots = toIndentedCodes (\n -> [qq|'{n}'|]) fieldNames ",\n        "
+        initialArgs = toIndentedCodes (\(n, t) -> [qq|{n}: {t}|]) nameNTypes ", "
         initialValues =
-            createCodes (\n -> [qq|self.{n} = {n}|]) fieldNames "\n        "
+            toIndentedCodes (\n -> [qq|self.{n} = {n}|]) fieldNames "\n        "
         nameMaps =
-            createCodes
+            toIndentedCodes
                 (\(Name f b) -> [qq|('{toAttributeName f}', '{toSnakeCaseText b}')|])
                 [name | Field name _ _ <- toList fields, N.isComplex name]
                 ",\n        "
@@ -336,23 +337,27 @@ class $className:
     def __nirum_deserialize__(cls: type, value) -> '{className}':
         return deserialize_record_type(cls, value)
                         |]
-  where
-      createCodes :: (a -> T.Text) -> [a] -> T.Text -> T.Text
-      createCodes f traversable concatenator =
-          T.intercalate concatenator $ map f traversable
 compileTypeDeclaration (TypeDeclaration typename (UnionType tags) _) = do
     fieldCodes <- mapM (uncurry (compileUnionTag typename)) tagNameNFields
     let className = toClassName' typename
         fieldCodes' = T.intercalate "\n\n" fieldCodes
+        enumMembers = toIndentedCodes (\t -> [qq|$t = '{t}'|]) enumMembers' "\n        "
     withStandardImport "typing" $
-        withThirdPartyImports [ ("nirum.serialize", ["serialize_union_type"])
-                              , ("nirum.deserialize", ["deserialize_union_type"])
-                              , ("nirum.constructs", ["NameDict"])
-                              ] $
-            return [qq|
+        withStandardImport "enum" $
+            withThirdPartyImports [ ("nirum.serialize", ["serialize_union_type"])
+                                  , ("nirum.deserialize", ["deserialize_union_type"])
+                                  , ("nirum.constructs", ["NameDict"])
+                                  ] $
+                return [qq|
 class $className:
 
     __nirum_union_behind_name__ = '{toSnakeCaseText $ N.behindName typename}'
+    __nirum_field_names__ = NameDict([
+        $nameMaps
+    ])
+
+    class Tag(enum.Enum):
+        $enumMembers
 
     def __init__(self, *args, **kwargs):
         raise NotImplementedError(
@@ -378,6 +383,16 @@ $fieldCodes'
     tagNameNFields = [ (tagName, fields)
                      | (Tag tagName fields _) <- toList tags
                      ]
+    enumMembers' :: [T.Text]
+    enumMembers' = [ toAttributeName' tagName
+                   | (Tag tagName _ _) <- toList tags
+                   ]
+    nameMaps :: T.Text
+    nameMaps =
+        toIndentedCodes
+            (\(Name f b) -> [qq|('{toAttributeName f}', '{toSnakeCaseText b}')|])
+            [name | (name, _) <- tagNameNFields, N.isComplex name]
+            ",\n        "
 
 compileModuleBody :: Module -> CodeGen Code
 compileModuleBody Module { types = types' } = do

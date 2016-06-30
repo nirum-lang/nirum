@@ -415,6 +415,10 @@ spec = do
                        ]
                 decl = TypeDeclaration "name" (UnionType tags) Nothing
             tT decl "isinstance(Name, type)"
+            tT decl "Name.Tag.western_name.value == 'western_name'"
+            tT decl "Name.Tag.east_asian_name.value == 'east_asian_name'"
+            tT decl [q|Name.Tag.culture_agnostic_name.value ==
+                       'culture_agnostic_name'|]
             tT decl "isinstance(WesternName, type)"
             tT decl "issubclass(WesternName, Name)"
             tR' decl "NotImplementedError" "Name()"
