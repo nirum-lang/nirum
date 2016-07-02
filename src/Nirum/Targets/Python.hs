@@ -232,6 +232,8 @@ compileTypeDeclaration (TypeDeclaration typename (BoxedType itype) _) = do
 class $className:
     # TODO: docstring
 
+    __nirum_boxed_type__ = $itypeExpr
+
     def __init__(self, value: $itypeExpr) -> None:
         validate_boxed_type(value, $itypeExpr)
         self.value = value  # type: $itypeExpr
