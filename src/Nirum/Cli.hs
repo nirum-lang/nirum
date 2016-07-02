@@ -41,11 +41,11 @@ data NirumCli = NirumCli { targetLanguage :: TargetLanguage
 toErrorMessage :: ParseError -> FilePath -> IO String
 toErrorMessage parseError' filePath' = do
     sourceCode <- readFile filePath'
-    let sourceLine' = lines sourceCode
+    let sourceLines = lines sourceCode
     return [qq|
 File: "{sourceName error'}", line $errorLine column $errorColumn
 
-{(!!) sourceLine' (errorLine - 1)}
+{sourceLines !! (errorLine - 1)}
 {arrow}
 
 {showMessages . errorMessages $ parseError'}|]
