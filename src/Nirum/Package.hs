@@ -3,17 +3,12 @@ module Nirum.Package ( Package(Package, modules)
                      , scanPackage
                      ) where
 
-import Data.Char (toLower)
-import Data.Maybe (mapMaybe)
-
 import Data.Map.Strict (Map, empty, foldrWithKey, fromList, insert)
-import Data.Text (pack)
 import System.Directory (doesDirectoryExist, listDirectory)
-import System.FilePath (takeBaseName, takeExtension, (</>))
+import System.FilePath ((</>))
 
-import Nirum.Constructs.Identifier (Identifier, fromText)
 import Nirum.Constructs.Module (Module)
-import Nirum.Constructs.ModulePath (ModulePath(ModuleName, ModulePath))
+import Nirum.Constructs.ModulePath (ModulePath, fromFilePath)
 import Nirum.Parser (ParseError, parseFile)
 
 -- | Represents a package which consists of modules.
@@ -44,28 +39,25 @@ scanPackage packagePath = do
 -- detected module paths.
 scanModules :: FilePath -> IO (Map ModulePath FilePath)
 scanModules packagePath = do
-    files <- scanFiles packagePath Nothing
+    files <- scanFiles ""
     return $ fromList files
   where
-    scanFiles :: FilePath -> Maybe ModulePath -> IO [(ModulePath, FilePath)]
-    scanFiles path prefix = do
-        dir <- doesDirectoryExist path
+    isNotHidden :: FilePath -> Bool
+    isNotHidden ('.':_) = False
+    isNotHidden _ = True
+    scanFiles :: FilePath -> IO [(ModulePath, FilePath)]
+    scanFiles path = do
+        dir <- doesDirectoryExist realPath
         if dir
-        then do subpaths <- listDirectory path
-                filesList <- mapM
-                    (\(p, m) -> scanFiles (path </> p) $
-                                          Just $ submodule prefix m)
-                    (mapMaybe toModuleName subpaths)
-                return [(m, f) | files <- filesList, (m, f) <- files]
-        else if map toLower (takeExtension path) == ".nrm"
-             then return $ case prefix of
-                               Just prefix' -> [(prefix', path)]
-                               Nothing -> []
-             else return []
-    toModuleName :: FilePath -> Maybe (FilePath, Identifier)
-    toModuleName f = case fromText (pack $ takeBaseName f) of
-                         Just ident -> Just (f, ident)
-                         Nothing -> Nothing
-    submodule :: Maybe ModulePath -> Identifier -> ModulePath
-    submodule Nothing = ModuleName
-    submodule (Just path) = ModulePath path
+        then do
+            subpaths <- listDirectory realPath
+            scans <- mapM (scanFiles . (path </>)) $ filter isNotHidden subpaths
+            return $ concat scans
+        else return $ case fromFilePath path of
+                          Just modulePath' -> [(modulePath', realPath)]
+                          Nothing -> []
+      where
+        realPath :: FilePath
+        realPath = case path of
+                       [] -> packagePath
+                       p -> packagePath </> p
