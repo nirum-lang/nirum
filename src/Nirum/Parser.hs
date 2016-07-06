@@ -8,6 +8,7 @@ module Nirum.Parser ( Parser
                     , enumTypeDeclaration
                     , file
                     , identifier
+                    , imports
                     , listModifier
                     , mapModifier
                     , module'
@@ -75,7 +76,9 @@ import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
                                               , RecordType
                                               , UnionType
                                               )
-                                        , TypeDeclaration(TypeDeclaration)
+                                        , TypeDeclaration( Import
+                                                         , TypeDeclaration
+                                                         )
                                         )
 import Nirum.Constructs.TypeExpression ( TypeExpression( ListModifier
                                                        , MapModifier
@@ -359,7 +362,7 @@ typeDeclaration =
 modulePath :: Parser ModulePath
 modulePath = do
     idents <- sepBy1 (identifier <?> "module identifier")
-                     (spaces >> char '.' >> spaces)
+                     (try (spaces >> char '.' >> spaces))
               <?> "module path"
     case makePath idents of
         Nothing -> fail "module path cannot be empty"
@@ -371,6 +374,24 @@ modulePath = do
     f Nothing i = Just $ ModuleName i
     f (Just p) i = Just $ ModulePath p i
 
+imports :: Parser [TypeDeclaration]
+imports = do
+    string' "import" <?> "import keyword"
+    spaces
+    path <- modulePath <?> "module path"
+    spaces
+    char '('
+    spaces
+    idents <- sepBy1 (identifier <?> "name to import")
+                     (spaces >> char ',' >> spaces)
+              <?> "names to import"
+    spaces
+    char ')'
+    spaces
+    char ';'
+    return [Import path ident | ident <- idents]
+
+
 module' :: Parser Module
 module' = do
     spaces
@@ -378,11 +399,16 @@ module' = do
         d <- docs <?> "module docs"
         spaces
         return d
+    spaces
+    importLists <- many $ do
+        importList <- imports
+        spaces
+        return importList
     types <- many $ do
         typeDecl <- typeDeclaration
         spaces
         return typeDecl
-    case fromList types of
+    case fromList (types ++ [i | l <- importLists, i <- l]) of
         Left (BehindNameDuplication (Name _ bname)) ->
             fail ("the behind type name `" ++ toString bname ++
                   "` is duplicated")

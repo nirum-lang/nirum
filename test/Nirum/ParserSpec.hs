@@ -498,6 +498,16 @@ spec = do
             expectError "foo.bar." 1 9
             expectError "foo.bar.baz." 1 13
 
+    describe "imports" $ do
+        let (parse', expectError) = helperFuncs P.imports
+        it "emits Import values if succeeded to parse" $
+            parse' "import foo.bar (a, b);" `shouldBe`
+                Right [ Import ["foo", "bar"] "a"
+                      , Import ["foo", "bar"] "b"
+                      ]
+        it "errors if parentheses have nothing" $
+            expectError "import foo.bar ();" 1 17
+
     specify "parse & parseFile" $ do
         files <- getDirectoryContents "examples"
         let examples = map ("examples/" ++) $ filter (isSuffixOf ".nrm") files
