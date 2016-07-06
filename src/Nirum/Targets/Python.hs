@@ -42,7 +42,9 @@ import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
                                               , RecordType
                                               , UnionType
                                               )
-                                        , TypeDeclaration(TypeDeclaration)
+                                        , TypeDeclaration( Import
+                                                         , TypeDeclaration
+                                                         )
                                         )
 import Nirum.Constructs.TypeExpression ( TypeExpression( ListModifier
                                                        , MapModifier
@@ -421,6 +423,8 @@ $fieldCodes'
         (\(Name f b) -> [qq|('{toAttributeName f}', '{toSnakeCaseText b}')|])
         [name | (name, _) <- tagNameNFields, N.isComplex name]
         ",\n        "
+compileTypeDeclaration (Import _ _) =
+    return "# TODO"
 
 compileModuleBody :: Module -> CodeGen Code
 compileModuleBody Module { types = types' } = do

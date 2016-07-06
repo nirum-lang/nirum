@@ -5,7 +5,14 @@ module Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
                                         , PrimitiveTypeIdentifier(..)
                                         , Tag(Tag)
                                         , Type(..)
-                                        , TypeDeclaration(..)
+                                        , TypeDeclaration( Import
+                                                         , TypeDeclaration
+                                                         , importName
+                                                         , modulePath
+                                                         , type'
+                                                         , typeDocs
+                                                         , typename
+                                                         )
                                         ) where
 
 import Data.Maybe (isJust)
@@ -19,7 +26,9 @@ import Nirum.Constructs.Declaration ( Declaration(..)
                                     , toCodeWithPrefix
                                     )
 import Nirum.Constructs.DeclarationSet (DeclarationSet, null', toList)
-import Nirum.Constructs.Name (Name)
+import Nirum.Constructs.Identifier (Identifier)
+import Nirum.Constructs.ModulePath (ModulePath)
+import Nirum.Constructs.Name (Name(Name))
 import Nirum.Constructs.TypeExpression (TypeExpression)
 
 data Type
@@ -96,6 +105,9 @@ data TypeDeclaration
                       , type' :: Type
                       , typeDocs :: Maybe Docs
                       }
+    | Import { modulePath :: ModulePath
+             , importName :: Identifier
+             }
     deriving (Eq, Ord, Show)
 
 instance Construct TypeDeclaration where
@@ -151,7 +163,15 @@ instance Construct TypeDeclaration where
         docString Nothing = ""
         docString (Just (Docs d)) =
             T.concat ["\n// ", T.replace "\n" "\n// " $ T.stripEnd d, "\n"]
+    toCode (Import path ident) = T.concat [ "import "
+                                          , toCode path
+                                          , " ("
+                                          , toCode ident
+                                          , ");\n"
+                                          ]
 
 instance Declaration TypeDeclaration where
     name (TypeDeclaration name' _ _) = name'
+    name (Import _ identifier) = Name identifier identifier
     docs (TypeDeclaration _ _ docs') = docs'
+    docs (Import _ _) = Nothing

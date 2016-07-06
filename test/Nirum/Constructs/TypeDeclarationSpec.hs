@@ -142,6 +142,14 @@ spec = do
             specify "toCode" $
                 T.lines (toCode decl) `shouldSatisfy`
                     all (T.isPrefixOf "//" . T.stripStart)
+        context "Import" $ do
+            let import' = Import ["foo", "bar"] "baz"
+            specify "name" $
+                name import' `shouldBe` "baz"
+            specify "docs" $
+                docs import' `shouldBe` Nothing
+            specify "toCode" $
+                toCode import' `shouldBe` "import foo.bar (baz);\n"
     describe "EnumMember" $ do
         let kr = EnumMember "kr" Nothing
             jp = EnumMember "jp" $ Just "Japan"
