@@ -1,4 +1,7 @@
 enum country
+    # Two-letter country codes, standarized as [ISO 3166][1]-1 alpha-2.
+    #
+    # [1]: http://www.iso.org/iso/home/standards/country_codes.htm
     = af  # Afghanistan
     | ax  # Åland Islands
     | al  # Albania

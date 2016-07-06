@@ -232,12 +232,18 @@ enumTypeDeclaration = do
     spaces
     typename <- name <?> "enum type name"
     spaces
-    char '='
-    spaces
-    docs' <- optional $ do
+    frontDocs <- optional $ do
         d <- docs <?> "enum type docs"
         spaces
         return d
+    char '='
+    spaces
+    docs' <- case frontDocs of
+        d@(Just _) -> return d
+        Nothing -> optional $ do
+            d <- docs <?> "enum type docs"
+            spaces
+            return d
     members <- (enumMember `sepBy1` (spaces >> char '|' >> spaces))
                    <?> "enum members"
     case fromList members of

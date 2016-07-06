@@ -331,6 +331,10 @@ spec = do
             parse' "enum gender = male | female | unknown;" `shouldBe`
                 Right expected
             parse' "enum gender=male|female|unknown;" `shouldBe` Right expected
+            -- forward docs of enum type
+            parse' "enum gender\n# gender type\n= male | female | unknown;"
+                `shouldBe` Right (expected { typeDocs = Just "gender type\n" })
+            -- backward docs of enum type
             parse' "enum gender =\n# gender type\nmale | female | unknown;"
                 `shouldBe` Right (expected { typeDocs = Just "gender type\n" })
             parse' "enum gender = male # docs\n| female | unknown # docs2\n;"
