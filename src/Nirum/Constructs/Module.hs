@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedLists, OverloadedStrings, QuasiQuotes  #-}
 module Nirum.Constructs.Module ( Module(Module, docs, types)
                                , coreModule
+                               , coreModulePath
                                , coreTypes
                                , imports
                                ) where
@@ -50,6 +51,9 @@ instance Construct Module where
 imports :: Module -> M.Map ModulePath (S.Set Identifier)
 imports (Module decls _) =
     M.fromListWith S.union [(p, [i]) | Import p i <- DS.toList decls]
+
+coreModulePath :: ModulePath
+coreModulePath = ["core"]
 
 coreModule :: Module
 coreModule = Module coreTypes $ Just coreDocs

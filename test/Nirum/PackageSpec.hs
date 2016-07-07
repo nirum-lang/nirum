@@ -5,22 +5,30 @@ import qualified Data.Map.Strict as M
 import System.FilePath ((</>))
 import Test.Hspec.Meta
 
-import Nirum.Constructs.Module (Module(Module))
+import Nirum.Constructs.Module (Module(Module), coreModulePath)
 import Nirum.Constructs.ModulePath (ModulePath)
-import Nirum.Constructs.TypeDeclaration ( Type(Alias)
+import Nirum.Constructs.TypeDeclaration ( JsonType(String)
+                                        , PrimitiveTypeIdentifier(Text)
+                                        , Type(Alias, PrimitiveType)
                                         , TypeDeclaration ( Import
                                                           , TypeDeclaration
                                                           )
                                         )
-import Nirum.Package ( ImportError ( CircularImportError
+import Nirum.Package ( BoundModule(boundPackage, modulePath)
+                     , ImportError ( CircularImportError
                                    , MissingImportError
                                    , MissingModulePathError
                                    )
                      , Package
+                     , TypeLookup(Imported, Local, Missing)
+                     , docs
+                     , lookupType
                      , makePackage
+                     , resolveBoundModule
                      , resolveModule
                      , scanModules
                      , scanPackage
+                     , types
                      )
 import Nirum.Parser (parseFile)
 
@@ -86,6 +94,11 @@ spec = do
             resolveModule ["qux"] validPackage `shouldBe`
                 Just (Module [] $ Just "qux")
             resolveModule ["baz"] validPackage `shouldBe` Nothing
+        specify "resolveBoundModule" $ do
+            let Just bm = resolveBoundModule ["foo"] validPackage
+            boundPackage bm `shouldBe` validPackage
+            modulePath bm `shouldBe` ["foo"]
+            resolveBoundModule ["baz"] validPackage `shouldBe` Nothing
         specify "detectMissingImports" $
             makePackage missingImportsModules `shouldBe`
                 Left [ MissingModulePathError ["foo"] ["foo", "bar"]
@@ -144,3 +157,28 @@ spec = do
                              , (["countries"], path </> "countries.nrm")
                              , (["address"], path </> "address.nrm")
                              ]
+    describe "BoundModule" $ do
+        let Just bm = resolveBoundModule ["foo", "bar"] validPackage
+            Just abc = resolveBoundModule ["abc"] validPackage
+            Just xyz = resolveBoundModule ["xyz"] validPackage
+        specify "docs" $ do
+            docs bm `shouldBe` Just "foo.bar"
+            let Just bm' = resolveBoundModule ["foo"] validPackage
+            docs bm' `shouldBe` Just "foo"
+        specify "types" $ do
+            types bm `shouldBe` []
+            types abc `shouldBe` [TypeDeclaration "a" (Alias "text") Nothing]
+            types xyz `shouldBe` [ Import ["abc"] "a"
+                                 , TypeDeclaration "x" (Alias "text") Nothing
+                                 ]
+        specify "lookupType" $ do
+            lookupType "a" bm `shouldBe` Missing
+            lookupType "a" abc `shouldBe` Local (Alias "text")
+            lookupType "a" xyz `shouldBe` Imported ["abc"] (Alias "text")
+            lookupType "x" bm `shouldBe` Missing
+            lookupType "x" abc `shouldBe` Missing
+            lookupType "x" xyz `shouldBe` Local (Alias "text")
+            lookupType "text" bm `shouldBe`
+                Imported coreModulePath (PrimitiveType Text String)
+            lookupType "text" abc `shouldBe` lookupType "text" bm
+            lookupType "text" xyz `shouldBe` lookupType "text" bm
