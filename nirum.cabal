@@ -78,6 +78,7 @@ test-suite spec
                ,       nirum
                ,       process                  >=1.1     && <2
                ,       semigroups
+               ,       temporary                >=1.2     && <1.3
                ,       text                     >=0.9.1.0 && <1.3
   ghc-options:         -Wall -Werror
                        -fno-warn-incomplete-uni-patterns

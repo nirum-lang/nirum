@@ -6,34 +6,46 @@ module Nirum.Targets.Python ( Code
                                      , standardImports
                                      , thirdPartyImports
                                      )
+                            , Source( Source
+                                    , sourceModule
+                                    , sourcePackage
+                                    )
+                            , compileError
                             , compileModule
+                            , compilePackage
+                            , compilePrimitiveType
                             , compileTypeDeclaration
                             , compileTypeExpression
-                            , errorMessage
+                            , hasError
                             , toAttributeName
                             , toClassName
+                            , toImportPath
                             , withLocalImport
                             , withStandardImport
                             , withThirdPartyImports
                             ) where
 
 import qualified Data.List as L
+import GHC.Exts (IsList(toList))
 
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
+import System.FilePath (joinPath)
 import Text.InterpolatedString.Perl6 (qq)
 
-import Nirum.Constructs.DeclarationSet (DeclarationSet, toList)
+import qualified Nirum.Constructs.DeclarationSet as DS
 import Nirum.Constructs.Identifier ( Identifier
                                    , toPascalCaseText
                                    , toSnakeCaseText
+                                   , toString
                                    )
-import Nirum.Constructs.Module (Module(Module, types))
+import Nirum.Constructs.ModulePath (ModulePath)
 import Nirum.Constructs.Name (Name(Name))
 import qualified Nirum.Constructs.Name as N
 import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
                                         , Field(Field)
+                                        , PrimitiveTypeIdentifier(..)
                                         , Tag(Tag)
                                         , Type( Alias
                                               , BoxedType
@@ -53,15 +65,27 @@ import Nirum.Constructs.TypeExpression ( TypeExpression( ListModifier
                                                        , TypeIdentifier
                                                        )
                                        )
+import Nirum.Package ( BoundModule
+                     , Package(modules)
+                     , TypeLookup(Imported, Local, Missing)
+                     , lookupType
+                     , resolveBoundModule
+                     , types
+                     )
+
+data Source = Source { sourcePackage :: Package
+                     , sourceModule :: BoundModule
+                     } deriving (Eq, Ord, Show)
 
 type Code = T.Text
+type CompileError = T.Text
 
 data CodeGen a = CodeGen { standardImports :: S.Set T.Text
                          , thirdPartyImports :: M.Map T.Text (S.Set T.Text)
                          , localImports :: M.Map T.Text (S.Set T.Text)
                          , code :: a
                          }
-               | CodeGenError T.Text
+               | CodeGenError CompileError
                deriving (Eq, Ord, Show)
 
 instance Functor CodeGen where
@@ -90,9 +114,13 @@ instance Monad CodeGen where
 
     fail = CodeGenError . T.pack
 
-errorMessage :: CodeGen a -> Maybe T.Text
-errorMessage CodeGen {} = Nothing
-errorMessage (CodeGenError m) = Just m
+hasError :: CodeGen a -> Bool
+hasError (CodeGenError _) = True
+hasError _ = False
+
+compileError :: CodeGen a -> Maybe CompileError
+compileError CodeGen {} = Nothing
+compileError (CodeGenError m) = Just m
 
 withStandardImport :: T.Text -> CodeGen a -> CodeGen a
 withStandardImport module' c@CodeGen { standardImports = si } =
@@ -143,13 +171,21 @@ toAttributeName identifier =
 toAttributeName' :: Name -> T.Text
 toAttributeName' = toAttributeName . N.facialName
 
+toImportPath :: ModulePath -> T.Text
+toImportPath = T.intercalate "." . map toAttributeName . toList
+
 toIndentedCodes :: (a -> T.Text) -> [a] -> T.Text -> T.Text
 toIndentedCodes f traversable concatenator =
     T.intercalate concatenator $ map f traversable
 
-compileUnionTag :: Name -> Name -> DeclarationSet Field -> CodeGen Code
-compileUnionTag parentname typename fields = do
-    typeExprCodes <- mapM compileTypeExpression
+
+compileUnionTag :: Source
+                -> Name
+                -> Name
+                -> DS.DeclarationSet Field
+                -> CodeGen Code
+compileUnionTag source parentname typename fields = do
+    typeExprCodes <- mapM (compileTypeExpression source)
         [typeExpr | (Field _ typeExpr _) <- toList fields]
     let className = toClassName' typename
         tagNames = map toAttributeName' [ name
@@ -204,14 +240,39 @@ class $className($parentClass):
             for attr in self.__slots__
         )
             |]
-compileTypeExpression :: TypeExpression -> CodeGen Code
-compileTypeExpression (TypeIdentifier i) = return $ toClassName i
-compileTypeExpression (MapModifier k v) = do
-    kExpr <- compileTypeExpression k
-    vExpr <- compileTypeExpression v
+
+compilePrimitiveType :: PrimitiveTypeIdentifier -> CodeGen Code
+compilePrimitiveType primitiveTypeIdentifier =
+    case primitiveTypeIdentifier of
+        Bool -> return "bool"
+        Bigint -> return "int"
+        Decimal -> withStandardImport "decimal" $ return "decimal.Decimal"
+        Int32 -> return "int"
+        Int64 -> return "int"
+        Float32 -> return "float"
+        Float64 -> return "float"
+        Text -> return "str"
+        Binary -> return "bytes"
+        Date -> withStandardImport "datetime" $ return "datetime.date"
+        Datetime -> withStandardImport "datetime" $ return "datetime.datetime"
+        Uuid -> withStandardImport "uuid" $ return"uuid.UUID"
+        Uri -> return "str"
+
+compileTypeExpression :: Source -> TypeExpression -> CodeGen Code
+compileTypeExpression Source { sourceModule = boundModule } (TypeIdentifier i) =
+    case lookupType i boundModule of
+        Missing -> fail $ "undefined identifier: " ++ toString i
+        Imported _ (PrimitiveType p _) -> compilePrimitiveType p
+        Imported m _ ->
+            withThirdPartyImports [(toImportPath m, [toClassName i])] $
+                return $ toClassName i
+        Local _ -> return $ toClassName i
+compileTypeExpression source (MapModifier k v) = do
+    kExpr <- compileTypeExpression source k
+    vExpr <- compileTypeExpression source v
     withStandardImport "typing" $ return [qq|typing.Mapping[$kExpr, $vExpr]|]
-compileTypeExpression modifier = do
-    expr <- compileTypeExpression typeExpr
+compileTypeExpression source modifier = do
+    expr <- compileTypeExpression source typeExpr
     withStandardImport "typing" $ return [qq|typing.$className[$expr]|]
   where
     typeExpr :: TypeExpression
@@ -223,18 +284,18 @@ compileTypeExpression modifier = do
         TypeIdentifier _ -> undefined  -- never happen!
         MapModifier _ _ -> undefined  -- never happen!
 
-compileTypeDeclaration :: TypeDeclaration -> CodeGen Code
-compileTypeDeclaration (TypeDeclaration _ (PrimitiveType _ _) _) =
-    return "" -- never used
-compileTypeDeclaration (TypeDeclaration typename (Alias ctype) _) = do
-    ctypeExpr <- compileTypeExpression ctype
+compileTypeDeclaration :: Source -> TypeDeclaration -> CodeGen Code
+compileTypeDeclaration _ (TypeDeclaration _ (PrimitiveType _ _) _) =
+    return ""  -- never used
+compileTypeDeclaration src (TypeDeclaration typename (Alias ctype) _) = do
+    ctypeExpr <- compileTypeExpression src ctype
     return [qq|
-        # TODO: docstring
-        {toClassName' typename} = $ctypeExpr
+# TODO: docstring
+{toClassName' typename} = $ctypeExpr
     |]
-compileTypeDeclaration (TypeDeclaration typename (BoxedType itype) _) = do
+compileTypeDeclaration src (TypeDeclaration typename (BoxedType itype) _) = do
     let className = toClassName' typename
-    itypeExpr <- compileTypeExpression itype
+    itypeExpr <- compileTypeExpression src itype
     withStandardImport "typing" $
         withThirdPartyImports [ ( "nirum.validate"
                                 , ["validate_boxed_type"]
@@ -261,13 +322,11 @@ class $className:
     def __hash__(self) -> int:
         return hash(self.value)
 
-    def __nirum_serialize__(self) -> typing.Mapping[str, typing.Any]:
+    def __nirum_serialize__(self) -> typing.Any:
         return serialize_boxed_type(self)
 
     @classmethod
-    def __nirum_deserialize__(
-        cls: type, value: typing.Mapping[str, typing.Any]
-    ) -> '{className}':
+    def __nirum_deserialize__(cls: type, value: typing.Any) -> '{className}':
         return deserialize_boxed_type(cls, value)
 
     def __repr__(self) -> str:
@@ -275,7 +334,7 @@ class $className:
             type(self), self.value
         )
             |]
-compileTypeDeclaration (TypeDeclaration typename (EnumType members) _) = do
+compileTypeDeclaration _ (TypeDeclaration typename (EnumType members) _) = do
     let className = toClassName' typename
         memberNames = T.intercalate
             "\n    "
@@ -295,8 +354,8 @@ class $className(enum.Enum):
     def __nirum_deserialize__(cls: type, value: str) -> '{className}':
         return cls(value.replace('-', '_'))  # FIXME: validate input
     |]
-compileTypeDeclaration (TypeDeclaration typename (RecordType fields) _) = do
-    typeExprCodes <- mapM compileTypeExpression
+compileTypeDeclaration src (TypeDeclaration typename (RecordType fields) _) = do
+    typeExprCodes <- mapM (compileTypeExpression src)
         [typeExpr | (Field _ typeExpr _) <- toList fields]
     let className = toClassName' typename
         fieldNames = map toAttributeName' [ name
@@ -363,8 +422,8 @@ class $className:
     def __nirum_deserialize__(cls: type, value) -> '{className}':
         return deserialize_record_type(cls, value)
                         |]
-compileTypeDeclaration (TypeDeclaration typename (UnionType tags) _) = do
-    fieldCodes <- mapM (uncurry (compileUnionTag typename)) tagNameNFields
+compileTypeDeclaration src (TypeDeclaration typename (UnionType tags) _) = do
+    fieldCodes <- mapM (uncurry (compileUnionTag src typename)) tagNameNFields
     let className = toClassName' typename
         fieldCodes' = T.intercalate "\n\n" fieldCodes
         enumMembers = toIndentedCodes
@@ -408,7 +467,7 @@ class $className:
 $fieldCodes'
             |]
   where
-    tagNameNFields :: [(Name, DeclarationSet Field)]
+    tagNameNFields :: [(Name, DS.DeclarationSet Field)]
     tagNameNFields = [ (tagName, fields)
                      | (Tag tagName fields _) <- toList tags
                      ]
@@ -423,36 +482,35 @@ $fieldCodes'
         (\(Name f b) -> [qq|('{toAttributeName f}', '{toSnakeCaseText b}')|])
         [name | (name, _) <- tagNameNFields, N.isComplex name]
         ",\n        "
-compileTypeDeclaration (Import _ _) =
+compileTypeDeclaration _ (Import _ _) =
     return "# TODO"
 
-compileModuleBody :: Module -> CodeGen Code
-compileModuleBody Module { types = types' } = do
-    typeCodes <- mapM compileTypeDeclaration (toList types')
+compileModuleBody :: Source -> CodeGen Code
+compileModuleBody src@Source { sourceModule = boundModule } = do
+    let types' = types boundModule
+    typeCodes <- mapM (compileTypeDeclaration src) $ toList types'
     let moduleCode = T.intercalate "\n\n" typeCodes
     return [qq|
 # TODO: docs
 $moduleCode
     |]
 
-compileModule :: Module -> Code
-compileModule module' =
-    [qq|
+compileModule :: Source -> Either CompileError Code
+compileModule source =
+    case code' of
+        CodeGenError errMsg -> Left errMsg
+        CodeGen {} -> Right [qq|
 {imports $ standardImports code'}
 
 {fromImports $ localImports code'}
 
 {fromImports $ thirdPartyImports code'}
 
-Float64 = float  # FIXME
-Bigint = int
-Text = str
-
 {code code'}
     |]
   where
     code' :: CodeGen T.Text
-    code' = compileModuleBody module'
+    code' = compileModuleBody source
     imports :: S.Set T.Text -> T.Text
     imports importSet =
         if S.null importSet
@@ -464,3 +522,18 @@ Text = str
             [ [qq|from $from import {T.intercalate ", " $ S.elems vars}|]
             | (from, vars) <- M.assocs importMap
             ]
+
+compilePackage :: Package -> M.Map FilePath (Either CompileError Code)
+compilePackage package =
+    M.fromList [ ( toFilename modulePath'
+                 , compileModule $ Source package boundModule
+                 )
+               | (modulePath', _) <- M.assocs (modules package)
+               , Just boundModule <- [resolveBoundModule modulePath' package]
+               ]
+  where
+    toFilename :: ModulePath -> FilePath
+    toFilename mp =
+        joinPath $ [ T.unpack (toAttributeName i)
+                   | i <- toList mp
+                   ] ++ ["__init__.py"]
