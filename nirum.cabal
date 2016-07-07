@@ -67,6 +67,7 @@ test-suite spec
                ,       Nirum.Targets.PythonSpec
   default-language:    Haskell2010
   build-depends:       base                     >=4.7     && <5
+               ,       containers               >=0.5.6.2 && <0.6
                ,       directory
                ,       filepath                 >=1.4     && <1.5
                ,       hspec
