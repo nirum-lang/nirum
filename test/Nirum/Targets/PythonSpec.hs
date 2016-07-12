@@ -234,7 +234,11 @@ makeDummySource m =
                        ] Nothing
               )
             , ( ["qux"]
-              , Module [TypeDeclaration "path" (Alias "text") Nothing] Nothing
+              , Module
+                  [ TypeDeclaration "path" (Alias "text") Nothing
+                  , TypeDeclaration "name" (BoxedType "text") Nothing
+                  ]
+                  Nothing
               )
             ]
 
@@ -462,6 +466,22 @@ spec = do
             |]
             tR'' decls "TypeError" "ImportedTypeBox.__nirum_deserialize__(123)"
             tR'' decls "TypeError" "ImportedTypeBox(123)"
+            let boxedAlias = [ Import ["qux"] "path"
+                             , TypeDeclaration "way"
+                                               (BoxedType "path") Nothing
+                             ]
+            tT' boxedAlias "Way('.').value == '.'"
+            tT' boxedAlias "Way(Path('.')).value == '.'"
+            tT' boxedAlias "Way.__nirum_deserialize__('.') == Way('.')"
+            tT' boxedAlias "Way('.').__nirum_serialize__() == '.'"
+            let aliasBoxed = [ Import ["qux"] "name"
+                             , TypeDeclaration "irum" (Alias "name") Nothing
+                             ]
+            tT' aliasBoxed "Name('khj') == Irum('khj')"
+            tT' aliasBoxed "Irum.__nirum_deserialize__('khj') == Irum('khj')"
+            tT' aliasBoxed "Irum('khj').__nirum_serialize__() == 'khj'"
+            tT' aliasBoxed "Irum.__nirum_deserialize__('khj') == Name('khj')"
+            tT' aliasBoxed "Irum.__nirum_deserialize__('khj') == Irum('khj')"
         specify "enum type" $ do
             let members = [ "male"
                           , EnumMember (Name "female" "yeoseong") Nothing
