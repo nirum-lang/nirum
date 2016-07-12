@@ -243,7 +243,7 @@ makeDummySource m =
             ]
 
 spec :: Spec
-spec = do
+spec = parallel $ do
     describe "CodeGen" $ do
         let v = 123 :: Int
             cg = return v :: CodeGen Int
