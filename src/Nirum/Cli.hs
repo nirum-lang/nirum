@@ -74,7 +74,7 @@ main' = do
             -- FIXME: find more efficient way to determine filename from
             --        the given module path
             filePaths <- scanModules src
-            case  M.lookup modulePath filePaths of
+            case M.lookup modulePath filePaths of
                 Just filePath' -> do
                     m <- toErrorMessage error' filePath'
                     putStrLn m
