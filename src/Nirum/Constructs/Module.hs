@@ -42,8 +42,8 @@ instance Construct Module where
             [ T.concat [ "import ", toCode p, " ("
                        , T.intercalate ", " $ map toCode $ S.toAscList i
                        , ");"
-            ]
-              | (p, i) <- M.toAscList (imports m)
+                       ]
+            | (p, i) <- M.toAscList (imports m)
             ]
         typeCodes :: [T.Text]
         typeCodes = [toCode t | t@TypeDeclaration {} <- typeList]
