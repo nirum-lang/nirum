@@ -1,15 +1,18 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 module Nirum.Parser ( Parser
+                    , ParseError
                     , aliasTypeDeclaration 
                     , boxedTypeDeclaration 
                     , docs
                     , enumTypeDeclaration
                     , file
                     , identifier
+                    , imports
                     , listModifier
                     , mapModifier
                     , module'
+                    , modulePath
                     , name
                     , optionModifier
                     , parse
@@ -25,26 +28,27 @@ module Nirum.Parser ( Parser
 
 import Control.Monad (void)
 import Data.List (foldl1')
+import Prelude hiding (readFile)
 
 import Data.Set (elems)
 import qualified Data.Text as T
-import Text.Megaparsec ( eof
+import Data.Text.IO (readFile)
+import Text.Megaparsec ( Token
+                       , eof
                        , many
                        , notFollowedBy
                        , option
                        , optional
-                       , parseFromFile
                        , runParser
                        , sepBy1
                        , sepEndBy1
                        , skipMany
                        , try
-                       , unexpected
                        , (<|>)
                        , (<?>)
                        )
 import Text.Megaparsec.Char (char, eol, noneOf, spaceChar, string, string')
-import Text.Megaparsec.Error (ParseError)
+import qualified Text.Megaparsec.Error as E
 import Text.Megaparsec.Text (Parser)
 
 import Nirum.Constructs.Declaration (Docs(Docs))
@@ -61,6 +65,7 @@ import Nirum.Constructs.Identifier ( Identifier
                                    , toString
                                    )
 import Nirum.Constructs.Module (Module(Module))
+import Nirum.Constructs.ModulePath (ModulePath(ModulePath, ModuleName))
 import Nirum.Constructs.Name (Name(Name))
 import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
                                         , Field(Field)
@@ -71,7 +76,9 @@ import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
                                               , RecordType
                                               , UnionType
                                               )
-                                        , TypeDeclaration(TypeDeclaration)
+                                        , TypeDeclaration( Import
+                                                         , TypeDeclaration
+                                                         )
                                         )
 import Nirum.Constructs.TypeExpression ( TypeExpression( ListModifier
                                                        , MapModifier
@@ -81,8 +88,10 @@ import Nirum.Constructs.TypeExpression ( TypeExpression( ListModifier
                                                        )
                                        )
 
+type ParseError = E.ParseError (Token T.Text) E.Dec
+
 comment :: Parser ()
-comment = string "//" >> void (many $ noneOf "\n") <?> "comment"
+comment = string "//" >> void (many $ noneOf ("\n" :: String)) <?> "comment"
 
 spaces :: Parser ()
 spaces = skipMany $ void spaceChar <|> comment
@@ -170,7 +179,7 @@ docs :: Parser Docs
 docs = do
     comments <- sepEndBy1 (do { char '#'
                               ; void $ optional $ char ' '
-                              ; line <- many $ noneOf "\r\n"
+                              ; line <- many $ noneOf ("\r\n" :: String)
                               ; return $ T.pack line
                               }) (eol >> spaces) <?> "comments"
     return $ Docs $ T.unlines comments
@@ -223,21 +232,27 @@ enumTypeDeclaration = do
     spaces
     typename <- name <?> "enum type name"
     spaces
-    char '='
-    spaces
-    docs' <- optional $ do
+    frontDocs <- optional $ do
         d <- docs <?> "enum type docs"
         spaces
         return d
+    char '='
+    spaces
+    docs' <- case frontDocs of
+        d@(Just _) -> return d
+        Nothing -> optional $ do
+            d <- docs <?> "enum type docs"
+            spaces
+            return d
     members <- (enumMember `sepBy1` (spaces >> char '|' >> spaces))
                    <?> "enum members"
     case fromList members of
         Left (BehindNameDuplication (Name _ bname)) ->
-            unexpected ("the behind member name `" ++ toString bname ++
-                        "` is duplicated")
+            fail ("the behind member name `" ++ toString bname ++
+                  "` is duplicated")
         Left (FacialNameDuplication (Name fname _)) ->
-            unexpected ("the facial member name `" ++ toString fname ++
-                        "` is duplicated")
+            fail ("the facial member name `" ++ toString fname ++
+                  "` is duplicated")
         Right memberSet -> do
             spaces
             char ';'
@@ -272,11 +287,11 @@ fieldSet = do
     fields' <- fields <?> "fields"
     case fromList fields' of
         Left (BehindNameDuplication (Name _ bname)) ->
-            unexpected ("the behind field name `" ++ toString bname ++
-                        "` is duplicated")
+            fail ("the behind field name `" ++ toString bname ++
+                  "` is duplicated")
         Left (FacialNameDuplication (Name fname _)) ->
-            unexpected ("the facial field name `" ++ toString fname ++
-                        "` is duplicated")
+            fail ("the facial field name `" ++ toString fname ++
+                  "` is duplicated")
         Right set -> return set
 
 recordTypeDeclaration :: Parser TypeDeclaration
@@ -333,11 +348,11 @@ unionTypeDeclaration = do
     char ';'
     case fromList tags' of
         Left (BehindNameDuplication (Name _ bname)) ->
-            unexpected ("the behind tag name `" ++ toString bname ++
-                        "` is duplicated")
+            fail ("the behind tag name `" ++ toString bname ++
+                  "` is duplicated")
         Left (FacialNameDuplication (Name fname _)) ->
-            unexpected ("the facial tag name `" ++ toString fname ++
-                        "` is duplicated")
+            fail ("the facial tag name `" ++ toString fname ++
+                  "` is duplicated")
         Right tagSet ->
             return $ TypeDeclaration typename (UnionType tagSet) docs'
 
@@ -350,6 +365,39 @@ typeDeclaration =
       unionTypeDeclaration
     ) <?> "type declaration (e.g. boxed, enum, record, union)"
 
+modulePath :: Parser ModulePath
+modulePath = do
+    idents <- sepBy1 (identifier <?> "module identifier")
+                     (try (spaces >> char '.' >> spaces))
+              <?> "module path"
+    case makePath idents of
+        Nothing -> fail "module path cannot be empty"
+        Just path -> return path
+  where
+    makePath :: [Identifier] -> Maybe ModulePath
+    makePath = foldl f Nothing
+    f :: Maybe ModulePath -> Identifier -> Maybe ModulePath
+    f Nothing i = Just $ ModuleName i
+    f (Just p) i = Just $ ModulePath p i
+
+imports :: Parser [TypeDeclaration]
+imports = do
+    string' "import" <?> "import keyword"
+    spaces
+    path <- modulePath <?> "module path"
+    spaces
+    char '('
+    spaces
+    idents <- sepBy1 (identifier <?> "name to import")
+                     (spaces >> char ',' >> spaces)
+              <?> "names to import"
+    spaces
+    char ')'
+    spaces
+    char ';'
+    return [Import path ident | ident <- idents]
+
+
 module' :: Parser Module
 module' = do
     spaces
@@ -357,17 +405,22 @@ module' = do
         d <- docs <?> "module docs"
         spaces
         return d
+    spaces
+    importLists <- many $ do
+        importList <- imports
+        spaces
+        return importList
     types <- many $ do
         typeDecl <- typeDeclaration
         spaces
         return typeDecl
-    case fromList types of
+    case fromList (types ++ [i | l <- importLists, i <- l]) of
         Left (BehindNameDuplication (Name _ bname)) ->
-            unexpected ("the behind type name `" ++ toString bname ++
-                        "` is duplicated")
+            fail ("the behind type name `" ++ toString bname ++
+                  "` is duplicated")
         Left (FacialNameDuplication (Name fname _)) ->
-            unexpected ("the facial type name `" ++ toString fname ++
-                        "` is duplicated")
+            fail ("the facial type name `" ++ toString fname ++
+                  "` is duplicated")
         Right typeSet -> return $ Module typeSet docs'
 
 file :: Parser Module
@@ -383,6 +436,8 @@ parse = runParser file
 
 parseFile :: FilePath -- | Source path
           -> IO (Either ParseError Module)
-parseFile = parseFromFile file
+parseFile path = do
+    code <- readFile path
+    return $ runParser file path code
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}

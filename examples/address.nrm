@@ -1,0 +1,10 @@
+import examples.countries (country);
+
+record address (
+    float32 lat,
+    float32 lng,
+    text street,
+    text town,
+    country country,
+    text postal-code,
+);

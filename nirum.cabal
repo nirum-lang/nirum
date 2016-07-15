@@ -24,17 +24,20 @@ library
                  ,     Nirum.Constructs.DeclarationSet
                  ,     Nirum.Constructs.Identifier
                  ,     Nirum.Constructs.Module
+                 ,     Nirum.Constructs.ModulePath
                  ,     Nirum.Constructs.Name
                  ,     Nirum.Constructs.TypeDeclaration
                  ,     Nirum.Constructs.TypeExpression
+                 ,     Nirum.Package
                  ,     Nirum.Parser
                  ,     Nirum.Targets.Python
   build-depends:       base                     >=4.7     && <5
                ,       containers               >=0.5.6.2 && <0.6
                ,       cmdargs                  >=0.10.14 && <0.11
+               ,       directory                >=1.2.5   && <1.3
                ,       filepath                 >=1.4     && <1.5
                ,       interpolatedstring-perl6 >=1.0.0   && <1.1.0
-               ,       megaparsec               >=4.4.0   && <5.0.0
+               ,       megaparsec               >=5       && <5.1
                ,       text                     >=0.9.1.0 && <1.3
   hs-source-dirs:      src
   default-language:    Haskell2010
@@ -46,6 +49,7 @@ executable nirum
   main-is:             Main.hs
   default-language:    Haskell2010
   ghc-options:         -Wall -Werror -fwarn-incomplete-uni-patterns
+                       -threaded -with-rtsopts=-N
 
 test-suite spec
   type:                exitcode-stdio-1.0
@@ -55,25 +59,32 @@ test-suite spec
                ,       Nirum.Constructs.DeclarationSetSpec
                ,       Nirum.Constructs.IdentifierSpec
                ,       Nirum.Constructs.ModuleSpec
+               ,       Nirum.Constructs.ModulePathSpec
                ,       Nirum.Constructs.NameSpec
                ,       Nirum.Constructs.TypeDeclarationSpec
                ,       Nirum.Constructs.TypeExpressionSpec
+               ,       Nirum.PackageSpec
                ,       Nirum.ParserSpec
                ,       Nirum.Targets.PythonSpec
   default-language:    Haskell2010
   build-depends:       base                     >=4.7     && <5
+               ,       containers               >=0.5.6.2 && <0.6
                ,       directory
+               ,       filepath                 >=1.4     && <1.5
                ,       hspec
                ,       hspec-core
                ,       hspec-meta
                ,       interpolatedstring-perl6 >=1.0.0   && <1.1.0
-               ,       megaparsec               >=4.4.0   && <5.0.0
+               ,       megaparsec               >=5       && <5.1
                ,       nirum
                ,       process                  >=1.1     && <2
+               ,       semigroups
+               ,       temporary                >=1.2     && <1.3
                ,       text                     >=0.9.1.0 && <1.3
   ghc-options:         -Wall -Werror
                        -fno-warn-incomplete-uni-patterns
                        -fno-warn-missing-signatures
+                       -threaded -with-rtsopts=-N
 
 test-suite hlint
   type:                exitcode-stdio-1.0

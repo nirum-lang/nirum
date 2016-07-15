@@ -16,6 +16,7 @@ import Nirum.Constructs.DeclarationSet ( DeclarationSet
                                        , null'
                                        , size
                                        , toList
+                                       , union
                                        , (!)
                                        )
 import Nirum.Constructs.Name (Name(Name))
@@ -87,3 +88,13 @@ spec =
                 dset ! "baz" `shouldBe` sd "baz" "asdf"
             it "fails if there is no such facial name" $
                 evaluate (dset ! "not-exists") `shouldThrow` anyException
+        context "union" $ do
+            it "returns Right DeclarationSet if there aren't no duplications" $
+                union dset ["apple", "banana"] `shouldBe`
+                    Right ["foo" , "bar" , sd "baz" "asdf", "apple", "banana"]
+            it "returns Left FacialNameDuplication if facial names are dup" $
+                union dset [sd "foo" "xyz"] `shouldBe`
+                    Left (FacialNameDuplication $ Name "foo" "xyz")
+            it "returns Left BehindNameDuplication if behind names are dup" $
+                union dset [sd "xyz" "foo"] `shouldBe`
+                    Left (BehindNameDuplication $ Name "xyz" "foo")

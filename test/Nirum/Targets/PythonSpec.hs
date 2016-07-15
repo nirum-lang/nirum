@@ -18,13 +18,20 @@ run this unit test in the virtualenv (pyvenv).  E.g.:
 -}
 module Nirum.Targets.PythonSpec where
 
-import Control.Monad (void, unless)
+import Control.Monad (forM_, void, unless)
 import Data.Char (isSpace)
+import Data.Maybe (fromJust)
+import System.IO.Error (catchIOError)
 
 import Data.List (dropWhileEnd)
+import qualified Data.Map.Strict as M
 import qualified Data.Text as T
+import qualified Data.Text.IO as TI
+import System.Directory (createDirectoryIfMissing)
+import System.FilePath (takeDirectory, (</>))
 import System.Info (os)
-import System.Process (readProcess)
+import System.IO.Temp (withSystemTempDirectory)
+import System.Process (CreateProcess(cwd), proc, readCreateProcess)
 import Test.Hspec.Meta
 import Text.InterpolatedString.Perl6 (q, qq)
 import Text.Megaparsec (char, digitChar, runParser, some, space, string')
@@ -35,10 +42,17 @@ import Nirum.Constructs.Module (Module(Module))
 import Nirum.Constructs.Name (Name(Name))
 import Nirum.Constructs.TypeDeclaration ( Field(Field)
                                         , EnumMember(EnumMember)
+                                        , PrimitiveTypeIdentifier(..)
                                         , Tag(Tag)
-                                        , Type(BoxedType, EnumType, RecordType,
-                                               UnionType)
-                                        , TypeDeclaration(TypeDeclaration)
+                                        , Type( Alias
+                                              , BoxedType
+                                              , EnumType
+                                              , RecordType
+                                              , UnionType
+                                              )
+                                        , TypeDeclaration( Import
+                                                         , TypeDeclaration
+                                                         )
                                         )
 import Nirum.Constructs.TypeExpression ( TypeExpression( ListModifier
                                                        , MapModifier
@@ -47,18 +61,23 @@ import Nirum.Constructs.TypeExpression ( TypeExpression( ListModifier
                                                        , TypeIdentifier
                                                        )
                                        )
-import Nirum.Targets.Python ( CodeGen( code
+import Nirum.Package (BoundModule(modulePath), Package, resolveBoundModule)
+import Nirum.PackageSpec (createPackage)
+import Nirum.Targets.Python ( Source(Source, sourceModule, sourcePackage)
+                            , CodeGen( code
                                      , localImports
-                                     , packages
                                      , standardImports
                                      , thirdPartyImports
                                      )
-                            , compileModule
+                            , compileError
+                            , compilePackage
+                            , compilePrimitiveType
                             , compileTypeExpression
+                            , hasError
                             , toAttributeName
                             , toClassName
+                            , toImportPath
                             , withLocalImport
-                            , withPackage
                             , withStandardImport
                             , withThirdPartyImports
                             )
@@ -71,19 +90,22 @@ windows = os `elem` (["mingw32", "cygwin32", "win32"] :: [String])
 
 data PyVersion = PyVersion Int Int Int deriving (Eq, Ord, Show)
 
-isPythonInstalled :: IO Bool
-isPythonInstalled = do
-    pyExist <- readProcess which ["python3"] ""
+isPythonInstalled :: Maybe FilePath -> IO Bool
+isPythonInstalled cwd' = do
+    pyExist <- readCreateProcess proc' ""
     return $ not $ all isSpace pyExist
   where
     which :: String
     which = if windows then "where" else "which"
+    proc' :: CreateProcess
+    proc' = (proc which ["python3"]) { cwd = cwd' }
 
-getPythonVersion :: IO (Maybe PyVersion)
-getPythonVersion = do
-    installed <- isPythonInstalled
+getPythonVersion :: Maybe FilePath -> IO (Maybe PyVersion)
+getPythonVersion cwd' = do
+    installed <- isPythonInstalled cwd'
     if installed then do
-        pyVersionStr <- readProcess "python3" ["-V"] ""
+        let proc' = (proc "python3" ["-V"]) { cwd = cwd' }
+        pyVersionStr <- readCreateProcess proc' ""
         return $ case runParser pyVersionParser "<python3>" pyVersionStr of
              Left _ -> Nothing
              Right v -> Just v
@@ -106,9 +128,9 @@ getPythonVersion = do
         digits <- some digitChar
         return (read digits :: Int)
 
-runPython :: String -> IO (Maybe String)
-runPython code' = do
-    pyVerM <- getPythonVersion
+runPython :: Maybe FilePath -> String -> IO (Maybe String)
+runPython cwd' code' = do
+    pyVerM <- getPythonVersion cwd'
     case pyVerM of
         Nothing -> do
             putStrLn "Can't determine Python version; skipping..."
@@ -117,14 +139,26 @@ runPython code' = do
             if version < PyVersion 3 3 0 then do
                 putStrLn "Python seems below 3.3; skipping..."
                 return Nothing
-            else do
-                result <- readProcess "python3" [] code'
-                return $ Just result
+            else
+                catchIOError (execute cwd' code') $ \e -> do
+                    putStrLn "\nThe following IO error was raised:\n"
+                    putStrLn $ indent "  " $ show e
+                    putStrLn "\n... while the following code was executed:\n"
+                    putStrLn $ indent "  " code'
+                    ioError e
+  where
+    execute :: Maybe FilePath -> String -> IO (Maybe String)
+    execute cwdPath pyCode = do
+        let proc' = (proc "python3" []) { cwd = cwdPath }
+        result <- readCreateProcess proc' pyCode
+        return $ Just result
+    indent :: String -> String -> String
+    indent spaces content = unlines [spaces ++ l | l <- lines content]
 
-testPythonSuit :: String -> T.Text -> IO ()
-testPythonSuit suitCode testCode = do
+testPythonSuit :: Maybe FilePath -> String -> T.Text -> IO ()
+testPythonSuit cwd' suitCode testCode = do
     nirumPackageInstalledM <-
-        runPython [q|
+        runPython cwd' [q|
 try: import nirum
 except ImportError: print('F')
 else: print('T')
@@ -133,7 +167,7 @@ else: print('T')
         Just nirumPackageInstalled ->
             case strip nirumPackageInstalled of
                 "T" -> do
-                    resultM <- runPython suitCode
+                    resultM <- runPython cwd' suitCode
                     case resultM of
                         Just result ->
                             unless (strip result == "True") $
@@ -147,8 +181,8 @@ else: print('T')
     strip :: String -> String
     strip = dropWhile isSpace . dropWhileEnd isSpace
 
-testPython :: T.Text -> T.Text -> IO ()
-testPython defCode testCode = testPythonSuit code' testCode'
+testPython :: Maybe FilePath -> T.Text -> T.Text -> IO ()
+testPython cwd' defCode testCode = testPythonSuit cwd' code' testCode'
   where
     -- to workaround hlint's "Eta reduce" warning
     -- hlint seems unable to look inside qq string literal...
@@ -161,9 +195,9 @@ if __name__ == '__main__':
     print(bool($testCode'))
 |]
 
-testRaisePython :: T.Text -> T.Text -> T.Text -> IO ()
-testRaisePython defCode errorClassName testCode =
-    testPythonSuit code' testCode''
+testRaisePython :: Maybe FilePath -> T.Text -> T.Text -> T.Text -> IO ()
+testRaisePython cwd' errorClassName defCode testCode =
+    testPythonSuit cwd' code' testCode''
   where
     -- to workaround hlint's "Eta reduce" warning
     -- hlint seems unable to look inside qq string literal...
@@ -181,8 +215,35 @@ if __name__ == '__main__':
         print(False)
 |]
 
+makeDummySource :: Module -> Source
+makeDummySource m =
+    Source pkg $ fromJust $ resolveBoundModule ["foo"] pkg
+  where
+    pkg :: Package
+    pkg = createPackage
+            [ (["foo"], m)
+            , ( ["foo", "bar"]
+              , Module [ Import ["qux"] "path"
+                       , TypeDeclaration "path-box" (BoxedType "path") Nothing
+                       , TypeDeclaration "int-box" (BoxedType "bigint") Nothing
+                       , TypeDeclaration "point"
+                                         (RecordType [ Field "x" "int64" Nothing
+                                                     , Field "y" "int64" Nothing
+                                                     ])
+                                         Nothing
+                       ] Nothing
+              )
+            , ( ["qux"]
+              , Module
+                  [ TypeDeclaration "path" (Alias "text") Nothing
+                  , TypeDeclaration "name" (BoxedType "text") Nothing
+                  ]
+                  Nothing
+              )
+            ]
+
 spec :: Spec
-spec = do
+spec = parallel $ do
     describe "CodeGen" $ do
         let v = 123 :: Int
             cg = return v :: CodeGen Int
@@ -224,73 +285,99 @@ spec = do
             specify "packages and imports" $ do
                 let (c :: CodeGen Int) = do
                         a <- withStandardImport "sys" cg
-                        b <- withPackage "nirum" cg
-                        c' <- withThirdPartyImports
+                        b <- withThirdPartyImports
                             [("nirum", ["serialize_boxed_type"])]
                             cg
-                        d <- withLocalImport ".." "Gender" cg
-                        e <- withStandardImport "os" cg
-                        f'' <- withPackage "nirum" cg
-                        g'' <- withThirdPartyImports
+                        c' <- withLocalImport ".." "Gender" cg
+                        d <- withStandardImport "os" cg
+                        e <- withThirdPartyImports
                             [("nirum", ["serialize_enum_type"])]
                             cg
-                        h'' <- withLocalImport ".." "Path" cg
-                        return $ sum ([a, b, c', d, e, f'', g'', h''] :: [Int])
-                packages c `shouldBe` ["nirum"]
+                        f'' <- withLocalImport ".." "Path" cg
+                        return $ sum ([a, b, c', d, e, f''] :: [Int])
+                c `shouldSatisfy` (not . hasError)
                 standardImports c `shouldBe` ["os", "sys"]
                 thirdPartyImports c `shouldBe`
                     [("nirum", ["serialize_boxed_type", "serialize_enum_type"])]
                 localImports c `shouldBe` [("..", ["Gender", "Path"])]
-                code c `shouldBe` (123 * 8)
+                code c `shouldBe` (123 * 6)
         specify "withStandardImport" $ do
             let codeGen1 = withStandardImport "sys" (pure True)
-            packages codeGen1 `shouldBe` []
+            codeGen1 `shouldSatisfy` (not . hasError)
             standardImports codeGen1 `shouldBe` ["sys"]
             thirdPartyImports codeGen1 `shouldBe` []
             localImports codeGen1 `shouldBe` []
             code codeGen1 `shouldBe` True
+            compileError codeGen1 `shouldBe` Nothing
             let codeGen2 = withStandardImport "os" codeGen1
-            packages codeGen2 `shouldBe` []
+            codeGen2 `shouldSatisfy` (not . hasError)
             standardImports codeGen2 `shouldBe` ["os", "sys"]
             thirdPartyImports codeGen2 `shouldBe` []
             localImports codeGen2 `shouldBe` []
             code codeGen2 `shouldBe` True
+            compileError codeGen2 `shouldBe` Nothing
+        specify "fail" $ do
+            let codeGen' = do
+                    val <- withStandardImport "sys" (pure True)
+                    _ <- fail "test"
+                    withStandardImport "sys" (pure val)
+            compileError codeGen' `shouldBe` Just "test"
+
+    specify "compilePrimitiveType" $ do
+        code (compilePrimitiveType Bool) `shouldBe` "bool"
+        code (compilePrimitiveType Bigint) `shouldBe` "int"
+        let decimal = compilePrimitiveType Decimal
+        code decimal `shouldBe` "decimal.Decimal"
+        standardImports decimal `shouldBe` ["decimal"]
+        code (compilePrimitiveType Int32) `shouldBe` "int"
+        code (compilePrimitiveType Int64) `shouldBe` "int"
+        code (compilePrimitiveType Float32) `shouldBe` "float"
+        code (compilePrimitiveType Float64) `shouldBe` "float"
+        code (compilePrimitiveType Text) `shouldBe` "str"
+        code (compilePrimitiveType Binary) `shouldBe` "bytes"
+        let date = compilePrimitiveType Date
+        code date `shouldBe` "datetime.date"
+        standardImports date `shouldBe` ["datetime"]
+        let datetime = compilePrimitiveType Datetime
+        code datetime `shouldBe` "datetime.datetime"
+        standardImports datetime `shouldBe` ["datetime"]
+        let uuid = compilePrimitiveType Uuid
+        code uuid `shouldBe` "uuid.UUID"
+        standardImports uuid `shouldBe` ["uuid"]
+        code (compilePrimitiveType Uri) `shouldBe` "str"
 
     describe "compileTypeExpression" $ do
+        let s = makeDummySource $ Module [] Nothing
         specify "TypeIdentifier" $ do
-            let c = compileTypeExpression (TypeIdentifier "bigint")
-            packages c `shouldBe` []
+            let c = compileTypeExpression s (TypeIdentifier "bigint")
+            c `shouldSatisfy` (not . hasError)
             standardImports c `shouldBe` []
             localImports c `shouldBe` []
-            code c `shouldBe` "Bigint"  -- FIXME: numbers.Integral
+            code c `shouldBe` "int"
         specify "OptionModifier" $ do
-            let c' = compileTypeExpression (OptionModifier "text")
-            packages c' `shouldBe` []
+            let c' = compileTypeExpression s (OptionModifier "text")
+            c' `shouldSatisfy` (not . hasError)
             standardImports c' `shouldBe` ["typing"]
             localImports c' `shouldBe` []
-            code c' `shouldBe` "typing.Optional[Text]"
-            -- FIXME: typing.Optional[str]
+            code c' `shouldBe` "typing.Optional[str]"
         specify "SetModifier" $ do
-            let c'' = compileTypeExpression (SetModifier "text")
-            packages c'' `shouldBe` []
+            let c'' = compileTypeExpression s (SetModifier "text")
+            c'' `shouldSatisfy` (not . hasError)
             standardImports c'' `shouldBe` ["typing"]
             localImports c'' `shouldBe` []
-            code c'' `shouldBe` "typing.AbstractSet[Text]"
-            -- FIXME: typing.AbstractSet[str]
+            code c'' `shouldBe` "typing.AbstractSet[str]"
         specify "ListModifier" $ do
-            let c''' = compileTypeExpression (ListModifier "text")
-            packages c''' `shouldBe` []
+            let c''' = compileTypeExpression s (ListModifier "text")
+            c''' `shouldSatisfy` (not . hasError)
             standardImports c''' `shouldBe` ["typing"]
             localImports c''' `shouldBe` []
-            code c''' `shouldBe` "typing.Sequence[Text]"
-            -- FIXME: typing.Sequence[str]
+            code c''' `shouldBe` "typing.Sequence[str]"
         specify "MapModifier" $ do
-            let c'''' = compileTypeExpression (MapModifier "uuid" "text")
-            packages c'''' `shouldBe` []
-            standardImports c'''' `shouldBe` ["typing"]
+            let c'''' = compileTypeExpression s (MapModifier "uuid" "text")
+            c'''' `shouldSatisfy` (not . hasError)
+            standardImports c'''' `shouldBe` ["uuid", "typing"]
             localImports c'''' `shouldBe` []
-            code c'''' `shouldBe` "typing.Mapping[Uuid, Text]"
-            -- FIXME: typing.Mapping[uuid.UUID, str]
+            code c'''' `shouldBe` "typing.Mapping[uuid.UUID, str]"
 
     describe "toClassName" $ do
         it "transform the facial name of the argument into PascalCase" $ do
@@ -310,11 +397,34 @@ spec = do
             toAttributeName "lambda" `shouldBe` "lambda_"
             toAttributeName "nonlocal" `shouldBe` "nonlocal_"
 
-    describe "compileModule" $ do
-        let tM module' = testPython $ compileModule module'
-            tT typeDecl = tM $ Module [typeDecl] Nothing
-            tR module' = testRaisePython $ compileModule module'
-            tR' typeDecl = tR $ Module [typeDecl] Nothing
+    let test testRunner
+             Source { sourcePackage = pkg
+                    , sourceModule = boundM
+                    }
+             testCode =
+            let files = compilePackage pkg
+                errors = [error' | (_, Left error') <- M.toList files]
+                codes = [(path, code') | (path, Right code') <- M.toList files]
+                pyImportPath = toImportPath $ modulePath boundM
+                defCode = [qq|from $pyImportPath import *|]
+            in
+                case errors of
+                    error':_ -> fail $ T.unpack error'
+                    [] -> withSystemTempDirectory "nirumpy." $ \dir -> do
+                        forM_ codes $ \(filePath, code') -> do
+                            let filePath' = dir </> filePath
+                                dirName = takeDirectory filePath'
+                            createDirectoryIfMissing True dirName
+                            TI.writeFile filePath' code'
+                        testRunner (Just dir) defCode testCode
+        tM = test testPython
+        tT' typeDecls = tM $ makeDummySource $ Module typeDecls Nothing
+        tT typeDecl = tT' [typeDecl]
+        tR source excType = test (`testRaisePython` excType) source
+        tR'' typeDecls = tR $ makeDummySource $ Module typeDecls Nothing
+        tR' typeDecl = tR'' [typeDecl]
+
+    describe "compilePackage" $ do
         specify "boxed type" $ do
             let decl = TypeDeclaration "float-box" (BoxedType "float64") Nothing
             tT decl "isinstance(FloatBox, type)"
@@ -328,6 +438,50 @@ spec = do
             tT decl "FloatBox.__nirum_deserialize__(3.14) == FloatBox(3.14)"
             tR' decl "TypeError" "FloatBox.__nirum_deserialize__('a')"
             tR' decl "TypeError" "FloatBox('a')"
+            let decls = [ Import ["foo", "bar"] "path-box"
+                        , TypeDeclaration "imported-type-box"
+                                          (BoxedType "path-box") Nothing
+                        ]
+            tT' decls "isinstance(ImportedTypeBox, type)"
+            tT' decls [q|ImportedTypeBox(PathBox('/path/string')).value.value ==
+                         '/path/string'|]
+            tT' decls [q|ImportedTypeBox(PathBox('/path/string')) ==
+                         ImportedTypeBox(PathBox('/path/string'))|]
+            tT' decls [q|ImportedTypeBox(PathBox('/path/string')) !=
+                         ImportedTypeBox(PathBox('/other/path'))|]
+            tT' decls [q|{ImportedTypeBox(PathBox('/path/string')),
+                          ImportedTypeBox(PathBox('/path/string')),
+                          ImportedTypeBox(PathBox('/other/path')),
+                          ImportedTypeBox(PathBox('/path/string')),
+                          ImportedTypeBox(PathBox('/other/path'))} ==
+                         {ImportedTypeBox(PathBox('/path/string')),
+                          ImportedTypeBox(PathBox('/other/path'))}|]
+            tT' decls [q|
+                ImportedTypeBox(PathBox('/path/string')).__nirum_serialize__()
+                == '/path/string'
+            |]
+            tT' decls [q|
+                ImportedTypeBox.__nirum_deserialize__('/path/string') ==
+                ImportedTypeBox(PathBox('/path/string'))
+            |]
+            tR'' decls "TypeError" "ImportedTypeBox.__nirum_deserialize__(123)"
+            tR'' decls "TypeError" "ImportedTypeBox(123)"
+            let boxedAlias = [ Import ["qux"] "path"
+                             , TypeDeclaration "way"
+                                               (BoxedType "path") Nothing
+                             ]
+            tT' boxedAlias "Way('.').value == '.'"
+            tT' boxedAlias "Way(Path('.')).value == '.'"
+            tT' boxedAlias "Way.__nirum_deserialize__('.') == Way('.')"
+            tT' boxedAlias "Way('.').__nirum_serialize__() == '.'"
+            let aliasBoxed = [ Import ["qux"] "name"
+                             , TypeDeclaration "irum" (Alias "name") Nothing
+                             ]
+            tT' aliasBoxed "Name('khj') == Irum('khj')"
+            tT' aliasBoxed "Irum.__nirum_deserialize__('khj') == Irum('khj')"
+            tT' aliasBoxed "Irum('khj').__nirum_serialize__() == 'khj'"
+            tT' aliasBoxed "Irum.__nirum_deserialize__('khj') == Name('khj')"
+            tT' aliasBoxed "Irum.__nirum_deserialize__('khj') == Irum('khj')"
         specify "enum type" $ do
             let members = [ "male"
                           , EnumMember (Name "female" "yeoseong") Nothing
@@ -387,6 +541,59 @@ spec = do
             tR' decl "TypeError" "Point(left=1, top='a')"
             tR' decl "TypeError" "Point(left='a', top=1)"
             tR' decl "TypeError" "Point(left='a', top='b')"
+            let fields' = [ Field "left" "int-box" Nothing
+                          , Field "top" "int-box" Nothing
+                          ]
+                decls = [ Import ["foo", "bar"] "int-box"
+                        , TypeDeclaration "point" (RecordType fields') Nothing
+                        ]
+                payload' = "{'_type': 'point', 'left': 3, 'top': 14}" :: T.Text
+            tT' decls "isinstance(Point, type)"
+            tT' decls "Point(left=IntBox(3), top=IntBox(14)).left == IntBox(3)"
+            tT' decls "Point(left=IntBox(3), top=IntBox(14)).top == IntBox(14)"
+            tT' decls [q|Point(left=IntBox(3), top=IntBox(14)) ==
+                         Point(left=IntBox(3), top=IntBox(14))|]
+            tT' decls [q|Point(left=IntBox(3), top=IntBox(14)) !=
+                         Point(left=IntBox(3), top=IntBox(15))|]
+            tT' decls [q|Point(left=IntBox(3), top=IntBox(14)) !=
+                         Point(left=IntBox(4), top=IntBox(14))|]
+            tT' decls [q|Point(left=IntBox(3), top=IntBox(14)) !=
+                         Point(left=IntBox(4), top=IntBox(15))|]
+            tT' decls "Point(left=IntBox(3), top=IntBox(14)) != 'foo'"
+            tT' decls [q|Point(left=IntBox(3),
+                               top=IntBox(14)).__nirum_serialize__() ==
+                         {'_type': 'point', 'left': 3, 'top': 14}|]
+            tT' decls [qq|Point.__nirum_deserialize__($payload') ==
+                          Point(left=IntBox(3), top=IntBox(14))|]
+            tR'' decls "ValueError"
+                 "Point.__nirum_deserialize__({'left': 3, 'top': 14})"
+            tR'' decls "ValueError"
+                 "Point.__nirum_deserialize__({'_type': 'foo'})"
+            tR'' decls "TypeError" "Point(left=IntBox(1), top='a')"
+            tR'' decls "TypeError" "Point(left=IntBox(1), top=2)"
+            let fields'' = [ Field "xy" "point" Nothing
+                           , Field "z" "int64" Nothing
+                           ]
+                decls' = [ Import ["foo", "bar"] "point"
+                         , TypeDeclaration "point3d"
+                                           (RecordType fields'')
+                                           Nothing
+                         ]
+            tT' decls' "isinstance(Point3d, type)"
+            tT' decls' [q|Point3d(xy=Point(x=1, y=2), z=3).xy ==
+                          Point(x=1, y=2)|]
+            tT' decls' "Point3d(xy=Point(x=1, y=2), z=3).xy.x == 1"
+            tT' decls' "Point3d(xy=Point(x=1, y=2), z=3).xy.y == 2"
+            tT' decls' "Point3d(xy=Point(x=1, y=2), z=3).z == 3"
+            tT' decls' [q|Point3d(xy=Point(x=1, y=2), z=3).__nirum_serialize__()
+                          == {'_type': 'point3d',
+                              'xy': {'_type': 'point', 'x': 1, 'y': 2},
+                              'z': 3}|]
+            tT' decls' [q|Point3d.__nirum_deserialize__({
+                              '_type': 'point3d',
+                              'xy': {'_type': 'point', 'x': 1, 'y': 2},
+                              'z': 3
+                          }) == Point3d(xy=Point(x=1, y=2), z=3)|]
         specify "record type with one field" $ do
             let fields = [ Field "length" "bigint" Nothing ]
                 payload = "{'_type': 'line', 'length': 3}" :: T.Text

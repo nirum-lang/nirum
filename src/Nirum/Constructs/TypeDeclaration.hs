@@ -1,13 +1,23 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
                                         , Field(Field)
+                                        , JsonType(..)
+                                        , PrimitiveTypeIdentifier(..)
                                         , Tag(Tag)
                                         , Type(..)
-                                        , TypeDeclaration(..)
+                                        , TypeDeclaration( Import
+                                                         , TypeDeclaration
+                                                         , importName
+                                                         , modulePath
+                                                         , type'
+                                                         , typeDocs
+                                                         , typename
+                                                         )
                                         ) where
 
 import Data.Maybe (isJust)
 import Data.String (IsString(fromString))
+
 import qualified Data.Text as T
 
 import Nirum.Constructs (Construct(toCode))
@@ -16,7 +26,9 @@ import Nirum.Constructs.Declaration ( Declaration(..)
                                     , toCodeWithPrefix
                                     )
 import Nirum.Constructs.DeclarationSet (DeclarationSet, null', toList)
-import Nirum.Constructs.Name (Name)
+import Nirum.Constructs.Identifier (Identifier)
+import Nirum.Constructs.ModulePath (ModulePath)
+import Nirum.Constructs.Name (Name(Name))
 import Nirum.Constructs.TypeExpression (TypeExpression)
 
 data Type
@@ -25,6 +37,9 @@ data Type
     | EnumType { members :: DeclarationSet EnumMember }
     | RecordType { fields :: DeclarationSet Field }
     | UnionType { tags :: DeclarationSet Tag }
+    | PrimitiveType { primitiveTypeIdentifier :: PrimitiveTypeIdentifier
+                    , jsonType :: JsonType
+                    }
     deriving (Eq, Ord, Show)
 
 -- | Member of 'EnumType'.
@@ -75,11 +90,25 @@ instance Declaration Tag where
     name (Tag name' _ _) = name'
     docs (Tag _ _ docs') = docs'
 
+-- | Primitive type identifiers.
+data PrimitiveTypeIdentifier
+    = Bigint | Decimal | Int32 | Int64 | Float32 | Float64 | Text | Binary
+    | Date | Datetime | Bool | Uuid | Uri
+    deriving (Eq, Ord, Show)
+
+-- | Possible coded types of 'PrimitiveType' in JSON representation.
+data JsonType = Boolean | Number | String deriving (Eq, Ord, Show)
+
 -- Top-level 'Declaration' of type.
-data TypeDeclaration = TypeDeclaration { name :: Name
-                                       , type' :: Type
-                                       , docs :: Maybe Docs
-                                       } deriving (Eq, Ord, Show)
+data TypeDeclaration
+    = TypeDeclaration { typename :: Name
+                      , type' :: Type
+                      , typeDocs :: Maybe Docs
+                      }
+    | Import { modulePath :: ModulePath
+             , importName :: Identifier
+             }
+    deriving (Eq, Ord, Show)
 
 instance Construct TypeDeclaration where
     toCode (TypeDeclaration name' (Alias cname) docs') =
@@ -121,7 +150,28 @@ instance Construct TypeDeclaration where
                                  [ T.replace "\n" "\n    " (toCode t)
                                  | t <- toList tags'
                                  ]
+    toCode (TypeDeclaration name' (PrimitiveType typename' jsonType') docs') =
+        T.concat [ "// primitive type `", toCode name', "`\n"
+                 , "//     internal type identifier: ", showT typename', "\n"
+                 , "//     coded to json ", showT jsonType', " type\n"
+                 , docString docs'
+                 ]
+      where
+        showT :: Show a => a -> T.Text
+        showT = T.pack . show
+        docString :: Maybe Docs -> T.Text
+        docString Nothing = ""
+        docString (Just (Docs d)) =
+            T.concat ["\n// ", T.replace "\n" "\n// " $ T.stripEnd d, "\n"]
+    toCode (Import path ident) = T.concat [ "import "
+                                          , toCode path
+                                          , " ("
+                                          , toCode ident
+                                          , ");\n"
+                                          ]
 
 instance Declaration TypeDeclaration where
     name (TypeDeclaration name' _ _) = name'
+    name (Import _ identifier) = Name identifier identifier
     docs (TypeDeclaration _ _ docs') = docs'
+    docs (Import _ _) = Nothing

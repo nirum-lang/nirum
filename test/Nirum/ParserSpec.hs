@@ -8,12 +8,13 @@ import Data.Maybe (fromJust)
 import Prelude hiding (readFile)
 import System.Directory (getDirectoryContents)
 
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Text as T
 import Data.Text.IO (readFile)
 import Test.Hspec.Meta
 import Text.Megaparsec (eof, runParser)
-import Text.Megaparsec.Error (ParseError, errorPos)
-import Text.Megaparsec.Pos (SourcePos, sourceColumn, sourceLine)
+import Text.Megaparsec.Error (errorPos)
+import Text.Megaparsec.Pos (Pos, SourcePos(sourceColumn, sourceLine), mkPos)
 import Text.Megaparsec.Text (Parser)
 
 import qualified Nirum.Parser as P
@@ -31,16 +32,16 @@ import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
                                         )
 import Nirum.Constructs.TypeExpression (TypeExpression(..))
 
-erroredPos :: Either ParseError a -> (Int, Int)
+erroredPos :: Either P.ParseError a -> (Pos, Pos)
 erroredPos left =
     (sourceLine pos, sourceColumn pos)
   where
-    error' = head $ lefts [left] :: ParseError
-    pos = errorPos error' :: SourcePos
+    error' = head $ lefts [left] :: P.ParseError
+    pos = NE.head (errorPos error') :: SourcePos
 
 helperFuncs :: (Show a)
             => Parser a
-            -> ( T.Text -> Either ParseError a
+            -> ( T.Text -> Either P.ParseError a
                , T.Text -> Int -> Int -> Expectation
                )
 helperFuncs parser =
@@ -52,8 +53,10 @@ helperFuncs parser =
         return r
     parse' = runParser parserAndEof ""
     expectError string line col = do
+        line' <- mkPos line
+        col' <- mkPos col
         parse' string `shouldSatisfy` isLeft
-        erroredPos (parse' string) `shouldBe` (line, col)
+        erroredPos (parse' string) `shouldBe` (line', col')
 
 spec :: Spec
 spec = do
@@ -328,8 +331,12 @@ spec = do
             parse' "enum gender = male | female | unknown;" `shouldBe`
                 Right expected
             parse' "enum gender=male|female|unknown;" `shouldBe` Right expected
+            -- forward docs of enum type
+            parse' "enum gender\n# gender type\n= male | female | unknown;"
+                `shouldBe` Right (expected { typeDocs = Just "gender type\n" })
+            -- backward docs of enum type
             parse' "enum gender =\n# gender type\nmale | female | unknown;"
-                `shouldBe` Right (expected { docs = Just "gender type\n" })
+                `shouldBe` Right (expected { typeDocs = Just "gender type\n" })
             parse' "enum gender = male # docs\n| female | unknown # docs2\n;"
                 `shouldBe` Right (TypeDeclaration "gender"
                                                   (EnumType membersWithDocs)
@@ -354,7 +361,7 @@ spec = do
                           ] :: DeclarationSet Field
                 record = RecordType fields'
                 a = TypeDeclaration "person" record Nothing
-                b = a { docs = Just "person record type" }
+                b = a { typeDocs = Just "person record type" }
             -- without docs, last field with trailing comma
             parse' "record person (\n\
                    \    text name,\n\
@@ -416,7 +423,7 @@ spec = do
                         ]
                 union = UnionType tags'
                 a = TypeDeclaration "shape" union Nothing
-                b = a { docs = Just "shape type" }
+                b = a { typeDocs = Just "shape type" }
             parse' "union shape\n\
                    \    = circle (point origin, \
                                  \offset radius,)\n\
@@ -458,7 +465,7 @@ spec = do
                         ] :: [(String, Parser Module)]
     forM_ moduleParsers $ \(label, parser') ->
         describe label $ do
-            let (parse', _) = helperFuncs parser'
+            let (parse', expectError) = helperFuncs parser'
             it "emits Module if succeeded to parse" $ do
                 let decls = [ TypeDeclaration "path" (Alias "text") Nothing
                             , TypeDeclaration "offset"
@@ -471,6 +478,39 @@ spec = do
             it "may have no type declarations" $ do
                 parse' "" `shouldBe` Right (Module [] Nothing)
                 parse' "# docs" `shouldBe` Right (Module [] $ Just "docs")
+            it "errors if there are any duplicated facial names" $
+                expectError "type a = text;\ntype a/b = text;" 2 7
+            it "errors if there are any duplicated behind names" $
+                expectError "type b = text;\ntype a/b = text;" 2 7
+
+    describe "modulePath" $ do
+        let (parse', expectError) = helperFuncs P.modulePath
+        it "emits ModulePath if succeeded to parse" $ do
+            parse' "foo" `shouldBe` Right ["foo"]
+            parse' "foo.bar" `shouldBe` Right ["foo", "bar"]
+            parse' "foo.bar.baz" `shouldBe` Right ["foo", "bar", "baz"]
+        it "errors if it's empty" $
+            expectError "" 1 1
+        it "errors if it starts with period" $ do
+            expectError "." 1 1
+            expectError ".foo" 1 1
+            expectError ".foo.bar" 1 1
+            expectError ".foo.bar.baz" 1 1
+        it "errors if it ends with period" $ do
+            expectError "." 1 1
+            expectError "foo." 1 5
+            expectError "foo.bar." 1 9
+            expectError "foo.bar.baz." 1 13
+
+    describe "imports" $ do
+        let (parse', expectError) = helperFuncs P.imports
+        it "emits Import values if succeeded to parse" $
+            parse' "import foo.bar (a, b);" `shouldBe`
+                Right [ Import ["foo", "bar"] "a"
+                      , Import ["foo", "bar"] "b"
+                      ]
+        it "errors if parentheses have nothing" $
+            expectError "import foo.bar ();" 1 17
 
     specify "parse & parseFile" $ do
         files <- getDirectoryContents "examples"
