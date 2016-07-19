@@ -1,4 +1,4 @@
-import examples.countries (country);
+import countries (country);
 
 record address (
     float32 lat,

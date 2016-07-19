@@ -20,6 +20,7 @@ import Nirum.Package ( BoundModule(boundPackage, modulePath)
                                    , MissingModulePathError
                                    )
                      , Package
+                     , PackageError (ImportError)
                      , TypeLookup(Imported, Local, Missing)
                      , docs
                      , lookupType
@@ -126,20 +127,23 @@ spec = do
                                            ]
                      ]
         specify "scanPackage" $ do
-            Right package <- scanPackage "."
             let path = "." </> "examples"
+            Right package <- scanPackage path
             Right builtinsM <- parseFile (path </> "builtins.nrm")
             Right productM <- parseFile (path </> "product.nrm")
             Right shapesM <- parseFile (path </> "shapes.nrm")
             Right countriesM <- parseFile (path </> "countries.nrm")
             Right addressM <- parseFile (path </> "address.nrm")
-            let modules = [ (["examples", "builtins"], builtinsM)
-                          , (["examples", "product"], productM)
-                          , (["examples", "shapes"], shapesM)
-                          , (["examples", "countries"], countriesM)
-                          , (["examples", "address"], addressM)
+            let modules = [ (["builtins"], builtinsM)
+                          , (["product"], productM)
+                          , (["shapes"], shapesM)
+                          , (["countries"], countriesM)
+                          , (["address"], addressM)
                           ] :: M.Map ModulePath Module
             package `shouldBe` createPackage modules
+            Left error' <- scanPackage $ "." </> "test" </> "import_error"
+            error' `shouldBe`
+                ImportError [MissingModulePathError ["import_error"] ["foo"]]
         specify "scanModules" $ do
             let path = "." </> "examples"
             mods <- scanModules "."
@@ -149,6 +153,9 @@ spec = do
                 , (["examples", "shapes"], path </> "shapes.nrm")
                 , (["examples", "countries"], path </> "countries.nrm")
                 , (["examples", "address"], path </> "address.nrm")
+                , ( ["test", "import_error", "import_error"]
+                  , "." </> "test" </> "import_error" </> "import_error.nrm"
+                  )
                 ]
             mods' <- scanModules path
             mods' `shouldBe` [ (["builtins"], path </> "builtins.nrm")

@@ -114,7 +114,7 @@ detectCircularImports Package { modules = ms } =
 
 data PackageError = ScanError FilePath IOError
                   | ParseError ModulePath ParseError
-                  | ImportError ImportError
+                  | ImportError (S.Set ImportError)
                   deriving (Eq, Show)
 
 -- | Scan the given package path, and then return the read package.
@@ -124,7 +124,9 @@ scanPackage packagePath = do
     -- FIXME: catch IO errors
     modules' <- mapM parseFile modulePaths
     return $ case M.foldrWithKey excludeFailedParse (Right M.empty) modules' of
-        Right parsedModules -> Right Package { modules = parsedModules }
+        Right parsedModules -> case makePackage parsedModules of
+            Right p -> Right p
+            Left errors -> Left $ ImportError errors
         Left error' -> Left error'
   where
     excludeFailedParse :: ModulePath
