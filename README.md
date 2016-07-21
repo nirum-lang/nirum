@@ -13,22 +13,22 @@ WIP.
 Getting Started
 ---------------
 
-In order to compile `examples/shapes.nrm` file to python in `out` directory:
+In order to compile a Nirum package (`examples/`) to a Python package:
 
-    $ nirum --python -d=./out ./examples/shapes.nrm
+    $ mkdir out/  # directory to place generated Python files
+    $ nirum -o out/ examples/
 
-For more infomration, type `--help`:
+For more infomration, use `--help` option:
 
     $ nirum --help
     Nirum Compiler CLI
 
-    nirum [OPTIONS] FILE
+    nirum [OPTIONS] DIR
 
     Common flags:
-      -p --python            python
-      -d --destination=DEST  Write generated file to DEST
-      -? --help              Display help message
-      -V --version           Print version information
+      -o --objectpath=FILE  The directory to place object files
+      -? --help             Display help message
+      -V --version          Print version information
 
 
 Etymology
