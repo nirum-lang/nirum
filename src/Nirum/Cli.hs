@@ -18,6 +18,7 @@ import System.Console.CmdArgs.Implicit ( Data
                                        , summary
                                        , typDir
                                        , typFile
+                                       , versionArg
                                        , (&=)
                                        )
 import System.Console.CmdArgs.Default (def)
@@ -32,6 +33,7 @@ import Text.Megaparsec.Pos (SourcePos(sourceLine, sourceColumn), unPos)
 
 import Nirum.Package (PackageError(ParseError), scanModules, scanPackage)
 import Nirum.Targets.Python (compilePackage)
+import Nirum.Version (versionString)
 
 data NirumCli = NirumCli { sourcePath :: FilePath
                          , objectPath :: FilePath
@@ -63,7 +65,8 @@ nirumCli = NirumCli { objectPath = def &= typFile
                     , sourcePath = def &= argPos 1 &= typDir
                     }
          &= program "nirum"
-         &= summary "Nirum Compiler CLI"
+         &= summary ("Nirum Compiler " ++ versionString)
+         &= versionArg [summary versionString]
 
 main' :: IO ()
 main' = do

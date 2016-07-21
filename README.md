@@ -21,7 +21,7 @@ In order to compile a Nirum package (`examples/`) to a Python package:
 For more infomration, use `--help` option:
 
     $ nirum --help
-    Nirum Compiler CLI
+    Nirum Compiler 0.1.0
 
     nirum [OPTIONS] DIR
 
@@ -29,6 +29,7 @@ For more infomration, use `--help` option:
       -o --objectpath=FILE  The directory to place object files
       -? --help             Display help message
       -V --version          Print version information
+         --numeric-version  Print just the version number
 
 
 Etymology
