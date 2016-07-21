@@ -13,11 +13,12 @@ import System.Console.CmdArgs.Implicit ( Data
                                        , Typeable
                                        , argPos
                                        , cmdArgs
+                                       , explicit
                                        , help
+                                       , name
                                        , program
                                        , summary
                                        , typDir
-                                       , typFile
                                        , versionArg
                                        , (&=)
                                        )
@@ -60,7 +61,8 @@ toErrorMessage parseError' filePath' = do
     arrow = T.snoc (T.concat (replicate (errorColumn - 1) (T.pack " "))) '^'
 
 nirumCli :: NirumCli
-nirumCli = NirumCli { objectPath = def &= typFile
+nirumCli = NirumCli { objectPath = def &= explicit
+                          &= name "output-dir" &= typDir
                           &= help "The directory to place object files"
                     , sourcePath = def &= argPos 1 &= typDir
                     }

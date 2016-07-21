@@ -26,7 +26,7 @@ For more infomration, use `--help` option:
     nirum [OPTIONS] DIR
 
     Common flags:
-      -o --objectpath=FILE  The directory to place object files
+         --output-dir=DIR   The directory to place object files
       -? --help             Display help message
       -V --version          Print version information
          --numeric-version  Print just the version number
