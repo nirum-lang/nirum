@@ -58,10 +58,11 @@ parseErrortoPrettyMessage :: ParseError (Token T.Text) Dec
 parseErrortoPrettyMessage parseError' filePath' = do
     sourceCode <- readFile filePath'
     let sourceLines = lines sourceCode
+        sl = if length sourceLines < errorLine then ""
+             else sourceLines !! (errorLine - 1)
     return [qq|
 {parseErrorPretty $ parseError'}
-
-{sourceLines !! (errorLine - 1)}
+$sl
 {arrow}
 |]
   where
@@ -139,7 +140,6 @@ main' = do
                 Just filePath' -> do
                     m <- parseErrortoPrettyMessage error' filePath'
                     putStrLn m
-                    putStrLn [qq|Error: {parseErrorPretty error'}|]
                 Nothing -> putStrLn [qq|error: $modulePath|]
         Left (ImportError importErrors) ->
             putStrLn [qq|Import error:
