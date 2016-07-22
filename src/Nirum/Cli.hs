@@ -1,6 +1,6 @@
 {-# LANGUAGE ExtendedDefaultRules, OverloadedStrings, QuasiQuotes,
              DeriveDataTypeable #-}
-module Nirum.Cli (main) where
+module Nirum.Cli (main, writeFiles) where
 
 import Control.Monad (forM_)
 import GHC.Exts (IsList(toList))
@@ -23,7 +23,8 @@ import System.Console.CmdArgs.Implicit ( Data
                                        , (&=)
                                        )
 import System.Console.CmdArgs.Default (def)
-import System.FilePath ((</>))
+import System.Directory (createDirectoryIfMissing)
+import System.FilePath (takeDirectory, (</>))
 import Text.InterpolatedString.Perl6 (qq)
 import Text.Megaparsec (Token)
 import Text.Megaparsec.Error ( Dec
@@ -94,6 +95,7 @@ writeFiles obj m =
         case result of
             Left compileError -> putStrLn [qq|error: $filePath: $compileError|]
             Right code -> do
+                createDirectoryIfMissing True $ takeDirectory filePath
                 putStrLn filePath
                 TI.writeFile filePath code
   where
