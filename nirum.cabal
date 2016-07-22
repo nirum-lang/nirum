@@ -57,7 +57,8 @@ test-suite spec
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   main-is:             Spec.hs
-  other-modules:       Nirum.Constructs.DeclarationSpec
+  other-modules:       Nirum.CliSpec
+               ,       Nirum.Constructs.DeclarationSpec
                ,       Nirum.Constructs.DeclarationSetSpec
                ,       Nirum.Constructs.IdentifierSpec
                ,       Nirum.Constructs.ModuleSpec
