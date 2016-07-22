@@ -13,11 +13,13 @@ import System.Console.CmdArgs.Implicit ( Data
                                        , Typeable
                                        , argPos
                                        , cmdArgs
+                                       , explicit
                                        , help
+                                       , name
                                        , program
                                        , summary
                                        , typDir
-                                       , typFile
+                                       , versionArg
                                        , (&=)
                                        )
 import System.Console.CmdArgs.Default (def)
@@ -32,6 +34,7 @@ import Text.Megaparsec.Pos (SourcePos(sourceLine, sourceColumn), unPos)
 
 import Nirum.Package (PackageError(ParseError), scanModules, scanPackage)
 import Nirum.Targets.Python (compilePackage)
+import Nirum.Version (versionString)
 
 data NirumCli = NirumCli { sourcePath :: FilePath
                          , objectPath :: FilePath
@@ -58,12 +61,14 @@ toErrorMessage parseError' filePath' = do
     arrow = T.snoc (T.concat (replicate (errorColumn - 1) (T.pack " "))) '^'
 
 nirumCli :: NirumCli
-nirumCli = NirumCli { objectPath = def &= typFile
+nirumCli = NirumCli { objectPath = def &= explicit
+                          &= name "output-dir" &= typDir
                           &= help "The directory to place object files"
                     , sourcePath = def &= argPos 1 &= typDir
                     }
          &= program "nirum"
-         &= summary "Nirum Compiler CLI"
+         &= summary ("Nirum Compiler " ++ versionString)
+         &= versionArg [summary versionString]
 
 main' :: IO ()
 main' = do
