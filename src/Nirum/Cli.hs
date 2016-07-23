@@ -51,10 +51,10 @@ data NirumCli = NirumCli { sourcePath :: FilePath
                          , objectPath :: FilePath
                          } deriving (Show, Data, Typeable)
 
-parseErrortoPrettyMessage :: ParseError (Token T.Text) Dec
+parseErrorToPrettyMessage :: ParseError (Token T.Text) Dec
                           -> FilePath
                           -> IO String
-parseErrortoPrettyMessage parseError' filePath' = do
+parseErrorToPrettyMessage parseError' filePath' = do
     sourceCode <- readFile filePath'
     let sourceLines = lines sourceCode
         sl = if length sourceLines < errorLine then ""
@@ -137,7 +137,7 @@ main' = do
             filePaths <- scanModules src
             case M.lookup modulePath filePaths of
                 Just filePath' -> do
-                    m <- parseErrortoPrettyMessage error' filePath'
+                    m <- parseErrorToPrettyMessage error' filePath'
                     putStrLn m
                 Nothing -> putStrLn [qq|$modulePath not found|]
         Left (ImportError importErrors) ->
