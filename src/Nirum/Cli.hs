@@ -7,6 +7,7 @@ import GHC.Exts (IsList(toList))
 import System.IO.Error (catchIOError, ioeGetErrorString)
 
 import qualified Data.Map.Strict as M
+import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.IO as TI
 import System.Console.CmdArgs.Implicit ( Data
@@ -33,7 +34,17 @@ import Text.Megaparsec.Error ( Dec
                              )
 import Text.Megaparsec.Pos (SourcePos(sourceLine, sourceColumn), unPos)
 
-import Nirum.Package (PackageError(ParseError), scanModules, scanPackage)
+import Nirum.Constructs (Construct(toCode))
+import Nirum.Constructs.Identifier (toText)
+import Nirum.Constructs.ModulePath (ModulePath)
+import Nirum.Package ( PackageError(ParseError, ImportError, ScanError)
+                     , ImportError ( CircularImportError
+                                   , MissingImportError
+                                   , MissingModulePathError
+                                   )
+                     , scanModules
+                     , scanPackage
+                     )
 import Nirum.Targets.Python (compilePackage)
 import Nirum.Version (versionString)
 
@@ -41,14 +52,17 @@ data NirumCli = NirumCli { sourcePath :: FilePath
                          , objectPath :: FilePath
                          } deriving (Show, Data, Typeable)
 
-toErrorMessage :: ParseError (Token T.Text) Dec -> FilePath -> IO String
-toErrorMessage parseError' filePath' = do
+parseErrortoPrettyMessage :: ParseError (Token T.Text) Dec
+                          -> FilePath
+                          -> IO String
+parseErrortoPrettyMessage parseError' filePath' = do
     sourceCode <- readFile filePath'
     let sourceLines = lines sourceCode
+        sl = if length sourceLines < errorLine then ""
+             else sourceLines !! (errorLine - 1)
     return [qq|
 {parseErrorPretty $ parseError'}
-
-{sourceLines !! (errorLine - 1)}
+$sl
 {arrow}
 |]
   where
@@ -60,6 +74,49 @@ toErrorMessage parseError' filePath' = do
     errorColumn = fromEnum $ unPos $ sourceColumn error'
     arrow :: T.Text
     arrow = T.snoc (T.concat (replicate (errorColumn - 1) (T.pack " "))) '^'
+
+toModuleNameText :: T.Text -> T.Text
+toModuleNameText t = [qq|'{t}'|]
+
+modulePathToRepr :: ModulePath -> T.Text
+modulePathToRepr = toModuleNameText . toCode
+
+importErrorToPrettyMessage :: ImportError -> T.Text
+importErrorToPrettyMessage (CircularImportError modulePaths) =
+    [qq|Circular import detected in following orders: $order|]
+  where
+    circularModulesText :: [ModulePath] -> [T.Text]
+    circularModulesText = map modulePathToRepr
+    order :: T.Text
+    order = T.intercalate " > " $ circularModulesText modulePaths
+importErrorToPrettyMessage (MissingModulePathError path path') =
+    [qq|No module named $dataName in $moduleName|]
+  where
+    moduleName :: T.Text
+    moduleName = modulePathToRepr path
+    dataName :: T.Text
+    dataName = modulePathToRepr path'
+importErrorToPrettyMessage (MissingImportError path path' identifier) =
+    [qq|Cannot import $importText from $attrText in $foundText|]
+  where
+    importText :: T.Text
+    importText = (toModuleNameText . toText) identifier
+    foundText :: T.Text
+    foundText = modulePathToRepr path
+    attrText :: T.Text
+    attrText = modulePathToRepr path'
+
+
+importErrorsToMessageList :: S.Set ImportError -> [T.Text]
+importErrorsToMessageList importErrors =
+    S.toList $ S.map importErrorToPrettyMessage importErrors
+importErrorsToPrettyMessage :: S.Set ImportError -> String
+importErrorsToPrettyMessage importErrors =
+    T.unpack $ T.intercalate "\n" withListStyleText
+  where
+    withListStyleText :: [T.Text]
+    withListStyleText =
+        map (T.append "- ") (importErrorsToMessageList importErrors)
 
 nirumCli :: NirumCli
 nirumCli = NirumCli { objectPath = def &= explicit
@@ -82,11 +139,14 @@ main' = do
             filePaths <- scanModules src
             case M.lookup modulePath filePaths of
                 Just filePath' -> do
-                    m <- toErrorMessage error' filePath'
+                    m <- parseErrortoPrettyMessage error' filePath'
                     putStrLn m
-                    putStrLn [qq|error: {parseErrorPretty error'}|]
-                Nothing -> putStrLn [qq|error: $modulePath|]
-        Left error' -> putStrLn [qq|error: $error'|]
+                Nothing -> putStrLn [qq|$modulePath not found|]
+        Left (ImportError importErrors) ->
+            putStrLn [qq|Import error:
+{importErrorsToPrettyMessage importErrors}
+|]
+        Left (ScanError _ error') -> putStrLn [qq|Scan error: $error'|]
         Right pkg -> writeFiles obj $ compilePackage pkg
 
 writeFiles :: FilePath -> M.Map FilePath (Either T.Text T.Text) -> IO ()
