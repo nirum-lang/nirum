@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedLists, OverloadedStrings #-}
+{-# LANGUAGE OverloadedLists, OverloadedStrings, QuasiQuotes #-}
 module Nirum.CliSpec where
 
 import Control.Monad (forM_)
@@ -9,9 +9,11 @@ import qualified Data.Text.IO as TI
 import System.Directory (listDirectory)
 import System.FilePath ((</>))
 import System.IO.Temp (withSystemTempDirectory)
+import Text.InterpolatedString.Perl6 (qq)
 import Test.Hspec.Meta
 
-import Nirum.Cli (writeFiles)
+import Nirum.Cli (parseErrorToPrettyMessage, writeFiles)
+import Nirum.Parser (parseFile)
 
 expectWriteFiles :: FilePath -> [(FilePath, Text)] -> IO [FilePath]
 expectWriteFiles tmpDir files = do
@@ -22,7 +24,19 @@ expectWriteFiles tmpDir files = do
     listDirectory tmpDir
 
 spec :: Spec
-spec =
+spec = do
+    specify "parseErrorToPrettyMessage" $ do
+        let path = "test" </> "parse-error" </> "missing-semicolon.nrm"
+        Left parseError <- parseFile path
+        message <- parseErrorToPrettyMessage parseError path
+        message `shouldBe` [qq|
+$path:3:1:
+unexpected 't'
+expecting ';', comment, or white space
+
+type c = b;
+^
+|]
     describe "writeFiles" $ do
         it "writes root files" $
             withSystemTempDirectory "writeFiles-rootFiles" $ \tmpDir -> do

@@ -1,6 +1,6 @@
 {-# LANGUAGE ExtendedDefaultRules, OverloadedStrings, QuasiQuotes,
              DeriveDataTypeable #-}
-module Nirum.Cli (main, writeFiles) where
+module Nirum.Cli (main, parseErrorToPrettyMessage, writeFiles) where
 
 import Control.Monad (forM_)
 import GHC.Exts (IsList(toList))
