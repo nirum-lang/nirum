@@ -79,14 +79,14 @@ toModuleNameText :: T.Text -> T.Text
 toModuleNameText t = [qq|'{t}'|]
 
 modulePathToRepr :: ModulePath -> T.Text
-modulePathToRepr path = (toModuleNameText . toCode) path
+modulePathToRepr = toModuleNameText . toCode
 
 importErrorToPrettyMessage :: ImportError -> T.Text
 importErrorToPrettyMessage (CircularImportError modulePaths) =
     [qq|Circular import detected in following orders: $order|]
   where
     circularModulesText :: [ModulePath] -> [T.Text]
-    circularModulesText mps = map modulePathToRepr mps
+    circularModulesText = map modulePathToRepr
     order :: T.Text
     order = T.intercalate " > " $ circularModulesText modulePaths
 importErrorToPrettyMessage (MissingModulePathError path path') =
@@ -112,7 +112,7 @@ importErrorsToMessageList importErrors =
     S.toList $ S.map importErrorToPrettyMessage importErrors
 importErrorsToPrettyMessage :: S.Set ImportError -> String
 importErrorsToPrettyMessage importErrors =
-    T.unpack $ T.intercalate "\n" $ withListStyleText
+    T.unpack $ T.intercalate "\n" withListStyleText
   where
     withListStyleText :: [T.Text]
     withListStyleText =
