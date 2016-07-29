@@ -20,7 +20,6 @@ import System.Console.CmdArgs.Implicit ( Data
                                        , program
                                        , summary
                                        , typDir
-                                       , versionArg
                                        , (&=)
                                        )
 import System.Console.CmdArgs.Default (def)
@@ -126,7 +125,6 @@ nirumCli = NirumCli { objectPath = def &= explicit
                     }
          &= program "nirum"
          &= summary ("Nirum Compiler " ++ versionString)
-         &= versionArg [summary versionString]
 
 main' :: IO ()
 main' = do
