@@ -120,7 +120,7 @@ importErrorsToPrettyMessage importErrors =
 
 nirumCli :: NirumCli
 nirumCli = NirumCli { objectPath = def &= explicit
-                          &= name "output-dir" &= typDir
+                          &= name "o" &= name "output-dir" &= typDir
                           &= help "The directory to place object files"
                     , sourcePath = def &= argPos 1 &= typDir
                     }
