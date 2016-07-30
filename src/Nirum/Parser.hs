@@ -7,6 +7,7 @@ module Nirum.Parser ( Parser
                     , docs
                     , enumTypeDeclaration
                     , file
+                    , handleNameDuplication
                     , identifier
                     , imports
                     , listModifier
@@ -51,7 +52,7 @@ import Text.Megaparsec.Char (char, eol, noneOf, spaceChar, string, string')
 import qualified Text.Megaparsec.Error as E
 import Text.Megaparsec.Text (Parser)
 
-import Nirum.Constructs.Declaration (Docs(Docs))
+import Nirum.Constructs.Declaration (Declaration, Docs(Docs))
 import Nirum.Constructs.DeclarationSet ( DeclarationSet
                                        , NameDuplication( BehindNameDuplication
                                                         , FacialNameDuplication
@@ -226,6 +227,20 @@ enumMember = do
         return d
     return $ EnumMember memberName docs'
 
+handleNameDuplication :: Declaration a
+                      => String -> [a]
+                      -> (DeclarationSet a -> Parser b)
+                      -> Parser b
+handleNameDuplication label declarations cont =
+    case fromList declarations of
+        Left (BehindNameDuplication (Name _ bname)) ->
+            fail ("the behind " ++ label ++ " name `" ++ toString bname ++
+                  "` is duplicated")
+        Left (FacialNameDuplication (Name fname _)) ->
+            fail ("the facial " ++ label ++ " name `" ++ toString fname ++
+                  "` is duplicated")
+        Right set -> cont set
+
 enumTypeDeclaration :: Parser TypeDeclaration
 enumTypeDeclaration = do
     string "enum" <?> "enum keyword"
@@ -285,14 +300,7 @@ fields = do
 fieldSet :: Parser (DeclarationSet Field)
 fieldSet = do
     fields' <- fields <?> "fields"
-    case fromList fields' of
-        Left (BehindNameDuplication (Name _ bname)) ->
-            fail ("the behind field name `" ++ toString bname ++
-                  "` is duplicated")
-        Left (FacialNameDuplication (Name fname _)) ->
-            fail ("the facial field name `" ++ toString fname ++
-                  "` is duplicated")
-        Right set -> return set
+    handleNameDuplication "field" fields' return
 
 recordTypeDeclaration :: Parser TypeDeclaration
 recordTypeDeclaration = do
@@ -346,15 +354,8 @@ unionTypeDeclaration = do
              <?> "union tags"
     spaces
     char ';'
-    case fromList tags' of
-        Left (BehindNameDuplication (Name _ bname)) ->
-            fail ("the behind tag name `" ++ toString bname ++
-                  "` is duplicated")
-        Left (FacialNameDuplication (Name fname _)) ->
-            fail ("the facial tag name `" ++ toString fname ++
-                  "` is duplicated")
-        Right tagSet ->
-            return $ TypeDeclaration typename (UnionType tagSet) docs'
+    handleNameDuplication "tag" tags' $ \tagSet ->
+        return $ TypeDeclaration typename (UnionType tagSet) docs'
 
 typeDeclaration :: Parser TypeDeclaration
 typeDeclaration =
@@ -414,14 +415,8 @@ module' = do
         typeDecl <- typeDeclaration
         spaces
         return typeDecl
-    case fromList (types ++ [i | l <- importLists, i <- l]) of
-        Left (BehindNameDuplication (Name _ bname)) ->
-            fail ("the behind type name `" ++ toString bname ++
-                  "` is duplicated")
-        Left (FacialNameDuplication (Name fname _)) ->
-            fail ("the facial type name `" ++ toString fname ++
-                  "` is duplicated")
-        Right typeSet -> return $ Module typeSet docs'
+    handleNameDuplication "type" (types ++ [i | l <- importLists, i <- l]) $
+                          \typeSet -> return $ Module typeSet docs'
 
 file :: Parser Module
 file = do

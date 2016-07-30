@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedLists, OverloadedStrings #-}
+{-# LANGUAGE OverloadedLists, OverloadedStrings, TypeFamilies #-}
 module Nirum.ParserSpec where
 
 import Control.Monad (forM_)
@@ -13,7 +13,8 @@ import qualified Data.Text as T
 import Data.Text.IO (readFile)
 import Test.Hspec.Meta
 import Text.Megaparsec (eof, runParser)
-import Text.Megaparsec.Error (errorPos)
+import Text.Megaparsec.Char (string)
+import Text.Megaparsec.Error (errorPos, parseErrorPretty)
 import Text.Megaparsec.Pos (Pos, SourcePos(sourceColumn, sourceLine), mkPos)
 import Text.Megaparsec.Text (Parser)
 
@@ -21,6 +22,7 @@ import qualified Nirum.Parser as P
 import Nirum.Constructs (Construct(toCode))
 import Nirum.Constructs.Declaration (Docs(Docs))
 import Nirum.Constructs.DeclarationSet (DeclarationSet)
+import Nirum.Constructs.DeclarationSetSpec (SampleDecl(..))
 import Nirum.Constructs.Identifier (fromText)
 import Nirum.Constructs.Module (Module(Module))
 import Nirum.Constructs.Name (Name(..))
@@ -52,11 +54,12 @@ helperFuncs parser =
         eof
         return r
     parse' = runParser parserAndEof ""
-    expectError string line col = do
+    expectError inputString line col = do
         line' <- mkPos line
         col' <- mkPos col
-        parse' string `shouldSatisfy` isLeft
-        erroredPos (parse' string) `shouldBe` (line', col')
+        let parseResult = parse' inputString
+        parseResult `shouldSatisfy` isLeft
+        erroredPos parseResult `shouldBe` (line', col')
 
 spec :: Spec
 spec = do
@@ -286,6 +289,38 @@ spec = do
             in forM_ parsers $ \(label', parser') ->
                 describe label' $
                     spec' $ helperFuncs parser'
+
+    describe "handleNameDuplication" $ do
+        let cont dset = do _ <- string "a"
+                           return dset :: Parser (DeclarationSet SampleDecl)
+        it "fails if there are any duplication on facial names" $ do
+            let ds = [ "a"
+                     , "b"
+                     , SampleDecl (Name "b" "c") Nothing
+                     ] :: [SampleDecl]
+                p = P.handleNameDuplication "LABEL" ds cont
+                (parse', expectError) = helperFuncs p
+            expectError "a" 1 1
+            let (Left e) = parse' "a"
+            parseErrorPretty e `shouldBe`
+                "1:1:\nthe facial LABEL name `b` is duplicated\n"
+        it "fails if there are any duplication on behind names" $ do
+            let ds = [ "a"
+                     , "b"
+                     , SampleDecl (Name "c" "b") Nothing
+                     ] :: [SampleDecl]
+                p = P.handleNameDuplication "LABEL" ds cont
+                (parse', expectError) = helperFuncs p
+            expectError "a" 1 1
+            let (Left e) = parse' "a"
+            parseErrorPretty e `shouldBe`
+                "1:1:\nthe behind LABEL name `b` is duplicated\n"
+        it "continues using the given DeclarationSet if there are no dups" $ do
+            let ds = ["a", "b", "c"] :: [SampleDecl]
+                p = P.handleNameDuplication "LABEL" ds cont
+                (parse', _) = helperFuncs p
+            parse' "a" `shouldBe`
+                Right (["a", "b", "c"] :: DeclarationSet SampleDecl)
 
     descTypeDecl "aliasTypeDeclaration" P.aliasTypeDeclaration $ \helpers -> do
         let (parse', expectError) = helpers
