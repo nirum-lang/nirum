@@ -153,8 +153,12 @@ spec = do
                 , (["examples", "shapes"], path </> "shapes.nrm")
                 , (["examples", "countries"], path </> "countries.nrm")
                 , (["examples", "address"], path </> "address.nrm")
+                -- FIXME: the following files should be opt-out
                 , ( ["test", "import_error", "import_error"]
                   , "." </> "test" </> "import_error" </> "import_error.nrm"
+                  )
+                , ( ["test", "parse-error", "missing-semicolon"]
+                  , "." </> "test" </> "parse-error" </> "missing-semicolon.nrm"
                   )
                 ]
             mods' <- scanModules path
