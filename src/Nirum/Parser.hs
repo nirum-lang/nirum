@@ -337,7 +337,7 @@ unionTypeDeclaration = do
     typename <- name <?> "union type name"
     spaces
     docs' <- optional $ do
-        d <- docs <?> "record type docs"
+        d <- docs <?> "union type docs"
         spaces
         return d
     char '='
