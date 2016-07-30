@@ -20,7 +20,6 @@ import System.Console.CmdArgs.Implicit ( Data
                                        , program
                                        , summary
                                        , typDir
-                                       , versionArg
                                        , (&=)
                                        )
 import System.Console.CmdArgs.Default (def)
@@ -120,13 +119,12 @@ importErrorsToPrettyMessage importErrors =
 
 nirumCli :: NirumCli
 nirumCli = NirumCli { objectPath = def &= explicit
-                          &= name "output-dir" &= typDir
+                          &= name "o" &= name "output-dir" &= typDir
                           &= help "The directory to place object files"
                     , sourcePath = def &= argPos 1 &= typDir
                     }
          &= program "nirum"
          &= summary ("Nirum Compiler " ++ versionString)
-         &= versionArg [summary versionString]
 
 main' :: IO ()
 main' = do
