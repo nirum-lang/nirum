@@ -44,6 +44,7 @@ import Text.Megaparsec ( Token
                        , sepBy1
                        , sepEndBy1
                        , skipMany
+                       , skipSome
                        , try
                        , (<|>)
                        , (<?>)
@@ -96,6 +97,9 @@ comment = string "//" >> void (many $ noneOf ("\n" :: String)) <?> "comment"
 
 spaces :: Parser ()
 spaces = skipMany $ void spaceChar <|> comment
+
+spaces1 :: Parser ()
+spaces1 = skipSome $ void spaceChar <|> comment
 
 identifier :: Parser Identifier
 identifier =
@@ -276,7 +280,7 @@ enumTypeDeclaration = do
 fields :: Parser [Field]
 fields = do
     fieldType <- typeExpression <?> "field type"
-    spaces
+    spaces1
     fieldName <- name <?> "field name"
     spaces
     let mkField = Field fieldName fieldType

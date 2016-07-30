@@ -442,6 +442,9 @@ spec = do
                         \    text b/c,\n\
                         \    text c/b,\n\
                         \);" 5 1
+        it "fails to parse if there's no space between field type and name" $ do
+            expectError "record a (typename);" 1 11
+            expectError "record a (typename\n#docs\n);" 1 11
 
     descTypeDecl "unionTypeDeclaration" P.unionTypeDeclaration $ \helpers -> do
         let (parse', expectError) = helpers
