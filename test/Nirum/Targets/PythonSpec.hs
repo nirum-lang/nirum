@@ -77,6 +77,7 @@ import Nirum.Targets.Python ( Source(Source, sourceModule, sourcePackage)
                             , toAttributeName
                             , toClassName
                             , toImportPath
+                            , toNamePair
                             , withLocalImport
                             , withStandardImport
                             , withThirdPartyImports
@@ -396,6 +397,20 @@ spec = parallel $ do
             toAttributeName "def" `shouldBe` "def_"
             toAttributeName "lambda" `shouldBe` "lambda_"
             toAttributeName "nonlocal" `shouldBe` "nonlocal_"
+
+    describe "toNamePair" $ do
+        it "transforms the name to a Python code string of facial/behind pair" $
+            do toNamePair "text" `shouldBe` "('text', 'text')"
+               toNamePair (Name "test" "hello") `shouldBe` "('test', 'hello')"
+        it "replaces hyphens to underscores" $ do
+            toNamePair "hello-world" `shouldBe` "('hello_world', 'hello_world')"
+            toNamePair (Name "hello-world" "annyeong-sesang") `shouldBe`
+                "('hello_world', 'annyeong_sesang')"
+        it "appends an underscore if the facial name is a Python keyword" $ do
+            toNamePair "def" `shouldBe` "('def_', 'def')"
+            toNamePair "lambda" `shouldBe` "('lambda_', 'lambda')"
+            toNamePair (Name "abc" "lambda") `shouldBe` "('abc', 'lambda')"
+            toNamePair (Name "lambda" "abc") `shouldBe` "('lambda_', 'abc')"
 
     let test testRunner
              Source { sourcePackage = pkg

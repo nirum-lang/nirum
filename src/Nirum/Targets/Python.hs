@@ -20,6 +20,7 @@ module Nirum.Targets.Python ( Code
                             , toAttributeName
                             , toClassName
                             , toImportPath
+                            , toNamePair
                             , withLocalImport
                             , withStandardImport
                             , withThirdPartyImports
@@ -174,6 +175,9 @@ toAttributeName' = toAttributeName . N.facialName
 toImportPath :: ModulePath -> T.Text
 toImportPath = T.intercalate "." . map toAttributeName . toList
 
+toNamePair :: Name -> T.Text
+toNamePair (Name f b) = [qq|('{toAttributeName f}', '{toSnakeCaseText b}')|]
+
 toIndentedCodes :: (a -> T.Text) -> [a] -> T.Text -> T.Text
 toIndentedCodes f traversable concatenator =
     T.intercalate concatenator $ map f traversable
@@ -200,8 +204,7 @@ compileUnionTag source parentname typename fields = do
         initialValues =
             toIndentedCodes (\n -> [qq|self.{n} = {n}|]) tagNames "\n        "
         nameMaps = toIndentedCodes
-            (\(Name f b) ->
-                [qq|('{toAttributeName f}', '{toSnakeCaseText b}')|])
+            toNamePair
             [name | Field name _ _ <- toList fields, N.isComplex name]
             ",\n        "
         parentClass = toClassName' parentname
@@ -370,8 +373,7 @@ compileTypeDeclaration src (TypeDeclaration typename (RecordType fields) _) = do
         initialValues = toIndentedCodes
             (\n -> [qq|self.{n} = {n}|]) fieldNames "\n        "
         nameMaps = toIndentedCodes
-            (\(Name f b) ->
-                [qq|('{toAttributeName f}', '{toSnakeCaseText b}')|])
+            toNamePair
             [name | Field name _ _ <- toList fields, N.isComplex name]
             ",\n        "
     withStandardImport "typing" $
@@ -479,7 +481,7 @@ $fieldCodes'
                    ]
     nameMaps :: T.Text
     nameMaps = toIndentedCodes
-        (\(Name f b) -> [qq|('{toAttributeName f}', '{toSnakeCaseText b}')|])
+        toNamePair
         [name | (name, _) <- tagNameNFields, N.isComplex name]
         ",\n        "
 compileTypeDeclaration _ (Import _ _) =
