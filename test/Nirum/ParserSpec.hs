@@ -167,9 +167,9 @@ spec = do
         it "fails to parse if annotation name start with hyphen" $ do
             expectError "[-abc: \"helloworld\"]" 1 2
             expectError "[-abc-d: \"helloworld\"]" 1 2
-        it "fails to parse without colon " $ do
+        it "fails to parse without colon " $
             expectError "[foobar \"helloworld\"]" 1 9
-        it "fails to parse without double quotes" $ do
+        it "fails to parse without double quotes" $
             expectError "[foobar: helloworld]" 1 10
 
     describe "typeIdentifier" $ do
