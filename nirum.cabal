@@ -53,6 +53,15 @@ executable nirum
   ghc-options:         -Wall -Werror -fwarn-incomplete-uni-patterns
                        -threaded -with-rtsopts=-N
 
+executable nirum-static
+  build-depends:       base   >=4.7     && <5
+               ,       nirum
+  main-is:             Main.hs
+  default-language:    Haskell2010
+  ghc-options:         -Wall -Werror -fwarn-incomplete-uni-patterns
+                       -threaded -with-rtsopts=-N
+                       -static
+
 test-suite spec
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
