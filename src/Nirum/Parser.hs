@@ -2,8 +2,9 @@
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 module Nirum.Parser ( Parser
                     , ParseError
-                    , aliasTypeDeclaration 
-                    , boxedTypeDeclaration 
+                    , aliasTypeDeclaration
+                    , annotation
+                    , boxedTypeDeclaration
                     , docs
                     , enumTypeDeclaration
                     , file
@@ -39,6 +40,7 @@ import Data.Text.IO (readFile)
 import Text.Megaparsec ( Token
                        , eof
                        , many
+                       , manyTill
                        , notFollowedBy
                        , option
                        , optional
@@ -52,10 +54,18 @@ import Text.Megaparsec ( Token
                        , (<|>)
                        , (<?>)
                        )
-import Text.Megaparsec.Char (char, eol, noneOf, spaceChar, string, string')
+import Text.Megaparsec.Char (char
+                            , eol
+                            , noneOf
+                            , spaceChar
+                            , string
+                            , string'
+                            )
 import qualified Text.Megaparsec.Error as E
 import Text.Megaparsec.Text (Parser)
+import Text.Megaparsec.Lexer (charLiteral)
 
+import Nirum.Constructs.Annotation (Annotation(Annotation))
 import Nirum.Constructs.Declaration (Declaration, Docs(Docs))
 import Nirum.Constructs.DeclarationSet ( DeclarationSet
                                        , NameDuplication( BehindNameDuplication
@@ -135,6 +145,21 @@ name = do
         spaces
         identifier <?> "behind name"
     return $ Name facialName behindName
+
+annotation :: Parser Annotation
+annotation = do
+    char '['
+    spaces
+    name' <- identifier
+    spaces
+    char ':'
+    spaces
+    metadata <- (char '"' >> manyTill charLiteral (char '"'))
+                <?> "annotation metadata"
+    spaces
+    char ']'
+    return $ Annotation name' $ T.pack metadata
+
 
 typeExpression :: Parser TypeExpression
 typeExpression =

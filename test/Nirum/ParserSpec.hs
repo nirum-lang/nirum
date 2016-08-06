@@ -20,6 +20,7 @@ import Text.Megaparsec.Text (Parser)
 
 import qualified Nirum.Parser as P
 import Nirum.Constructs (Construct(toCode))
+import Nirum.Constructs.Annotation (Annotation(Annotation))
 import Nirum.Constructs.Declaration (Docs(Docs))
 import Nirum.Constructs.DeclarationSet (DeclarationSet)
 import Nirum.Constructs.DeclarationSetSpec (SampleDecl(..))
@@ -152,6 +153,24 @@ spec = do
             parse' "facial / behind" `shouldBeRight` Name "facial" "behind"
             parse' "`enum`/`boxed`" `shouldBeRight` Name "enum" "boxed"
             parse' "`enum` / `boxed`" `shouldBeRight` Name "enum" "boxed"
+
+    describe "annoation" $ do
+        let (parse', expectError) = helperFuncs P.annotation
+            rightAnnotaiton = Right (Annotation "name-abc" "wo\"rld")
+        it "success" $ do
+            parse' "[name-abc: \"wo\\\"rld\"]" `shouldBe` rightAnnotaiton
+            parse' "[name-abc:\"wo\\\"rld\"]" `shouldBe` rightAnnotaiton
+            parse' "[name-abc:\"wo\\\"rld\" ]" `shouldBe` rightAnnotaiton
+            parse' "[name-abc: \"wo\\\"rld\" ]" `shouldBe` rightAnnotaiton
+            parse' "[ name-abc : \"wo\\\"rld\"]" `shouldBe` rightAnnotaiton
+            parse' "[name-abc : \"wo\\\"rld\"]" `shouldBe` rightAnnotaiton
+        it "fails to parse if annotation name start with hyphen" $ do
+            expectError "[-abc: \"helloworld\"]" 1 2
+            expectError "[-abc-d: \"helloworld\"]" 1 2
+        it "fails to parse without colon " $ do
+            expectError "[foobar \"helloworld\"]" 1 9
+        it "fails to parse without double quotes" $ do
+            expectError "[foobar: helloworld]" 1 10
 
     describe "typeIdentifier" $ do
         let (parse', expectError) = helperFuncs P.typeIdentifier
