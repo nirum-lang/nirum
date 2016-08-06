@@ -4,7 +4,7 @@ module Nirum.Constructs.Declaration ( Declaration
                                     , docs
                                     , name
                                     , toCode
-                                    , toCodeWithPrefix 
+                                    , toCodeWithPrefix
                                     , toText
                                     ) where
 

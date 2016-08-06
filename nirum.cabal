@@ -20,6 +20,7 @@ cabal-version:       >=1.10
 library
   exposed-modules:     Nirum.Cli
                  ,     Nirum.Constructs
+                 ,     Nirum.Constructs.Annotation
                  ,     Nirum.Constructs.Declaration
                  ,     Nirum.Constructs.DeclarationSet
                  ,     Nirum.Constructs.Identifier
@@ -68,6 +69,7 @@ test-suite spec
   hs-source-dirs:      test
   main-is:             Spec.hs
   other-modules:       Nirum.CliSpec
+               ,       Nirum.Constructs.AnnotationSpec
                ,       Nirum.Constructs.DeclarationSpec
                ,       Nirum.Constructs.DeclarationSetSpec
                ,       Nirum.Constructs.IdentifierSpec
