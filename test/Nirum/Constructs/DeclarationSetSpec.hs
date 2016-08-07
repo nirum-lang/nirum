@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedLists, OverloadedStrings #-}
-module Nirum.Constructs.DeclarationSetSpec where
+module Nirum.Constructs.DeclarationSetSpec (SampleDecl(..), spec) where
 
 import Control.Exception.Base (evaluate)
 import Data.String (IsString(..))

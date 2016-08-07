@@ -46,7 +46,12 @@ instance Construct Module where
             | (p, i) <- M.toAscList (imports m)
             ]
         typeCodes :: [T.Text]
-        typeCodes = [toCode t | t@TypeDeclaration {} <- typeList]
+        typeCodes = [ toCode t
+                    | t <- typeList
+                    , case t of
+                          Import {} -> False
+                          _ -> True
+                    ]
 
 imports :: Module -> M.Map ModulePath (S.Set Identifier)
 imports (Module decls _) =

@@ -20,6 +20,7 @@ module Nirum.Targets.Python ( Code
                             , toAttributeName
                             , toClassName
                             , toImportPath
+                            , toNamePair
                             , withLocalImport
                             , withStandardImport
                             , withThirdPartyImports
@@ -43,6 +44,10 @@ import Nirum.Constructs.Identifier ( Identifier
 import Nirum.Constructs.ModulePath (ModulePath)
 import Nirum.Constructs.Name (Name(Name))
 import qualified Nirum.Constructs.Name as N
+import Nirum.Constructs.Service ( Method(Method, methodName)
+                                , Parameter(Parameter)
+                                , Service(Service)
+                                )
 import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
                                         , Field(Field)
                                         , PrimitiveTypeIdentifier(..)
@@ -55,6 +60,7 @@ import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
                                               , UnionType
                                               )
                                         , TypeDeclaration( Import
+                                                         , ServiceDeclaration
                                                          , TypeDeclaration
                                                          )
                                         )
@@ -174,6 +180,9 @@ toAttributeName' = toAttributeName . N.facialName
 toImportPath :: ModulePath -> T.Text
 toImportPath = T.intercalate "." . map toAttributeName . toList
 
+toNamePair :: Name -> T.Text
+toNamePair (Name f b) = [qq|('{toAttributeName f}', '{toSnakeCaseText b}')|]
+
 toIndentedCodes :: (a -> T.Text) -> [a] -> T.Text -> T.Text
 toIndentedCodes f traversable concatenator =
     T.intercalate concatenator $ map f traversable
@@ -200,14 +209,14 @@ compileUnionTag source parentname typename fields = do
         initialValues =
             toIndentedCodes (\n -> [qq|self.{n} = {n}|]) tagNames "\n        "
         nameMaps = toIndentedCodes
-            (\(Name f b) ->
-                [qq|('{toAttributeName f}', '{toSnakeCaseText b}')|])
-            [name | Field name _ _ <- toList fields, N.isComplex name]
+            toNamePair
+            [name | Field name _ _ <- toList fields]
             ",\n        "
         parentClass = toClassName' parentname
     withStandardImport "typing" $
-        withThirdPartyImports
-            [("nirum.validate", ["validate_union_type"])] $
+        withThirdPartyImports [ ("nirum.validate", ["validate_union_type"])
+                              , ("nirum.constructs", ["name_dict_type"])
+                              ] $
             return [qq|
 class $className($parentClass):
     # TODO: docstring
@@ -219,7 +228,7 @@ class $className($parentClass):
     __nirum_tag_types__ = \{
         $slotTypes
     \}
-    __nirum_tag_names__ = NameDict([
+    __nirum_tag_names__ = name_dict_type([
         $nameMaps
     ])
 
@@ -297,9 +306,7 @@ compileTypeDeclaration src (TypeDeclaration typename (BoxedType itype) _) = do
     let className = toClassName' typename
     itypeExpr <- compileTypeExpression src itype
     withStandardImport "typing" $
-        withThirdPartyImports [ ( "nirum.validate"
-                                , ["validate_boxed_type"]
-                                )
+        withThirdPartyImports [ ("nirum.validate", ["validate_boxed_type"])
                               , ("nirum.serialize", ["serialize_boxed_type"])
                               , ( "nirum.deserialize"
                                 , ["deserialize_boxed_type"]
@@ -370,9 +377,8 @@ compileTypeDeclaration src (TypeDeclaration typename (RecordType fields) _) = do
         initialValues = toIndentedCodes
             (\n -> [qq|self.{n} = {n}|]) fieldNames "\n        "
         nameMaps = toIndentedCodes
-            (\(Name f b) ->
-                [qq|('{toAttributeName f}', '{toSnakeCaseText b}')|])
-            [name | Field name _ _ <- toList fields, N.isComplex name]
+            toNamePair
+            [name | Field name _ _ <- toList fields]
             ",\n        "
     withStandardImport "typing" $
         withThirdPartyImports [ ( "nirum.validate"
@@ -381,7 +387,7 @@ compileTypeDeclaration src (TypeDeclaration typename (RecordType fields) _) = do
                               , ("nirum.serialize", ["serialize_record_type"])
                               , ( "nirum.deserialize"
                                 , ["deserialize_record_type"])
-                              , ("nirum.constructs", ["NameDict"])
+                              , ("nirum.constructs", ["name_dict_type"])
                               ] $
             return [qq|
 class $className:
@@ -394,7 +400,7 @@ class $className:
     __nirum_field_types__ = \{
         $slotTypes
     \}
-    __nirum_field_names__ = NameDict([
+    __nirum_field_names__ = name_dict_type([
         $nameMaps
     ])
 
@@ -434,13 +440,13 @@ compileTypeDeclaration src (TypeDeclaration typename (UnionType tags) _) = do
                                     , ["serialize_union_type"])
                                   , ( "nirum.deserialize"
                                     , ["deserialize_union_type"])
-                                  , ("nirum.constructs", ["NameDict"])
+                                  , ("nirum.constructs", ["name_dict_type"])
                                   ] $
                 return [qq|
 class $className:
 
     __nirum_union_behind_name__ = '{toSnakeCaseText $ N.behindName typename}'
-    __nirum_field_names__ = NameDict([
+    __nirum_field_names__ = name_dict_type([
         $nameMaps
     ])
 
@@ -479,11 +485,75 @@ $fieldCodes'
                    ]
     nameMaps :: T.Text
     nameMaps = toIndentedCodes
-        (\(Name f b) -> [qq|('{toAttributeName f}', '{toSnakeCaseText b}')|])
-        [name | (name, _) <- tagNameNFields, N.isComplex name]
+        toNamePair
+        [name | (name, _) <- tagNameNFields]
         ",\n        "
+compileTypeDeclaration src (ServiceDeclaration name (Service methods) _) = do
+    let methods' = toList methods
+    methodMetadata <- mapM compileMethodMetadata methods'
+    let methodMetadata' = commaNl methodMetadata
+    dummyMethods <- mapM compileMethod methods'
+    let dummyMethods' = T.intercalate "\n\n" dummyMethods
+    withThirdPartyImports [ ("nirum.constructs", ["name_dict_type"])
+                          , ("nirum.rpc", ["service_type"])
+                          ] $
+        return [qq|
+class $className(service_type):
+
+    __nirum_service_methods__ = \{
+        {methodMetadata'}
+    \}
+    __nirum_method_names__ = name_dict_type([
+        $methodNameMap
+    ])
+
+    {dummyMethods'}
+|]
+  where
+    className :: T.Text
+    className = toClassName' name
+    commaNl :: [T.Text] -> T.Text
+    commaNl = T.intercalate ",\n"
+    compileMethod :: Method -> CodeGen Code
+    compileMethod (Method mName params rtype _) = do
+        let mName' = toAttributeName' mName
+        params' <- mapM compileParameter $ toList params
+        rtypeExpr <- compileTypeExpression src rtype
+        return [qq|
+    def {mName'}(self, {commaNl params'}) -> $rtypeExpr:
+        raise NotImplementedError('$className has to implement {mName'}()')
+|]
+    compileParameter :: Parameter -> CodeGen Code
+    compileParameter (Parameter pName pType _) = do
+        pTypeExpr <- compileTypeExpression src pType
+        return [qq|{toAttributeName' pName}: $pTypeExpr|]
+    compileMethodMetadata :: Method -> CodeGen Code
+    compileMethodMetadata (Method mName params rtype _) = do
+        let params' = toList params :: [Parameter]
+        rtypeExpr <- compileTypeExpression src rtype
+        paramMetadata <- mapM compileParameterMetadata params'
+        let paramMetadata' = commaNl paramMetadata
+        withThirdPartyImports [("nirum.constructs", ["name_dict_type"])] $
+            return [qq|'{toAttributeName' mName}': \{
+                '_return': $rtypeExpr,
+                '_names': name_dict_type([{paramNameMap params'}]),
+                {paramMetadata'}
+            \}|]
+    compileParameterMetadata :: Parameter -> CodeGen Code
+    compileParameterMetadata (Parameter pName pType _) = do
+        let pName' = toAttributeName' pName
+        pTypeExpr <- compileTypeExpression src pType
+        return [qq|'{pName'}': $pTypeExpr|]
+    methodNameMap :: T.Text
+    methodNameMap = toIndentedCodes
+        toNamePair
+        [mName | Method { methodName = mName } <- toList methods]
+        ",\n        "
+    paramNameMap :: [Parameter] -> T.Text
+    paramNameMap params = toIndentedCodes
+        toNamePair [pName | Parameter pName _ _ <- params] ",\n        "
 compileTypeDeclaration _ (Import _ _) =
-    return "# TODO"
+    return ""  -- Nothing to compile
 
 compileModuleBody :: Source -> CodeGen Code
 compileModuleBody src@Source { sourceModule = boundModule } = do

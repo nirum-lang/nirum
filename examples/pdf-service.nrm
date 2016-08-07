@@ -1,0 +1,14 @@
+
+service pdf-service (
+    # A microservice which renders a PDF from the given URI or HTML.
+
+    blob render-uri (
+        # Renders a PDF from the given URI.
+        uri uri,
+    ),
+
+    blob render-html (
+        # Renders a PDF from the given HTML text.
+        text html,
+    ),
+);
