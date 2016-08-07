@@ -29,6 +29,7 @@ import qualified Nirum.Constructs.Module as Mod
 import Nirum.Constructs.ModulePath (ModulePath, fromFilePath)
 import Nirum.Constructs.TypeDeclaration ( Type
                                         , TypeDeclaration ( Import
+                                                          , ServiceDeclaration
                                                           , TypeDeclaration
                                                           , type'
                                                           )
@@ -83,6 +84,7 @@ detectMissingImports package@Package { modules = ms } =
                     | i <- S.toList idents
                     , e <- case DS.lookup i decls of
                         Just TypeDeclaration {} -> []
+                        Just ServiceDeclaration {} -> []
                         Just Import {} -> [MissingImportError path path' i]
                         Nothing -> [MissingImportError path path' i]
                     ]
@@ -200,6 +202,7 @@ lookupType identifier boundModule =
                 Nothing -> Missing
                 Just (Mod.Module decls _) ->
                     toType path (DS.lookup identifier decls)
+        Just ServiceDeclaration {} -> Missing
   where
     toType :: ModulePath -> Maybe TypeDeclaration -> TypeLookup
     toType mp (Just TypeDeclaration { type' = t }) = Imported mp t

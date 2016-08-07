@@ -6,9 +6,13 @@ module Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
                                         , Tag(Tag)
                                         , Type(..)
                                         , TypeDeclaration( Import
+                                                         , ServiceDeclaration
                                                          , TypeDeclaration
                                                          , importName
                                                          , modulePath
+                                                         , service
+                                                         , serviceDocs
+                                                         , serviceName
                                                          , type'
                                                          , typeDocs
                                                          , typename
@@ -29,6 +33,9 @@ import Nirum.Constructs.DeclarationSet (DeclarationSet, null', toList)
 import Nirum.Constructs.Identifier (Identifier)
 import Nirum.Constructs.ModulePath (ModulePath)
 import Nirum.Constructs.Name (Name(Name))
+import Nirum.Constructs.Service ( Method (Method, methodDocs)
+                                , Service (Service)
+                                )
 import Nirum.Constructs.TypeExpression (TypeExpression)
 
 data Type
@@ -105,6 +112,10 @@ data TypeDeclaration
                       , type' :: Type
                       , typeDocs :: Maybe Docs
                       }
+    | ServiceDeclaration { serviceName :: Name
+                         , service :: Service
+                         , serviceDocs :: Maybe Docs
+                         }
     | Import { modulePath :: ModulePath
              , importName :: Identifier
              }
@@ -163,6 +174,28 @@ instance Construct TypeDeclaration where
         docString Nothing = ""
         docString (Just (Docs d)) =
             T.concat ["\n// ", T.replace "\n" "\n// " $ T.stripEnd d, "\n"]
+    toCode (ServiceDeclaration name' (Service methods) docs') =
+        T.concat [ "service "
+                 , toCode name'
+                 , " ("
+                 , toCodeWithPrefix "\n    " docs'
+                 , case (docs', methods') of
+                      (_, []) -> ""
+                      (Nothing, [Method { methodDocs = Nothing }]) -> ""
+                      _ -> "\n    "
+                 , if length methods' > 1
+                   then methodsText
+                   else T.dropWhileEnd (== ',') (T.strip methodsText)
+                 , case docs' of
+                       Nothing -> ""
+                       Just _ -> "\n"
+                 , ");"
+                 ]
+      where
+        methods' :: [Method]
+        methods' = toList methods
+        methodsText :: T.Text
+        methodsText = T.intercalate "\n" $ map toCode methods'
     toCode (Import path ident) = T.concat [ "import "
                                           , toCode path
                                           , " ("
@@ -172,6 +205,8 @@ instance Construct TypeDeclaration where
 
 instance Declaration TypeDeclaration where
     name (TypeDeclaration name' _ _) = name'
+    name (ServiceDeclaration name' _ _) = name'
     name (Import _ identifier) = Name identifier identifier
     docs (TypeDeclaration _ _ docs') = docs'
+    docs (ServiceDeclaration _ _ docs') = docs'
     docs (Import _ _) = Nothing

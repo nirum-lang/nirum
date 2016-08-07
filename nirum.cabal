@@ -26,6 +26,7 @@ library
                  ,     Nirum.Constructs.Module
                  ,     Nirum.Constructs.ModulePath
                  ,     Nirum.Constructs.Name
+                 ,     Nirum.Constructs.Service
                  ,     Nirum.Constructs.TypeDeclaration
                  ,     Nirum.Constructs.TypeExpression
                  ,     Nirum.Package

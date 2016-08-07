@@ -26,6 +26,10 @@ import Nirum.Constructs.DeclarationSetSpec (SampleDecl(..))
 import Nirum.Constructs.Identifier (fromText)
 import Nirum.Constructs.Module (Module(Module))
 import Nirum.Constructs.Name (Name(..))
+import Nirum.Constructs.Service ( Method (Method)
+                                , Parameter (Parameter)
+                                , Service (Service)
+                                )
 import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
                                         , Field(Field)
                                         , Tag(Tag)
@@ -493,6 +497,144 @@ spec = do
                         \    | b\n\
                         \    ;" 2 38
 
+    describe "method" $ do
+        let (parse', expectError) = helperFuncs P.method
+        it "emits Method if succeeded to parse" $ do
+            parse' "text get-name()" `shouldBeRight`
+                Method "get-name" [] "text" Nothing
+            parse' "text get-name (person user)" `shouldBeRight`
+                Method "get-name" [Parameter "user" "person" Nothing]
+                       "text" Nothing
+            parse' "text get-name  ( person user,text default )" `shouldBeRight`
+                Method "get-name"
+                       [ Parameter "user" "person" Nothing
+                       , Parameter "default" "text" Nothing
+                       ]
+                       "text" Nothing
+        it "can have docs" $ do
+            parse' "text get-name (\n\
+                   \  # Gets the name.\n\
+                   \)" `shouldBeRight`
+                Method "get-name" [] "text" (Just "Gets the name.")
+            parse' "text get-name (\n\
+                   \  # Gets the name of the user.\n\
+                   \  person user,\n\
+                   \)" `shouldBeRight`
+                Method "get-name"
+                       [Parameter "user" "person" Nothing]
+                       "text"
+                       (Just "Gets the name of the user.")
+            parse' "text get-name (\n\
+                   \  # Gets the name of the user.\n\
+                   \  person user,\n\
+                   \  # The person to find their name.\n\
+                   \  text default\n\
+                   \  # The default name used when the user has no name.\n\
+                   \)" `shouldBeRight`
+                Method "get-name"
+                       [ Parameter "user" "person" $
+                                   Just "The person to find their name."
+                       , Parameter "default" "text" $
+                                   Just "The default name used when \
+                                        \the user has no name."
+                       ]
+                       "text"
+                       (Just "Gets the name of the user.")
+        it "fails to parse if there are parameters of the same facial name" $ do
+            expectError "bool pred(text a, text a/b)" 1 11
+            expectError "bool pred(text a/b, text a)" 1 11
+            expectError "bool pred(text c/a, text c/b)" 1 11
+        it "fails to parse if there are parameters of the same behind name" $ do
+            expectError "bool pred(text a, text b/a)" 1 11
+            expectError "bool pred(text a/b, text b)" 1 11
+            expectError "bool pred(text a/c, text b/c)" 1 11
+
+    describe "serviceDeclaration" $ do
+        let (parse', expectError) = helperFuncs P.serviceDeclaration
+        it "emits ServiceDeclaration if succeeded to parse" $ do
+            parse' "service null-service();" `shouldBeRight`
+                ServiceDeclaration "null-service" (Service []) Nothing
+            parse' "service null-service (\n\
+                   \  # Service having no methods.\n\
+                   \);" `shouldBeRight`
+                ServiceDeclaration "null-service"
+                                   (Service [])
+                                   (Just "Service having no methods.")
+            parse' "service one-method-service(\n\
+                   \  user get-user(uuid user-id)\n\
+                   \);" `shouldBeRight`
+                ServiceDeclaration
+                    "one-method-service"
+                    (Service [ Method "get-user"
+                                      [Parameter "user-id" "uuid" Nothing]
+                                      "user"
+                                      Nothing
+                             ])
+                    Nothing
+            parse' "service one-method-service (\n\
+                   \  # Service having only one method.\n\
+                   \  user get-user (\n\
+                   \    # Gets an user by its id.\n\
+                   \    uuid user-id\n\
+                   \  ),\n\
+                   \);" `shouldBeRight`
+                ServiceDeclaration
+                    "one-method-service"
+                    (Service [ Method "get-user"
+                                      [Parameter "user-id" "uuid" Nothing]
+                                      "user"
+                                      (Just "Gets an user by its id.")
+                             ])
+                    (Just "Service having only one method.")
+            parse' "service user-service (\n\
+                   \  # Service having multiple methods.\n\
+                   \  user create-user (\n\
+                   \    # Creates a new user\n\
+                   \    user user\n\
+                   \  ),\n\
+                   \  user get-user (\n\
+                   \    # Gets an user by its id.\n\
+                   \    uuid user-id\n\
+                   \  ),\n\
+                   \);" `shouldBeRight`
+                ServiceDeclaration
+                    "user-service"
+                    (Service [ Method "create-user"
+                                      [Parameter "user" "user" Nothing]
+                                      "user"
+                                      (Just "Creates a new user")
+                             , Method "get-user"
+                                      [Parameter "user-id" "uuid" Nothing]
+                                      "user"
+                                      (Just "Gets an user by its id.")
+                             ])
+                    (Just "Service having multiple methods.")
+        it "fails to parse if there are methods of the same facial name" $ do
+            expectError "service method-dups (\n\
+                        \  bool same-name ()\n\
+                        \  text same-name (uuid id)\n\
+                        \);" 3 3
+            expectError "service method-dups (\n\
+                        \  bool same-name ()\n\
+                        \  text same-name/different-behind-name (uuid id)\n\
+                        \);" 3 3
+            expectError "service method-dups (\n\
+                        \  bool same-name/unique-behind-name ()\n\
+                        \  text same-name/different-behind-name (uuid id)\n\
+                        \);" 3 3
+        it "fails to parse if there are methods of the same behind name" $ do
+            expectError "service method-dups (\n\
+                        \  bool same-name ()\n\
+                        \  text same-name (uuid id)\n\
+                        \);" 3 3
+            expectError "service method-dups (\n\
+                        \  bool same-name ()\n\
+                        \  text unique-name/same-name (uuid id)\n\
+                        \);" 3 3
+            expectError "service method-dups (\n\
+                        \  bool unique-name/same-name ()\n\
+                        \  text different-facial-name/same-name (uuid id)\n\
+                        \);" 3 3
     let moduleParsers = [ ("module'", P.module')
                         , ("file", P.file)
                         ] :: [(String, Parser Module)]

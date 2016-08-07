@@ -40,6 +40,10 @@ import Text.Megaparsec.String (Parser)
 import Nirum.Constructs.DeclarationSet (DeclarationSet)
 import Nirum.Constructs.Module (Module(Module))
 import Nirum.Constructs.Name (Name(Name))
+import Nirum.Constructs.Service ( Method (Method)
+                                , Parameter (Parameter)
+                                , Service (Service)
+                                )
 import Nirum.Constructs.TypeDeclaration ( Field(Field)
                                         , EnumMember(EnumMember)
                                         , PrimitiveTypeIdentifier(..)
@@ -50,9 +54,10 @@ import Nirum.Constructs.TypeDeclaration ( Field(Field)
                                               , RecordType
                                               , UnionType
                                               )
-                                        , TypeDeclaration( Import
-                                                         , TypeDeclaration
-                                                         )
+                                        , TypeDeclaration ( Import
+                                                          , ServiceDeclaration
+                                                          , TypeDeclaration
+                                                          )
                                         )
 import Nirum.Constructs.TypeExpression ( TypeExpression( ListModifier
                                                        , MapModifier
@@ -736,8 +741,22 @@ spec = parallel $ do
                 tags = [pop]
                 decl = TypeDeclaration "music" (UnionType tags) Nothing
             tT decl "Pop(country='KR').__nirum_tag__.value == 'popular_music'"
-
-
+        specify "service" $ do
+            let null' = ServiceDeclaration "null-service" (Service []) Nothing
+                pingService = Service [Method "ping"
+                                              [Parameter "nonce" "text" Nothing]
+                                              "bool"
+                                              Nothing]
+                ping' = ServiceDeclaration "ping-service" pingService Nothing
+            tT null' "issubclass(NullService, __import__('nirum').rpc.Service)"
+            tT ping' "issubclass(PingService, __import__('nirum').rpc.Service)"
+            tT ping' "set(PingService.ping.__annotations__) == \
+                     \    {'nonce', 'return'}"
+            tT ping' "PingService.ping.__annotations__['nonce'] is str"
+            tT ping' "PingService.ping.__annotations__['return'] is bool"
+            tR' ping' "NotImplementedError" "PingService().ping('nonce')"
+            tR' ping' "NotImplementedError" "PingService().ping(nonce='nonce')"
+            tR' ping' "TypeError" "PingService().ping(wrongkwd='a')"
 
 {-# ANN module ("HLint: ignore Functor law" :: String) #-}
 {-# ANN module ("HLint: ignore Monad law, left identity" :: String) #-}

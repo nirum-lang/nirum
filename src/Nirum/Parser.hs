@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, ScopedTypeVariables #-}
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 module Nirum.Parser ( Parser
                     , ParseError
@@ -12,6 +12,7 @@ module Nirum.Parser ( Parser
                     , imports
                     , listModifier
                     , mapModifier
+                    , method
                     , module'
                     , modulePath
                     , name
@@ -19,6 +20,7 @@ module Nirum.Parser ( Parser
                     , parse
                     , parseFile
                     , recordTypeDeclaration
+                    , serviceDeclaration
                     , setModifier
                     , typeDeclaration
                     , typeExpression
@@ -42,6 +44,7 @@ import Text.Megaparsec ( Token
                        , optional
                        , runParser
                        , sepBy1
+                       , sepEndBy
                        , sepEndBy1
                        , skipMany
                        , skipSome
@@ -69,6 +72,10 @@ import Nirum.Constructs.Identifier ( Identifier
 import Nirum.Constructs.Module (Module(Module))
 import Nirum.Constructs.ModulePath (ModulePath(ModulePath, ModuleName))
 import Nirum.Constructs.Name (Name(Name))
+import Nirum.Constructs.Service ( Method(Method)
+                                , Parameter(Parameter)
+                                , Service(Service)
+                                )
 import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
                                         , Field(Field)
                                         , Tag(Tag)
@@ -79,6 +86,7 @@ import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
                                               , UnionType
                                               )
                                         , TypeDeclaration( Import
+                                                         , ServiceDeclaration
                                                          , TypeDeclaration
                                                          )
                                         )
@@ -277,29 +285,36 @@ enumTypeDeclaration = do
             char ';'
             return $ TypeDeclaration typename (EnumType memberSet) docs'
 
-fields :: Parser [Field]
-fields = do
-    fieldType <- typeExpression <?> "field type"
+fieldsOrParameters :: forall a. (String, String)
+                   -> (Name -> TypeExpression -> Maybe Docs -> a)
+                   -> Parser [a]
+fieldsOrParameters (label, pluralLabel) make = do
+    type' <- typeExpression <?> (label ++ " type")
     spaces1
-    fieldName <- name <?> "field name"
+    name' <- name <?> (label ++ " name")
     spaces
-    let mkField = Field fieldName fieldType
-    followedByComma mkField <|> do
-        d <- optional docs' <?> "field docs"
-        return [mkField d]
+    let makeWithDocs = make name' type'
+    followedByComma makeWithDocs <|> do
+        d <- optional docs' <?> (label ++ " docs")
+        return [makeWithDocs d]
   where
-    followedByComma :: (Maybe Docs -> Field) -> Parser [Field]
-    followedByComma mkField = do
+    recur :: Parser [a]
+    recur = fieldsOrParameters (label, pluralLabel) make
+    followedByComma :: (Maybe Docs -> a) -> Parser [a]
+    followedByComma makeWithDocs = do
         char ','
         spaces
-        d <- optional docs' <?> "field docs"
-        rest <- option [] fields <?> "rest of fields"
-        return $ mkField d : rest
+        d <- optional docs' <?> (label ++ " docs")
+        rest <- option [] recur <?> ("rest of " ++ pluralLabel)
+        return $ makeWithDocs d : rest
     docs' :: Parser Docs
     docs' = do
-        d <- docs <?> "field docs"
+        d <- docs <?> (label ++ " docs")
         spaces
         return d
+
+fields :: Parser [Field]
+fields = fieldsOrParameters ("label", "labels") Field
 
 fieldSet :: Parser (DeclarationSet Field)
 fieldSet = do
@@ -370,6 +385,58 @@ typeDeclaration =
       unionTypeDeclaration
     ) <?> "type declaration (e.g. boxed, enum, record, union)"
 
+parameters :: Parser [Parameter]
+parameters = fieldsOrParameters ("parameter", "parameters") Parameter
+
+parameterSet :: Parser (DeclarationSet Parameter)
+parameterSet = option empty $ try $ do
+    params <- parameters <?> "method parameters"
+    handleNameDuplication "parameter" params return
+
+method :: Parser Method
+method = do
+    returnType <- typeExpression <?> "method return type"
+    spaces1
+    methodName <- name <?> "method name"
+    spaces
+    char '('
+    spaces
+    docs' <- optional $ do
+        d <- docs <?> "method docs"
+        spaces
+        return d
+    params <- parameterSet
+    spaces
+    char ')'
+    return $ Method methodName params returnType docs'
+
+methods :: Parser [Method]
+methods = method `sepEndBy` try (spaces >> char ',' >> spaces)
+
+methodSet :: Parser (DeclarationSet Method)
+methodSet = do
+    methods' <- methods <?> "service methods"
+    handleNameDuplication "method" methods' return
+
+serviceDeclaration :: Parser TypeDeclaration
+serviceDeclaration = do
+    string "service" <?> "service keyword"
+    spaces
+    serviceName <- name <?> "service name"
+    spaces
+    char '('
+    spaces
+    docs' <- optional $ do
+        d <- docs <?> "service docs"
+        spaces
+        return d
+    methods' <- methodSet <?> "service methods"
+    spaces
+    char ')'
+    spaces
+    char ';'
+    return $ ServiceDeclaration serviceName (Service methods') docs'
+
 modulePath :: Parser ModulePath
 modulePath = do
     idents <- sepBy1 (identifier <?> "module identifier")
@@ -416,7 +483,8 @@ module' = do
         spaces
         return importList
     types <- many $ do
-        typeDecl <- typeDeclaration
+        typeDecl <- typeDeclaration <|>
+                    (serviceDeclaration <?> "service declaration")
         spaces
         return typeDecl
     handleNameDuplication "type" (types ++ [i | l <- importLists, i <- l]) $

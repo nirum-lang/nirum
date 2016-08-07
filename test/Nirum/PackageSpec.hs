@@ -134,11 +134,13 @@ spec = do
             Right shapesM <- parseFile (path </> "shapes.nrm")
             Right countriesM <- parseFile (path </> "countries.nrm")
             Right addressM <- parseFile (path </> "address.nrm")
+            Right pdfServiceM <- parseFile (path </> "pdf-service.nrm")
             let modules = [ (["builtins"], builtinsM)
                           , (["product"], productM)
                           , (["shapes"], shapesM)
                           , (["countries"], countriesM)
                           , (["address"], addressM)
+                          , (["pdf-service"], pdfServiceM)
                           ] :: M.Map ModulePath Module
             package `shouldBe` createPackage modules
             Left error' <- scanPackage $ "." </> "test" </> "import_error"
@@ -153,6 +155,7 @@ spec = do
                 , (["examples", "shapes"], path </> "shapes.nrm")
                 , (["examples", "countries"], path </> "countries.nrm")
                 , (["examples", "address"], path </> "address.nrm")
+                , (["examples", "pdf-service"], path </> "pdf-service.nrm")
                 , ( ["test", "import_error", "import_error"]
                   , "." </> "test" </> "import_error" </> "import_error.nrm"
                   )
@@ -163,6 +166,7 @@ spec = do
                              , (["shapes"], path </> "shapes.nrm")
                              , (["countries"], path </> "countries.nrm")
                              , (["address"], path </> "address.nrm")
+                             , (["pdf-service"], path </> "pdf-service.nrm")
                              ]
     describe "BoundModule" $ do
         let Just bm = resolveBoundModule ["foo", "bar"] validPackage
