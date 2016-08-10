@@ -37,7 +37,7 @@ data AnnotationSet
 
 instance Construct AnnotationSet where
     toCode AnnotationSet {annotations = annotations'} =
-        T.intercalate "\n" $ map toCode (M.elems annotations')
+        T.concat [s | e <- M.elems annotations', s <- [toCode e, "\n"]]
 
 data NameDuplication = AnnotationNameDuplication Identifier
                      deriving (Eq, Ord, Show)

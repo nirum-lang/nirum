@@ -755,12 +755,14 @@ spec = parallel $ do
                 decl = TypeDeclaration "music" (UnionType tags) Nothing empty
             tT decl "Pop(country='KR').__nirum_tag__.value == 'popular_music'"
         specify "service" $ do
-            let null' = ServiceDeclaration "null-service" (Service []) Nothing
+            let null' = ServiceDeclaration "null-service" (Service [])
+                                           Nothing empty
                 pingService = Service [Method "ping"
                                               [Parameter "nonce" "text" Nothing]
                                               "bool"
                                               Nothing]
-                ping' = ServiceDeclaration "ping-service" pingService Nothing
+                ping' = ServiceDeclaration "ping-service" pingService
+                                           Nothing empty
             tT null' "issubclass(NullService, __import__('nirum').rpc.Service)"
             tT ping' "issubclass(PingService, __import__('nirum').rpc.Service)"
             tT ping' "set(PingService.ping.__annotations__) == \

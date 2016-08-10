@@ -11,6 +11,7 @@ module Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
                                                          , importName
                                                          , modulePath
                                                          , service
+                                                         , serviceAnnotations
                                                          , serviceDocs
                                                          , serviceName
                                                          , type'
@@ -118,6 +119,7 @@ data TypeDeclaration
     | ServiceDeclaration { serviceName :: Name
                          , service :: Service
                          , serviceDocs :: Maybe Docs
+                         , serviceAnnotations :: AnnotationSet
                          }
     | Import { modulePath :: ModulePath
              , importName :: Identifier
@@ -186,8 +188,9 @@ instance Construct TypeDeclaration where
         docString Nothing = ""
         docString (Just (Docs d)) =
             T.concat ["\n// ", T.replace "\n" "\n// " $ T.stripEnd d, "\n"]
-    toCode (ServiceDeclaration name' (Service methods) docs') =
-        T.concat [ "service "
+    toCode (ServiceDeclaration name' (Service methods) docs' annotations') =
+        T.concat [ toCode annotations'
+                 , "service "
                  , toCode name'
                  , " ("
                  , toCodeWithPrefix "\n    " docs'
@@ -217,8 +220,8 @@ instance Construct TypeDeclaration where
 
 instance Declaration TypeDeclaration where
     name (TypeDeclaration name' _ _ _) = name'
-    name (ServiceDeclaration name' _ _) = name'
+    name (ServiceDeclaration name' _ _ _) = name'
     name (Import _ identifier) = Name identifier identifier
     docs (TypeDeclaration _ _ docs' _) = docs'
-    docs (ServiceDeclaration _ _ docs') = docs'
+    docs (ServiceDeclaration _ _ docs' _) = docs'
     docs (Import _ _) = Nothing

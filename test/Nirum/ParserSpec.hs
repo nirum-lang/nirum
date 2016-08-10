@@ -623,13 +623,14 @@ spec = do
         let (parse', expectError) = helperFuncs P.serviceDeclaration
         it "emits ServiceDeclaration if succeeded to parse" $ do
             parse' "service null-service();" `shouldBeRight`
-                ServiceDeclaration "null-service" (Service []) Nothing
+                ServiceDeclaration "null-service" (Service []) Nothing empty
             parse' "service null-service (\n\
                    \  # Service having no methods.\n\
                    \);" `shouldBeRight`
                 ServiceDeclaration "null-service"
                                    (Service [])
                                    (Just "Service having no methods.")
+                                   empty
             parse' "service one-method-service(\n\
                    \  user get-user(uuid user-id)\n\
                    \);" `shouldBeRight`
@@ -641,6 +642,7 @@ spec = do
                                       Nothing
                              ])
                     Nothing
+                    empty
             parse' "service one-method-service (\n\
                    \  # Service having only one method.\n\
                    \  user get-user (\n\
@@ -656,6 +658,7 @@ spec = do
                                       (Just "Gets an user by its id.")
                              ])
                     (Just "Service having only one method.")
+                    empty
             parse' "service user-service (\n\
                    \  # Service having multiple methods.\n\
                    \  user create-user (\n\
@@ -679,6 +682,15 @@ spec = do
                                       (Just "Gets an user by its id.")
                              ])
                     (Just "Service having multiple methods.")
+                    empty
+            parse' "[foo: \"bar\"]\n\
+                   \service null-service (\n\
+                   \  # Service having no methods.\n\
+                   \);" `shouldBeRight`
+                ServiceDeclaration "null-service"
+                                   (Service [])
+                                   (Just "Service having no methods.")
+                                   fooAnnotationSet
         it "fails to parse if there are methods of the same facial name" $ do
             expectError "service method-dups (\n\
                         \  bool same-name ()\n\

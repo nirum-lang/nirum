@@ -463,6 +463,7 @@ methodSet = do
 
 serviceDeclaration :: Parser TypeDeclaration
 serviceDeclaration = do
+    annotationSet' <- annotationSet <?> "service annotation"
     string "service" <?> "service keyword"
     spaces
     serviceName <- name <?> "service name"
@@ -478,7 +479,8 @@ serviceDeclaration = do
     char ')'
     spaces
     char ';'
-    return $ ServiceDeclaration serviceName (Service methods') docs'
+    return $ ServiceDeclaration serviceName (Service methods')
+                                docs' annotationSet'
 
 modulePath :: Parser ModulePath
 modulePath = do
@@ -526,7 +528,7 @@ module' = do
         spaces
         return importList
     types <- many $ do
-        typeDecl <- typeDeclaration <|>
+        typeDecl <- try typeDeclaration <|>
                     (serviceDeclaration <?> "service declaration")
         spaces
         return typeDecl

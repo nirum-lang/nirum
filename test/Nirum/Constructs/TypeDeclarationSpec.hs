@@ -1,11 +1,16 @@
 {-# LANGUAGE OverloadedLists, OverloadedStrings #-}
 module Nirum.Constructs.TypeDeclarationSpec where
 
+import Data.Either (rights)
 import qualified Data.Text as T
 import Test.Hspec.Meta
 
 import Nirum.Constructs (Construct(toCode))
-import Nirum.Constructs.Annotation (empty)
+import Nirum.Constructs.Annotation ( Annotation (Annotation)
+                                   , AnnotationSet
+                                   ,  fromList
+                                   , empty
+                                   )
 import Nirum.Constructs.Declaration (Declaration(name, docs))
 import Nirum.Constructs.DeclarationSet (DeclarationSet)
 import Nirum.Constructs.Service (Method(Method), Service(Service))
@@ -17,6 +22,9 @@ import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
                                         , Type(..)
                                         , TypeDeclaration(..)
                                         )
+
+barAnnotationSet :: AnnotationSet
+barAnnotationSet = head $ rights [fromList [Annotation "bar" "baz"]]
 
 spec :: Spec
 spec = do
@@ -149,15 +157,23 @@ spec = do
             specify "toCode" $
                 T.lines (toCode decl) `shouldSatisfy`
                     all (T.isPrefixOf "//" . T.stripStart)
-        context "SerciceDeclaration" $ do
+        context "ServiceDeclaration" $ do
             let nullService = Service []
                 nullDecl = ServiceDeclaration "null-service" nullService Nothing
-                nullDecl' = ServiceDeclaration "null-service" nullService $
-                                               Just "Null service declaration."
+                                              empty
+                nullDecl' =
+                    ServiceDeclaration "null-service" nullService
+                                       (Just "Null service declaration.")
+                                       empty
                 pingService = Service [ Method "ping" [] "bool" Nothing ]
                 pingDecl = ServiceDeclaration "ping-service" pingService Nothing
-                pingDecl' = ServiceDeclaration "ping-service" pingService $
-                                               Just "Ping service declaration."
+                                              empty
+                pingDecl' =
+                    ServiceDeclaration "ping-service" pingService
+                                       (Just "Ping service declaration.")
+                                       empty
+                annoDecl = ServiceDeclaration "anno-service" pingService
+                                              Nothing barAnnotationSet
             specify "toCode" $ do
                 toCode nullDecl `shouldBe` "service null-service ();"
                 toCode nullDecl' `shouldBe` "service null-service (\n\
@@ -170,6 +186,9 @@ spec = do
                     \    # Ping service declaration.\n\
                     \    bool ping ()\n\
                     \);"
+                toCode annoDecl `shouldBe`
+                    "[bar: \"baz\"]\n\
+                    \service anno-service (bool ping ());"
                 -- TODO: more tests
         context "Import" $ do
             let import' = Import ["foo", "bar"] "baz"

@@ -488,7 +488,7 @@ $fieldCodes'
         toNamePair
         [name | (name, _) <- tagNameNFields]
         ",\n        "
-compileTypeDeclaration src (ServiceDeclaration name (Service methods) _) = do
+compileTypeDeclaration src (ServiceDeclaration name (Service methods) _ _) = do
     let methods' = toList methods
     methodMetadata <- mapM compileMethodMetadata methods'
     let methodMetadata' = commaNl methodMetadata
