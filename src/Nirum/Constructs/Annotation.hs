@@ -15,28 +15,32 @@ import qualified Data.Text as T
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 
-import Nirum.Constructs (Construct(toCode))
-import qualified Nirum.Constructs.Identifier as CI
+import Nirum.Constructs (Construct (toCode))
+import Nirum.Constructs.Identifier (Identifier)
 
 
 type Metadata = T.Text
 
--- | Annotation for names.
-data Annotation = Annotation { name :: CI.Identifier
+-- | Annotation for 'Declaration'.
+data Annotation = Annotation { name :: Identifier
                              , metadata :: Metadata
                              } deriving (Eq, Ord, Show)
 
 instance Construct Annotation where
-    toCode Annotation {name = n,  metadata = m} = [qq|[{CI.toCode n}: "$m"]|]
+    toCode Annotation {name = n,  metadata = m} = [qq|[{toCode n}: "$m"]|]
 
 data AnnotationSet
   -- | The set of 'Annotation' values.
   -- Evenry annotaiton name has to be unique in the set.
-  = AnnotationSet { annotations :: M.Map CI.Identifier Annotation }
+  = AnnotationSet { annotations :: M.Map Identifier Annotation }
   deriving (Eq, Ord, Show)
 
-data NameDuplication = AnnotationNameDuplication CI.Identifier
-                     deriving (Eq, Show)
+instance Construct AnnotationSet where
+    toCode AnnotationSet {annotations = annotations'} =
+        T.intercalate "\n" $ map toCode (M.elems annotations')
+
+data NameDuplication = AnnotationNameDuplication Identifier
+                     deriving (Eq, Ord, Show)
 
 empty :: AnnotationSet
 empty = AnnotationSet { annotations = M.empty }
@@ -50,9 +54,9 @@ fromList annotations' =
                                                             ]
                                  }
   where
-    names :: [CI.Identifier]
+    names :: [Identifier]
     names = [name a | a <- annotations']
-    findDup :: [CI.Identifier] -> S.Set CI.Identifier -> Maybe CI.Identifier
+    findDup :: [Identifier] -> S.Set Identifier -> Maybe Identifier
     findDup identifiers dups =
         case identifiers of
             x:xs -> if x `S.member` dups

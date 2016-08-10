@@ -4,16 +4,15 @@ module Nirum.Constructs.AnnotationSpec where
 import Test.Hspec.Meta
 import qualified Data.Map.Strict as M
 
-import Nirum.Constructs.Annotation ( Annotation (Annotation)
-                                   , AnnotationSet (AnnotationSet)
-                                   , NameDuplication (
-                                         AnnotationNameDuplication
-                                     )
-                                   , empty
-                                   , fromList
-                                   , toCode
-                                   , toList
-                                   )
+import Nirum.Constructs.Annotation
+    ( Annotation (Annotation)
+    , AnnotationSet (AnnotationSet)
+    , NameDuplication (AnnotationNameDuplication)
+    , empty
+    , fromList
+    , toCode
+    , toList
+    )
 
 spec :: Spec
 spec = do
@@ -41,4 +40,4 @@ spec = do
                                 Right set -> set
                                 Left _ -> empty
         it "toList" $
-            (fromList $ toList annotationSet) `shouldBe` Right annotationSet
+            fromList (toList annotationSet) `shouldBe` Right annotationSet

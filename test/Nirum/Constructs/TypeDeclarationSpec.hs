@@ -5,6 +5,7 @@ import qualified Data.Text as T
 import Test.Hspec.Meta
 
 import Nirum.Constructs (Construct(toCode))
+import Nirum.Constructs.Annotation (empty)
 import Nirum.Constructs.Declaration (Declaration(name, docs))
 import Nirum.Constructs.DeclarationSet (DeclarationSet)
 import Nirum.Constructs.Service (Method(Method), Service(Service))
@@ -25,6 +26,7 @@ spec = do
                 a = TypeDeclaration { typename = "path"
                                     , type' = alias
                                     , typeDocs = Nothing
+                                    , typeAnnotations = empty
                                     }
                 b = a { typeDocs = Just "docs"}
             specify "name" $ do
@@ -41,6 +43,7 @@ spec = do
                 a = TypeDeclaration { typename = "offset"
                                     , type' = boxed
                                     , typeDocs = Nothing
+                                    , typeAnnotations = empty
                                     }
                 b = a { typeDocs = Just "docs" }
             specify "name" $ do
@@ -61,6 +64,7 @@ spec = do
                 a = TypeDeclaration { typename = "country"
                                     , type' = enum
                                     , typeDocs = Nothing
+                                    , typeAnnotations = empty
                                     }
                 b = a { typeDocs = Just "country codes" }
             specify "toCode" $ do
@@ -88,6 +92,7 @@ spec = do
                 a = TypeDeclaration { typename = "person"
                                     , type' = record
                                     , typeDocs = Nothing
+                                    , typeAnnotations = empty
                                     }
                 b = a { typeDocs = Just "person record type" }
             specify "toCode" $ do
@@ -119,6 +124,7 @@ spec = do
                 a = TypeDeclaration { typename = "shape"
                                     , type' = union
                                     , typeDocs = Nothing
+                                    , typeAnnotations = empty
                                     }
                 b = a { typeDocs = Just "shape type" }
             specify "toCode" $ do
@@ -139,7 +145,7 @@ spec = do
                                     \    ;"
         context "PrimitiveType" $ do
             let primitiveType = PrimitiveType Text String
-                decl = TypeDeclaration "text" primitiveType Nothing
+                decl = TypeDeclaration "text" primitiveType Nothing empty
             specify "toCode" $
                 T.lines (toCode decl) `shouldSatisfy`
                     all (T.isPrefixOf "//" . T.stripStart)

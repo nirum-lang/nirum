@@ -4,6 +4,7 @@ module Nirum.Parser ( Parser
                     , ParseError
                     , aliasTypeDeclaration
                     , annotation
+                    , annotationSet
                     , boxedTypeDeclaration
                     , docs
                     , enumTypeDeclaration
@@ -65,7 +66,7 @@ import qualified Text.Megaparsec.Error as E
 import Text.Megaparsec.Text (Parser)
 import Text.Megaparsec.Lexer (charLiteral)
 
-import Nirum.Constructs.Annotation (Annotation(Annotation))
+import qualified Nirum.Constructs.Annotation as A
 import Nirum.Constructs.Declaration (Declaration, Docs(Docs))
 import Nirum.Constructs.DeclarationSet ( DeclarationSet
                                        , NameDuplication( BehindNameDuplication
@@ -146,7 +147,7 @@ name = do
         identifier <?> "behind name"
     return $ Name facialName behindName
 
-annotation :: Parser Annotation
+annotation :: Parser A.Annotation
 annotation = do
     char '['
     spaces
@@ -158,8 +159,18 @@ annotation = do
                 <?> "annotation metadata"
     spaces
     char ']'
-    return $ Annotation name' $ T.pack metadata
+    return $ A.Annotation name' $ T.pack metadata
 
+annotationSet :: Parser A.AnnotationSet
+annotationSet = do
+    annotations <- many $ do
+        spaces
+        a <- annotation
+        spaces
+        return a
+    case A.fromList annotations of
+        Right annotations' -> return annotations'
+        Left (A.AnnotationNameDuplication _) -> fail "annotation name duplicate"
 
 typeExpression :: Parser TypeExpression
 typeExpression =
@@ -224,6 +235,7 @@ docs = do
 
 aliasTypeDeclaration :: Parser TypeDeclaration
 aliasTypeDeclaration = do
+    annotationSet' <- annotationSet <?> "type alias annotations"
     string' "type" <?> "type alias keyword"
     spaces
     typename <- identifier <?> "alias type name"
@@ -235,10 +247,12 @@ aliasTypeDeclaration = do
     spaces
     char ';'
     docs' <- optional $ try $ spaces >> (docs <?> "type alias docs")
-    return $ TypeDeclaration name' (Alias canonicalType) docs'
+    return $ TypeDeclaration name' (Alias canonicalType) docs' annotationSet'
+
 
 boxedTypeDeclaration :: Parser TypeDeclaration
 boxedTypeDeclaration = do
+    annotationSet' <- annotationSet <?> "boxed type annotations"
     string' "boxed" <?> "boxed type keyword"
     spaces
     typename <- identifier <?> "boxed type name"
@@ -251,8 +265,8 @@ boxedTypeDeclaration = do
     char ')'
     spaces
     char ';'
-    docs' <- optional $ try $ spaces >> (docs <?> "boed type docs")
-    return $ TypeDeclaration name' (BoxedType innerType) docs'
+    docs' <- optional $ try $ spaces >> (docs <?> "boxed type docs")
+    return $ TypeDeclaration name' (BoxedType innerType) docs' annotationSet'
 
 enumMember :: Parser EnumMember
 enumMember = do
@@ -280,6 +294,7 @@ handleNameDuplication label declarations cont =
 
 enumTypeDeclaration :: Parser TypeDeclaration
 enumTypeDeclaration = do
+    annotationSet' <- annotationSet <?> "enum type annotations"
     string "enum" <?> "enum keyword"
     spaces
     typename <- name <?> "enum type name"
@@ -308,7 +323,8 @@ enumTypeDeclaration = do
         Right memberSet -> do
             spaces
             char ';'
-            return $ TypeDeclaration typename (EnumType memberSet) docs'
+            return $ TypeDeclaration typename (EnumType memberSet)
+                                     docs' annotationSet'
 
 fieldsOrParameters :: forall a. (String, String)
                    -> (Name -> TypeExpression -> Maybe Docs -> a)
@@ -348,6 +364,7 @@ fieldSet = do
 
 recordTypeDeclaration :: Parser TypeDeclaration
 recordTypeDeclaration = do
+    annotationSet' <- annotationSet <?> "record type annotations"
     string "record" <?> "record keyword"
     spaces
     typename <- name <?> "record type name"
@@ -363,7 +380,7 @@ recordTypeDeclaration = do
     char ')'
     spaces
     char ';'
-    return $ TypeDeclaration typename (RecordType fields') docs'
+    return $ TypeDeclaration typename (RecordType fields') docs' annotationSet'
 
 tag :: Parser Tag
 tag = do
@@ -384,6 +401,7 @@ tag = do
 
 unionTypeDeclaration :: Parser TypeDeclaration
 unionTypeDeclaration = do
+    annotationSet' <- annotationSet <?> "union type annotations"
     string "union" <?> "union keyword"
     spaces
     typename <- name <?> "union type name"
@@ -399,14 +417,14 @@ unionTypeDeclaration = do
     spaces
     char ';'
     handleNameDuplication "tag" tags' $ \tagSet ->
-        return $ TypeDeclaration typename (UnionType tagSet) docs'
+        return $ TypeDeclaration typename (UnionType tagSet) docs' annotationSet'
 
 typeDeclaration :: Parser TypeDeclaration
 typeDeclaration =
-    ( aliasTypeDeclaration <|>
-      boxedTypeDeclaration <|>
-      enumTypeDeclaration <|>
-      recordTypeDeclaration <|>
+    ( try aliasTypeDeclaration <|>
+      try boxedTypeDeclaration <|>
+      try enumTypeDeclaration <|>
+      try recordTypeDeclaration <|>
       unionTypeDeclaration
     ) <?> "type declaration (e.g. boxed, enum, record, union)"
 

@@ -12,6 +12,7 @@ import qualified Data.Text as T
 import Text.InterpolatedString.Perl6 (q)
 
 import Nirum.Constructs (Construct(toCode))
+import Nirum.Constructs.Annotation (empty)
 import Nirum.Constructs.Declaration (Docs)
 import qualified Nirum.Constructs.DeclarationSet as DS
 import Nirum.Constructs.Identifier (Identifier)
@@ -66,22 +67,24 @@ coreModule = Module coreTypes $ Just coreDocs
 coreTypes :: DS.DeclarationSet TypeDeclaration
 coreTypes =
     -- number types
-    [ TypeDeclaration "bigint" (PrimitiveType Bigint String) Nothing
-    , TypeDeclaration "decimal" (PrimitiveType Decimal String) Nothing
-    , TypeDeclaration "int32" (PrimitiveType Int32 Number) Nothing
-    , TypeDeclaration "int64" (PrimitiveType Int64 Number) Nothing
-    , TypeDeclaration "float32" (PrimitiveType Float32 Number) Nothing
-    , TypeDeclaration "float64" (PrimitiveType Float64 Number) Nothing
+    [ TypeDeclaration "bigint" (PrimitiveType Bigint String) Nothing empty
+    , TypeDeclaration "decimal" (PrimitiveType Decimal String) Nothing empty
+    , TypeDeclaration "int32" (PrimitiveType Int32 Number) Nothing empty
+    , TypeDeclaration "int64" (PrimitiveType Int64 Number) Nothing empty
+    , TypeDeclaration "float32" (PrimitiveType Float32 Number) Nothing empty
+    , TypeDeclaration "float64" (PrimitiveType Float64 Number) Nothing empty
     -- string types
-    , TypeDeclaration "text" (PrimitiveType Text String) Nothing
-    , TypeDeclaration "binary" (PrimitiveType Binary String) Nothing
+    , TypeDeclaration "text" (PrimitiveType Text String) Nothing empty
+    , TypeDeclaration "binary" (PrimitiveType Binary String) Nothing empty
     -- time types
-    , TypeDeclaration "date" (PrimitiveType Date String) Nothing
-    , TypeDeclaration "datetime" (PrimitiveType Datetime String) Nothing
+    , TypeDeclaration
+          "date" (PrimitiveType Date String) Nothing empty
+    , TypeDeclaration
+          "datetime" (PrimitiveType Datetime String) Nothing empty
     -- et cetera
-    , TypeDeclaration "bool" (PrimitiveType Bool Boolean) Nothing
-    , TypeDeclaration "uuid" (PrimitiveType Uuid String) Nothing
-    , TypeDeclaration "uri" (PrimitiveType Uri String) Nothing
+    , TypeDeclaration "bool" (PrimitiveType Bool Boolean) Nothing empty
+    , TypeDeclaration "uuid" (PrimitiveType Uuid String) Nothing empty
+    , TypeDeclaration "uri" (PrimitiveType Uri String) Nothing empty
     ]
 
 coreDocs :: Docs

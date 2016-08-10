@@ -14,6 +14,7 @@ module Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
                                                          , serviceDocs
                                                          , serviceName
                                                          , type'
+                                                         , typeAnnotations
                                                          , typeDocs
                                                          , typename
                                                          )
@@ -25,8 +26,9 @@ import Data.String (IsString(fromString))
 import qualified Data.Text as T
 
 import Nirum.Constructs (Construct(toCode))
-import Nirum.Constructs.Declaration ( Declaration(..)
-                                    , Docs(..)
+import Nirum.Constructs.Annotation (AnnotationSet)
+import Nirum.Constructs.Declaration ( Declaration (..)
+                                    , Docs (..)
                                     , toCodeWithPrefix
                                     )
 import Nirum.Constructs.DeclarationSet (DeclarationSet, null', toList)
@@ -111,6 +113,7 @@ data TypeDeclaration
     = TypeDeclaration { typename :: Name
                       , type' :: Type
                       , typeDocs :: Maybe Docs
+                      , typeAnnotations :: AnnotationSet
                       }
     | ServiceDeclaration { serviceName :: Name
                          , service :: Service
@@ -122,24 +125,28 @@ data TypeDeclaration
     deriving (Eq, Ord, Show)
 
 instance Construct TypeDeclaration where
-    toCode (TypeDeclaration name' (Alias cname) docs') =
-        T.concat [ "type ", toCode name'
+    toCode (TypeDeclaration name' (Alias cname) docs' annotationSet') =
+        T.concat [ toCode annotationSet'
+                 , "type ", toCode name'
                  , " = ", toCode cname, ";"
                  , toCodeWithPrefix "\n" docs'
                  ]
-    toCode (TypeDeclaration name' (BoxedType itype) docs') =
-        T.concat [ "boxed ", toCode name'
+    toCode (TypeDeclaration name' (BoxedType itype) docs' annotationSet') =
+        T.concat [ toCode annotationSet'
+                 , "boxed ", toCode name'
                  , " (", toCode itype, ");"
                  , toCodeWithPrefix "\n" docs']
-    toCode (TypeDeclaration name' (EnumType members') docs') =
-        T.concat [ "enum ", toCode name'
+    toCode (TypeDeclaration name' (EnumType members') docs' annotationSet') =
+        T.concat [ toCode annotationSet'
+                 , "enum ", toCode name'
                  , toCodeWithPrefix "\n    " docs'
                  , "\n    = ", T.replace "\n" "\n    " membersCode, "\n    ;"
                  ]
       where
         membersCode = T.intercalate "\n| " $ map toCode $ toList members'
-    toCode (TypeDeclaration name' (RecordType fields') docs') =
-        T.concat [ "record ", toCode name', " ("
+    toCode (TypeDeclaration name' (RecordType fields') docs' annotationSet') =
+        T.concat [ toCode annotationSet'
+                 , "record ", toCode name', " ("
                  , toCodeWithPrefix "\n    " docs'
                  , if isJust docs' then "\n" else ""
                  , T.replace "\n" "\n    " $ T.cons '\n' fieldsCode
@@ -147,8 +154,9 @@ instance Construct TypeDeclaration where
                  ]
       where
         fieldsCode = T.intercalate "\n" $ map toCode $ toList fields'
-    toCode (TypeDeclaration name' (UnionType tags') docs') =
-        T.concat [ "union ", nameCode
+    toCode (TypeDeclaration name' (UnionType tags') docs' annotationSet') =
+        T.concat [ toCode annotationSet'
+                 , "union ", nameCode
                  , toCodeWithPrefix "\n    " docs'
                  , "\n    = " , tagsCode
                  , "\n    ;"
@@ -161,8 +169,12 @@ instance Construct TypeDeclaration where
                                  [ T.replace "\n" "\n    " (toCode t)
                                  | t <- toList tags'
                                  ]
-    toCode (TypeDeclaration name' (PrimitiveType typename' jsonType') docs') =
-        T.concat [ "// primitive type `", toCode name', "`\n"
+    toCode (TypeDeclaration name'
+                            (PrimitiveType typename' jsonType')
+                            docs'
+                            annotationSet') =
+        T.concat [ toCode annotationSet'
+                 , "// primitive type `", toCode name', "`\n"
                  , "//     internal type identifier: ", showT typename', "\n"
                  , "//     coded to json ", showT jsonType', " type\n"
                  , docString docs'
@@ -204,9 +216,9 @@ instance Construct TypeDeclaration where
                                           ]
 
 instance Declaration TypeDeclaration where
-    name (TypeDeclaration name' _ _) = name'
+    name (TypeDeclaration name' _ _ _) = name'
     name (ServiceDeclaration name' _ _) = name'
     name (Import _ identifier) = Name identifier identifier
-    docs (TypeDeclaration _ _ docs') = docs'
+    docs (TypeDeclaration _ _ docs' _) = docs'
     docs (ServiceDeclaration _ _ docs') = docs'
     docs (Import _ _) = Nothing
