@@ -55,7 +55,7 @@ import Text.Megaparsec ( Token
                        , (<|>)
                        , (<?>)
                        )
-import Text.Megaparsec.Char (char
+import Text.Megaparsec.Char ( char
                             , eol
                             , noneOf
                             , spaceChar
@@ -438,6 +438,7 @@ parameterSet = option empty $ try $ do
 
 method :: Parser Method
 method = do
+    annotationSet' <- annotationSet <?> "service method annotation"
     returnType <- typeExpression <?> "method return type"
     spaces1
     methodName <- name <?> "method name"
@@ -451,7 +452,7 @@ method = do
     params <- parameterSet
     spaces
     char ')'
-    return $ Method methodName params returnType docs'
+    return $ Method methodName params returnType docs' annotationSet'
 
 methods :: Parser [Method]
 methods = method `sepEndBy` try (spaces >> char ',' >> spaces)

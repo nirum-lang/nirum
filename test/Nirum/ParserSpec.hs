@@ -569,23 +569,31 @@ spec = do
 
     describe "method" $ do
         let (parse', expectError) = helperFuncs P.method
+            httpGetAnnotation =
+                head $ rights [fromList [Annotation "http-get" "/get-name/"]]
         it "emits Method if succeeded to parse" $ do
             parse' "text get-name()" `shouldBeRight`
-                Method "get-name" [] "text" Nothing
+                Method "get-name" [] "text" Nothing empty
             parse' "text get-name (person user)" `shouldBeRight`
                 Method "get-name" [Parameter "user" "person" Nothing]
-                       "text" Nothing
+                       "text" Nothing empty
             parse' "text get-name  ( person user,text default )" `shouldBeRight`
                 Method "get-name"
                        [ Parameter "user" "person" Nothing
                        , Parameter "default" "text" Nothing
                        ]
-                       "text" Nothing
+                       "text" Nothing empty
+            parse' "[http-get: \"/get-name/\"] text get-name  ( person user,text default )" `shouldBeRight`
+                Method "get-name"
+                       [ Parameter "user" "person" Nothing
+                       , Parameter "default" "text" Nothing
+                       ]
+                       "text" Nothing httpGetAnnotation
         it "can have docs" $ do
             parse' "text get-name (\n\
                    \  # Gets the name.\n\
                    \)" `shouldBeRight`
-                Method "get-name" [] "text" (Just "Gets the name.")
+                Method "get-name" [] "text" (Just "Gets the name.") empty
             parse' "text get-name (\n\
                    \  # Gets the name of the user.\n\
                    \  person user,\n\
@@ -594,6 +602,7 @@ spec = do
                        [Parameter "user" "person" Nothing]
                        "text"
                        (Just "Gets the name of the user.")
+                       empty
             parse' "text get-name (\n\
                    \  # Gets the name of the user.\n\
                    \  person user,\n\
@@ -610,6 +619,7 @@ spec = do
                        ]
                        "text"
                        (Just "Gets the name of the user.")
+                       empty
         it "fails to parse if there are parameters of the same facial name" $ do
             expectError "bool pred(text a, text a/b)" 1 11
             expectError "bool pred(text a/b, text a)" 1 11
@@ -640,6 +650,7 @@ spec = do
                                       [Parameter "user-id" "uuid" Nothing]
                                       "user"
                                       Nothing
+                                      empty
                              ])
                     Nothing
                     empty
@@ -656,6 +667,7 @@ spec = do
                                       [Parameter "user-id" "uuid" Nothing]
                                       "user"
                                       (Just "Gets an user by its id.")
+                                      empty
                              ])
                     (Just "Service having only one method.")
                     empty
@@ -676,10 +688,12 @@ spec = do
                                       [Parameter "user" "user" Nothing]
                                       "user"
                                       (Just "Creates a new user")
+                                      empty
                              , Method "get-user"
                                       [Parameter "user-id" "uuid" Nothing]
                                       "user"
                                       (Just "Gets an user by its id.")
+                                      empty
                              ])
                     (Just "Service having multiple methods.")
                     empty

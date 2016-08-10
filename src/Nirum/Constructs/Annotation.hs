@@ -10,10 +10,10 @@ module Nirum.Constructs.Annotation ( Annotation(Annotation)
                                    , toList
                                    ) where
 
-import Text.InterpolatedString.Perl6 (qq)
-import qualified Data.Text as T
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
+import qualified Data.Text as T
+import Text.InterpolatedString.Perl6 (qq)
 
 import Nirum.Constructs (Construct (toCode))
 import Nirum.Constructs.Identifier (Identifier)
@@ -31,7 +31,7 @@ instance Construct Annotation where
 
 data AnnotationSet
   -- | The set of 'Annotation' values.
-  -- Evenry annotaiton name has to be unique in the set.
+  -- Every annotation name has to be unique in the set.
   = AnnotationSet { annotations :: M.Map Identifier Annotation }
   deriving (Eq, Ord, Show)
 

@@ -760,7 +760,8 @@ spec = parallel $ do
                 pingService = Service [Method "ping"
                                               [Parameter "nonce" "text" Nothing]
                                               "bool"
-                                              Nothing]
+                                              Nothing
+                                              empty]
                 ping' = ServiceDeclaration "ping-service" pingService
                                            Nothing empty
             tT null' "issubclass(NullService, __import__('nirum').rpc.Service)"

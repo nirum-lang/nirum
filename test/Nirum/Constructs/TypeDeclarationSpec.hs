@@ -165,7 +165,7 @@ spec = do
                     ServiceDeclaration "null-service" nullService
                                        (Just "Null service declaration.")
                                        empty
-                pingService = Service [ Method "ping" [] "bool" Nothing ]
+                pingService = Service [ Method "ping" [] "bool" Nothing empty ]
                 pingDecl = ServiceDeclaration "ping-service" pingService Nothing
                                               empty
                 pingDecl' =
