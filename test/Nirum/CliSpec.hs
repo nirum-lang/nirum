@@ -4,6 +4,7 @@ module Nirum.CliSpec where
 import Control.Monad (forM_)
 
 import qualified Data.Map.Strict as M
+import Data.List (sort)
 import Data.Text (Text)
 import qualified Data.Text.IO as TI
 import System.Directory (listDirectory)
@@ -19,7 +20,8 @@ expectWriteFiles tmpDir files = do
     forM_ files $ \(f, expectedContent) -> do
         content <- TI.readFile (tmpDir </> f)
         content `shouldBe` expectedContent
-    listDirectory tmpDir
+    fileList <- listDirectory tmpDir
+    return $ sort fileList
 
 spec :: Spec
 spec =
@@ -30,7 +32,7 @@ spec =
                             , ("b.txt", "content B")
                             ]
                 fileList <- expectWriteFiles tmpDir files
-                fileList `shouldBe` [f | (f, _) <- files]
+                fileList `shouldBe` (sort [f | (f, _) <- files])
         it "makes directories if necessary" $
             withSystemTempDirectory "writeFiles-directories" $ \tmpDir -> do
                 let files = [ ("a.txt", "content A")
@@ -42,7 +44,7 @@ spec =
                 fileList <- expectWriteFiles tmpDir files
                 fileList `shouldBe` ["a.txt", "b.txt", "d", "d2"]
                 dFileList <- listDirectory $ tmpDir </> "d"
-                dFileList `shouldBe` ["a.txt", "b"]
+                (sort dFileList) `shouldBe` ["a.txt", "b"]
                 dBFileList <- listDirectory $ tmpDir </> "d" </> "b"
                 dBFileList `shouldBe` ["c.txt"]
                 d2FileList <- listDirectory $ tmpDir </> "d2"
