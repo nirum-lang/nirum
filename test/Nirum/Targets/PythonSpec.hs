@@ -28,10 +28,15 @@ import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import qualified Data.Text.IO as TI
 import System.Directory (createDirectoryIfMissing)
+import System.Exit (ExitCode(ExitSuccess))
 import System.FilePath (takeDirectory, (</>))
 import System.Info (os)
 import System.IO.Temp (withSystemTempDirectory)
-import System.Process (CreateProcess(cwd), proc, readCreateProcess)
+import System.Process ( CreateProcess(cwd)
+                      , proc
+                      , readCreateProcess
+                      , readCreateProcessWithExitCode
+                      )
 import Test.Hspec.Meta
 import Text.InterpolatedString.Perl6 (q, qq)
 import Text.Megaparsec (char, digitChar, runParser, some, space, string')
@@ -97,14 +102,15 @@ windows = os `elem` (["mingw32", "cygwin32", "win32"] :: [String])
 data PyVersion = PyVersion Int Int Int deriving (Eq, Ord, Show)
 
 isPythonInstalled :: Maybe FilePath -> IO Bool
-isPythonInstalled cwd' = do
-    pyExist <- readCreateProcess proc' ""
-    return $ not $ all isSpace pyExist
-  where
-    which :: String
-    which = if windows then "where" else "which"
-    proc' :: CreateProcess
-    proc' = (proc which ["python3"]) { cwd = cwd' }
+isPythonInstalled cwd' =
+    if windows then do
+        let proc' = (proc "where.exe" ["python3"]) { cwd = cwd' }
+        (exitCode, _, _) <- readCreateProcessWithExitCode proc' ""
+        return $ exitCode == ExitSuccess
+    else do
+        let proc' = (proc "which" ["python3"]) { cwd = cwd' }
+        pyExist <- readCreateProcess proc' ""
+        return $ not $ all isSpace pyExist
 
 getPythonVersion :: Maybe FilePath -> IO (Maybe PyVersion)
 getPythonVersion cwd' = do
