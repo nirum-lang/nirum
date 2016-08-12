@@ -452,7 +452,14 @@ method = do
     params <- parameterSet
     spaces
     char ')'
-    return $ Method methodName params returnType docs' annotationSet'
+    spaces
+    errorType <- optional $ do
+        string "throws" <?> "throws keyword"
+        spaces
+        e <- typeExpression <?> "method error type"
+        spaces
+        return e
+    return $ Method methodName params returnType errorType docs' annotationSet'
 
 methods :: Parser [Method]
 methods = method `sepEndBy` try (spaces >> char ',' >> spaces)

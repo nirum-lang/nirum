@@ -772,6 +772,7 @@ spec = parallel $ do
                                               [Parameter "nonce" "text" Nothing]
                                               "bool"
                                               Nothing
+                                              Nothing
                                               empty]
                 ping' = ServiceDeclaration "ping-service" pingService
                                            Nothing empty

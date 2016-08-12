@@ -515,7 +515,7 @@ class $className(service_type):
     commaNl :: [T.Text] -> T.Text
     commaNl = T.intercalate ",\n"
     compileMethod :: Method -> CodeGen Code
-    compileMethod (Method mName params rtype _ _) = do
+    compileMethod (Method mName params rtype _etype _docs _anno) = do
         let mName' = toAttributeName' mName
         params' <- mapM compileParameter $ toList params
         rtypeExpr <- compileTypeExpression src rtype
@@ -528,7 +528,7 @@ class $className(service_type):
         pTypeExpr <- compileTypeExpression src pType
         return [qq|{toAttributeName' pName}: $pTypeExpr|]
     compileMethodMetadata :: Method -> CodeGen Code
-    compileMethodMetadata (Method mName params rtype _ _) = do
+    compileMethodMetadata (Method mName params rtype _etype _docs _anno) = do
         let params' = toList params :: [Parameter]
         rtypeExpr <- compileTypeExpression src rtype
         paramMetadata <- mapM compileParameterMetadata params'
