@@ -14,7 +14,7 @@ import Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
 
 spec :: Spec
 spec = do
-    let Right methodAnno = fromList [Annotation "http-get" "/ping/"]
+    let Right methodAnno = fromList [Annotation "http-get" (Just "/ping/")]
     describe "Parameter" $
         specify "toCode" $ do
             toCode (Parameter "dob" "date" Nothing) `shouldBe` "date dob,"
@@ -25,7 +25,7 @@ spec = do
             toCode (Method "ping" [] "bool" Nothing empty) `shouldBe`
                 "bool ping (),"
             toCode (Method "ping" [] "bool" Nothing methodAnno) `shouldBe`
-                "[http-get: \"/ping/\"]\nbool ping (),"
+                "@http-get(\"/ping/\")\nbool ping (),"
             toCode (Method "ping" [] "bool" (Just "docs...") empty) `shouldBe`
                 "bool ping (\n  # docs...\n),"
             toCode (Method "get-user"

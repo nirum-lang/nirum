@@ -75,7 +75,11 @@ helperFuncs parser =
 
 
 fooAnnotationSet :: AnnotationSet
-fooAnnotationSet = head $ rights [fromList [Annotation "foo" "bar"]]
+fooAnnotationSet = head $ rights [fromList [Annotation "foo" (Just "bar")]]
+
+bazAnnotationSet :: AnnotationSet
+bazAnnotationSet = head $ rights [fromList [Annotation "baz" Nothing]]
+
 
 spec :: Spec
 spec = do
@@ -164,35 +168,48 @@ spec = do
 
     describe "annotation" $ do
         let (parse', expectError) = helperFuncs P.annotation
-            rightAnnotaiton = Annotation "name-abc" "wo\"rld"
-        it "success" $ do
-            parse' "[name-abc: \"wo\\\"rld\"]" `shouldBeRight` rightAnnotaiton
-            parse' "[name-abc:\"wo\\\"rld\"]" `shouldBeRight` rightAnnotaiton
-            parse' "[name-abc:\"wo\\\"rld\" ]" `shouldBeRight` rightAnnotaiton
-            parse' "[name-abc: \"wo\\\"rld\" ]" `shouldBeRight` rightAnnotaiton
-            parse' "[ name-abc : \"wo\\\"rld\"]" `shouldBeRight`
-                rightAnnotaiton
-            parse' "[name-abc : \"wo\\\"rld\"]" `shouldBeRight` rightAnnotaiton
-        it "fails to parse if annotation name start with hyphen" $ do
-            expectError "[-abc: \"helloworld\"]" 1 2
-            expectError "[-abc-d: \"helloworld\"]" 1 2
-        it "fails to parse without colon " $
-            expectError "[foobar \"helloworld\"]" 1 9
-        it "fails to parse without double quotes" $
-            expectError "[foobar: helloworld]" 1 10
+        context "with single argument" $ do
+            let rightAnnotaiton = Annotation "name-abc" (Just "wo\"rld")
+            it "success" $ do
+                parse' "@name-abc(\"wo\\\"rld\")" `shouldBeRight` rightAnnotaiton
+                parse' "@name-abc( \"wo\\\"rld\")" `shouldBeRight` rightAnnotaiton
+                parse' "@name-abc(\"wo\\\"rld\" )" `shouldBeRight` rightAnnotaiton
+                parse' "@name-abc( \"wo\\\"rld\" )" `shouldBeRight` rightAnnotaiton
+                parse' "@ name-abc ( \"wo\\\"rld\")" `shouldBeRight`
+                    rightAnnotaiton
+                parse' "@name-abc ( \"wo\\\"rld\")" `shouldBeRight` rightAnnotaiton
+            it "fails to parse if annotation name start with hyphen" $ do
+                expectError "@-abc(\"helloworld\")" 1 2
+                expectError "@-abc-d(\"helloworld\")" 1 2
+            it "fails to parse without parentheses" $
+                expectError "@foobar \"helloworld\"" 1 9
+            it "fails to parse without double quotes" $
+                expectError "@foobar(helloworld)" 1 9
+        context "without arguments" $ do
+            let rightAnnotaiton = Annotation "name-abc" Nothing
+            it "success" $ do
+                parse' "@name-abc" `shouldBeRight` rightAnnotaiton
+                parse' "@name-abc " `shouldBeRight` rightAnnotaiton
+                parse' "@ name-abc" `shouldBeRight` rightAnnotaiton
+                parse' "@name-abc()" `shouldBeRight` rightAnnotaiton
+                parse' "@name-abc ( )" `shouldBeRight` rightAnnotaiton
+                parse' "@ name-abc ( )" `shouldBeRight` rightAnnotaiton
+            it "fails to parse if annotation name start with hyphen" $ do
+                expectError "@-abc" 1 2
+                expectError "@-abc-d" 1 2
 
     describe "annotationSet" $ do
         let (parse', expectError) = helperFuncs P.annotationSet
-            annotationSet = head $ rights [fromList [ Annotation "a" "b"
-                                                    , Annotation "c" "d"
+            annotationSet = head $ rights [fromList [ Annotation "a" (Just "b")
+                                                    , Annotation "c" Nothing
                                                     ]
                                           ]
         it "success" $ do
-            parse' "[a: \"b\"][c: \"d\"]" `shouldBeRight` annotationSet
-            parse' "[a: \"b\"] [c: \"d\"]" `shouldBeRight` annotationSet
-            parse' "[a: \"b\"] [c: \"d\"] " `shouldBeRight` annotationSet
+            parse' "@a(\"b\")@c" `shouldBeRight` annotationSet
+            parse' "@a(\"b\") @c" `shouldBeRight` annotationSet
+            parse' "@a(\"b\") @c() " `shouldBeRight` annotationSet
         it "fails to parse if has duplicated name" $
-            expectError "[a: \"b\"][a: \"c\"]" 1 17
+            expectError "@a(\"b\")@a" 1 10
 
     describe "typeIdentifier" $ do
         let (parse', expectError) = helperFuncs P.typeIdentifier
@@ -375,11 +392,16 @@ spec = do
                 TypeDeclaration "path" (Alias "text")
                                 (Just $ Docs "docs\ndocs...\n")
                                 empty
-            parse' "[foo: \"bar\"] type path = text;\n# docs\n# docs..."
+            parse' "@foo ( \"bar\" ) type path = text;\n# docs\n# docs..."
                 `shouldBeRight`
                 TypeDeclaration "path" (Alias "text")
                                 (Just $ Docs "docs\ndocs...\n")
                                 fooAnnotationSet
+            parse' "@baz  type path = text;\n# docs\n# docs..."
+                `shouldBeRight`
+                TypeDeclaration "path" (Alias "text")
+                                (Just $ Docs "docs\ndocs...\n")
+                                bazAnnotationSet
         specify "its name can't have behind name since \
                 \its canonical type's behind name would be used instead" $
             expectError "type path/error = text;" 1 10
@@ -397,11 +419,16 @@ spec = do
                 TypeDeclaration "offset" (BoxedType "float64")
                                 (Just $ Docs "docs\ndocs...\n")
                                 empty
-            parse' "[foo: \"bar\"]\nboxed offset (float64);\n# docs\n# docs..."
+            parse' "@foo(\"bar\")\nboxed offset (float64);\n# docs\n# docs..."
                 `shouldBeRight`
                     TypeDeclaration "offset" (BoxedType "float64")
                                     (Just $ Docs "docs\ndocs...\n")
                                     fooAnnotationSet
+            parse' "@baz\nboxed offset (float64);\n# docs\n# docs..."
+                `shouldBeRight`
+                    TypeDeclaration "offset" (BoxedType "float64")
+                                    (Just $ Docs "docs\ndocs...\n")
+                                    bazAnnotationSet
             expectError "boxed offset/behind (float64);" 1 13
 
     descTypeDecl "enumTypeDeclaration" P.enumTypeDeclaration $ \helpers -> do
@@ -431,10 +458,14 @@ spec = do
                                                 (EnumType membersWithDocs)
                                                 Nothing
                                                 empty
-            parse' "[foo: \"bar\"]\nenum gender=male|female|unknown;"
+            parse' "@foo (\"bar\")\nenum gender=male|female|unknown;"
                 `shouldBeRight`
                     TypeDeclaration "gender" (EnumType members')
                                     Nothing fooAnnotationSet
+            parse' "@baz\nenum gender=male|female|unknown;"
+                `shouldBeRight`
+                    TypeDeclaration "gender" (EnumType members')
+                                    Nothing bazAnnotationSet
         it "fails to parse if there are duplicated facial names" $
             expectError "enum dup = a/b\n\
                         \         | b/c\n\
@@ -486,8 +517,9 @@ spec = do
                    \    # date of birth\n\
                    \    gender gender\n\
                    \);" `shouldBeRight` b
-            -- without docs, last field with trailing comma
-            parse' "[foo: \"bar\"]\n\
+            -- without docs, last field with trailing comma,
+            -- with annotation with single argument
+            parse' "@foo(\"bar\")\n\
                    \record person (\n\
                    \    text name,\n\
                    \    date dob,\n\
@@ -496,6 +528,17 @@ spec = do
                    \);"
                 `shouldBeRight`
                 TypeDeclaration "person" record Nothing fooAnnotationSet
+            -- without docs, last field with trailing comma,
+            -- with annotation without arguments
+            parse' "@baz\n\
+                   \record person (\n\
+                   \    text name,\n\
+                   \    date dob,\n\
+                   \    # date of birth\n\
+                   \    gender gender,\n\
+                   \);"
+                `shouldBeRight`
+                TypeDeclaration "person" record Nothing bazAnnotationSet
         it "should have one or more fields" $ do
             expectError "record unit ();" 1 14
             expectError "record unit (\n# docs\n);" 3 1
@@ -570,7 +613,7 @@ spec = do
     describe "method" $ do
         let (parse', expectError) = helperFuncs P.method
             httpGetAnnotation =
-                head $ rights [fromList [Annotation "http-get" "/get-name/"]]
+                head $ rights [fromList [Annotation "http-get" (Just "/get-name/")]]
         it "emits Method if succeeded to parse" $ do
             parse' "text get-name()" `shouldBeRight`
                 Method "get-name" [] "text" Nothing empty
@@ -583,7 +626,7 @@ spec = do
                        , Parameter "default" "text" Nothing
                        ]
                        "text" Nothing empty
-            parse' "[http-get: \"/get-name/\"] text get-name  ( person user,text default )" `shouldBeRight`
+            parse' "@http-get(\"/get-name/\") text get-name  ( person user,text default )" `shouldBeRight`
                 Method "get-name"
                        [ Parameter "user" "person" Nothing
                        , Parameter "default" "text" Nothing
@@ -697,7 +740,7 @@ spec = do
                              ])
                     (Just "Service having multiple methods.")
                     empty
-            parse' "[foo: \"bar\"]\n\
+            parse' "@foo(\"bar\")\n\
                    \service null-service (\n\
                    \  # Service having no methods.\n\
                    \);" `shouldBeRight`
@@ -705,6 +748,14 @@ spec = do
                                    (Service [])
                                    (Just "Service having no methods.")
                                    fooAnnotationSet
+            parse' "@baz\n\
+                   \service null-service (\n\
+                   \  # Service having no methods.\n\
+                   \);" `shouldBeRight`
+                ServiceDeclaration "null-service"
+                                   (Service [])
+                                   (Just "Service having no methods.")
+                                   bazAnnotationSet
         it "fails to parse if there are methods of the same facial name" $ do
             expectError "service method-dups (\n\
                         \  bool same-name ()\n\

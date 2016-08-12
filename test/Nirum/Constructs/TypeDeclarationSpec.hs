@@ -24,7 +24,7 @@ import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
                                         )
 
 barAnnotationSet :: AnnotationSet
-barAnnotationSet = head $ rights [fromList [Annotation "bar" "baz"]]
+barAnnotationSet = head $ rights [fromList [Annotation "bar" (Just "baz")]]
 
 spec :: Spec
 spec = do
@@ -187,7 +187,7 @@ spec = do
                     \    bool ping ()\n\
                     \);"
                 toCode annoDecl `shouldBe`
-                    "[bar: \"baz\"]\n\
+                    "@bar(\"baz\")\n\
                     \service anno-service (bool ping ());"
                 -- TODO: more tests
         context "Import" $ do
