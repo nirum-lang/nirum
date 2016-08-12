@@ -28,10 +28,15 @@ import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import qualified Data.Text.IO as TI
 import System.Directory (createDirectoryIfMissing)
-import System.FilePath (takeDirectory, (</>))
+import System.Exit (ExitCode(ExitSuccess))
+import System.FilePath (isValid, takeDirectory, (</>))
 import System.Info (os)
 import System.IO.Temp (withSystemTempDirectory)
-import System.Process (CreateProcess(cwd), proc, readCreateProcess)
+import System.Process ( CreateProcess(cwd)
+                      , proc
+                      , readCreateProcess
+                      , readCreateProcessWithExitCode
+                      )
 import Test.Hspec.Meta
 import Text.InterpolatedString.Perl6 (q, qq)
 import Text.Megaparsec (char, digitChar, runParser, some, space, string')
@@ -97,28 +102,25 @@ windows = os `elem` (["mingw32", "cygwin32", "win32"] :: [String])
 
 data PyVersion = PyVersion Int Int Int deriving (Eq, Ord, Show)
 
-isPythonInstalled :: Maybe FilePath -> IO Bool
-isPythonInstalled cwd' = do
-    pyExist <- readCreateProcess proc' ""
-    return $ not $ all isSpace pyExist
+installedPythonPaths :: Maybe FilePath -> IO [FilePath]
+installedPythonPaths cwd' = do
+    (exitCode, stdOut, _) <- readCreateProcessWithExitCode proc' ""
+    return $ case exitCode of
+        ExitSuccess -> filter isValid $ lines' stdOut
+        _ -> []
   where
-    which :: String
-    which = if windows then "where" else "which"
     proc' :: CreateProcess
-    proc' = (proc which ["python3"]) { cwd = cwd' }
+    proc' = (if windows then proc "where.exe" ["python"] else proc "which" ["python3"]) { cwd = cwd' }
+    lines' :: String -> [String]
+    lines' = map T.unpack . filter (not . T.null) . map T.strip . T.lines . T.pack
 
-getPythonVersion :: Maybe FilePath -> IO (Maybe PyVersion)
-getPythonVersion cwd' = do
-    installed <- isPythonInstalled cwd'
-    if installed then do
-        let proc' = (proc "python3" ["-V"]) { cwd = cwd' }
-        pyVersionStr <- readCreateProcess proc' ""
-        return $ case runParser pyVersionParser "<python3>" pyVersionStr of
-             Left _ -> Nothing
-             Right v -> Just v
-    else do
-        putStrLn "Python 3 seems not installed; skipping..."
-        return Nothing
+getPythonVersion :: Maybe FilePath -> FilePath -> IO (Maybe PyVersion)
+getPythonVersion cwd' path' = do
+    let proc' = (proc path' ["-V"]) { cwd = cwd' }
+    pyVersionStr <- readCreateProcess proc' ""
+    return $ case runParser pyVersionParser "<python3>" pyVersionStr of
+            Left _ -> Nothing
+            Right v -> Just v
   where
     pyVersionParser :: Parser PyVersion
     pyVersionParser = do
@@ -135,28 +137,37 @@ getPythonVersion cwd' = do
         digits <- some digitChar
         return (read digits :: Int)
 
+findPython :: Maybe FilePath -> IO (Maybe FilePath)
+findPython cwd' = installedPythonPaths cwd' >>= findPython'
+  where
+    findPython' :: [FilePath] -> IO (Maybe FilePath)
+    findPython' (x:xs) = do
+        pyVerM <- getPythonVersion cwd' x
+        case pyVerM of
+            Nothing -> findPython' xs
+            Just version -> if version >= PyVersion 3 3 0
+                            then return $ Just x
+                            else findPython' xs
+    findPython' [] = return Nothing
+
 runPython :: Maybe FilePath -> String -> IO (Maybe String)
 runPython cwd' code' = do
-    pyVerM <- getPythonVersion cwd'
-    case pyVerM of
+    pyPathM <- findPython cwd'
+    case pyPathM of
         Nothing -> do
-            putStrLn "Can't determine Python version; skipping..."
+            putStrLn "Python 3 seems not installed; skipping..."
             return Nothing
-        Just version ->
-            if version < PyVersion 3 3 0 then do
-                putStrLn "Python seems below 3.3; skipping..."
-                return Nothing
-            else
-                catchIOError (execute cwd' code') $ \e -> do
-                    putStrLn "\nThe following IO error was raised:\n"
-                    putStrLn $ indent "  " $ show e
-                    putStrLn "\n... while the following code was executed:\n"
-                    putStrLn $ indent "  " code'
-                    ioError e
+        Just path ->
+            catchIOError (execute cwd' path code') $ \e -> do
+                putStrLn "\nThe following IO error was raised:\n"
+                putStrLn $ indent "  " $ show e
+                putStrLn "\n... while the following code was executed:\n"
+                putStrLn $ indent "  " code'
+                ioError e
   where
-    execute :: Maybe FilePath -> String -> IO (Maybe String)
-    execute cwdPath pyCode = do
-        let proc' = (proc "python3" []) { cwd = cwdPath }
+    execute :: Maybe FilePath -> FilePath -> String -> IO (Maybe String)
+    execute cwdPath pyPath pyCode = do
+        let proc' = (proc pyPath []) { cwd = cwdPath }
         result <- readCreateProcess proc' pyCode
         return $ Just result
     indent :: String -> String -> String
