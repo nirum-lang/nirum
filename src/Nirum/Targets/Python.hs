@@ -294,15 +294,15 @@ compileTypeExpression source modifier = do
         MapModifier _ _ -> undefined  -- never happen!
 
 compileTypeDeclaration :: Source -> TypeDeclaration -> CodeGen Code
-compileTypeDeclaration _ (TypeDeclaration _ (PrimitiveType _ _) _) =
+compileTypeDeclaration _ (TypeDeclaration _ (PrimitiveType _ _) _ _) =
     return ""  -- never used
-compileTypeDeclaration src (TypeDeclaration typename (Alias ctype) _) = do
+compileTypeDeclaration src (TypeDeclaration typename (Alias ctype) _ _) = do
     ctypeExpr <- compileTypeExpression src ctype
     return [qq|
 # TODO: docstring
 {toClassName' typename} = $ctypeExpr
     |]
-compileTypeDeclaration src (TypeDeclaration typename (BoxedType itype) _) = do
+compileTypeDeclaration src (TypeDeclaration typename (BoxedType itype) _ _) = do
     let className = toClassName' typename
     itypeExpr <- compileTypeExpression src itype
     withStandardImport "typing" $
@@ -341,7 +341,7 @@ class $className:
             type(self), self.value
         )
             |]
-compileTypeDeclaration _ (TypeDeclaration typename (EnumType members) _) = do
+compileTypeDeclaration _ (TypeDeclaration typename (EnumType members) _ _) = do
     let className = toClassName' typename
         memberNames = T.intercalate
             "\n    "
@@ -361,7 +361,7 @@ class $className(enum.Enum):
     def __nirum_deserialize__(cls: type, value: str) -> '{className}':
         return cls(value.replace('-', '_'))  # FIXME: validate input
     |]
-compileTypeDeclaration src (TypeDeclaration typename (RecordType fields) _) = do
+compileTypeDeclaration src (TypeDeclaration typename (RecordType fields) _ _) = do
     typeExprCodes <- mapM (compileTypeExpression src)
         [typeExpr | (Field _ typeExpr _) <- toList fields]
     let className = toClassName' typename
@@ -428,7 +428,7 @@ class $className:
     def __nirum_deserialize__(cls: type, value) -> '{className}':
         return deserialize_record_type(cls, value)
                         |]
-compileTypeDeclaration src (TypeDeclaration typename (UnionType tags) _) = do
+compileTypeDeclaration src (TypeDeclaration typename (UnionType tags) _ _) = do
     fieldCodes <- mapM (uncurry (compileUnionTag src typename)) tagNameNFields
     let className = toClassName' typename
         fieldCodes' = T.intercalate "\n\n" fieldCodes
@@ -488,7 +488,7 @@ $fieldCodes'
         toNamePair
         [name | (name, _) <- tagNameNFields]
         ",\n        "
-compileTypeDeclaration src (ServiceDeclaration name (Service methods) _) = do
+compileTypeDeclaration src (ServiceDeclaration name (Service methods) _ _) = do
     let methods' = toList methods
     methodMetadata <- mapM compileMethodMetadata methods'
     let methodMetadata' = commaNl methodMetadata
@@ -515,7 +515,7 @@ class $className(service_type):
     commaNl :: [T.Text] -> T.Text
     commaNl = T.intercalate ",\n"
     compileMethod :: Method -> CodeGen Code
-    compileMethod (Method mName params rtype _) = do
+    compileMethod (Method mName params rtype _ _) = do
         let mName' = toAttributeName' mName
         params' <- mapM compileParameter $ toList params
         rtypeExpr <- compileTypeExpression src rtype
@@ -528,7 +528,7 @@ class $className(service_type):
         pTypeExpr <- compileTypeExpression src pType
         return [qq|{toAttributeName' pName}: $pTypeExpr|]
     compileMethodMetadata :: Method -> CodeGen Code
-    compileMethodMetadata (Method mName params rtype _) = do
+    compileMethodMetadata (Method mName params rtype _ _) = do
         let params' = toList params :: [Parameter]
         rtypeExpr <- compileTypeExpression src rtype
         paramMetadata <- mapM compileParameterMetadata params'

@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Nirum.Constructs.Service ( Method ( Method
+                                         , methodAnnotations
                                          , methodDocs
                                          , methodName
                                          , parameters
@@ -12,6 +13,7 @@ module Nirum.Constructs.Service ( Method ( Method
 import qualified Data.Text as T
 
 import Nirum.Constructs (Construct(toCode))
+import Nirum.Constructs.Annotation (AnnotationSet)
 import Nirum.Constructs.Declaration ( Declaration(name, docs)
                                     , Docs
                                     , toCodeWithPrefix
@@ -40,13 +42,18 @@ instance Declaration Parameter where
 -- | 'Service' method.
 data Method = Method { methodName :: Name
                      , parameters :: DeclarationSet Parameter
-                     , returnType :: TypeExpression 
+                     , returnType :: TypeExpression
                      , methodDocs :: Maybe Docs
+                     , methodAnnotations :: AnnotationSet
                      } deriving (Eq, Ord, Show)
 
 instance Construct Method where
-    toCode method@Method { parameters = params, methodDocs = docs' } =
-        T.concat $ [ toCode $ returnType method
+    toCode method@Method { parameters = params
+                         , methodDocs = docs'
+                         , methodAnnotations = annotationSet'
+                         } =
+        T.concat $ [ toCode annotationSet'
+                   , toCode $ returnType method
                    , " "
                    , toCode $ methodName method
                    , " ("

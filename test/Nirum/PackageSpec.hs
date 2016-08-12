@@ -5,6 +5,7 @@ import qualified Data.Map.Strict as M
 import System.FilePath ((</>))
 import Test.Hspec.Meta
 
+import Nirum.Constructs.Annotation (empty)
 import Nirum.Constructs.Module (Module(Module), coreModulePath)
 import Nirum.Constructs.ModulePath (ModulePath)
 import Nirum.Constructs.TypeDeclaration ( JsonType(String)
@@ -46,12 +47,12 @@ validPackage =
                   , (["foo"],        Module [] $ Just "foo")
                   , (["qux"],        Module [] $ Just "qux")
                   , ( ["abc"]
-                    , Module [TypeDeclaration "a" (Alias "text") Nothing]
+                    , Module [TypeDeclaration "a" (Alias "text") Nothing empty]
                              Nothing
                     )
                   , ( ["xyz"]
                     , Module [ Import ["abc"] "a"
-                             , TypeDeclaration "x" (Alias "text") Nothing
+                             , TypeDeclaration "x" (Alias "text") Nothing empty
                              ] Nothing
                     )
                   ]
@@ -62,7 +63,9 @@ missingImportsModules =
                        , Import ["foo", "bar"] "zzz" -- MissingModulePathError
                        , Import ["baz"] "qux"
                        ] Nothing)
-    , (["baz"], Module [ TypeDeclaration "qux" (Alias "text") Nothing ] Nothing)
+    , ( ["baz"]
+      , Module [ TypeDeclaration "qux" (Alias "text") Nothing empty ] Nothing
+      )
     , (["qux"], Module [ Import ["foo"] "abc" -- MissingImportError
                        , Import ["foo"] "def" -- MissingImportError
                        ] Nothing)
@@ -71,16 +74,19 @@ missingImportsModules =
 circularImportsModules :: M.Map ModulePath Module
 circularImportsModules =
     [ (["asdf"], Module [ Import ["asdf"] "foo"
-                        , TypeDeclaration "bar" (Alias "text") Nothing
+                        , TypeDeclaration "bar" (Alias "text") Nothing empty
                         ] Nothing)
-    , (["abc", "def"], Module [Import ["abc", "ghi"] "bar"
-                              , TypeDeclaration "foo" (Alias "text") Nothing
+    , (["abc", "def"], Module [ Import ["abc", "ghi"] "bar"
+                              , TypeDeclaration
+                                    "foo" (Alias "text") Nothing empty
                               ] Nothing)
-    , (["abc", "ghi"], Module [Import ["abc", "xyz"] "baz"
-                              , TypeDeclaration "bar" (Alias "text") Nothing
+    , (["abc", "ghi"], Module [ Import ["abc", "xyz"] "baz"
+                              , TypeDeclaration
+                                    "bar" (Alias "text") Nothing empty
                               ] Nothing)
-    , (["abc", "xyz"], Module [Import ["abc", "def"] "foo"
-                              , TypeDeclaration "baz" (Alias "text") Nothing
+    , (["abc", "xyz"], Module [ Import ["abc", "def"] "foo"
+                              , TypeDeclaration
+                                    "baz" (Alias "text") Nothing empty
                               ] Nothing)
     ]
 
@@ -178,9 +184,11 @@ spec = do
             docs bm' `shouldBe` Just "foo"
         specify "types" $ do
             types bm `shouldBe` []
-            types abc `shouldBe` [TypeDeclaration "a" (Alias "text") Nothing]
+            types abc `shouldBe` [TypeDeclaration
+                                      "a" (Alias "text") Nothing empty]
             types xyz `shouldBe` [ Import ["abc"] "a"
-                                 , TypeDeclaration "x" (Alias "text") Nothing
+                                 , TypeDeclaration
+                                       "x" (Alias "text") Nothing empty
                                  ]
         specify "lookupType" $ do
             lookupType "a" bm `shouldBe` Missing

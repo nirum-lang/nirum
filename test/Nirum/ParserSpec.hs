@@ -2,7 +2,7 @@
 module Nirum.ParserSpec where
 
 import Control.Monad (forM_)
-import Data.Either (isLeft, isRight, lefts)
+import Data.Either (isLeft, isRight, lefts, rights)
 import Data.List (isSuffixOf)
 import Data.Maybe (fromJust)
 import Prelude hiding (readFile)
@@ -19,24 +19,29 @@ import Text.Megaparsec.Pos (Pos, SourcePos(sourceColumn, sourceLine), mkPos)
 import Text.Megaparsec.Text (Parser)
 
 import qualified Nirum.Parser as P
-import Nirum.Constructs (Construct(toCode))
-import Nirum.Constructs.Declaration (Docs(Docs))
+import Nirum.Constructs (Construct (toCode))
+import Nirum.Constructs.Annotation ( Annotation (Annotation)
+                                   , AnnotationSet
+                                   , empty
+                                   , fromList
+                                   )
+import Nirum.Constructs.Declaration (Docs (Docs))
 import Nirum.Constructs.DeclarationSet (DeclarationSet)
 import Nirum.Constructs.DeclarationSetSpec (SampleDecl(..))
 import Nirum.Constructs.Identifier (fromText)
-import Nirum.Constructs.Module (Module(Module))
+import Nirum.Constructs.Module (Module (Module))
 import Nirum.Constructs.Name (Name(..))
 import Nirum.Constructs.Service ( Method (Method)
                                 , Parameter (Parameter)
                                 , Service (Service)
                                 )
-import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
-                                        , Field(Field)
-                                        , Tag(Tag)
-                                        , Type(..)
-                                        , TypeDeclaration(..)
+import Nirum.Constructs.TypeDeclaration ( EnumMember (EnumMember)
+                                        , Field (Field)
+                                        , Tag (Tag)
+                                        , Type (..)
+                                        , TypeDeclaration (..)
                                         )
-import Nirum.Constructs.TypeExpression (TypeExpression(..))
+import Nirum.Constructs.TypeExpression (TypeExpression (..))
 
 shouldBeRight :: (Eq l, Eq r, Show l, Show r) => Either l r -> r -> Expectation
 shouldBeRight actual expected = actual `shouldBe` Right expected
@@ -67,6 +72,10 @@ helperFuncs parser =
         let parseResult = parse' inputString
         parseResult `shouldSatisfy` isLeft
         erroredPos parseResult `shouldBe` (line', col')
+
+
+fooAnnotationSet :: AnnotationSet
+fooAnnotationSet = head $ rights [fromList [Annotation "foo" "bar"]]
 
 spec :: Spec
 spec = do
@@ -152,6 +161,38 @@ spec = do
             parse' "facial / behind" `shouldBeRight` Name "facial" "behind"
             parse' "`enum`/`boxed`" `shouldBeRight` Name "enum" "boxed"
             parse' "`enum` / `boxed`" `shouldBeRight` Name "enum" "boxed"
+
+    describe "annotation" $ do
+        let (parse', expectError) = helperFuncs P.annotation
+            rightAnnotaiton = Annotation "name-abc" "wo\"rld"
+        it "success" $ do
+            parse' "[name-abc: \"wo\\\"rld\"]" `shouldBeRight` rightAnnotaiton
+            parse' "[name-abc:\"wo\\\"rld\"]" `shouldBeRight` rightAnnotaiton
+            parse' "[name-abc:\"wo\\\"rld\" ]" `shouldBeRight` rightAnnotaiton
+            parse' "[name-abc: \"wo\\\"rld\" ]" `shouldBeRight` rightAnnotaiton
+            parse' "[ name-abc : \"wo\\\"rld\"]" `shouldBeRight`
+                rightAnnotaiton
+            parse' "[name-abc : \"wo\\\"rld\"]" `shouldBeRight` rightAnnotaiton
+        it "fails to parse if annotation name start with hyphen" $ do
+            expectError "[-abc: \"helloworld\"]" 1 2
+            expectError "[-abc-d: \"helloworld\"]" 1 2
+        it "fails to parse without colon " $
+            expectError "[foobar \"helloworld\"]" 1 9
+        it "fails to parse without double quotes" $
+            expectError "[foobar: helloworld]" 1 10
+
+    describe "annotationSet" $ do
+        let (parse', expectError) = helperFuncs P.annotationSet
+            annotationSet = head $ rights [fromList [ Annotation "a" "b"
+                                                    , Annotation "c" "d"
+                                                    ]
+                                          ]
+        it "success" $ do
+            parse' "[a: \"b\"][c: \"d\"]" `shouldBeRight` annotationSet
+            parse' "[a: \"b\"] [c: \"d\"]" `shouldBeRight` annotationSet
+            parse' "[a: \"b\"] [c: \"d\"] " `shouldBeRight` annotationSet
+        it "fails to parse if has duplicated name" $
+            expectError "[a: \"b\"][a: \"c\"]" 1 17
 
     describe "typeIdentifier" $ do
         let (parse', expectError) = helperFuncs P.typeIdentifier
@@ -326,12 +367,19 @@ spec = do
         let (parse', expectError) = helpers
         it "emits (TypeDeclaration (Alias ...)) if succeeded to parse" $ do
             parse' "type path = text;" `shouldBeRight`
-                TypeDeclaration "path" (Alias "text") Nothing
+                TypeDeclaration "path" (Alias "text") Nothing empty
             parse' "type path = text;\n# docs" `shouldBeRight`
-                TypeDeclaration "path" (Alias "text") (Just $ Docs "docs\n")
+                TypeDeclaration "path" (Alias "text")
+                                (Just $ Docs "docs\n") empty
             parse' "type path = text;\n# docs\n# docs..." `shouldBeRight`
                 TypeDeclaration "path" (Alias "text")
                                 (Just $ Docs "docs\ndocs...\n")
+                                empty
+            parse' "[foo: \"bar\"] type path = text;\n# docs\n# docs..."
+                `shouldBeRight`
+                TypeDeclaration "path" (Alias "text")
+                                (Just $ Docs "docs\ndocs...\n")
+                                fooAnnotationSet
         specify "its name can't have behind name since \
                 \its canonical type's behind name would be used instead" $
             expectError "type path/error = text;" 1 10
@@ -340,14 +388,20 @@ spec = do
         let (parse', expectError) = helpers
         it "emits (TypeDeclaration (BoxedType ...)) if succeeded to parse" $ do
             parse' "boxed offset (float64);" `shouldBeRight`
-                TypeDeclaration "offset" (BoxedType "float64") Nothing
+                TypeDeclaration "offset" (BoxedType "float64") Nothing empty
             parse' "boxed offset (float64);\n# docs" `shouldBeRight`
                 TypeDeclaration "offset" (BoxedType "float64")
                                 (Just $ Docs "docs\n")
+                                empty
             parse' "boxed offset (float64);\n# docs\n# docs..." `shouldBeRight`
                 TypeDeclaration "offset" (BoxedType "float64")
                                 (Just $ Docs "docs\ndocs...\n")
-        it "cannot have behind name" $
+                                empty
+            parse' "[foo: \"bar\"]\nboxed offset (float64);\n# docs\n# docs..."
+                `shouldBeRight`
+                    TypeDeclaration "offset" (BoxedType "float64")
+                                    (Just $ Docs "docs\ndocs...\n")
+                                    fooAnnotationSet
             expectError "boxed offset/behind (float64);" 1 13
 
     descTypeDecl "enumTypeDeclaration" P.enumTypeDeclaration $ \helpers -> do
@@ -362,6 +416,7 @@ spec = do
                                   , EnumMember "unknown" (Just "docs2\n")
                                   ] :: DeclarationSet EnumMember
                 expected = TypeDeclaration "gender" (EnumType members') Nothing
+                                           empty
             parse' "enum gender = male | female | unknown;"
                 `shouldBeRight` expected
             parse' "enum gender=male|female|unknown;" `shouldBeRight` expected
@@ -375,6 +430,11 @@ spec = do
                 `shouldBeRight` TypeDeclaration "gender"
                                                 (EnumType membersWithDocs)
                                                 Nothing
+                                                empty
+            parse' "[foo: \"bar\"]\nenum gender=male|female|unknown;"
+                `shouldBeRight`
+                    TypeDeclaration "gender" (EnumType members')
+                                    Nothing fooAnnotationSet
         it "fails to parse if there are duplicated facial names" $
             expectError "enum dup = a/b\n\
                         \         | b/c\n\
@@ -394,7 +454,7 @@ spec = do
                           , Field "gender" "gender" Nothing
                           ] :: DeclarationSet Field
                 record = RecordType fields'
-                a = TypeDeclaration "person" record Nothing
+                a = TypeDeclaration "person" record Nothing empty
                 b = a { typeDocs = Just "person record type" }
             -- without docs, last field with trailing comma
             parse' "record person (\n\
@@ -426,6 +486,16 @@ spec = do
                    \    # date of birth\n\
                    \    gender gender\n\
                    \);" `shouldBeRight` b
+            -- without docs, last field with trailing comma
+            parse' "[foo: \"bar\"]\n\
+                   \record person (\n\
+                   \    text name,\n\
+                   \    date dob,\n\
+                   \    # date of birth\n\
+                   \    gender gender,\n\
+                   \);"
+                `shouldBeRight`
+                TypeDeclaration "person" record Nothing fooAnnotationSet
         it "should have one or more fields" $ do
             expectError "record unit ();" 1 14
             expectError "record unit (\n# docs\n);" 3 1
@@ -459,7 +529,7 @@ spec = do
                         , Tag "none" [] Nothing
                         ]
                 union = UnionType tags'
-                a = TypeDeclaration "shape" union Nothing
+                a = TypeDeclaration "shape" union Nothing empty
                 b = a { typeDocs = Just "shape type" }
             parse' "union shape\n\
                    \    = circle (point origin, \
@@ -499,23 +569,31 @@ spec = do
 
     describe "method" $ do
         let (parse', expectError) = helperFuncs P.method
+            httpGetAnnotation =
+                head $ rights [fromList [Annotation "http-get" "/get-name/"]]
         it "emits Method if succeeded to parse" $ do
             parse' "text get-name()" `shouldBeRight`
-                Method "get-name" [] "text" Nothing
+                Method "get-name" [] "text" Nothing empty
             parse' "text get-name (person user)" `shouldBeRight`
                 Method "get-name" [Parameter "user" "person" Nothing]
-                       "text" Nothing
+                       "text" Nothing empty
             parse' "text get-name  ( person user,text default )" `shouldBeRight`
                 Method "get-name"
                        [ Parameter "user" "person" Nothing
                        , Parameter "default" "text" Nothing
                        ]
-                       "text" Nothing
+                       "text" Nothing empty
+            parse' "[http-get: \"/get-name/\"] text get-name  ( person user,text default )" `shouldBeRight`
+                Method "get-name"
+                       [ Parameter "user" "person" Nothing
+                       , Parameter "default" "text" Nothing
+                       ]
+                       "text" Nothing httpGetAnnotation
         it "can have docs" $ do
             parse' "text get-name (\n\
                    \  # Gets the name.\n\
                    \)" `shouldBeRight`
-                Method "get-name" [] "text" (Just "Gets the name.")
+                Method "get-name" [] "text" (Just "Gets the name.") empty
             parse' "text get-name (\n\
                    \  # Gets the name of the user.\n\
                    \  person user,\n\
@@ -524,6 +602,7 @@ spec = do
                        [Parameter "user" "person" Nothing]
                        "text"
                        (Just "Gets the name of the user.")
+                       empty
             parse' "text get-name (\n\
                    \  # Gets the name of the user.\n\
                    \  person user,\n\
@@ -540,6 +619,7 @@ spec = do
                        ]
                        "text"
                        (Just "Gets the name of the user.")
+                       empty
         it "fails to parse if there are parameters of the same facial name" $ do
             expectError "bool pred(text a, text a/b)" 1 11
             expectError "bool pred(text a/b, text a)" 1 11
@@ -553,13 +633,14 @@ spec = do
         let (parse', expectError) = helperFuncs P.serviceDeclaration
         it "emits ServiceDeclaration if succeeded to parse" $ do
             parse' "service null-service();" `shouldBeRight`
-                ServiceDeclaration "null-service" (Service []) Nothing
+                ServiceDeclaration "null-service" (Service []) Nothing empty
             parse' "service null-service (\n\
                    \  # Service having no methods.\n\
                    \);" `shouldBeRight`
                 ServiceDeclaration "null-service"
                                    (Service [])
                                    (Just "Service having no methods.")
+                                   empty
             parse' "service one-method-service(\n\
                    \  user get-user(uuid user-id)\n\
                    \);" `shouldBeRight`
@@ -569,8 +650,10 @@ spec = do
                                       [Parameter "user-id" "uuid" Nothing]
                                       "user"
                                       Nothing
+                                      empty
                              ])
                     Nothing
+                    empty
             parse' "service one-method-service (\n\
                    \  # Service having only one method.\n\
                    \  user get-user (\n\
@@ -584,8 +667,10 @@ spec = do
                                       [Parameter "user-id" "uuid" Nothing]
                                       "user"
                                       (Just "Gets an user by its id.")
+                                      empty
                              ])
                     (Just "Service having only one method.")
+                    empty
             parse' "service user-service (\n\
                    \  # Service having multiple methods.\n\
                    \  user create-user (\n\
@@ -603,12 +688,23 @@ spec = do
                                       [Parameter "user" "user" Nothing]
                                       "user"
                                       (Just "Creates a new user")
+                                      empty
                              , Method "get-user"
                                       [Parameter "user-id" "uuid" Nothing]
                                       "user"
                                       (Just "Gets an user by its id.")
+                                      empty
                              ])
                     (Just "Service having multiple methods.")
+                    empty
+            parse' "[foo: \"bar\"]\n\
+                   \service null-service (\n\
+                   \  # Service having no methods.\n\
+                   \);" `shouldBeRight`
+                ServiceDeclaration "null-service"
+                                   (Service [])
+                                   (Just "Service having no methods.")
+                                   fooAnnotationSet
         it "fails to parse if there are methods of the same facial name" $ do
             expectError "service method-dups (\n\
                         \  bool same-name ()\n\
@@ -643,8 +739,10 @@ spec = do
             let (parse', expectError) = helperFuncs parser'
             it "emits Module if succeeded to parse" $ do
                 let decls = [ TypeDeclaration "path" (Alias "text") Nothing
+                                              empty
                             , TypeDeclaration "offset"
                                               (BoxedType "float64") Nothing
+                                              empty
                             ]
                 parse' "type path = text; boxed offset (float64);"
                     `shouldBeRight` Module decls Nothing
@@ -654,9 +752,9 @@ spec = do
                 parse' "" `shouldBeRight` Module [] Nothing
                 parse' "# docs" `shouldBeRight` Module [] (Just "docs")
             it "errors if there are any duplicated facial names" $
-                expectError "type a = text;\ntype a/b = text;" 2 7
+                expectError "type a = text;\ntype a/b = text;" 2 1
             it "errors if there are any duplicated behind names" $
-                expectError "type b = text;\ntype a/b = text;" 2 7
+                expectError "type b = text;\ntype a/b = text;" 2 1
 
     describe "modulePath" $ do
         let (parse', expectError) = helperFuncs P.modulePath

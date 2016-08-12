@@ -37,6 +37,7 @@ import Text.InterpolatedString.Perl6 (q, qq)
 import Text.Megaparsec (char, digitChar, runParser, some, space, string')
 import Text.Megaparsec.String (Parser)
 
+import Nirum.Constructs.Annotation (empty)
 import Nirum.Constructs.DeclarationSet (DeclarationSet)
 import Nirum.Constructs.Module (Module(Module))
 import Nirum.Constructs.Name (Name(Name))
@@ -231,18 +232,21 @@ makeDummySource m =
             , ( ["foo", "bar"]
               , Module [ Import ["qux"] "path"
                        , TypeDeclaration "path-box" (BoxedType "path") Nothing
-                       , TypeDeclaration "int-box" (BoxedType "bigint") Nothing
+                                         empty
+                       , TypeDeclaration "int-box" (BoxedType "bigint")
+                                         Nothing empty
                        , TypeDeclaration "point"
                                          (RecordType [ Field "x" "int64" Nothing
                                                      , Field "y" "int64" Nothing
                                                      ])
                                          Nothing
+                                         empty
                        ] Nothing
               )
             , ( ["qux"]
               , Module
-                  [ TypeDeclaration "path" (Alias "text") Nothing
-                  , TypeDeclaration "name" (BoxedType "text") Nothing
+                  [ TypeDeclaration "path" (Alias "text") Nothing empty
+                  , TypeDeclaration "name" (BoxedType "text") Nothing empty
                   ]
                   Nothing
               )
@@ -446,7 +450,8 @@ spec = parallel $ do
 
     describe "compilePackage" $ do
         specify "boxed type" $ do
-            let decl = TypeDeclaration "float-box" (BoxedType "float64") Nothing
+            let decl = TypeDeclaration "float-box" (BoxedType "float64")
+                                       Nothing empty
             tT decl "isinstance(FloatBox, type)"
             tT decl "FloatBox(3.14).value == 3.14"
             tT decl "FloatBox(3.14) == FloatBox(3.14)"
@@ -461,6 +466,7 @@ spec = parallel $ do
             let decls = [ Import ["foo", "bar"] "path-box"
                         , TypeDeclaration "imported-type-box"
                                           (BoxedType "path-box") Nothing
+                                          empty
                         ]
             tT' decls "isinstance(ImportedTypeBox, type)"
             tT' decls [q|ImportedTypeBox(PathBox('/path/string')).value.value ==
@@ -489,6 +495,7 @@ spec = parallel $ do
             let boxedAlias = [ Import ["qux"] "path"
                              , TypeDeclaration "way"
                                                (BoxedType "path") Nothing
+                                               empty
                              ]
             tT' boxedAlias "Way('.').value == '.'"
             tT' boxedAlias "Way(Path('.')).value == '.'"
@@ -496,6 +503,7 @@ spec = parallel $ do
             tT' boxedAlias "Way('.').__nirum_serialize__() == '.'"
             let aliasBoxed = [ Import ["qux"] "name"
                              , TypeDeclaration "irum" (Alias "name") Nothing
+                                               empty
                              ]
             tT' aliasBoxed "Name('khj') == Irum('khj')"
             tT' aliasBoxed "Irum.__nirum_deserialize__('khj') == Irum('khj')"
@@ -507,6 +515,7 @@ spec = parallel $ do
                           , EnumMember (Name "female" "yeoseong") Nothing
                           ] :: DeclarationSet EnumMember
                 decl = TypeDeclaration "gender" (EnumType members) Nothing
+                                       empty
             tT decl "type(Gender) is enum.EnumMeta"
             tT decl "set(Gender) == {Gender.male, Gender.female}"
             tT decl "Gender.male.value == 'male'"
@@ -523,6 +532,7 @@ spec = parallel $ do
                            , "nagisa-kaworu"
                            ] :: DeclarationSet EnumMember
                 decl' = TypeDeclaration "eva-char" (EnumType members') Nothing
+                                        empty
             tT decl' "type(EvaChar) is enum.EnumMeta"
             tT decl' "set(EvaChar) == {EvaChar.soryu_asuka_langley, \
                                      \ EvaChar.ayanami_rei, \
@@ -542,6 +552,7 @@ spec = parallel $ do
                          ]
                 payload = "{'_type': 'point', 'x': 3, 'top': 14}" :: T.Text
                 decl = TypeDeclaration "point" (RecordType fields) Nothing
+                                       empty
             tT decl "isinstance(Point, type)"
             tT decl "Point(left=3, top=14).left == 3"
             tT decl "Point(left=3, top=14).top == 14"
@@ -566,6 +577,7 @@ spec = parallel $ do
                           ]
                 decls = [ Import ["foo", "bar"] "int-box"
                         , TypeDeclaration "point" (RecordType fields') Nothing
+                                          empty
                         ]
                 payload' = "{'_type': 'point', 'left': 3, 'top': 14}" :: T.Text
             tT' decls "isinstance(Point, type)"
@@ -598,6 +610,7 @@ spec = parallel $ do
                          , TypeDeclaration "point3d"
                                            (RecordType fields'')
                                            Nothing
+                                           empty
                          ]
             tT' decls' "isinstance(Point3d, type)"
             tT' decls' [q|Point3d(xy=Point(x=1, y=2), z=3).xy ==
@@ -617,7 +630,7 @@ spec = parallel $ do
         specify "record type with one field" $ do
             let fields = [ Field "length" "bigint" Nothing ]
                 payload = "{'_type': 'line', 'length': 3}" :: T.Text
-                decl = TypeDeclaration "line" (RecordType fields) Nothing
+                decl = TypeDeclaration "line" (RecordType fields) Nothing empty
             tT decl "isinstance(Line, type)"
             tT decl "Line(length=10).length == 10"
             tT decl "Line.__slots__ == ('length', )"
@@ -640,7 +653,7 @@ spec = parallel $ do
                        , eastAsianNameTag
                        , cultureAgnosticNameTag
                        ]
-                decl = TypeDeclaration "name" (UnionType tags) Nothing
+                decl = TypeDeclaration "name" (UnionType tags) Nothing empty
             tT decl "isinstance(Name, type)"
             tT decl "Name.Tag.western_name.value == 'western_name'"
             tT decl "Name.Tag.east_asian_name.value == 'east_asian_name'"
@@ -727,7 +740,7 @@ spec = parallel $ do
                         [ Field "country" "text" Nothing ]
                         Nothing
                 tags = [cultureAgnosticNameTag]
-                decl = TypeDeclaration "music" (UnionType tags) Nothing
+                decl = TypeDeclaration "music" (UnionType tags) Nothing empty
             tT decl "Pop(country='KR').country == 'KR'"
             tT decl "Pop(country='KR') == Pop(country='KR')"
             tT decl "Pop(country='US') != Pop(country='KR')"
@@ -739,15 +752,18 @@ spec = parallel $ do
                         [ Field "country" "text" Nothing ]
                         Nothing
                 tags = [pop]
-                decl = TypeDeclaration "music" (UnionType tags) Nothing
+                decl = TypeDeclaration "music" (UnionType tags) Nothing empty
             tT decl "Pop(country='KR').__nirum_tag__.value == 'popular_music'"
         specify "service" $ do
-            let null' = ServiceDeclaration "null-service" (Service []) Nothing
+            let null' = ServiceDeclaration "null-service" (Service [])
+                                           Nothing empty
                 pingService = Service [Method "ping"
                                               [Parameter "nonce" "text" Nothing]
                                               "bool"
-                                              Nothing]
-                ping' = ServiceDeclaration "ping-service" pingService Nothing
+                                              Nothing
+                                              empty]
+                ping' = ServiceDeclaration "ping-service" pingService
+                                           Nothing empty
             tT null' "issubclass(NullService, __import__('nirum').rpc.Service)"
             tT ping' "issubclass(PingService, __import__('nirum').rpc.Service)"
             tT ping' "set(PingService.ping.__annotations__) == \

@@ -2,8 +2,10 @@
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 module Nirum.Parser ( Parser
                     , ParseError
-                    , aliasTypeDeclaration 
-                    , boxedTypeDeclaration 
+                    , aliasTypeDeclaration
+                    , annotation
+                    , annotationSet
+                    , boxedTypeDeclaration
                     , docs
                     , enumTypeDeclaration
                     , file
@@ -39,6 +41,7 @@ import Data.Text.IO (readFile)
 import Text.Megaparsec ( Token
                        , eof
                        , many
+                       , manyTill
                        , notFollowedBy
                        , option
                        , optional
@@ -52,10 +55,18 @@ import Text.Megaparsec ( Token
                        , (<|>)
                        , (<?>)
                        )
-import Text.Megaparsec.Char (char, eol, noneOf, spaceChar, string, string')
+import Text.Megaparsec.Char ( char
+                            , eol
+                            , noneOf
+                            , spaceChar
+                            , string
+                            , string'
+                            )
 import qualified Text.Megaparsec.Error as E
 import Text.Megaparsec.Text (Parser)
+import Text.Megaparsec.Lexer (charLiteral)
 
+import qualified Nirum.Constructs.Annotation as A
 import Nirum.Constructs.Declaration (Declaration, Docs(Docs))
 import Nirum.Constructs.DeclarationSet ( DeclarationSet
                                        , NameDuplication( BehindNameDuplication
@@ -136,6 +147,31 @@ name = do
         identifier <?> "behind name"
     return $ Name facialName behindName
 
+annotation :: Parser A.Annotation
+annotation = do
+    char '['
+    spaces
+    name' <- identifier
+    spaces
+    char ':'
+    spaces
+    metadata <- (char '"' >> manyTill charLiteral (char '"'))
+                <?> "annotation metadata"
+    spaces
+    char ']'
+    return $ A.Annotation name' $ T.pack metadata
+
+annotationSet :: Parser A.AnnotationSet
+annotationSet = do
+    annotations <- many $ do
+        spaces
+        a <- annotation
+        spaces
+        return a
+    case A.fromList annotations of
+        Right annotations' -> return annotations'
+        Left (A.AnnotationNameDuplication _) -> fail "annotation name duplicate"
+
 typeExpression :: Parser TypeExpression
 typeExpression =
     try optionModifier <|> typeExpressionWithoutOptionModifier
@@ -199,6 +235,7 @@ docs = do
 
 aliasTypeDeclaration :: Parser TypeDeclaration
 aliasTypeDeclaration = do
+    annotationSet' <- annotationSet <?> "type alias annotations"
     string' "type" <?> "type alias keyword"
     spaces
     typename <- identifier <?> "alias type name"
@@ -210,10 +247,12 @@ aliasTypeDeclaration = do
     spaces
     char ';'
     docs' <- optional $ try $ spaces >> (docs <?> "type alias docs")
-    return $ TypeDeclaration name' (Alias canonicalType) docs'
+    return $ TypeDeclaration name' (Alias canonicalType) docs' annotationSet'
+
 
 boxedTypeDeclaration :: Parser TypeDeclaration
 boxedTypeDeclaration = do
+    annotationSet' <- annotationSet <?> "boxed type annotations"
     string' "boxed" <?> "boxed type keyword"
     spaces
     typename <- identifier <?> "boxed type name"
@@ -226,8 +265,8 @@ boxedTypeDeclaration = do
     char ')'
     spaces
     char ';'
-    docs' <- optional $ try $ spaces >> (docs <?> "boed type docs")
-    return $ TypeDeclaration name' (BoxedType innerType) docs'
+    docs' <- optional $ try $ spaces >> (docs <?> "boxed type docs")
+    return $ TypeDeclaration name' (BoxedType innerType) docs' annotationSet'
 
 enumMember :: Parser EnumMember
 enumMember = do
@@ -255,6 +294,7 @@ handleNameDuplication label declarations cont =
 
 enumTypeDeclaration :: Parser TypeDeclaration
 enumTypeDeclaration = do
+    annotationSet' <- annotationSet <?> "enum type annotations"
     string "enum" <?> "enum keyword"
     spaces
     typename <- name <?> "enum type name"
@@ -283,7 +323,8 @@ enumTypeDeclaration = do
         Right memberSet -> do
             spaces
             char ';'
-            return $ TypeDeclaration typename (EnumType memberSet) docs'
+            return $ TypeDeclaration typename (EnumType memberSet)
+                                     docs' annotationSet'
 
 fieldsOrParameters :: forall a. (String, String)
                    -> (Name -> TypeExpression -> Maybe Docs -> a)
@@ -323,6 +364,7 @@ fieldSet = do
 
 recordTypeDeclaration :: Parser TypeDeclaration
 recordTypeDeclaration = do
+    annotationSet' <- annotationSet <?> "record type annotations"
     string "record" <?> "record keyword"
     spaces
     typename <- name <?> "record type name"
@@ -338,7 +380,7 @@ recordTypeDeclaration = do
     char ')'
     spaces
     char ';'
-    return $ TypeDeclaration typename (RecordType fields') docs'
+    return $ TypeDeclaration typename (RecordType fields') docs' annotationSet'
 
 tag :: Parser Tag
 tag = do
@@ -359,6 +401,7 @@ tag = do
 
 unionTypeDeclaration :: Parser TypeDeclaration
 unionTypeDeclaration = do
+    annotationSet' <- annotationSet <?> "union type annotations"
     string "union" <?> "union keyword"
     spaces
     typename <- name <?> "union type name"
@@ -374,14 +417,14 @@ unionTypeDeclaration = do
     spaces
     char ';'
     handleNameDuplication "tag" tags' $ \tagSet ->
-        return $ TypeDeclaration typename (UnionType tagSet) docs'
+        return $ TypeDeclaration typename (UnionType tagSet) docs' annotationSet'
 
 typeDeclaration :: Parser TypeDeclaration
 typeDeclaration =
-    ( aliasTypeDeclaration <|>
-      boxedTypeDeclaration <|>
-      enumTypeDeclaration <|>
-      recordTypeDeclaration <|>
+    ( try aliasTypeDeclaration <|>
+      try boxedTypeDeclaration <|>
+      try enumTypeDeclaration <|>
+      try recordTypeDeclaration <|>
       unionTypeDeclaration
     ) <?> "type declaration (e.g. boxed, enum, record, union)"
 
@@ -395,6 +438,7 @@ parameterSet = option empty $ try $ do
 
 method :: Parser Method
 method = do
+    annotationSet' <- annotationSet <?> "service method annotation"
     returnType <- typeExpression <?> "method return type"
     spaces1
     methodName <- name <?> "method name"
@@ -408,7 +452,7 @@ method = do
     params <- parameterSet
     spaces
     char ')'
-    return $ Method methodName params returnType docs'
+    return $ Method methodName params returnType docs' annotationSet'
 
 methods :: Parser [Method]
 methods = method `sepEndBy` try (spaces >> char ',' >> spaces)
@@ -420,6 +464,7 @@ methodSet = do
 
 serviceDeclaration :: Parser TypeDeclaration
 serviceDeclaration = do
+    annotationSet' <- annotationSet <?> "service annotation"
     string "service" <?> "service keyword"
     spaces
     serviceName <- name <?> "service name"
@@ -435,7 +480,8 @@ serviceDeclaration = do
     char ')'
     spaces
     char ';'
-    return $ ServiceDeclaration serviceName (Service methods') docs'
+    return $ ServiceDeclaration serviceName (Service methods')
+                                docs' annotationSet'
 
 modulePath :: Parser ModulePath
 modulePath = do
@@ -483,7 +529,7 @@ module' = do
         spaces
         return importList
     types <- many $ do
-        typeDecl <- typeDeclaration <|>
+        typeDecl <- try typeDeclaration <|>
                     (serviceDeclaration <?> "service declaration")
         spaces
         return typeDecl
