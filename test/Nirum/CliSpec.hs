@@ -32,7 +32,7 @@ spec =
                             , ("b.txt", "content B")
                             ]
                 fileList <- expectWriteFiles tmpDir files
-                fileList `shouldBe` (sort [f | (f, _) <- files])
+                fileList `shouldBe` sort [f | (f, _) <- files]
         it "makes directories if necessary" $
             withSystemTempDirectory "writeFiles-directories" $ \tmpDir -> do
                 let files = [ ("a.txt", "content A")
@@ -44,7 +44,7 @@ spec =
                 fileList <- expectWriteFiles tmpDir files
                 fileList `shouldBe` ["a.txt", "b.txt", "d", "d2"]
                 dFileList <- listDirectory $ tmpDir </> "d"
-                (sort dFileList) `shouldBe` ["a.txt", "b"]
+                sort dFileList `shouldBe` ["a.txt", "b"]
                 dBFileList <- listDirectory $ tmpDir </> "d" </> "b"
                 dBFileList `shouldBe` ["c.txt"]
                 d2FileList <- listDirectory $ tmpDir </> "d2"
