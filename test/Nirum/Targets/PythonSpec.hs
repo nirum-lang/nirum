@@ -44,7 +44,9 @@ import Text.Megaparsec.String (Parser)
 
 import Nirum.Constructs.Annotation (empty)
 import Nirum.Constructs.DeclarationSet (DeclarationSet)
+import Nirum.Constructs.Identifier (Identifier)
 import Nirum.Constructs.Module (Module(Module))
+import Nirum.Constructs.ModulePath (ModulePath, fromIdentifiers)
 import Nirum.Constructs.Name (Name(Name))
 import Nirum.Constructs.Service ( Method (Method)
                                 , Parameter (Parameter)
@@ -250,15 +252,17 @@ if __name__ == '__main__':
         print(False)
 |]
 
-makeDummySource :: Module -> Source
-makeDummySource m =
+makeDummySource' :: [Identifier] -> Module -> Source
+makeDummySource' pathPrefix m =
     Source pkg $ fromJust $ resolveBoundModule ["foo"] pkg
   where
+    mp :: [Identifier] -> ModulePath
+    mp identifiers = fromJust $ fromIdentifiers (pathPrefix ++ identifiers)
     pkg :: Package
     pkg = createPackage
-            [ (["foo"], m)
-            , ( ["foo", "bar"]
-              , Module [ Import ["qux"] "path"
+            [ (mp ["foo"], m)
+            , ( mp ["foo", "bar"]
+              , Module [ Import (mp ["qux"]) "path"
                        , TypeDeclaration "path-box" (BoxedType "path") Nothing
                                          empty
                        , TypeDeclaration "int-box" (BoxedType "bigint")
@@ -271,7 +275,7 @@ makeDummySource m =
                                          empty
                        ] Nothing
               )
-            , ( ["qux"]
+            , ( mp ["qux"]
               , Module
                   [ TypeDeclaration "path" (Alias "text") Nothing empty
                   , TypeDeclaration "name" (BoxedType "text") Nothing empty
@@ -279,6 +283,9 @@ makeDummySource m =
                   Nothing
               )
             ]
+
+makeDummySource :: Module -> Source
+makeDummySource = makeDummySource' []
 
 spec :: Spec
 spec = parallel $ do
@@ -485,6 +492,16 @@ spec = parallel $ do
                 [ "foo" </> "__init__.py"
                 , "foo" </> "bar" </> "__init__.py"
                 , "qux" </> "__init__.py"
+                , "setup.py"
+                ]
+        it "creates an emtpy Python package directory if necessary" $ do
+            let (Source pkg _) = makeDummySource' ["test"] $ Module [] Nothing
+                files = compilePackage pkg
+            M.keysSet files `shouldBe`
+                [ "test" </> "__init__.py"
+                , "test" </> "foo" </> "__init__.py"
+                , "test" </> "foo" </> "bar" </> "__init__.py"
+                , "test" </> "qux" </> "__init__.py"
                 , "setup.py"
                 ]
         specify "setup.py" $ do

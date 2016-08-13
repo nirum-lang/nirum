@@ -50,7 +50,7 @@ import Nirum.Constructs.Identifier ( Identifier
                                    , toSnakeCaseText
                                    , toString
                                    )
-import Nirum.Constructs.ModulePath (ModulePath)
+import Nirum.Constructs.ModulePath (ModulePath, ancestors)
 import Nirum.Constructs.Name (Name(Name))
 import qualified Nirum.Constructs.Name as N
 import Nirum.Constructs.Service ( Method(Method, methodName)
@@ -717,6 +717,7 @@ compilePackage :: Package
                -> M.Map FilePath (Either CompileError Code)
 compilePackage package =
     M.fromList $
+        initFiles ++
         [ ( f
           , case cd of
                 Left e -> Left e
@@ -731,6 +732,11 @@ compilePackage package =
         joinPath $ [ T.unpack (toAttributeName i)
                    | i <- toList mp
                    ] ++ ["__init__.py"]
+    initFiles :: [(FilePath, Either CompileError Code)]
+    initFiles = [ (toFilename mp', Right "")
+                | mp <- M.keys (modules package)
+                , mp' <- S.elems (ancestors mp)
+                ]
     modules' :: [(FilePath, Either CompileError (InstallRequires, Code))]
     modules' =
         [ ( toFilename modulePath'
