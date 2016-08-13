@@ -43,12 +43,14 @@ instance Declaration Parameter where
 data Method = Method { methodName :: Name
                      , parameters :: DeclarationSet Parameter
                      , returnType :: TypeExpression
+                     , errorType  :: Maybe TypeExpression
                      , methodDocs :: Maybe Docs
                      , methodAnnotations :: AnnotationSet
                      } deriving (Eq, Ord, Show)
 
 instance Construct Method where
     toCode method@Method { parameters = params
+                         , errorType = error'
                          , methodDocs = docs'
                          , methodAnnotations = annotationSet'
                          } =
@@ -67,7 +69,11 @@ instance Construct Method where
                                  , T.intercalate "\n" $ map indentedCode params'
                                  , "\n"
                                  ]
-                   ++ ["),"]
+                   ++ [")"]
+                   ++ case error' of
+                          Nothing -> []
+                          Just e -> [" throws ", toCode e]
+                   ++ [","]
       where
         params' :: [Parameter]
         params' = toList params

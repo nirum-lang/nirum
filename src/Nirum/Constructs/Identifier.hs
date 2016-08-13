@@ -52,7 +52,14 @@ import Nirum.Constructs (Construct(toCode))
 data Identifier = Identifier T.Text deriving (Show)
 
 reservedKeywords :: S.Set Identifier
-reservedKeywords = ["boxed", "enum", "record", "type", "union"]
+reservedKeywords = [ "boxed"
+                   , "enum"
+                   , "record"
+                   , "service"
+                   , "throws"
+                   , "type"
+                   , "union"
+                   ]
 
 identifierRule :: Parser Identifier
 identifierRule = do
