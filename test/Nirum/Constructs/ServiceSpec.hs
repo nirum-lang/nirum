@@ -51,12 +51,12 @@ spec = do
                            Nothing
                            Nothing
                            methodAnno) `shouldBe`
-                "[http-get: \"/ping/\"]\nbool ping (),"
+                "@http-get(\"/ping/\")\nbool ping (),"
             toCode (Method "ping" [] "bool"
                            (Just "ping-error")
                            Nothing
                            methodAnno) `shouldBe`
-                "[http-get: \"/ping/\"]\nbool ping () throws ping-error,"
+                "@http-get(\"/ping/\")\nbool ping () throws ping-error,"
             toCode (Method "get-user"
                            [Parameter "user-id" "uuid" Nothing]
                            (OptionModifier "user")
@@ -240,7 +240,7 @@ spec = do
                            (Just "search-posts-error")
                            (Just "docs...")
                            methodAnno) `shouldBe`
-                "[http-get: \"/ping/\"]\n\
+                "@http-get(\"/ping/\")\n\
                 \[post] search-posts (\n\
                 \  # docs...\n\
                 \  uuid blog-id,\n\

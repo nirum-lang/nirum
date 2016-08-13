@@ -641,7 +641,7 @@ spec = do
                        , Parameter "default" "text" Nothing
                        ]
                        "text" (Just "get-name-error") Nothing empty
-            parse' "[http-get:\"/get-name/\"]\n\
+            parse' "@http-get(\"/get-name/\")\n\
                    \text get-name  ( person user,text default )\n\
                    \               throws get-name-error" `shouldBeRight`
                 Method "get-name"
