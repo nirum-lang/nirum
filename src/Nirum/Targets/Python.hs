@@ -530,8 +530,8 @@ class $className(service_type):
 # FIXME client MUST be generated & saved on diffrent module
 #       where service isn't included.
 class {className}_Client(client_type, $className):
-
     {clientMethods'}
+    pass
 |]
   where
     className :: T.Text
@@ -581,7 +581,7 @@ class {className}_Client(client_type, $className):
         let pName' = toAttributeName' pName
         return [qq|meta['_names']['{pName'}']: serialize_meta({pName'})|]
     compileClientMethod :: Method -> CodeGen Code
-    compileClientMethod (Method mName params rtype _) = do
+    compileClientMethod (Method mName params rtype _ _ _) = do
         let mName' = toAttributeName' mName
         params' <- mapM compileParameter $ toList params
         rtypeExpr <- compileTypeExpression src rtype
