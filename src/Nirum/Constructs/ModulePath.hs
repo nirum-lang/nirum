@@ -4,6 +4,7 @@ module Nirum.Constructs.ModulePath ( ModulePath( ModuleName
                                                , moduleName
                                                , path
                                                )
+                                   , ancestors
                                    , fromFilePath
                                    , fromIdentifiers
                                    ) where
@@ -12,6 +13,7 @@ import Data.Char (toLower)
 import Data.Maybe (fromMaybe, mapMaybe)
 import GHC.Exts (IsList(Item, fromList, toList))
 
+import Data.Set (Set, insert, singleton)
 import Data.Text (intercalate, pack)
 import System.FilePath (splitDirectories, stripExtension)
 
@@ -48,6 +50,10 @@ fromFilePath filePath =
                         (splitDirectories filePath)
     fileIdentifiers :: [Identifier]
     fileIdentifiers = mapMaybe (fromText . pack) paths
+
+ancestors :: ModulePath -> Set ModulePath
+ancestors m@ModuleName {} = singleton m
+ancestors m@(ModulePath parent _) = m `insert` ancestors parent
 
 instance IsList ModulePath where
     type Item ModulePath = Identifier

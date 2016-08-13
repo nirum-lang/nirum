@@ -6,10 +6,17 @@ module Nirum.Targets.Python ( Code
                                      , standardImports
                                      , thirdPartyImports
                                      )
+                            , CompileError
+                            , InstallRequires ( InstallRequires
+                                              , dependencies
+                                              , optionalDependencies
+                                              )
                             , Source( Source
                                     , sourceModule
                                     , sourcePackage
                                     )
+                            , addDependency
+                            , addOptionalDependency
                             , compileError
                             , compileModule
                             , compilePackage
@@ -21,12 +28,14 @@ module Nirum.Targets.Python ( Code
                             , toClassName
                             , toImportPath
                             , toNamePair
+                            , unionInstallRequires
                             , withLocalImport
                             , withStandardImport
                             , withThirdPartyImports
                             ) where
 
 import qualified Data.List as L
+import Data.Maybe (fromMaybe)
 import GHC.Exts (IsList(toList))
 
 import qualified Data.Map.Strict as M
@@ -41,7 +50,7 @@ import Nirum.Constructs.Identifier ( Identifier
                                    , toSnakeCaseText
                                    , toString
                                    )
-import Nirum.Constructs.ModulePath (ModulePath)
+import Nirum.Constructs.ModulePath (ModulePath, ancestors)
 import Nirum.Constructs.Name (Name(Name))
 import qualified Nirum.Constructs.Name as N
 import Nirum.Constructs.Service ( Method(Method, methodName)
@@ -565,11 +574,40 @@ compileModuleBody src@Source { sourceModule = boundModule } = do
 $moduleCode
     |]
 
-compileModule :: Source -> Either CompileError Code
+data InstallRequires =
+    InstallRequires { dependencies :: S.Set T.Text
+                    , optionalDependencies :: M.Map (Int, Int) (S.Set T.Text)
+                    } deriving (Eq, Ord, Show)
+
+addDependency :: InstallRequires -> T.Text -> InstallRequires
+addDependency requires package =
+    requires { dependencies = S.insert package $ dependencies requires }
+
+addOptionalDependency :: InstallRequires
+                      -> (Int, Int)       -- | Python version already stasified
+                      -> T.Text           -- | PyPI package name
+                      -> InstallRequires
+addOptionalDependency requires pyVer package =
+    requires { optionalDependencies = newOptDeps }
+  where
+    oldOptDeps :: M.Map (Int, Int) (S.Set T.Text)
+    oldOptDeps = optionalDependencies requires
+    newOptDeps :: M.Map (Int, Int) (S.Set T.Text)
+    newOptDeps = M.alter (Just . S.insert package . fromMaybe S.empty)
+                         pyVer oldOptDeps
+
+unionInstallRequires :: InstallRequires -> InstallRequires -> InstallRequires
+unionInstallRequires a b =
+    a { dependencies = S.union (dependencies a) (dependencies b)
+      , optionalDependencies = M.unionWith S.union (optionalDependencies a)
+                                                   (optionalDependencies b)
+      }
+
+compileModule :: Source -> Either CompileError (InstallRequires, Code)
 compileModule source =
     case code' of
         CodeGenError errMsg -> Left errMsg
-        CodeGen {} -> Right [qq|
+        CodeGen {} -> codeWithDeps $ [qq|
 {imports $ standardImports code'}
 
 {fromImports $ localImports code'}
@@ -592,18 +630,122 @@ compileModule source =
             [ [qq|from $from import {T.intercalate ", " $ S.elems vars}|]
             | (from, vars) <- M.assocs importMap
             ]
+    has :: S.Set T.Text -> T.Text -> Bool
+    has set module' = module' `S.member` set ||
+                      any (T.isPrefixOf $ module' `T.snoc` '.') set
+    require :: T.Text -> T.Text -> S.Set T.Text -> S.Set T.Text
+    require pkg module' set =
+        if set `has` module' then S.singleton pkg else S.empty
+    deps :: S.Set T.Text
+    deps = require "nirum" "nirum" $ M.keysSet $ thirdPartyImports code'
+    optDeps :: M.Map (Int, Int) (S.Set T.Text)
+    optDeps = [ ((3, 4), require "enum34" "enum" $ standardImports code')
+              , ((3, 5), require "typing" "typing" $ standardImports code')
+              ]
+    codeWithDeps :: Code -> Either CompileError (InstallRequires, Code)
+    codeWithDeps c = Right (InstallRequires deps optDeps, c)
 
-compilePackage :: Package -> M.Map FilePath (Either CompileError Code)
+compilePackageMetadata :: Package -> InstallRequires -> Code
+compilePackageMetadata package (InstallRequires deps optDeps) = [qq|
+import sys
+
+from setuptools import setup, __version__ as setuptools_version
+
+install_requires = [$pInstallRequires]
+polyfill_requires = \{$pPolyfillRequires}
+
+if polyfill_requires:
+    # '<' operator for environment markers are supported since setuptools 17.1.
+    # Read PEP 496 for details of environment markers.
+    setup_requires = ['setuptools >= 17.1']
+    if tuple(map(int, setuptools_version.split('.'))) < (17, 1):
+        extras_require = \{}
+        if 'bdist_wheel' not in sys.argv:
+            for (major, minor), deps in polyfill_requires.items():
+                if sys.version_info < (major, minor):
+                    install_requires.extend(deps)
+        envmarker = ":python_version=='\{0}.\{1}'"
+        python_versions = [(2, 6), (2, 7),
+                           (3, 3), (3, 4), (3, 5), (3, 6)]  # FIXME
+        for pyver in python_versions:
+            extras_require[envmarker.format(*pyver)] = list(\{
+                d
+                for v, vdeps in polyfill_requires.items()
+                if pyver < v
+                for d in vdeps
+            })
+    else:
+        extras_require = \{
+            ":python_version<'\{0}.\{1}'".format(*pyver): deps
+            for pyver, deps in polyfill_requires.items()
+        }
+else:
+    setup_requires = []
+    extras_require = \{}
+
+# TODO: description, long_description, url, author, author_email, license,
+#       keywords, classifiers
+setup(
+    name='{pName}',
+    version='{pVersion}',
+    packages=[$pPackages],
+    provides=[$pPackages],
+    requires=[$pInstallRequires],
+    setup_requires=setup_requires,
+    install_requires=install_requires,
+    extras_require=extras_require,
+)
+|]
+  where
+    pName :: Code
+    pName = "TestPackage"  -- FIXME
+    pVersion :: Code
+    pVersion = "0.1.0"  -- FIXME
+    strings :: [Code] -> Code
+    strings values = T.intercalate ", " . L.sort $ [[qq|'{v}'|] | v <- values]
+    pPackages :: Code
+    pPackages = strings $ map toImportPath $ M.keys $ modules package
+    pInstallRequires :: Code
+    pInstallRequires = strings $ S.toList deps
+    pPolyfillRequires :: Code
+    pPolyfillRequires = T.intercalate ", "
+        [ [qq|($major, $minor): [{strings $ S.toList deps'}]|]
+        | ((major, minor), deps') <- M.toList optDeps
+        ]
+
+compilePackage :: Package
+               -> M.Map FilePath (Either CompileError Code)
 compilePackage package =
-    M.fromList [ ( toFilename modulePath'
-                 , compileModule $ Source package boundModule
-                 )
-               | (modulePath', _) <- M.assocs (modules package)
-               , Just boundModule <- [resolveBoundModule modulePath' package]
-               ]
+    M.fromList $
+        initFiles ++
+        [ ( f
+          , case cd of
+                Left e -> Left e
+                Right (_, cd') -> Right cd'
+          )
+        | (f, cd) <- modules'
+        ] ++
+        [("setup.py", Right $ compilePackageMetadata package installRequires)]
   where
     toFilename :: ModulePath -> FilePath
     toFilename mp =
         joinPath $ [ T.unpack (toAttributeName i)
                    | i <- toList mp
                    ] ++ ["__init__.py"]
+    initFiles :: [(FilePath, Either CompileError Code)]
+    initFiles = [ (toFilename mp', Right "")
+                | mp <- M.keys (modules package)
+                , mp' <- S.elems (ancestors mp)
+                ]
+    modules' :: [(FilePath, Either CompileError (InstallRequires, Code))]
+    modules' =
+        [ ( toFilename modulePath'
+          , compileModule $ Source package boundModule
+          )
+        | (modulePath', _) <- M.assocs (modules package)
+        , Just boundModule <- [resolveBoundModule modulePath' package]
+        ]
+    installRequires :: InstallRequires
+    installRequires = foldl unionInstallRequires
+                            (InstallRequires [] [])
+                            [deps | (_, Right (deps, _)) <- modules']
