@@ -573,27 +573,54 @@ spec = do
                 head $ rights [fromList [Annotation "http-get" "/get-name/"]]
         it "emits Method if succeeded to parse" $ do
             parse' "text get-name()" `shouldBeRight`
-                Method "get-name" [] "text" Nothing empty
+                Method "get-name" [] "text" Nothing Nothing empty
             parse' "text get-name (person user)" `shouldBeRight`
                 Method "get-name" [Parameter "user" "person" Nothing]
-                       "text" Nothing empty
+                       "text" Nothing Nothing empty
             parse' "text get-name  ( person user,text default )" `shouldBeRight`
                 Method "get-name"
                        [ Parameter "user" "person" Nothing
                        , Parameter "default" "text" Nothing
                        ]
-                       "text" Nothing empty
+                       "text" Nothing Nothing empty
             parse' "[http-get: \"/get-name/\"] text get-name  ( person user,text default )" `shouldBeRight`
                 Method "get-name"
                        [ Parameter "user" "person" Nothing
                        , Parameter "default" "text" Nothing
                        ]
-                       "text" Nothing httpGetAnnotation
+                       "text" Nothing Nothing httpGetAnnotation
+            parse' "text get-name() throws name-error" `shouldBeRight`
+                Method "get-name" [] "text" (Just "name-error") Nothing empty
+            parse' "text get-name  ( person user,text default )\n\
+                   \               throws get-name-error" `shouldBeRight`
+                Method "get-name"
+                       [ Parameter "user" "person" Nothing
+                       , Parameter "default" "text" Nothing
+                       ]
+                       "text" (Just "get-name-error") Nothing empty
+            parse' "[http-get:\"/get-name/\"]\n\
+                   \text get-name  ( person user,text default )\n\
+                   \               throws get-name-error" `shouldBeRight`
+                Method "get-name"
+                       [ Parameter "user" "person" Nothing
+                       , Parameter "default" "text" Nothing
+                       ]
+                       "text" (Just "get-name-error")
+                       Nothing
+                       httpGetAnnotation
         it "can have docs" $ do
             parse' "text get-name (\n\
                    \  # Gets the name.\n\
                    \)" `shouldBeRight`
-                Method "get-name" [] "text" (Just "Gets the name.") empty
+                Method "get-name" [] "text"
+                       Nothing (Just "Gets the name.") empty
+            parse' "text get-name (\n\
+                   \  # Gets the name.\n\
+                   \)throws name-error  " `shouldBeRight`
+                Method "get-name" [] "text"
+                       (Just "name-error")
+                       (Just "Gets the name.")
+                       empty
             parse' "text get-name (\n\
                    \  # Gets the name of the user.\n\
                    \  person user,\n\
@@ -601,6 +628,17 @@ spec = do
                 Method "get-name"
                        [Parameter "user" "person" Nothing]
                        "text"
+                       Nothing
+                       (Just "Gets the name of the user.")
+                       empty
+            parse' "text get-name (\n\
+                   \  # Gets the name of the user.\n\
+                   \  person user,\n\
+                   \) throws get-name-error" `shouldBeRight`
+                Method "get-name"
+                       [Parameter "user" "person" Nothing]
+                       "text"
+                       (Just "get-name-error")
                        (Just "Gets the name of the user.")
                        empty
             parse' "text get-name (\n\
@@ -618,6 +656,7 @@ spec = do
                                         \the user has no name."
                        ]
                        "text"
+                       Nothing
                        (Just "Gets the name of the user.")
                        empty
         it "fails to parse if there are parameters of the same facial name" $ do
@@ -650,6 +689,7 @@ spec = do
                                       [Parameter "user-id" "uuid" Nothing]
                                       "user"
                                       Nothing
+                                      Nothing
                                       empty
                              ])
                     Nothing
@@ -659,13 +699,14 @@ spec = do
                    \  user get-user (\n\
                    \    # Gets an user by its id.\n\
                    \    uuid user-id\n\
-                   \  ),\n\
+                   \  ) throws get-user-error,\n\
                    \);" `shouldBeRight`
                 ServiceDeclaration
                     "one-method-service"
                     (Service [ Method "get-user"
                                       [Parameter "user-id" "uuid" Nothing]
                                       "user"
+                                      (Just "get-user-error")
                                       (Just "Gets an user by its id.")
                                       empty
                              ])
@@ -687,11 +728,13 @@ spec = do
                     (Service [ Method "create-user"
                                       [Parameter "user" "user" Nothing]
                                       "user"
+                                      Nothing
                                       (Just "Creates a new user")
                                       empty
                              , Method "get-user"
                                       [Parameter "user-id" "uuid" Nothing]
                                       "user"
+                                      Nothing
                                       (Just "Gets an user by its id.")
                                       empty
                              ])
