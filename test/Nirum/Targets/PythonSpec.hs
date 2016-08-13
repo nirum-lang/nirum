@@ -20,7 +20,7 @@ module Nirum.Targets.PythonSpec where
 
 import Control.Monad (forM_, void, unless)
 import Data.Char (isSpace)
-import Data.Maybe (fromJust)
+import Data.Maybe (fromJust, isJust)
 import System.IO.Error (catchIOError)
 
 import Data.List (dropWhileEnd)
@@ -74,12 +74,20 @@ import Nirum.Constructs.TypeExpression ( TypeExpression( ListModifier
                                        )
 import Nirum.Package (BoundModule(modulePath), Package, resolveBoundModule)
 import Nirum.PackageSpec (createPackage)
-import Nirum.Targets.Python ( Source(Source, sourceModule, sourcePackage)
+import Nirum.Targets.Python ( Source (Source)
+                            , Code
                             , CodeGen( code
                                      , localImports
                                      , standardImports
                                      , thirdPartyImports
                                      )
+                            , CompileError
+                            , InstallRequires ( InstallRequires
+                                              , dependencies
+                                              , optionalDependencies
+                                              )
+                            , addDependency
+                            , addOptionalDependency
                             , compileError
                             , compilePackage
                             , compilePrimitiveType
@@ -89,6 +97,7 @@ import Nirum.Targets.Python ( Source(Source, sourceModule, sourcePackage)
                             , toClassName
                             , toImportPath
                             , toNamePair
+                            , unionInstallRequires
                             , withLocalImport
                             , withStandardImport
                             , withThirdPartyImports
@@ -150,26 +159,34 @@ findPython cwd' = installedPythonPaths cwd' >>= findPython'
                             else findPython' xs
     findPython' [] = return Nothing
 
-runPython :: Maybe FilePath -> String -> IO (Maybe String)
-runPython cwd' code' = do
+runPython' :: Maybe FilePath -> [String] -> String -> IO (Maybe String)
+runPython' cwd' args stdinStr = do
     pyPathM <- findPython cwd'
     case pyPathM of
         Nothing -> do
             putStrLn "Python 3 seems not installed; skipping..."
             return Nothing
-        Just path ->
-            catchIOError (execute cwd' path code') $ \e -> do
-                putStrLn "\nThe following IO error was raised:\n"
-                putStrLn $ indent "  " $ show e
-                putStrLn "\n... while the following code was executed:\n"
-                putStrLn $ indent "  " code'
-                ioError e
+        Just path -> execute cwd' path args stdinStr
   where
-    execute :: Maybe FilePath -> FilePath -> String -> IO (Maybe String)
-    execute cwdPath pyPath pyCode = do
-        let proc' = (proc pyPath []) { cwd = cwdPath }
-        result <- readCreateProcess proc' pyCode
+    execute :: Maybe FilePath
+            -> FilePath
+            -> [String]
+            -> String
+            -> IO (Maybe String)
+    execute cwdPath pyPath args' stdinStr' = do
+        let proc' = (proc pyPath args') { cwd = cwdPath }
+        result <- readCreateProcess proc' stdinStr'
         return $ Just result
+
+runPython :: Maybe FilePath -> String -> IO (Maybe String)
+runPython cwd' code' =
+    catchIOError (runPython' cwd' [] code') $ \e -> do
+        putStrLn "\nThe following IO error was raised:\n"
+        putStrLn $ indent "  " $ show e
+        putStrLn "\n... while the following code was executed:\n"
+        putStrLn $ indent "  " code'
+        ioError e
+  where
     indent :: String -> String -> String
     indent spaces content = unlines [spaces ++ l | l <- lines content]
 
@@ -432,26 +449,27 @@ spec = parallel $ do
             toNamePair (Name "abc" "lambda") `shouldBe` "('abc', 'lambda')"
             toNamePair (Name "lambda" "abc") `shouldBe` "('lambda_', 'abc')"
 
-    let test testRunner
-             Source { sourcePackage = pkg
-                    , sourceModule = boundM
-                    }
-             testCode =
-            let files = compilePackage pkg
-                errors = [error' | (_, Left error') <- M.toList files]
-                codes = [(path, code') | (path, Right code') <- M.toList files]
-                pyImportPath = toImportPath $ modulePath boundM
-                defCode = [qq|from $pyImportPath import *|]
-            in
-                case errors of
-                    error':_ -> fail $ T.unpack error'
-                    [] -> withSystemTempDirectory "nirumpy." $ \dir -> do
-                        forM_ codes $ \(filePath, code') -> do
-                            let filePath' = dir </> filePath
-                                dirName = takeDirectory filePath'
-                            createDirectoryIfMissing True dirName
-                            TI.writeFile filePath' code'
-                        testRunner (Just dir) defCode testCode
+    let test testRunner (Source pkg boundM) testCode =
+            case errors of
+                error':_ -> fail $ T.unpack error'
+                [] -> withSystemTempDirectory "nirumpy." $ \dir -> do
+                    forM_ codes $ \(filePath, code') -> do
+                        let filePath' = dir </> filePath
+                            dirName = takeDirectory filePath'
+                        createDirectoryIfMissing True dirName
+                        TI.writeFile filePath' code'
+                    testRunner (Just dir) defCode testCode
+          where
+            files :: M.Map FilePath (Either CompileError Code)
+            files = compilePackage pkg
+            errors :: [CompileError]
+            errors = [error' | (_, Left error') <- M.toList files]
+            codes :: [(FilePath, Code)]
+            codes = [(path, code') | (path, Right code') <- M.toList files]
+            pyImportPath :: T.Text
+            pyImportPath = toImportPath $ modulePath boundM
+            defCode :: Code
+            defCode = [qq|from $pyImportPath import *|]
         tM = test testPython
         tT' typeDecls = tM $ makeDummySource $ Module typeDecls Nothing
         tT typeDecl = tT' [typeDecl]
@@ -460,6 +478,40 @@ spec = parallel $ do
         tR' typeDecl = tR'' [typeDecl]
 
     describe "compilePackage" $ do
+        it "returns a Map of file paths and their contents to generate" $ do
+            let (Source pkg _) = makeDummySource $ Module [] Nothing
+                files = compilePackage pkg
+            M.keysSet files `shouldBe`
+                [ "foo" </> "__init__.py"
+                , "foo" </> "bar" </> "__init__.py"
+                , "qux" </> "__init__.py"
+                , "setup.py"
+                ]
+        specify "setup.py" $ do
+            let setupPyFields = [ ("--name", "TestPackage")
+                                , ("--version", "0.1.0")
+                                , ("--version", "0.1.0")
+                                , ("--provides", "foo\nfoo.bar\nqux")
+                                , ("--requires", "nirum")
+                                ] :: [(String, T.Text)]
+                source = makeDummySource $ Module [] Nothing
+                testRunner cwd' _ _ =
+                    {--  <- remove '{' to print debug log
+                    do
+                        let spath = case cwd' of
+                                        Just c -> c </> "setup.py"
+                                        Nothing -> "setup.py"
+                        contents <- TI.readFile spath
+                        TI.putStrLn "=========== setup.py ==========="
+                        TI.putStrLn contents
+                        TI.putStrLn "=========== /setup.py =========="
+                    -- --}
+                        forM_ setupPyFields $ \(option, expected) -> do
+                            out <- runPython' cwd' ["setup.py", option] ""
+                            out `shouldSatisfy` isJust
+                            let Just result = out
+                            T.strip (T.pack result) `shouldBe` expected
+            test testRunner source T.empty
         specify "boxed type" $ do
             let decl = TypeDeclaration "float-box" (BoxedType "float64")
                                        Nothing empty
@@ -785,6 +837,50 @@ spec = parallel $ do
             tR' ping' "NotImplementedError" "PingService().ping('nonce')"
             tR' ping' "NotImplementedError" "PingService().ping(nonce='nonce')"
             tR' ping' "TypeError" "PingService().ping(wrongkwd='a')"
+
+    describe "InstallRequires" $ do
+        let req = InstallRequires [] []
+            req2 = req { dependencies = ["six"] }
+            req3 = req { optionalDependencies = [((3, 4), ["enum34"])] }
+        specify "addDependency" $ do
+            addDependency req "six" `shouldBe` req2
+            addDependency req2 "six" `shouldBe` req2
+            addDependency req "nirum" `shouldBe`
+                req { dependencies = ["nirum"] }
+            addDependency req2 "nirum" `shouldBe`
+                req2 { dependencies = ["nirum", "six"] }
+        specify "addOptionalDependency" $ do
+            addOptionalDependency req (3, 4) "enum34" `shouldBe` req3
+            addOptionalDependency req3 (3, 4) "enum34" `shouldBe` req3
+            addOptionalDependency req (3, 4) "ipaddress" `shouldBe`
+                req { optionalDependencies = [((3, 4), ["ipaddress"])] }
+            addOptionalDependency req3 (3, 4) "ipaddress" `shouldBe`
+                req { optionalDependencies = [ ((3, 4), ["enum34", "ipaddress"])
+                                             ]
+                    }
+            addOptionalDependency req (3, 5) "typing" `shouldBe`
+                req { optionalDependencies = [((3, 5), ["typing"])] }
+            addOptionalDependency req3 (3, 5) "typing" `shouldBe`
+                req3 { optionalDependencies = [ ((3, 4), ["enum34"])
+                                              , ((3, 5), ["typing"])
+                                              ]
+                     }
+        specify "unionInstallRequires" $ do
+            (req `unionInstallRequires` req) `shouldBe` req
+            (req `unionInstallRequires` req2) `shouldBe` req2
+            (req2 `unionInstallRequires` req) `shouldBe` req2
+            (req `unionInstallRequires` req3) `shouldBe` req3
+            (req3 `unionInstallRequires` req) `shouldBe` req3
+            let req4 = req3 { dependencies = ["six"] }
+            (req2 `unionInstallRequires` req3) `shouldBe` req4
+            (req3 `unionInstallRequires` req2) `shouldBe` req4
+            let req5 = req { dependencies = ["nirum"]
+                           , optionalDependencies = [((3, 4), ["ipaddress"])]
+                           }
+                req6 = addOptionalDependency (addDependency req4 "nirum")
+                                             (3, 4) "ipaddress"
+            (req4 `unionInstallRequires` req5) `shouldBe` req6
+            (req5 `unionInstallRequires` req4) `shouldBe` req6
 
 {-# ANN module ("HLint: ignore Functor law" :: String) #-}
 {-# ANN module ("HLint: ignore Monad law, left identity" :: String) #-}
