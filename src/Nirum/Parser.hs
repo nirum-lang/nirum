@@ -31,7 +31,8 @@ module Nirum.Parser ( Parser
                     , unionTypeDeclaration
                     ) where
 
-import Control.Monad (void)
+import Control.Applicative ((<$>))
+import Control.Monad (join, void)
 import Data.List (foldl1')
 import Prelude hiding (readFile)
 
@@ -149,17 +150,20 @@ name = do
 
 annotation :: Parser A.Annotation
 annotation = do
-    char '['
+    char '@'
     spaces
     name' <- identifier
     spaces
-    char ':'
-    spaces
-    metadata <- (char '"' >> manyTill charLiteral (char '"'))
-                <?> "annotation metadata"
-    spaces
-    char ']'
-    return $ A.Annotation name' $ T.pack metadata
+    metadata <- optional $ do
+        char '('
+        spaces
+        m <- optional ((char '"' >> manyTill charLiteral (char '"'))
+                       <?> "annotation metadata")
+        spaces
+        char ')'
+        return m
+    let metadata' = T.pack <$> join metadata
+    return $ A.Annotation name' metadata'
 
 annotationSet :: Parser A.AnnotationSet
 annotationSet = do

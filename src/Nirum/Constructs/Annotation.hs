@@ -23,11 +23,13 @@ type Metadata = T.Text
 
 -- | Annotation for 'Declaration'.
 data Annotation = Annotation { name :: Identifier
-                             , metadata :: Metadata
+                             , metadata :: Maybe Metadata
                              } deriving (Eq, Ord, Show)
 
 instance Construct Annotation where
-    toCode Annotation {name = n,  metadata = m} = [qq|[{toCode n}: "$m"]|]
+    toCode Annotation {name = n,  metadata = Just m} =
+        let m' = T.replace "\"" "\\\"" m in [qq|@{toCode n}("$m'")|]
+    toCode Annotation {name = n,  metadata = Nothing} = [qq|@{toCode n}|]
 
 data AnnotationSet
   -- | The set of 'Annotation' values.

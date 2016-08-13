@@ -16,12 +16,15 @@ import Nirum.Constructs.Annotation
 
 spec :: Spec
 spec = do
-    let annotation = Annotation "foo" "bar"
-        loremAnno = Annotation "lorem" "ipsum"
+    let annotation = Annotation "foo" Nothing
+        loremAnno = Annotation "lorem" (Just "ipsum")
+        withEscapeChar = Annotation "quote" (Just "\"")
     describe "Annotation" $
         describe "toCode Annotation" $
-            it "prints annotation properly" $
-                toCode annotation `shouldBe` "[foo: \"bar\"]"
+            it "prints annotation properly" $ do
+                toCode annotation `shouldBe` "@foo"
+                toCode loremAnno `shouldBe` "@lorem(\"ipsum\")"
+                toCode withEscapeChar `shouldBe` "@quote(\"\\\"\")"
     describe "AnnotationSet" $ do
         it "empty" $ empty `shouldBe` AnnotationSet M.empty
         describe "fromList" $ do
