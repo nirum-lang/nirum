@@ -6,12 +6,14 @@ import qualified Data.Text as T
 import Test.Hspec.Meta
 
 import Nirum.Constructs (Construct(toCode))
+import qualified Nirum.Constructs.Annotation as A
 import Nirum.Constructs.Annotation ( Annotation (Annotation)
                                    , AnnotationSet
-                                   ,  fromList
+                                   , fromList
                                    , empty
+                                   , singleton
                                    )
-import Nirum.Constructs.Declaration (Declaration(name, docs))
+import Nirum.Constructs.Declaration (Declaration(name, docs), Docs)
 import Nirum.Constructs.DeclarationSet (DeclarationSet)
 import Nirum.Constructs.Service (Method(Method), Service(Service))
 import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
@@ -26,6 +28,9 @@ import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
 barAnnotationSet :: AnnotationSet
 barAnnotationSet = head $ rights [fromList [Annotation "bar" (Just "baz")]]
 
+docsAnno :: Docs -> AnnotationSet
+docsAnno = singleton . A.docs
+
 spec :: Spec
 spec = do
     describe "TypeDeclaration" $ do
@@ -33,10 +38,9 @@ spec = do
             let alias = Alias "text"
                 a = TypeDeclaration { typename = "path"
                                     , type' = alias
-                                    , typeDocs = Nothing
                                     , typeAnnotations = empty
                                     }
-                b = a { typeDocs = Just "docs"}
+                b = a { typeAnnotations = docsAnno "docs" }
             specify "name" $ do
                 name a `shouldBe` "path"
                 name b `shouldBe` "path"
@@ -50,10 +54,9 @@ spec = do
             let boxed = BoxedType "float64"
                 a = TypeDeclaration { typename = "offset"
                                     , type' = boxed
-                                    , typeDocs = Nothing
                                     , typeAnnotations = empty
                                     }
-                b = a { typeDocs = Just "docs" }
+                b = a { typeAnnotations = docsAnno "docs" }
             specify "name" $ do
                 name a `shouldBe` "offset"
                 name b `shouldBe` "offset"
@@ -71,10 +74,9 @@ spec = do
                 enum = EnumType enumMembers
                 a = TypeDeclaration { typename = "country"
                                     , type' = enum
-                                    , typeDocs = Nothing
                                     , typeAnnotations = empty
                                     }
-                b = a { typeDocs = Just "country codes" }
+                b = a { typeAnnotations = docsAnno "country codes" }
             specify "toCode" $ do
                 toCode a `shouldBe` "enum country\n\
                                     \    = kr\n\
@@ -99,10 +101,9 @@ spec = do
                 record = RecordType fields'
                 a = TypeDeclaration { typename = "person"
                                     , type' = record
-                                    , typeDocs = Nothing
                                     , typeAnnotations = empty
                                     }
-                b = a { typeDocs = Just "person record type" }
+                b = a { typeAnnotations = docsAnno "person record type" }
             specify "toCode" $ do
                 toCode a `shouldBe` "record person (\n\
                                     \    text name,\n\
@@ -131,10 +132,9 @@ spec = do
                 union = UnionType tags'
                 a = TypeDeclaration { typename = "shape"
                                     , type' = union
-                                    , typeDocs = Nothing
                                     , typeAnnotations = empty
                                     }
-                b = a { typeDocs = Just "shape type" }
+                b = a { typeAnnotations = docsAnno "shape type" }
             specify "toCode" $ do
                 toCode a `shouldBe` "union shape\n\
                                     \    = circle (point origin, \
@@ -153,27 +153,23 @@ spec = do
                                     \    ;"
         context "PrimitiveType" $ do
             let primitiveType = PrimitiveType Text String
-                decl = TypeDeclaration "text" primitiveType Nothing empty
+                decl = TypeDeclaration "text" primitiveType empty
             specify "toCode" $
                 T.lines (toCode decl) `shouldSatisfy`
                     all (T.isPrefixOf "//" . T.stripStart)
         context "ServiceDeclaration" $ do
             let nullService = Service []
-                nullDecl = ServiceDeclaration "null-service" nullService Nothing
-                                              empty
+                nullDecl = ServiceDeclaration "null-service" nullService empty
                 nullDecl' =
                     ServiceDeclaration "null-service" nullService
-                                       (Just "Null service declaration.")
-                                       empty
-                pingService = Service [ Method "ping" [] "bool" Nothing Nothing empty ]
-                pingDecl = ServiceDeclaration "ping-service" pingService Nothing
-                                              empty
+                                       (docsAnno "Null service declaration.")
+                pingService = Service [ Method "ping" [] "bool" Nothing empty ]
+                pingDecl = ServiceDeclaration "ping-service" pingService empty
                 pingDecl' =
                     ServiceDeclaration "ping-service" pingService
-                                       (Just "Ping service declaration.")
-                                       empty
+                                       (docsAnno "Ping service declaration.")
                 annoDecl = ServiceDeclaration "anno-service" pingService
-                                              Nothing barAnnotationSet
+                                              barAnnotationSet
             specify "toCode" $ do
                 toCode nullDecl `shouldBe` "service null-service ();"
                 toCode nullDecl' `shouldBe` "service null-service (\n\

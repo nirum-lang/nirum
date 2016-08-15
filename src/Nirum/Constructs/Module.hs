@@ -67,25 +67,29 @@ coreModule = Module coreTypes $ Just coreDocs
 coreTypes :: DS.DeclarationSet TypeDeclaration
 coreTypes =
     -- number types
-    [ TypeDeclaration "bigint" (PrimitiveType Bigint String) Nothing empty
-    , TypeDeclaration "decimal" (PrimitiveType Decimal String) Nothing empty
-    , TypeDeclaration "int32" (PrimitiveType Int32 Number) Nothing empty
-    , TypeDeclaration "int64" (PrimitiveType Int64 Number) Nothing empty
-    , TypeDeclaration "float32" (PrimitiveType Float32 Number) Nothing empty
-    , TypeDeclaration "float64" (PrimitiveType Float64 Number) Nothing empty
+    [ decl' "bigint" Bigint String
+    , decl' "decimal" Decimal String
+    , decl' "int32" Int32 Number
+    , decl' "int64" Int64 Number
+    , decl' "float32" Float32 Number
+    , decl' "float64" Float64 Number
     -- string types
-    , TypeDeclaration "text" (PrimitiveType Text String) Nothing empty
-    , TypeDeclaration "binary" (PrimitiveType Binary String) Nothing empty
+    , decl' "text" Text String
+    , decl' "binary" Binary String
     -- time types
-    , TypeDeclaration
-          "date" (PrimitiveType Date String) Nothing empty
-    , TypeDeclaration
-          "datetime" (PrimitiveType Datetime String) Nothing empty
+    , decl' "date" Date String
+    , decl' "datetime" Datetime String
     -- et cetera
-    , TypeDeclaration "bool" (PrimitiveType Bool Boolean) Nothing empty
-    , TypeDeclaration "uuid" (PrimitiveType Uuid String) Nothing empty
-    , TypeDeclaration "uri" (PrimitiveType Uri String) Nothing empty
+    , decl' "bool" Bool Boolean
+    , decl' "uuid" Uuid String
+    , decl' "uri" Uri String
     ]
+  where
+    decl' name prim json =
+        TypeDeclaration { typename = name
+                        , type' = PrimitiveType prim json
+                        , typeAnnotations = empty
+                        }
 
 coreDocs :: Docs
 coreDocs = [q|

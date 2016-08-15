@@ -251,7 +251,10 @@ aliasTypeDeclaration = do
     spaces
     char ';'
     docs' <- optional $ try $ spaces >> (docs <?> "type alias docs")
-    return $ TypeDeclaration name' (Alias canonicalType) docs' annotationSet'
+    annotationSet'' <- case docs' of
+        Just d  -> A.insertDocs d annotationSet'
+        Nothing -> return annotationSet'
+    return $ TypeDeclaration name' (Alias canonicalType) annotationSet''
 
 
 boxedTypeDeclaration :: Parser TypeDeclaration
@@ -270,7 +273,10 @@ boxedTypeDeclaration = do
     spaces
     char ';'
     docs' <- optional $ try $ spaces >> (docs <?> "boxed type docs")
-    return $ TypeDeclaration name' (BoxedType innerType) docs' annotationSet'
+    annotationSet'' <- case docs' of
+        Just d  -> A.insertDocs d annotationSet'
+        Nothing -> return annotationSet'
+    return $ TypeDeclaration name' (BoxedType innerType) annotationSet''
 
 enumMember :: Parser EnumMember
 enumMember = do
@@ -315,6 +321,9 @@ enumTypeDeclaration = do
             d <- docs <?> "enum type docs"
             spaces
             return d
+    annotationSet'' <- case docs' of
+        Just d  -> A.insertDocs d annotationSet'
+        Nothing -> return annotationSet'
     members <- (enumMember `sepBy1` (spaces >> char '|' >> spaces))
                    <?> "enum members"
     case fromList members of
@@ -328,7 +337,7 @@ enumTypeDeclaration = do
             spaces
             char ';'
             return $ TypeDeclaration typename (EnumType memberSet)
-                                     docs' annotationSet'
+                                     annotationSet''
 
 fieldsOrParameters :: forall a. (String, String)
                    -> (Name -> TypeExpression -> Maybe Docs -> a)
@@ -384,7 +393,10 @@ recordTypeDeclaration = do
     char ')'
     spaces
     char ';'
-    return $ TypeDeclaration typename (RecordType fields') docs' annotationSet'
+    annotationSet'' <- case docs' of
+        Just d  -> A.insertDocs d annotationSet'
+        Nothing -> return annotationSet'
+    return $ TypeDeclaration typename (RecordType fields') annotationSet''
 
 tag :: Parser Tag
 tag = do
@@ -420,8 +432,11 @@ unionTypeDeclaration = do
              <?> "union tags"
     spaces
     char ';'
+    annotationSet'' <- case docs' of
+        Just d  -> A.insertDocs d annotationSet'
+        Nothing -> return annotationSet'
     handleNameDuplication "tag" tags' $ \tagSet ->
-        return $ TypeDeclaration typename (UnionType tagSet) docs' annotationSet'
+        return $ TypeDeclaration typename (UnionType tagSet) annotationSet''
 
 typeDeclaration :: Parser TypeDeclaration
 typeDeclaration =
@@ -463,7 +478,10 @@ method = do
         e <- typeExpression <?> "method error type"
         spaces
         return e
-    return $ Method methodName params returnType errorType docs' annotationSet'
+    annotationSet'' <- case docs' of
+        Just d  -> A.insertDocs d annotationSet'
+        Nothing -> return annotationSet'
+    return $ Method methodName params returnType errorType annotationSet''
 
 methods :: Parser [Method]
 methods = method `sepEndBy` try (spaces >> char ',' >> spaces)
@@ -491,8 +509,10 @@ serviceDeclaration = do
     char ')'
     spaces
     char ';'
-    return $ ServiceDeclaration serviceName (Service methods')
-                                docs' annotationSet'
+    annotationSet'' <- case docs' of
+        Just d  -> A.insertDocs d annotationSet'
+        Nothing -> return annotationSet'
+    return $ ServiceDeclaration serviceName (Service methods') annotationSet''
 
 modulePath :: Parser ModulePath
 modulePath = do

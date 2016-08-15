@@ -5,7 +5,7 @@ import Test.Hspec.Meta
 import Text.InterpolatedString.Perl6 (q)
 
 import Nirum.Constructs (Construct(toCode))
-import Nirum.Constructs.Annotation (empty)
+import Nirum.Constructs.Annotation as A (docs, empty, singleton)
 import Nirum.Constructs.DeclarationSet (DeclarationSet)
 import Nirum.Constructs.Module (Module(..), imports)
 import Nirum.Constructs.TypeDeclaration ( Type(..)
@@ -17,10 +17,10 @@ import Nirum.Constructs.TypeDeclaration ( Type(..)
 spec :: Spec
 spec =
     describe "Module" $ do
-        let pathT = TypeDeclaration "path" (Alias "text")
-                                    (Just "path string") empty
+        let docsAnno = A.docs "path string"
+            pathT = TypeDeclaration "path" (Alias "text") (singleton docsAnno)
             offsetT =
-                TypeDeclaration "offset" (BoxedType "float64") Nothing empty
+                TypeDeclaration "offset" (BoxedType "float64") empty
             decls = [ Import ["foo", "bar"] "baz"
                     , Import ["foo", "bar"] "qux"
                     , Import ["zzz"] "qqq"

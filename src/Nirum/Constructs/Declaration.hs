@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Nirum.Constructs.Declaration ( Declaration
                                     , Docs(Docs)
+                                    , annotationDocsName
                                     , docs
                                     , name
                                     , toCode
@@ -13,7 +14,11 @@ import Data.String (IsString(fromString))
 import qualified Data.Text as T
 
 import Nirum.Constructs (Construct(toCode))
+import Nirum.Constructs.Identifier (Identifier)
 import Nirum.Constructs.Name (Name)
+
+annotationDocsName :: Identifier
+annotationDocsName = "doc"
 
 -- 'Construct' which has its own unique 'name' and can has its 'docs'.
 class Construct a => Declaration a where

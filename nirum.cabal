@@ -21,6 +21,7 @@ library
   exposed-modules:     Nirum.Cli
                  ,     Nirum.Constructs
                  ,     Nirum.Constructs.Annotation
+                 ,     Nirum.Constructs.Annotation.Internal
                  ,     Nirum.Constructs.Declaration
                  ,     Nirum.Constructs.DeclarationSet
                  ,     Nirum.Constructs.Identifier

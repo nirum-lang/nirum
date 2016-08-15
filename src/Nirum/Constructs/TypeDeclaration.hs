@@ -12,11 +12,9 @@ module Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
                                                          , modulePath
                                                          , service
                                                          , serviceAnnotations
-                                                         , serviceDocs
                                                          , serviceName
                                                          , type'
                                                          , typeAnnotations
-                                                         , typeDocs
                                                          , typename
                                                          )
                                         ) where
@@ -27,6 +25,7 @@ import Data.String (IsString(fromString))
 import qualified Data.Text as T
 
 import Nirum.Constructs (Construct(toCode))
+import qualified Nirum.Constructs.Annotation as A
 import Nirum.Constructs.Annotation (AnnotationSet)
 import Nirum.Constructs.Declaration ( Declaration (..)
                                     , Docs (..)
@@ -36,8 +35,9 @@ import Nirum.Constructs.DeclarationSet (DeclarationSet, null', toList)
 import Nirum.Constructs.Identifier (Identifier)
 import Nirum.Constructs.ModulePath (ModulePath)
 import Nirum.Constructs.Name (Name(Name))
-import Nirum.Constructs.Service ( Method (Method, methodDocs)
+import Nirum.Constructs.Service ( Method
                                 , Service (Service)
+                                , methodDocs
                                 )
 import Nirum.Constructs.TypeExpression (TypeExpression)
 
@@ -113,12 +113,10 @@ data JsonType = Boolean | Number | String deriving (Eq, Ord, Show)
 data TypeDeclaration
     = TypeDeclaration { typename :: Name
                       , type' :: Type
-                      , typeDocs :: Maybe Docs
                       , typeAnnotations :: AnnotationSet
                       }
     | ServiceDeclaration { serviceName :: Name
                          , service :: Service
-                         , serviceDocs :: Maybe Docs
                          , serviceAnnotations :: AnnotationSet
                          }
     | Import { modulePath :: ModulePath
@@ -127,26 +125,26 @@ data TypeDeclaration
     deriving (Eq, Ord, Show)
 
 instance Construct TypeDeclaration where
-    toCode (TypeDeclaration name' (Alias cname) docs' annotationSet') =
+    toCode (TypeDeclaration name' (Alias cname) annotationSet') =
         T.concat [ toCode annotationSet'
                  , "type ", toCode name'
                  , " = ", toCode cname, ";"
-                 , toCodeWithPrefix "\n" docs'
+                 , toCodeWithPrefix "\n" (A.lookupDocs annotationSet')
                  ]
-    toCode (TypeDeclaration name' (BoxedType itype) docs' annotationSet') =
+    toCode (TypeDeclaration name' (BoxedType itype) annotationSet') =
         T.concat [ toCode annotationSet'
                  , "boxed ", toCode name'
                  , " (", toCode itype, ");"
-                 , toCodeWithPrefix "\n" docs']
-    toCode (TypeDeclaration name' (EnumType members') docs' annotationSet') =
+                 , toCodeWithPrefix "\n" (A.lookupDocs annotationSet')]
+    toCode (TypeDeclaration name' (EnumType members') annotationSet') =
         T.concat [ toCode annotationSet'
                  , "enum ", toCode name'
-                 , toCodeWithPrefix "\n    " docs'
+                 , toCodeWithPrefix "\n    " (A.lookupDocs annotationSet')
                  , "\n    = ", T.replace "\n" "\n    " membersCode, "\n    ;"
                  ]
       where
         membersCode = T.intercalate "\n| " $ map toCode $ toList members'
-    toCode (TypeDeclaration name' (RecordType fields') docs' annotationSet') =
+    toCode (TypeDeclaration name' (RecordType fields') annotationSet') =
         T.concat [ toCode annotationSet'
                  , "record ", toCode name', " ("
                  , toCodeWithPrefix "\n    " docs'
@@ -156,10 +154,11 @@ instance Construct TypeDeclaration where
                  ]
       where
         fieldsCode = T.intercalate "\n" $ map toCode $ toList fields'
-    toCode (TypeDeclaration name' (UnionType tags') docs' annotationSet') =
+        docs' = A.lookupDocs annotationSet'
+    toCode (TypeDeclaration name' (UnionType tags') annotationSet') =
         T.concat [ toCode annotationSet'
                  , "union ", nameCode
-                 , toCodeWithPrefix "\n    " docs'
+                 , toCodeWithPrefix "\n    " (A.lookupDocs annotationSet')
                  , "\n    = " , tagsCode
                  , "\n    ;"
                  ]
@@ -173,13 +172,12 @@ instance Construct TypeDeclaration where
                                  ]
     toCode (TypeDeclaration name'
                             (PrimitiveType typename' jsonType')
-                            docs'
                             annotationSet') =
         T.concat [ toCode annotationSet'
                  , "// primitive type `", toCode name', "`\n"
                  , "//     internal type identifier: ", showT typename', "\n"
                  , "//     coded to json ", showT jsonType', " type\n"
-                 , docString docs'
+                 , docString (A.lookupDocs annotationSet')
                  ]
       where
         showT :: Show a => a -> T.Text
@@ -188,15 +186,15 @@ instance Construct TypeDeclaration where
         docString Nothing = ""
         docString (Just (Docs d)) =
             T.concat ["\n// ", T.replace "\n" "\n// " $ T.stripEnd d, "\n"]
-    toCode (ServiceDeclaration name' (Service methods) docs' annotations') =
+    toCode (ServiceDeclaration name' (Service methods) annotations') =
         T.concat [ toCode annotations'
                  , "service "
                  , toCode name'
                  , " ("
                  , toCodeWithPrefix "\n    " docs'
-                 , case (docs', methods') of
+                 , case (docs', map methodDocs methods') of
                       (_, []) -> ""
-                      (Nothing, [Method { methodDocs = Nothing }]) -> ""
+                      (Nothing, [Nothing]) -> ""
                       _ -> "\n    "
                  , if length methods' > 1
                    then methodsText
@@ -211,6 +209,8 @@ instance Construct TypeDeclaration where
         methods' = toList methods
         methodsText :: T.Text
         methodsText = T.intercalate "\n" $ map toCode methods'
+        docs' :: Maybe Docs
+        docs' = A.lookupDocs annotations'
     toCode (Import path ident) = T.concat [ "import "
                                           , toCode path
                                           , " ("
@@ -219,9 +219,9 @@ instance Construct TypeDeclaration where
                                           ]
 
 instance Declaration TypeDeclaration where
-    name (TypeDeclaration name' _ _ _) = name'
-    name (ServiceDeclaration name' _ _ _) = name'
-    name (Import _ identifier) = Name identifier identifier
-    docs (TypeDeclaration _ _ docs' _) = docs'
-    docs (ServiceDeclaration _ _ docs' _) = docs'
-    docs (Import _ _) = Nothing
+    name TypeDeclaration { typename = name' } = name'
+    name ServiceDeclaration { serviceName = name' } = name'
+    name Import { importName = id' } = Name id' id'
+    docs TypeDeclaration { typeAnnotations = anno' } = A.lookupDocs anno'
+    docs ServiceDeclaration { serviceAnnotations = anno' } = A.lookupDocs anno'
+    docs Import { } = Nothing
