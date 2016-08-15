@@ -1,6 +1,11 @@
 Nirum
 =====
 
+[![Build Status][ci-svg]][ci]
+
+[ci-svg]: https://travis-ci.org/spoqa/nirum.svg
+[ci]: https://travis-ci.org/spoqa/nirum
+
 Nirum is an [IDL][1] compiler and [RPC][2]/[distributed object][3] framework
 for [microservices][4], built on top of the modern Web server technologies
 such as RESTful HTTP and JSON.
