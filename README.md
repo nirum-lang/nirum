@@ -22,23 +22,13 @@ Also the feature set is incomplete yet.
 [4]: https://en.wikipedia.org/wiki/Microservices
 
 
-Installation
-------------
+Nightly builds
+--------------
 
-If you already installed [Haskell Platform][5] or [Haskell Stack][6],
-you can build the project in the same way other Haskell projects are built:
+The easiest way to give a try to use Nirum is downloading a nightly build.
+We currently provides the prebuilt binaries of the following platforms:
 
-    $ cabal sandbox init
-    $ cabal install --only-dependencies
-    $ cabal configure
-    $ cabal build
-
-or:
-
-    $ stack build
-
-[5]: https://www.haskell.org/platform/
-[6]: https://www.haskellstack.org/
+- [Linux (x86_64)](http://nightly-builds.nirum.org/travis-builds/nirum-linux-x86_64)
 
 
 Getting Started
@@ -61,6 +51,27 @@ For more infomration, use `--help` option:
       -? --help             Display help message
       -V --version          Print version information
          --numeric-version  Print just the version number
+
+
+Building
+--------
+
+If you already installed [Haskell Platform][5] or [Haskell Stack][6],
+you can build the project in the same way to build other Haskell projects.
+
+Using Stack:
+
+    $ stack build
+
+Using vanilla Cabal:
+
+    $ cabal sandbox init
+    $ cabal install --only-dependencies
+    $ cabal configure
+    $ cabal build
+
+[5]: https://www.haskell.org/platform/
+[6]: https://www.haskellstack.org/
 
 
 Etymology
