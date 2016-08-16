@@ -48,6 +48,12 @@ before_deploy:
 - export NIGHTLY_BINARY_PATH="/tmp/nirum-build/nirum-$(uname -s | tr '[A-Z]' '[a-z]')-$(uname -m)"
 - cp "$(stack path --local-bin-path)/nirum-static" "$NIGHTLY_BINARY_PATH"
 - upx-ucl -9 "$NIGHTLY_BINARY_PATH"
+notifications:
+  webhooks:
+    urls: ['https://webhooks.gitter.im/e/29cc2477daa438db4e9d']
+    on_success: change
+    on_failure: always
+    on_start: never
 deploy:
   - provider: s3
     local_dir: /tmp/nirum-build
