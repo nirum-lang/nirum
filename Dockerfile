@@ -10,4 +10,5 @@ RUN cabal sandbox init && \
     cabal configure && \
     cabal build
 
-ENTRYPOINT ["dist/build/nirum/nirum"]
+ENV CMD=dist/build/nirum/nirum
+ENTRYPOINT ["./docker-entrypoint.sh"]
