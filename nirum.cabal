@@ -4,13 +4,13 @@ synopsis:            Distributed object framework built on top of
                      REST HTTP and JSON
 description:         Distributed object framework for microservices,
                      built on top of RESTful HTTP and JSON
-homepage:            https://bitbucket.org/dahlia/nirum
-bug-reports:         https://bitbucket.org/dahlia/nirum/issues
+homepage:            https://github.com/spoqa/nirum
+bug-reports:         https://github.com/spoqa/nirum/issues
 license:             GPL-3
 license-file:        LICENSE
-author:              Hong Minhee
-maintainer:          hongminhee@member.fsf.org
-copyright:           (c) 2016 Hong Minhee
+author:              Nirum team
+maintainer:          Nirum team
+copyright:           (c) 2016 Nirum team
 stability:           alpha
 category:            Language
 build-type:          Simple

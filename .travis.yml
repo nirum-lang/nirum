@@ -1,0 +1,69 @@
+language: c
+matrix:
+  include:
+  - env: GHCVER=7.10.3 RESOLVER=lts-6.12 PY=3.4
+    addons:
+      apt:
+        sources: [hvr-ghc, deadsnakes]
+        packages: [ghc-7.10.3, python3.4, libgmp10, upx-ucl]
+  - env: GHCVER=7.10.3 RESOLVER=lts-6.12 PY=3.5
+    addons:
+      apt:
+        sources: [hvr-ghc, deadsnakes]
+        packages: [ghc-7.10.3, python3.5, libgmp10, upx-ucl]
+  - env: GHCVER=8.0.1 RESOLVER=nightly-2016-08-15 PY=3.4
+    addons:
+      apt:
+        sources: [hvr-ghc, deadsnakes]
+        packages: [ghc-8.0.1, python3.4, libgmp10, upx-ucl]
+  - env: GHCVER=8.0.1 RESOLVER=nightly-2016-08-15 PY=3.5
+    addons:
+      apt:
+        sources: [hvr-ghc, deadsnakes]
+        packages: [ghc-8.0.1, python3.5, libgmp10, upx-ucl]
+cache:
+  directories:
+  - "$HOME/.stack"
+  - "$HOME/.pyvenv"
+before_install:
+- mkdir -p "$HOME/.local/bin"
+- export PATH="$HOME/.local/bin:$PATH"
+- travis_retry curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C "$HOME/.local/bin" '*/stack'
+- curl -o "$HOME/.local/bin/travis_long" -L https://raw.githubusercontent.com/futurice/fum2github/master/travis_long
+- chmod +x "$HOME/.local/bin/travis_long"
+install:
+- 'sed -E "s/resolver\s*:\s*.*/resolver: $RESOLVER/" stack.yaml > stack-new.yml'
+- mv stack-new.yml stack.yml
+- travis_long stack --no-terminal setup
+- pip install --user virtualenv
+- if [[ ! -f "$HOME/.pyvenv/bin/activate" ]]; then virtualenv -p "$(which python$PY)" "$HOME/.pyvenv"; fi
+- '"$HOME/.pyvenv/bin/pip" install --upgrade pip setuptools'
+- '"$HOME/.pyvenv/bin/pip" install git+git://github.com/spoqa/nirum-python.git'
+- if [[ "$PY" = "3.4" ]]; then "$HOME/.pyvenv/bin/pip" install --upgrade typing; fi  # FIXME
+script:
+- source "$HOME/.pyvenv/bin/activate" && stack --no-terminal test
+before_deploy:
+- stack build --no-terminal --copy-bins
+- mkdir -p /tmp/nirum-build
+- export NIGHTLY_BINARY_PATH="/tmp/nirum-build/nirum-$(uname -s | tr '[A-Z]' '[a-z]')-$(uname -m)"
+- cp "$(stack path --local-bin-path)/nirum-static" "$NIGHTLY_BINARY_PATH"
+- upx-ucl -9 "$NIGHTLY_BINARY_PATH"
+notifications:
+  webhooks:
+    urls: ['https://webhooks.gitter.im/e/29cc2477daa438db4e9d']
+    on_success: change
+    on_failure: always
+    on_start: never
+deploy:
+  - provider: s3
+    local_dir: /tmp/nirum-build
+    on:
+      branch: master
+      condition: '"$GHCVER" = "8.0.1" && "$PY" = "3.5"'
+    upload-dir: travis-builds
+    acl: public_read
+    bucket: nightly-builds.nirum.org
+    access_key_id:
+      secure: "lqNHSWpskIWHBZdeUsT1LpUBnDv88vEdSwCX2vY+3hbspB2dEoeyxrQ3ObyHBvxizuxHC+wBKdCfpEUj9CuZTSZDuS0gbuks46IH5az5SmFFDRk/pq+5sSBte070YQfrJCEgFTiEww8LZCVjjySEqez0f1pQV4ZSmy8u8ME2PzF1jQdGZIUB/e3v7JAjhK3nKh2kt2YnEdscHngbmRaDkcpEmbia8fP9a9sRc9n4dG5m0/3vtuZJcUqrJzdqMfluwz9lOSWIjSCE3iClSrH0xrS1b4wIgEa2j5iHgayRwQ2MZN41+nhs+jG18FkSyHqdtZwLGZu8UdW7dQqIaPkk26yFBpHvKESJghh4HGKiijcVw4RNJmgJDpdmCrPU1awAvGdT8CXcbwr/9sqPfKgr1F79xn/7PDe6Nd3GXVRJRkV+g7GhSOCFcjBvEzbq4jmRI8Oo4GnyU0H3Kmgk2OyU0Yhq413cLEVcswyDBSjK+ItQQ/wQZgWL1+Vjh/MQbkESRpkRJK6Oq2y0nYhG/ajIXDuva623MNSaLU42/wku8r//bdbsguNEyncNzWcDwtfGBdyOD8GTLKtJD1tCSTH68b7isDjI/MDmCIay9hgCk/l8pBZgn89jLUDfiqH/ZgQduwKPYUUPUuBUv4YQg7bHeZk2NQSWWGsAfpZ5v9L1qUw="
+    secret_access_key:
+      secure: "HUxq2kPTnu3rSq+T7lZoUY4LsvIHjMcapxi5R50gE6pKUIJqJ6ekwB0fP6ge6S6ea3chpAi06oy7tGB4IiTtjUX6L+gOkrFACrWQqVsOvbyMh79oRTVPLY7RTXcDhSmSesChP06oxG2k17u7Agdf5jNfaVH8aOH4xAuBaAYWPTqkIwerGqQHj7oHUGImtu0FDS1ZxL28XiGjONoT2cpoaYT5pzV8KlETe5+ZAr/mxQYHgxt8wzev0pJY6UeBPARiPa1+txEK36AMrHEQHMInZcqgds05T0qX+UF326xlLuFP7soYGRh+mfnvCEx3+hcneX8wJYbaUwpmDrbcCcm91+TUlEWWV3xIXmGHedi0pIvgzH7vapOdzox6MpHGoLJsrRXpHEhMwLMcq0tMbyjcTQjOba2VKRg8hqUBT57oI9Hgpp8wdFnH5EV5GPSOhZ5s4w+PglifEqtqmYHA7PNc5I5iHLXC85UKee+FMQF7hp4heLVQZx541FL7eMYZo2bTOyxTEGMjoxemwN5yHPQ33k7VOKvYLHNX0SxasQme8DwOZbj1ozsWdSPqyArisW0CqXyjFpIm5hPx+gBH1gRXp0hJoyYRBKTrfTxPzFsO5Sf0VfDJC/1UZmzgNULjFdZUdv9/x7O4+Euo1wy/kcngmYbOqqBD3zKm8XcDqwkoAA4="

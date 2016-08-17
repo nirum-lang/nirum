@@ -122,7 +122,7 @@ It's represented in JSON as:
 
     {
         "_type": "payload",
-        "coord": {
+        "location": {
             "_type": "point",
             "left": 1.23,
             "top": 4.56
