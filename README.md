@@ -31,7 +31,8 @@ Nightly builds
 The easiest way to give a try to use Nirum is downloading a nightly build.
 We currently provides the prebuilt binaries of the following platforms:
 
-- [Linux (x86_64)](http://nightly-builds.nirum.org/travis-builds/nirum-linux-x86_64)
+- [Linux (x86_64)](https://nightly-builds.nirum.org/travis-builds/nirum-linux-x86_64)
+- [Docker (`spoqa/nirum:latest`)](https://hub.docker.com/r/spoqa/nirum/)
 
 
 Getting Started
