@@ -18,7 +18,7 @@ import Nirum.Constructs.Identifier (Identifier)
 import Nirum.Constructs.Name (Name)
 
 annotationDocsName :: Identifier
-annotationDocsName = "doc"
+annotationDocsName = "docs"
 
 -- 'Construct' which has its own unique 'name' and can has its 'docs'.
 class Construct a => Declaration a where

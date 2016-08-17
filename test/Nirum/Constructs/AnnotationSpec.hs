@@ -34,7 +34,7 @@ spec = do
                 toCode loremAnno `shouldBe` "@lorem(\"ipsum\")"
                 toCode escapeCharAnno `shouldBe` "@quote(\"\\\"\")"
         specify "docs" $
-            docsAnno `shouldBe` Annotation "doc" (Just "Description\n")
+            docsAnno `shouldBe` Annotation "docs" (Just "Description\n")
     describe "AnnotationSet" $ do
         it "empty" $ empty `shouldBe` AnnotationSet M.empty
         it "singleton" $ do
@@ -61,7 +61,7 @@ spec = do
             A.union a b `shouldBe` AnnotationSet [ ("foo", Nothing)
                                                  , ("lorem", Just "ipsum")
                                                  , ("quote", Just "\"")
-                                                 , ("doc", Just "Description\n")
+                                                 , ("docs", Just "Description\n")
                                                  ]
             A.union a c `shouldBe` a
         let Right annotationSet = fromList [ annotation
@@ -80,7 +80,7 @@ spec = do
                 A.lookup "quote" annotationSet `shouldBe` Just escapeCharAnno
                 A.lookup "long-cat-is-long" annotationSet `shouldBe` Just longNameAnno
                 A.lookup "long_cat_is_long" annotationSet `shouldBe` Just longNameAnno
-                A.lookup "doc" annotationSet `shouldBe` Just docsAnno
+                A.lookup "docs" annotationSet `shouldBe` Just docsAnno
             it "should be Nothing if lookup fails" $ do
                 A.lookup "bar" annotationSet `shouldBe` Nothing
                 A.lookup "longCatIsLong" annotationSet `shouldBe` Nothing
@@ -90,6 +90,6 @@ spec = do
         describe "insertDocs" $ do
             it "should insert the doc comment as an annotation" $
                 A.insertDocs "yay" empty `shouldReturn`
-                    AnnotationSet [("doc", Just "yay\n")]
+                    AnnotationSet [("docs", Just "yay\n")]
             it "should fail on the annotation that already have a doc" $
                 A.insertDocs "yay" annotationSet `shouldThrow` anyException
