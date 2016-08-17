@@ -5,22 +5,22 @@ matrix:
     addons:
       apt:
         sources: [hvr-ghc, deadsnakes]
-        packages: [ghc-7.10.3, python3.4, libgmp10, shellcheck, upx-ucl]
+        packages: [ghc-7.10.3, python3.4, libgmp10, upx-ucl]
   - env: GHCVER=7.10.3 RESOLVER=lts-6.12 PY=3.5
     addons:
       apt:
         sources: [hvr-ghc, deadsnakes]
-        packages: [ghc-7.10.3, python3.5, libgmp10, shellcheck, upx-ucl]
+        packages: [ghc-7.10.3, python3.5, libgmp10, upx-ucl]
   - env: GHCVER=8.0.1 RESOLVER=nightly-2016-08-15 PY=3.4
     addons:
       apt:
         sources: [hvr-ghc, deadsnakes]
-        packages: [ghc-8.0.1, python3.4, libgmp10, shellcheck, upx-ucl]
+        packages: [ghc-8.0.1, python3.4, libgmp10, upx-ucl]
   - env: GHCVER=8.0.1 RESOLVER=nightly-2016-08-15 PY=3.5
     addons:
       apt:
         sources: [hvr-ghc, deadsnakes]
-        packages: [ghc-8.0.1, python3.5, libgmp10, shellcheck, upx-ucl]
+        packages: [ghc-8.0.1, python3.5, libgmp10, upx-ucl]
 cache:
   directories:
   - "$HOME/.stack"
@@ -42,7 +42,6 @@ install:
 - if [[ "$PY" = "3.4" ]]; then "$HOME/.pyvenv/bin/pip" install --upgrade typing; fi  # FIXME
 script:
 - source "$HOME/.pyvenv/bin/activate" && stack --no-terminal test
-- shellcheck *.sh
 before_deploy:
 - stack build --no-terminal --copy-bins
 - mkdir -p /tmp/nirum-build
