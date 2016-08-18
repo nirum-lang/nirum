@@ -178,6 +178,8 @@ spec = do
                 parse' "@ name-abc ( \"wo\\\"rld\")" `shouldBeRight`
                     rightAnnotaiton
                 parse' "@name-abc ( \"wo\\\"rld\")" `shouldBeRight` rightAnnotaiton
+                parse' "@name-abc(\"wo\\\"rld\\n\")" `shouldBeRight`
+                    Annotation "name-abc" (Just "wo\"rld\n")
             it "fails to parse if annotation name start with hyphen" $ do
                 expectError "@-abc(\"helloworld\")" 1 2
                 expectError "@-abc-d(\"helloworld\")" 1 2

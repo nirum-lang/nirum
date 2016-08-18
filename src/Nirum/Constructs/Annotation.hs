@@ -10,6 +10,7 @@ module Nirum.Constructs.Annotation ( Annotation(Annotation)
                                    , toList
                                    ) where
 
+import qualified Data.Char as C
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -27,8 +28,14 @@ data Annotation = Annotation { name :: Identifier
                              } deriving (Eq, Ord, Show)
 
 instance Construct Annotation where
-    toCode Annotation {name = n,  metadata = Just m} =
-        let m' = T.replace "\"" "\\\"" m in [qq|@{toCode n}("$m'")|]
+    toCode Annotation {name = n,  metadata = Just m} = [qq|@{toCode n}("$m'")|]
+      where
+        m' = (showLitString $ T.unpack m) ""
+        showLitString :: String -> ShowS
+        showLitString = foldr ((.) . showLitChar') id
+        showLitChar' :: Char -> ShowS
+        showLitChar' '"' = showString "\\\""
+        showLitChar' c   = C.showLitChar c
     toCode Annotation {name = n,  metadata = Nothing} = [qq|@{toCode n}|]
 
 data AnnotationSet
