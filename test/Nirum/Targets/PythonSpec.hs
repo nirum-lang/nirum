@@ -462,6 +462,10 @@ spec = parallel $ do
                             dirName = takeDirectory filePath'
                         createDirectoryIfMissing True dirName
                         TI.writeFile filePath' code'
+                        {--  <- Remove '{' to print debug log
+                        TI.putStrLn $ T.pack filePath'
+                        TI.putStrLn code'
+                        -- --}
                     testRunner (Just dir) defCode testCode
           where
             files :: M.Map FilePath (Either CompileError Code)

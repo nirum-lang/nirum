@@ -2,10 +2,13 @@ Nirum
 =====
 
 [![Build Status][ci-svg]][ci]
+[![Docker Automated Build][docker-svg]][docker]
 [![Gitter][chat-svg]][chat]
 
 [ci-svg]: https://travis-ci.org/spoqa/nirum.svg
 [ci]: https://travis-ci.org/spoqa/nirum
+[docker]: https://hub.docker.com/r/spoqa/nirum/
+[docker-svg]: https://img.shields.io/docker/automated/spoqa/nirum.svg
 [chat-svg]: https://badges.gitter.im/spoqa/nirum.svg
 [chat]: https://gitter.im/spoqa/nirum?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge
 
@@ -31,7 +34,8 @@ Nightly builds
 The easiest way to give a try to use Nirum is downloading a nightly build.
 We currently provides the prebuilt binaries of the following platforms:
 
-- [Linux (x86_64)](http://nightly-builds.nirum.org/travis-builds/nirum-linux-x86_64)
+- [Linux (x86_64)](https://nightly-builds.nirum.org/travis-builds/nirum-linux-x86_64)
+- [Docker (`spoqa/nirum:latest`)][docker]
 
 
 Getting Started
