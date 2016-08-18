@@ -502,11 +502,19 @@ compileTypeDeclaration src (ServiceDeclaration name (Service methods) _ _) = do
     methodMetadata <- mapM compileMethodMetadata methods'
     let methodMetadata' = commaNl methodMetadata
     dummyMethods <- mapM compileMethod methods'
+    clientMethods <- mapM compileClientMethod methods'
     let dummyMethods' = T.intercalate "\n\n" dummyMethods
-    withThirdPartyImports [ ("nirum.constructs", ["name_dict_type"])
-                          , ("nirum.rpc", ["service_type"])
-                          ] $
-        return [qq|
+        clientMethods' = T.intercalate "\n\n" clientMethods
+    withStandardImport "urllib.request" $
+        withStandardImport "json" $
+            withThirdPartyImports [ ("nirum.constructs", ["name_dict_type"])
+                                  , ("nirum.deserialize", ["deserialize_meta"])
+                                  , ("nirum.serialize", ["serialize_meta"])
+                                  , ("nirum.rpc", [ "service_type"
+                                                  , "client_type"
+                                                  ])
+                                  ] $
+                return [qq|
 class $className(service_type):
 
     __nirum_service_methods__ = \{
@@ -517,6 +525,13 @@ class $className(service_type):
     ])
 
     {dummyMethods'}
+
+
+# FIXME client MUST be generated & saved on diffrent module
+#       where service isn't included.
+class {className}_Client(client_type, $className):
+    {clientMethods'}
+    pass
 |]
   where
     className :: T.Text
@@ -561,6 +576,30 @@ class $className(service_type):
     paramNameMap :: [Parameter] -> T.Text
     paramNameMap params = toIndentedCodes
         toNamePair [pName | Parameter pName _ _ <- params] ",\n        "
+    compileClientPayload :: Parameter -> CodeGen Code
+    compileClientPayload (Parameter pName _ _) = do
+        let pName' = toAttributeName' pName
+        return [qq|meta['_names']['{pName'}']: serialize_meta({pName'})|]
+    compileClientMethod :: Method -> CodeGen Code
+    compileClientMethod (Method mName params rtype _ _ _) = do
+        let clientMethodName' = toAttributeName' mName
+        params' <- mapM compileParameter $ toList params
+        rtypeExpr <- compileTypeExpression src rtype
+        payloadArguments <- mapM compileClientPayload $ toList params
+        return [qq|
+    def {clientMethodName'}(self, {commaNl params'}) -> $rtypeExpr:
+        meta = self.__nirum_service_methods__['{clientMethodName'}']
+        return deserialize_meta(
+            meta['_return'],
+            json.loads(
+                self.remote_call(
+                    self.__nirum_method_names__['{clientMethodName'}'],
+                    payload=\{{commaNl payloadArguments}\}
+                )
+            )
+        )
+|]
+
 compileTypeDeclaration _ (Import _ _) =
     return ""  -- Nothing to compile
 
