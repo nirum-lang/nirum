@@ -53,7 +53,11 @@ import Nirum.Constructs.Identifier ( Identifier
 import Nirum.Constructs.ModulePath (ModulePath, ancestors)
 import Nirum.Constructs.Name (Name(Name))
 import qualified Nirum.Constructs.Name as N
-import Nirum.Constructs.Service ( Method(Method, methodName)
+import Nirum.Constructs.Service ( Method( Method
+                                        , methodName
+                                        , parameters
+                                        , returnType
+                                        )
                                 , Parameter(Parameter)
                                 , Service(Service)
                                 )
@@ -555,7 +559,10 @@ class {className}_Client(client_type, $className):
         pTypeExpr <- compileTypeExpression src pType
         return [qq|{toAttributeName' pName}: $pTypeExpr|]
     compileMethodMetadata :: Method -> CodeGen Code
-    compileMethodMetadata (Method mName params rtype _etype _anno) = do
+    compileMethodMetadata Method { methodName = mName
+                                 , parameters = params
+                                 , returnType = rtype
+                                 } = do
         let params' = toList params :: [Parameter]
         rtypeExpr <- compileTypeExpression src rtype
         paramMetadata <- mapM compileParameterMetadata params'
@@ -584,7 +591,10 @@ class {className}_Client(client_type, $className):
         let pName' = toAttributeName' pName
         return [qq|meta['_names']['{pName'}']: serialize_meta({pName'})|]
     compileClientMethod :: Method -> CodeGen Code
-    compileClientMethod (Method mName params rtype _ _ _) = do
+    compileClientMethod Method { methodName = mName
+                               , parameters = params
+                               , returnType = rtype
+                               } = do
         let clientMethodName' = toAttributeName' mName
         params' <- mapM compileParameter $ toList params
         rtypeExpr <- compileTypeExpression src rtype
