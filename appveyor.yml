@@ -1,0 +1,48 @@
+version: "{build}"
+platform:
+- x86
+- x64
+environment:
+  STACK_ROOT: C:\sr
+cache:
+- '%STACK_ROOT% -> appveyor.yml'
+- '%LOCALAPPDATA%\Programs\stack -> appveyor.yml'
+install:
+- ps: Invoke-WebRequest -OutFile C:\upx391w.zip http://upx.sourceforge.net/download/upx391w.zip
+- 7z x -oC:\ C:\upx391w.zip
+- ps: ls C:\
+- ps: ls C:\upx391w
+- ps: $env:PATH = 'C:\upx391w;' + $env:PATH;
+- ps: >
+    if((Test-Path $env:STACK_ROOT) -ne $true) {
+      if($env:PLATFORM -eq 'x86') {
+        $stackUrl = 'https://www.stackage.org/stack/windows-i386';
+      }
+      elseif($env:PLATFORM -eq 'x64') {
+        $stackUrl = 'https://www.stackage.org/stack/windows-x86_64';
+      }
+      Invoke-WebRequest -OutFile C:\stack.zip $stackUrl;
+      Add-Type -AssemblyName System.IO.Compression.FileSystem;
+      [System.IO.Compression.ZipFile]::ExtractToDirectory('C:\stack.zip', $env:STACK_ROOT);
+      ls $env:STACK_ROOT;
+    }
+    $env:PATH = $env:STACK_ROOT + ';C:\msys64\usr\bin;' + $env:PATH;
+- if not exist "%LOCALAPPDATA%\Programs\stack" ( stack --no-terminal --skip-msys setup )
+- C:\Python35\python -m venv C:\pyvenv
+- >
+    C:\pyvenv\Scripts\Activate.bat &
+    pip install --upgrade setuptools pip &
+    pip install git+git://github.com/spoqa/nirum-python.git
+build_script:
+- stack --no-terminal build --copy-bins
+after_build:
+- stack --skip-msys --no-terminal path --local-bin
+- ps: ls $(stack path --skip-msys --no-terminal --local-bin)
+- ps: 'copy "$(stack --skip-msys --no-terminal path --local-bin)\nirum-static.exe" nirum-win-${env:PLATFORM}.exe'
+- ps: ls
+- ps: upx.exe -9 nirum-win-${env:PLATFORM}.exe
+test_script:
+- C:\pyvenv\Scripts\Activate.bat & stack test
+artifacts:
+- path: nirum-win-x86.exe
+- path: nirum-win-x64.exe

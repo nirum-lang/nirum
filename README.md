@@ -1,12 +1,15 @@
 Nirum
 =====
 
-[![Build Status][ci-svg]][ci]
+[![Build Status (Travis CI)][ci-svg]][ci]
+[![Build Status (AppVeyor)][ciw-svg]][ciw]
 [![Docker Automated Build][docker-svg]][docker]
 [![Gitter][chat-svg]][chat]
 
 [ci-svg]: https://travis-ci.org/spoqa/nirum.svg
 [ci]: https://travis-ci.org/spoqa/nirum
+[ciw-svg]: https://ci.appveyor.com/api/projects/status/jf9bsrnalcb1xrp0?svg=true
+[ciw]: https://ci.appveyor.com/project/dahlia/nirum-k5n5y
 [docker]: https://hub.docker.com/r/spoqa/nirum/
 [docker-svg]: https://img.shields.io/docker/automated/spoqa/nirum.svg
 [chat-svg]: https://badges.gitter.im/spoqa/nirum.svg
@@ -35,6 +38,8 @@ The easiest way to give a try to use Nirum is downloading a nightly build.
 We currently provides the prebuilt binaries of the following platforms:
 
 - [Linux (x86_64)](https://nightly-builds.nirum.org/travis-builds/nirum-linux-x86_64)
+- [Windwos (x64)](https://ci.appveyor.com/api/projects/dahlia/nirum-k5n5y/artifacts/nirum-win-x64.exe?job=Platform%3A%20x64&branch=master)
+- [Windwos (x86)](https://ci.appveyor.com/api/projects/dahlia/nirum-k5n5y/artifacts/nirum-win-x86.exe?job=Platform%3A%20x86&branch=master)
 - [Docker (`spoqa/nirum:latest`)][docker]
 
 
