@@ -12,8 +12,8 @@ module Nirum.Constructs.Service ( Method ( Method
 import qualified Data.Text as T
 
 import Nirum.Constructs (Construct(toCode))
-import Nirum.Constructs.Annotation (AnnotationSet, lookupDocs)
-import Nirum.Constructs.Declaration (Declaration(name, docs))
+import Nirum.Constructs.Annotation (AnnotationSet, empty, lookupDocs)
+import Nirum.Constructs.Declaration (Declaration(annotations, name, docs))
 import Nirum.Constructs.Docs (Docs, toCodeWithPrefix)
 import Nirum.Constructs.DeclarationSet (DeclarationSet, toList)
 import Nirum.Constructs.Name (Name)
@@ -34,6 +34,7 @@ instance Construct Parameter where
 
 instance Declaration Parameter where
     name (Parameter name' _ _) = name'
+    annotations Parameter { } = empty
     docs (Parameter _ _ docs') = docs'
 
 -- | 'Service' method.
@@ -84,7 +85,7 @@ instance Construct Method where
 
 instance Declaration Method where
     name = methodName
-    docs = methodDocs
+    annotations = methodAnnotations
 
 -- | RPC service.
 data Service =

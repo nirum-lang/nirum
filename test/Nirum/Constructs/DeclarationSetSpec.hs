@@ -7,8 +7,9 @@ import Data.String (IsString(..))
 import Test.Hspec.Meta
 
 import Nirum.Constructs (Construct(..))
+import qualified Nirum.Constructs.Annotation as A
+import Nirum.Constructs.Annotation (AnnotationSet)
 import Nirum.Constructs.Declaration (Declaration(..))
-import Nirum.Constructs.Docs (Docs)
 import Nirum.Constructs.DeclarationSet ( DeclarationSet
                                        , NameDuplication(..)
                                        , empty
@@ -22,24 +23,24 @@ import Nirum.Constructs.DeclarationSet ( DeclarationSet
                                        )
 import Nirum.Constructs.Name (Name(Name))
 
-data SampleDecl = SampleDecl Name (Maybe Docs) deriving (Eq, Ord, Show)
+data SampleDecl = SampleDecl Name AnnotationSet deriving (Eq, Ord, Show)
 
 instance Construct SampleDecl where
     toCode _ = "(do not impl)"
 
 instance Declaration SampleDecl where
     name (SampleDecl name' _) = name'
-    docs (SampleDecl _ docs') = docs'
+    annotations (SampleDecl _ anno') = anno'
 
 instance IsString SampleDecl where
-    fromString s = SampleDecl (fromString s) Nothing
+    fromString s = SampleDecl (fromString s) A.empty
 
 type SampleDeclSet = DeclarationSet SampleDecl
 
 spec :: Spec
 spec =
     describe "DeclarationSet" $ do
-        let sd fname bname = SampleDecl (Name fname bname) Nothing
+        let sd fname bname = SampleDecl (Name fname bname) A.empty
         context "fromList" $ do
             let fl = fromList :: [SampleDecl]
                               -> Either NameDuplication SampleDeclSet

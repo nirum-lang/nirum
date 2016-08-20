@@ -24,8 +24,7 @@ import Data.String (IsString(fromString))
 import qualified Data.Text as T
 
 import Nirum.Constructs (Construct(toCode))
-import qualified Nirum.Constructs.Annotation as A
-import Nirum.Constructs.Annotation (AnnotationSet)
+import Nirum.Constructs.Annotation as A (AnnotationSet, empty, lookupDocs)
 import Nirum.Constructs.Declaration (Declaration(..))
 import Nirum.Constructs.Docs (Docs(..), toCodeWithPrefix)
 import Nirum.Constructs.DeclarationSet (DeclarationSet, null', toList)
@@ -59,6 +58,7 @@ instance Construct EnumMember where
 
 instance Declaration EnumMember where
     name (EnumMember name' _) = name'
+    annotations EnumMember { } = A.empty
     docs (EnumMember _ docs') = docs'
 
 instance IsString EnumMember where
@@ -77,6 +77,7 @@ instance Construct Field where
 
 instance Declaration Field where
     name (Field name' _ _) = name'
+    annotations Field { } = A.empty
     docs (Field _ _ docs') = docs'
 
 -- | Tag of 'UnionType'.
@@ -95,6 +96,7 @@ instance Construct Tag where
 
 instance Declaration Tag where
     name (Tag name' _ _) = name'
+    annotations Tag { } = A.empty
     docs (Tag _ _ docs') = docs'
 
 -- | Primitive type identifiers.
@@ -219,6 +221,6 @@ instance Declaration TypeDeclaration where
     name TypeDeclaration { typename = name' } = name'
     name ServiceDeclaration { serviceName = name' } = name'
     name Import { importName = id' } = Name id' id'
-    docs TypeDeclaration { typeAnnotations = anno' } = A.lookupDocs anno'
-    docs ServiceDeclaration { serviceAnnotations = anno' } = A.lookupDocs anno'
-    docs Import { } = Nothing
+    annotations TypeDeclaration { typeAnnotations = anno' } = anno'
+    annotations ServiceDeclaration { serviceAnnotations = anno' } = anno'
+    annotations Import { } = A.empty

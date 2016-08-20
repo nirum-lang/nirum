@@ -359,7 +359,7 @@ spec = do
         it "fails if there are any duplication on facial names" $ do
             let ds = [ "a"
                      , "b"
-                     , SampleDecl (Name "b" "c") Nothing
+                     , SampleDecl (Name "b" "c") A.empty
                      ] :: [SampleDecl]
                 p = P.handleNameDuplication "LABEL" ds cont
                 (parse', expectError) = helperFuncs p
@@ -370,7 +370,7 @@ spec = do
         it "fails if there are any duplication on behind names" $ do
             let ds = [ "a"
                      , "b"
-                     , SampleDecl (Name "c" "b") Nothing
+                     , SampleDecl (Name "c" "b") A.empty
                      ] :: [SampleDecl]
                 p = P.handleNameDuplication "LABEL" ds cont
                 (parse', expectError) = helperFuncs p
