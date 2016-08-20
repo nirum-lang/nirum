@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 module Nirum.Constructs.IdentifierSpec where
 
 import Control.Exception (evaluate)

@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedLists, OverloadedStrings #-}
+{-# LANGUAGE OverloadedLists #-}
 module Nirum.Constructs.DeclarationSetSpec (SampleDecl(..), spec) where
 
 import Control.Exception.Base (evaluate)

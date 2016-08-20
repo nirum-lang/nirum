@@ -1,5 +1,4 @@
-{-# LANGUAGE ExtendedDefaultRules, OverloadedStrings, QuasiQuotes,
-             DeriveDataTypeable #-}
+{-# LANGUAGE ExtendedDefaultRules, QuasiQuotes, DeriveDataTypeable #-}
 module Nirum.Cli (main, writeFiles) where
 
 import Control.Monad (forM_)

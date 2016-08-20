@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedLists, OverloadedStrings, QuasiQuotes #-}
+{-# LANGUAGE OverloadedLists, QuasiQuotes #-}
 module Nirum.Constructs.ModuleSpec where
 
 import Test.Hspec.Meta

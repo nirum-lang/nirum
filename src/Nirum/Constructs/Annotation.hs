@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 module Nirum.Constructs.Annotation ( Annotation(Annotation)
                                    , AnnotationSet
                                    , Metadata

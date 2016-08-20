@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, TypeFamilies #-}
+{-# LANGUAGE TypeFamilies #-}
 module Nirum.Constructs.ModulePath ( ModulePath( ModuleName
                                                , ModulePath
                                                , moduleName

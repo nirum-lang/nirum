@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedLists, OverloadedStrings, TypeFamilies #-}
+{-# LANGUAGE OverloadedLists, TypeFamilies #-}
 module Nirum.ParserSpec where
 
 import Control.Monad (forM_)

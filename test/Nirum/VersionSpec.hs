@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 module Nirum.VersionSpec where
 
 import Data.Text (unpack)

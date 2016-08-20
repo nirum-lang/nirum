@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedLists, OverloadedStrings, QuasiQuotes  #-}
+{-# LANGUAGE OverloadedLists, QuasiQuotes  #-}
 module Nirum.Constructs.Module ( Module(Module, docs, types)
                                , coreModule
                                , coreModulePath

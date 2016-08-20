@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 module Nirum.Constructs.DeclarationSpec where
 
 import Test.Hspec.Meta

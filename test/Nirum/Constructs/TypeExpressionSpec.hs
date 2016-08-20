@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 module Nirum.Constructs.TypeExpressionSpec where
 
 import Test.Hspec.Meta

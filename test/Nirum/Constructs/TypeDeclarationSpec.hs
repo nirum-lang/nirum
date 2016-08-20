@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedLists, OverloadedStrings #-}
+{-# LANGUAGE OverloadedLists #-}
 module Nirum.Constructs.TypeDeclarationSpec where
 
 import Data.Either (rights)
