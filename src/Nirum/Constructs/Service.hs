@@ -13,29 +13,28 @@ import qualified Data.Text as T
 
 import Nirum.Constructs (Construct(toCode))
 import Nirum.Constructs.Annotation (AnnotationSet, empty, lookupDocs)
-import Nirum.Constructs.Declaration (Declaration(annotations, name, docs))
+import Nirum.Constructs.Declaration (Declaration(annotations, name), docs)
 import Nirum.Constructs.Docs (Docs, toCodeWithPrefix)
 import Nirum.Constructs.DeclarationSet (DeclarationSet, toList)
 import Nirum.Constructs.Name (Name)
 import Nirum.Constructs.TypeExpression (TypeExpression)
 
 -- | 'Method' parameter.
-data Parameter = Parameter Name TypeExpression (Maybe Docs)
+data Parameter = Parameter Name TypeExpression AnnotationSet
                  deriving (Eq, Ord, Show)
 
 instance Construct Parameter where
-    toCode (Parameter name' typeExpr docs') =
+    toCode p@(Parameter name' typeExpr _) =
         T.concat [ toCode typeExpr
                  , " "
                  , toCode name'
                  , ","
-                 , toCodeWithPrefix "\n" docs'
+                 , toCodeWithPrefix "\n" (docs p)
                  ]
 
 instance Declaration Parameter where
     name (Parameter name' _ _) = name'
-    annotations Parameter { } = empty
-    docs (Parameter _ _ docs') = docs'
+    annotations (Parameter _ _ anno') = anno'
 
 -- | 'Service' method.
 data Method = Method { methodName :: Name
@@ -59,15 +58,14 @@ instance Construct Method where
                    , toCode $ methodName method
                    , " ("
                    , toCodeWithPrefix "\n  " docs'
-                   ] ++ case (docs', params') of
+                   ] ++ case (docs method, params') of
                             (Nothing, []) -> []
                             (Just _, []) -> ["\n"]
-                            (Nothing, [p@(Parameter _ _ Nothing)]) ->
-                                [T.dropWhileEnd (== ',') $ toCode p]
-                            _ -> [ "\n"
-                                 , T.intercalate "\n" $ map indentedCode params'
-                                 , "\n"
-                                 ]
+                            (Nothing, [p@(Parameter _ _ anno')]) ->
+                                if anno' == empty
+                                then [T.dropWhileEnd (== ',') $ toCode p]
+                                else verboseForm params'
+                            _ -> verboseForm params'
                    ++ [")"]
                    ++ case error' of
                           Nothing -> []
@@ -77,11 +75,16 @@ instance Construct Method where
         params' :: [Parameter]
         params' = toList params
         docs' :: Maybe Docs
-        docs' = lookupDocs annotationSet'
+        docs' = docs method
         indentedCode :: Construct a => a -> T.Text
         indentedCode c = T.concat [ "  "
                                   , T.intercalate "\n  " $ T.lines (toCode c)
                                   ]
+        verboseForm :: [Parameter] -> [T.Text]
+        verboseForm p = [ "\n"
+                        , T.intercalate "\n" $ map indentedCode p
+                        , "\n"
+                        ]
 
 instance Declaration Method where
     name = methodName

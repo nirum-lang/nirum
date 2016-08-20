@@ -22,10 +22,8 @@ import qualified Nirum.Parser as P
 import Nirum.Constructs (Construct (toCode))
 import Nirum.Constructs.Annotation as A ( Annotation (Annotation)
                                         , AnnotationSet
-                                        , docs
                                         , empty
                                         , fromList
-                                        , singleton
                                         , union
                                         )
 import Nirum.Constructs.Docs (Docs (Docs))
@@ -45,6 +43,7 @@ import Nirum.Constructs.TypeDeclaration ( EnumMember (EnumMember)
                                         , TypeDeclaration (..)
                                         )
 import Nirum.Constructs.TypeExpression (TypeExpression (..))
+import Util (singleDocs)
 
 shouldBeRight :: (Eq l, Eq r, Show l, Show r) => Either l r -> r -> Expectation
 shouldBeRight actual expected = actual `shouldBe` Right expected
@@ -392,19 +391,19 @@ spec = do
                 TypeDeclaration "path" (Alias "text") empty
             parse' "type path = text;\n# docs" `shouldBeRight`
                 TypeDeclaration "path" (Alias "text")
-                                (singleton $ A.docs "docs\n")
+                                (singleDocs "docs\n")
             parse' "type path = text;\n# docs\n# docs..." `shouldBeRight`
                 TypeDeclaration "path" (Alias "text")
-                                (singleton $ A.docs "docs\ndocs...\n")
+                                (singleDocs "docs\ndocs...\n")
             parse' "@foo ( \"bar\" ) type path = text;\n# docs\n# docs..."
                 `shouldBeRight`
                 TypeDeclaration "path" (Alias "text")
-                                (A.union (singleton $ A.docs "docs\ndocs...\n")
+                                (A.union (singleDocs "docs\ndocs...\n")
                                          fooAnnotationSet)
             parse' "@baz  type path = text;\n# docs\n# docs..."
                 `shouldBeRight`
                 TypeDeclaration "path" (Alias "text")
-                                (A.union (singleton $ A.docs "docs\ndocs...\n")
+                                (A.union (singleDocs "docs\ndocs...\n")
                                          bazAnnotationSet)
         specify "its name can't have behind name since \
                 \its canonical type's behind name would be used instead" $
@@ -417,19 +416,19 @@ spec = do
                 TypeDeclaration "offset" (BoxedType "float64") empty
             parse' "boxed offset (float64);\n# docs" `shouldBeRight`
                 TypeDeclaration "offset" (BoxedType "float64")
-                                (singleton $ A.docs "docs\n")
+                                (singleDocs "docs\n")
             parse' "boxed offset (float64);\n# docs\n# docs..." `shouldBeRight`
                 TypeDeclaration "offset" (BoxedType "float64")
-                                (singleton $ A.docs "docs\ndocs...\n")
+                                (singleDocs "docs\ndocs...\n")
             parse' "@foo(\"bar\")\nboxed offset (float64);\n# docs\n# docs..."
                 `shouldBeRight`
                     TypeDeclaration "offset" (BoxedType "float64")
-                                    (A.union (singleton $ A.docs "docs\ndocs...\n")
+                                    (A.union (singleDocs "docs\ndocs...\n")
                                              fooAnnotationSet)
             parse' "@baz\nboxed offset (float64);\n# docs\n# docs..."
                 `shouldBeRight`
                     TypeDeclaration "offset" (BoxedType "float64")
-                                    (A.union (singleton $ A.docs "docs\ndocs...\n")
+                                    (A.union (singleDocs "docs\ndocs...\n")
                                              bazAnnotationSet)
             expectError "boxed offset/behind (float64);" 1 13
 
@@ -440,9 +439,9 @@ spec = do
                            , "female"
                            , "unknown"
                            ] :: DeclarationSet EnumMember
-                membersWithDocs = [ EnumMember "male" (Just "docs\n")
+                membersWithDocs = [ EnumMember "male" (singleDocs "docs\n")
                                   , "female"
-                                  , EnumMember "unknown" (Just "docs2\n")
+                                  , EnumMember "unknown" (singleDocs "docs2\n")
                                   ] :: DeclarationSet EnumMember
                 expected = TypeDeclaration "gender" (EnumType members') empty
             parse' "enum gender = male | female | unknown;"
@@ -450,10 +449,10 @@ spec = do
             parse' "enum gender=male|female|unknown;" `shouldBeRight` expected
             -- forward docs of enum type
             parse' "enum gender\n# gender type\n= male | female | unknown;"
-                `shouldBeRight` expected { typeAnnotations = singleton (docs "gender type\n") }
+                `shouldBeRight` expected { typeAnnotations = singleDocs "gender type\n" }
             -- backward docs of enum type
             parse' "enum gender =\n# gender type\nmale | female | unknown;"
-                `shouldBeRight` expected { typeAnnotations = singleton (docs "gender type\n") }
+                `shouldBeRight` expected { typeAnnotations = singleDocs "gender type\n" }
             parse' "enum gender = male # docs\n| female | unknown # docs2\n;"
                 `shouldBeRight` TypeDeclaration "gender"
                                                 (EnumType membersWithDocs)
@@ -480,13 +479,13 @@ spec = do
     descTypeDecl "recordTypeDeclaration" P.recordTypeDeclaration $ \helpers -> do
         let (parse', expectError) = helpers
         it "emits (TypeDeclaration (RecordType ...)) if succeeded to parse" $ do
-            let fields' = [ Field "name" "text" Nothing
-                          , Field "dob" "date" $ Just "date of birth"
-                          , Field "gender" "gender" Nothing
+            let fields' = [ Field "name" "text" empty
+                          , Field "dob" "date" (singleDocs "date of birth")
+                          , Field "gender" "gender" empty
                           ] :: DeclarationSet Field
                 record = RecordType fields'
                 a = TypeDeclaration "person" record empty
-                b = a { typeAnnotations = singleton (docs "person record type") }
+                b = a { typeAnnotations = singleDocs "person record type" }
             -- without docs, last field with trailing comma
             parse' "record person (\n\
                    \    text name,\n\
@@ -561,19 +560,19 @@ spec = do
     descTypeDecl "unionTypeDeclaration" P.unionTypeDeclaration $ \helpers -> do
         let (parse', expectError) = helpers
         it "emits (TypeDeclaration (UnionType ...)) if succeeded to parse" $ do
-            let circleFields = [ Field "origin" "point" Nothing
-                               , Field "radius" "offset" Nothing
+            let circleFields = [ Field "origin" "point" empty
+                               , Field "radius" "offset" empty
                                ]
-                rectangleFields = [ Field "upper-left" "point" Nothing
-                                  , Field "lower-right" "point" Nothing
+                rectangleFields = [ Field "upper-left" "point" empty
+                                  , Field "lower-right" "point" empty
                                   ]
-                tags' = [ Tag "circle" circleFields Nothing
-                        , Tag "rectangle" rectangleFields Nothing
-                        , Tag "none" [] Nothing
+                tags' = [ Tag "circle" circleFields empty
+                        , Tag "rectangle" rectangleFields empty
+                        , Tag "none" [] empty
                         ]
                 union' = UnionType tags'
                 a = TypeDeclaration "shape" union' empty
-                b = a { typeAnnotations = singleton (docs "shape type") }
+                b = a { typeAnnotations = singleDocs "shape type" }
             parse' "union shape\n\
                    \    = circle (point origin, \
                                  \offset radius,)\n\
@@ -618,18 +617,18 @@ spec = do
             parse' "text get-name()" `shouldBeRight`
                 Method "get-name" [] "text" Nothing empty
             parse' "text get-name (person user)" `shouldBeRight`
-                Method "get-name" [Parameter "user" "person" Nothing]
+                Method "get-name" [Parameter "user" "person" empty]
                        "text" Nothing empty
             parse' "text get-name  ( person user,text default )" `shouldBeRight`
                 Method "get-name"
-                       [ Parameter "user" "person" Nothing
-                       , Parameter "default" "text" Nothing
+                       [ Parameter "user" "person" empty
+                       , Parameter "default" "text" empty
                        ]
                        "text" Nothing empty
             parse' "@http-get(\"/get-name/\") text get-name  ( person user,text default )" `shouldBeRight`
                 Method "get-name"
-                       [ Parameter "user" "person" Nothing
-                       , Parameter "default" "text" Nothing
+                       [ Parameter "user" "person" empty
+                       , Parameter "default" "text" empty
                        ]
                        "text" Nothing httpGetAnnotation
             parse' "text get-name() throws name-error" `shouldBeRight`
@@ -637,16 +636,16 @@ spec = do
             parse' "text get-name  ( person user,text default )\n\
                    \               throws get-name-error" `shouldBeRight`
                 Method "get-name"
-                       [ Parameter "user" "person" Nothing
-                       , Parameter "default" "text" Nothing
+                       [ Parameter "user" "person" empty
+                       , Parameter "default" "text" empty
                        ]
                        "text" (Just "get-name-error") empty
             parse' "@http-get(\"/get-name/\")\n\
                    \text get-name  ( person user,text default )\n\
                    \               throws get-name-error" `shouldBeRight`
                 Method "get-name"
-                       [ Parameter "user" "person" Nothing
-                       , Parameter "default" "text" Nothing
+                       [ Parameter "user" "person" empty
+                       , Parameter "default" "text" empty
                        ]
                        "text" (Just "get-name-error")
                        httpGetAnnotation
@@ -655,31 +654,31 @@ spec = do
                    \  # Gets the name.\n\
                    \)" `shouldBeRight`
                 Method "get-name" [] "text"
-                       Nothing (singleton (docs "Gets the name."))
+                       Nothing (singleDocs "Gets the name.")
             parse' "text get-name (\n\
                    \  # Gets the name.\n\
                    \)throws name-error  " `shouldBeRight`
                 Method "get-name" [] "text"
                        (Just "name-error")
-                       (singleton (docs "Gets the name."))
+                       (singleDocs "Gets the name.")
             parse' "text get-name (\n\
                    \  # Gets the name of the user.\n\
                    \  person user,\n\
                    \)" `shouldBeRight`
                 Method "get-name"
-                       [Parameter "user" "person" Nothing]
+                       [Parameter "user" "person" empty]
                        "text"
                        Nothing
-                       (singleton $ A.docs "Gets the name of the user.")
+                       (singleDocs "Gets the name of the user.")
             parse' "text get-name (\n\
                    \  # Gets the name of the user.\n\
                    \  person user,\n\
                    \) throws get-name-error" `shouldBeRight`
                 Method "get-name"
-                       [Parameter "user" "person" Nothing]
+                       [Parameter "user" "person" empty]
                        "text"
                        (Just "get-name-error")
-                       (singleton $ A.docs "Gets the name of the user.")
+                       (singleDocs "Gets the name of the user.")
             parse' "text get-name (\n\
                    \  # Gets the name of the user.\n\
                    \  person user,\n\
@@ -689,14 +688,14 @@ spec = do
                    \)" `shouldBeRight`
                 Method "get-name"
                        [ Parameter "user" "person" $
-                                   Just "The person to find their name."
+                                   singleDocs "The person to find their name."
                        , Parameter "default" "text" $
-                                   Just "The default name used when \
-                                        \the user has no name."
+                                   singleDocs "The default name used when \
+                                              \the user has no name."
                        ]
                        "text"
                        Nothing
-                       (singleton $ A.docs "Gets the name of the user.")
+                       (singleDocs "Gets the name of the user.")
         it "fails to parse if there are parameters of the same facial name" $ do
             expectError "bool pred(text a, text a/b)" 1 11
             expectError "bool pred(text a/b, text a)" 1 11
@@ -716,14 +715,14 @@ spec = do
                    \);" `shouldBeRight`
                 ServiceDeclaration "null-service"
                                    (Service [])
-                                   (singleton (docs "Service having no methods."))
+                                   (singleDocs "Service having no methods.")
             parse' "service one-method-service(\n\
                    \  user get-user(uuid user-id)\n\
                    \);" `shouldBeRight`
                 ServiceDeclaration
                     "one-method-service"
                     (Service [ Method "get-user"
-                                      [Parameter "user-id" "uuid" Nothing]
+                                      [Parameter "user-id" "uuid" empty]
                                       "user"
                                       Nothing
                                       empty
@@ -739,12 +738,12 @@ spec = do
                 ServiceDeclaration
                     "one-method-service"
                     (Service [ Method "get-user"
-                                      [Parameter "user-id" "uuid" Nothing]
+                                      [Parameter "user-id" "uuid" empty]
                                       "user"
                                       (Just "get-user-error")
-                                      (singleton (docs "Gets an user by its id."))
+                                      (singleDocs "Gets an user by its id.")
                              ])
-                    (singleton (docs "Service having only one method."))
+                    (singleDocs "Service having only one method.")
             parse' "service user-service (\n\
                    \  # Service having multiple methods.\n\
                    \  user create-user (\n\
@@ -759,24 +758,24 @@ spec = do
                 ServiceDeclaration
                     "user-service"
                     (Service [ Method "create-user"
-                                      [Parameter "user" "user" Nothing]
+                                      [Parameter "user" "user" empty]
                                       "user"
                                       Nothing
-                                      (singleton (docs "Creates a new user"))
+                                      (singleDocs "Creates a new user")
                              , Method "get-user"
-                                      [Parameter "user-id" "uuid" Nothing]
+                                      [Parameter "user-id" "uuid" empty]
                                       "user"
                                       Nothing
-                                      (singleton (docs "Gets an user by its id."))
+                                      (singleDocs "Gets an user by its id.")
                              ])
-                    (singleton (docs "Service having multiple methods."))
+                    (singleDocs "Service having multiple methods.")
             parse' "@foo(\"bar\")\n\
                    \service null-service (\n\
                    \  # Service having no methods.\n\
                    \);" `shouldBeRight`
                 ServiceDeclaration "null-service"
                                    (Service [])
-                                   (A.union (singleton (docs "Service having no methods."))
+                                   (A.union (singleDocs "Service having no methods.")
                                             fooAnnotationSet)
             parse' "@baz\n\
                    \service null-service (\n\
@@ -784,7 +783,7 @@ spec = do
                    \);" `shouldBeRight`
                 ServiceDeclaration "null-service"
                                    (Service [])
-                                   (A.union (singleton (docs "Service having no methods."))
+                                   (A.union (singleDocs "Service having no methods.")
                                             bazAnnotationSet)
         it "fails to parse if there are methods of the same facial name" $ do
             expectError "service method-dups (\n\

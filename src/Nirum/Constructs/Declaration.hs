@@ -13,6 +13,6 @@ import Nirum.Constructs.Name (Name)
 class Construct a => Declaration a where
     name        :: a -> Name
     annotations :: a -> AnnotationSet
-    docs        :: a -> Maybe Docs
 
-    docs = lookupDocs . annotations
+docs :: Declaration a => a -> Maybe Docs
+docs = lookupDocs . annotations

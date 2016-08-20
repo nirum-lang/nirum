@@ -25,7 +25,7 @@ import qualified Data.Text as T
 
 import Nirum.Constructs (Construct(toCode))
 import Nirum.Constructs.Annotation as A (AnnotationSet, empty, lookupDocs)
-import Nirum.Constructs.Declaration (Declaration(..))
+import Nirum.Constructs.Declaration (Declaration(..), docs)
 import Nirum.Constructs.Docs (Docs(..), toCodeWithPrefix)
 import Nirum.Constructs.DeclarationSet (DeclarationSet, null', toList)
 import Nirum.Constructs.Identifier (Identifier)
@@ -49,55 +49,53 @@ data Type
     deriving (Eq, Ord, Show)
 
 -- | Member of 'EnumType'.
-data EnumMember = EnumMember Name (Maybe Docs) deriving (Eq, Ord, Show)
+data EnumMember = EnumMember Name AnnotationSet deriving (Eq, Ord, Show)
 
 instance Construct EnumMember where
-    toCode (EnumMember name' docs') = T.concat [ toCode name'
-                                               , toCodeWithPrefix "\n" docs'
-                                               ]
+    toCode e@(EnumMember name' _) = T.concat [ toCode name'
+                                             , toCodeWithPrefix "\n" (docs e)
+                                             ]
 
 instance Declaration EnumMember where
     name (EnumMember name' _) = name'
-    annotations EnumMember { } = A.empty
-    docs (EnumMember _ docs') = docs'
+    annotations (EnumMember _ anno') = anno'
 
 instance IsString EnumMember where
-    fromString s = EnumMember (fromString s) Nothing
+    fromString s = EnumMember (fromString s) A.empty
 
 -- | Field of 'RecordType' and 'Tag'.
-data Field = Field Name TypeExpression (Maybe Docs) deriving (Eq, Ord, Show)
+data Field = Field Name TypeExpression AnnotationSet deriving (Eq, Ord, Show)
 
 instance Construct Field where
-    toCode (Field name' typeExpr docs') = T.concat [ toCode typeExpr
-                                                   , " "
-                                                   , toCode name'
-                                                   , ","
-                                                   , toCodeWithPrefix "\n" docs'
-                                                   ]
+    toCode field@(Field name' typeExpr _) =
+        T.concat [ toCode typeExpr
+                 , " "
+                 , toCode name'
+                 , ","
+                 , toCodeWithPrefix "\n" (docs field)
+                 ]
 
 instance Declaration Field where
     name (Field name' _ _) = name'
-    annotations Field { } = A.empty
-    docs (Field _ _ docs') = docs'
+    annotations (Field _ _ anno') = anno'
 
 -- | Tag of 'UnionType'.
-data Tag = Tag Name (DeclarationSet Field) (Maybe Docs) deriving (Eq, Ord, Show)
+data Tag = Tag Name (DeclarationSet Field) AnnotationSet deriving (Eq, Ord, Show)
 
 instance Construct Tag where
-    toCode (Tag name' fields' docs') =
+    toCode tag@(Tag name' fields' _) =
         if null' fields'
-        then T.concat [toCode name', toCodeWithPrefix "\n" docs']
+        then T.concat [toCode name', toCodeWithPrefix "\n" (docs tag)]
         else T.concat [ toCode name'
                       , " (", fieldsCode, ")"
-                      , toCodeWithPrefix "\n" docs'
+                      , toCodeWithPrefix "\n" (docs tag)
                       ]
       where
         fieldsCode = T.intercalate " " $ map toCode $ toList fields'
 
 instance Declaration Tag where
     name (Tag name' _ _) = name'
-    annotations Tag { } = A.empty
-    docs (Tag _ _ docs') = docs'
+    annotations (Tag _ _ anno') = anno'
 
 -- | Primitive type identifiers.
 data PrimitiveTypeIdentifier
