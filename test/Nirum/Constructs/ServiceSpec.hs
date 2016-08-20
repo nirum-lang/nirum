@@ -10,7 +10,7 @@ import Nirum.Constructs.Annotation (Annotation (Annotation)
                                    , singleton
                                    , union
                                    )
-import Nirum.Constructs.Declaration (toCode)
+import Nirum.Constructs.Docs (toCode)
 import Nirum.Constructs.Service (Method(Method), Parameter(Parameter))
 import Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
                                                         , OptionModifier

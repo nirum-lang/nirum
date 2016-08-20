@@ -7,7 +7,8 @@ import Data.String (IsString(..))
 import Test.Hspec.Meta
 
 import Nirum.Constructs (Construct(..))
-import Nirum.Constructs.Declaration (Declaration(..), Docs)
+import Nirum.Constructs.Declaration (Declaration(..))
+import Nirum.Constructs.Docs (Docs)
 import Nirum.Constructs.DeclarationSet ( DeclarationSet
                                        , NameDuplication(..)
                                        , empty

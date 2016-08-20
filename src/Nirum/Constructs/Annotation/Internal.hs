@@ -11,7 +11,7 @@ import qualified Data.Text as T
 import Text.InterpolatedString.Perl6 (qq)
 
 import Nirum.Constructs (Construct (toCode))
-import Nirum.Constructs.Declaration (annotationDocsName)
+import Nirum.Constructs.Docs (annotationDocsName)
 import Nirum.Constructs.Identifier (Identifier)
 
 

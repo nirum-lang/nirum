@@ -1,9 +1,9 @@
-module Nirum.Constructs.DeclarationSpec where
+module Nirum.Constructs.DocsSpec where
 
 import Test.Hspec.Meta
 
 import Nirum.Constructs (Construct(..))
-import Nirum.Constructs.Declaration (Docs(Docs), toCodeWithPrefix)
+import Nirum.Constructs.Docs (Docs(Docs), toCodeWithPrefix)
 
 spec :: Spec
 spec =

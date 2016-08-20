@@ -13,7 +13,7 @@ import Text.InterpolatedString.Perl6 (q)
 
 import Nirum.Constructs (Construct(toCode))
 import Nirum.Constructs.Annotation (empty)
-import Nirum.Constructs.Declaration (Docs)
+import Nirum.Constructs.Docs (Docs)
 import qualified Nirum.Constructs.DeclarationSet as DS
 import Nirum.Constructs.Identifier (Identifier)
 import Nirum.Constructs.ModulePath (ModulePath)

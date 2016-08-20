@@ -68,7 +68,8 @@ import Text.Megaparsec.Text (Parser)
 import Text.Megaparsec.Lexer (charLiteral)
 
 import qualified Nirum.Constructs.Annotation as A
-import Nirum.Constructs.Declaration (Declaration, Docs(Docs))
+import Nirum.Constructs.Declaration (Declaration)
+import Nirum.Constructs.Docs (Docs(Docs))
 import Nirum.Constructs.DeclarationSet ( DeclarationSet
                                        , NameDuplication( BehindNameDuplication
                                                         , FacialNameDuplication

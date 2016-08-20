@@ -26,10 +26,8 @@ import qualified Data.Text as T
 import Nirum.Constructs (Construct(toCode))
 import qualified Nirum.Constructs.Annotation as A
 import Nirum.Constructs.Annotation (AnnotationSet)
-import Nirum.Constructs.Declaration ( Declaration (..)
-                                    , Docs (..)
-                                    , toCodeWithPrefix
-                                    )
+import Nirum.Constructs.Declaration (Declaration(..))
+import Nirum.Constructs.Docs (Docs(..), toCodeWithPrefix)
 import Nirum.Constructs.DeclarationSet (DeclarationSet, null', toList)
 import Nirum.Constructs.Identifier (Identifier)
 import Nirum.Constructs.ModulePath (ModulePath)

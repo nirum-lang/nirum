@@ -13,7 +13,8 @@ import Nirum.Constructs.Annotation ( Annotation (Annotation)
                                    , empty
                                    , singleton
                                    )
-import Nirum.Constructs.Declaration (Declaration(name, docs), Docs)
+import Nirum.Constructs.Declaration (Declaration(name, docs))
+import Nirum.Constructs.Docs (Docs)
 import Nirum.Constructs.DeclarationSet (DeclarationSet)
 import Nirum.Constructs.Service (Method(Method), Service(Service))
 import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)

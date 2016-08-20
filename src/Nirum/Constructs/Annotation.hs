@@ -22,7 +22,7 @@ import qualified Data.Set as S
 
 import Nirum.Constructs (Construct (toCode))
 import Nirum.Constructs.Annotation.Internal
-import Nirum.Constructs.Declaration (Docs (Docs), annotationDocsName, toText)
+import Nirum.Constructs.Docs (Docs (Docs), annotationDocsName, toText)
 import Nirum.Constructs.Identifier (Identifier)
 
 

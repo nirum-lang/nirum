@@ -13,10 +13,8 @@ import qualified Data.Text as T
 
 import Nirum.Constructs (Construct(toCode))
 import Nirum.Constructs.Annotation (AnnotationSet, lookupDocs)
-import Nirum.Constructs.Declaration ( Declaration(name, docs)
-                                    , Docs
-                                    , toCodeWithPrefix
-                                    )
+import Nirum.Constructs.Declaration (Declaration(name, docs))
+import Nirum.Constructs.Docs (Docs, toCodeWithPrefix)
 import Nirum.Constructs.DeclarationSet (DeclarationSet, toList)
 import Nirum.Constructs.Name (Name)
 import Nirum.Constructs.TypeExpression (TypeExpression)

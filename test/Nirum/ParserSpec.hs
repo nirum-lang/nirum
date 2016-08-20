@@ -28,7 +28,7 @@ import Nirum.Constructs.Annotation as A ( Annotation (Annotation)
                                         , singleton
                                         , union
                                         )
-import Nirum.Constructs.Declaration (Docs (Docs))
+import Nirum.Constructs.Docs (Docs (Docs))
 import Nirum.Constructs.DeclarationSet (DeclarationSet)
 import Nirum.Constructs.DeclarationSetSpec (SampleDecl(..))
 import Nirum.Constructs.Identifier (fromText)
