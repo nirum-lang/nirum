@@ -4,28 +4,27 @@ module Nirum.Constructs.ServiceSpec where
 import Test.Hspec.Meta
 
 import Nirum.Constructs.Annotation (Annotation (Annotation)
-                                   , docs
                                    , empty
                                    , fromList
-                                   , singleton
                                    , union
                                    )
-import Nirum.Constructs.Declaration (toCode)
+import Nirum.Constructs.Docs (toCode)
 import Nirum.Constructs.Service (Method(Method), Parameter(Parameter))
 import Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
                                                         , OptionModifier
                                                         )
                                        )
+import Util (singleDocs)
 
 
 spec :: Spec
 spec = do
     let Right methodAnno = fromList [Annotation "http-get" (Just "/ping/")]
-    let docsAnno = singleton $ docs "docs..."
+    let docsAnno = singleDocs "docs..."
     describe "Parameter" $
         specify "toCode" $ do
-            toCode (Parameter "dob" "date" Nothing) `shouldBe` "date dob,"
-            toCode (Parameter "dob" "date" $ Just "docs...") `shouldBe`
+            toCode (Parameter "dob" "date" empty) `shouldBe` "date dob,"
+            toCode (Parameter "dob" "date" docsAnno) `shouldBe`
                 "date dob,\n# docs..."
     describe "Method" $
         specify "toCode" $ do
@@ -58,25 +57,25 @@ spec = do
                            methodAnno) `shouldBe`
                 "@http-get(\"/ping/\")\nbool ping () throws ping-error,"
             toCode (Method "get-user"
-                           [Parameter "user-id" "uuid" Nothing]
+                           [Parameter "user-id" "uuid" empty]
                            (OptionModifier "user")
                            Nothing
                            empty) `shouldBe`
                 "user? get-user (uuid user-id),"
             toCode (Method "get-user"
-                           [Parameter "user-id" "uuid" Nothing]
+                           [Parameter "user-id" "uuid" empty]
                            (OptionModifier "user")
                            Nothing
                            docsAnno) `shouldBe`
                 "user? get-user (\n  # docs...\n  uuid user-id,\n),"
             toCode (Method "get-user"
-                           [Parameter "user-id" "uuid" Nothing]
+                           [Parameter "user-id" "uuid" empty]
                            (OptionModifier "user")
                            (Just "get-user-error")
                            empty) `shouldBe`
                 "user? get-user (uuid user-id) throws get-user-error,"
             toCode (Method "get-user"
-                           [Parameter "user-id" "uuid" Nothing]
+                           [Parameter "user-id" "uuid" empty]
                            (OptionModifier "user")
                            (Just "get-user-error")
                            docsAnno) `shouldBe`
@@ -85,13 +84,13 @@ spec = do
                 \  uuid user-id,\n\
                 \) throws get-user-error,"
             toCode (Method "get-user"
-                           [Parameter "user-id" "uuid" $ Just "param docs..."]
+                           [Parameter "user-id" "uuid" $ singleDocs "param docs..."]
                            (OptionModifier "user")
                            Nothing
                            empty) `shouldBe`
                 "user? get-user (\n  uuid user-id,\n  # param docs...\n),"
             toCode (Method "get-user"
-                           [Parameter "user-id" "uuid" $ Just "param docs..."]
+                           [Parameter "user-id" "uuid" $ singleDocs "param docs..."]
                            (OptionModifier "user")
                            Nothing
                            docsAnno) `shouldBe`
@@ -101,7 +100,7 @@ spec = do
                 \  # param docs...\n\
                 \),"
             toCode (Method "get-user"
-                           [Parameter "user-id" "uuid" $ Just "param docs..."]
+                           [Parameter "user-id" "uuid" $ singleDocs "param docs..."]
                            (OptionModifier "user")
                            (Just "get-user-error")
                            empty) `shouldBe`
@@ -110,7 +109,7 @@ spec = do
                 \  # param docs...\n\
                 \) throws get-user-error,"
             toCode (Method "get-user"
-                           [Parameter "user-id" "uuid" $ Just "param docs..."]
+                           [Parameter "user-id" "uuid" $ singleDocs "param docs..."]
                            (OptionModifier "user")
                            (Just "get-user-error")
                            docsAnno) `shouldBe`
@@ -120,16 +119,16 @@ spec = do
                 \  # param docs...\n\
                 \) throws get-user-error,"
             toCode (Method "search-posts"
-                           [ Parameter "blog-id" "uuid" Nothing
-                           , Parameter "keyword" "text" Nothing
+                           [ Parameter "blog-id" "uuid" empty
+                           , Parameter "keyword" "text" empty
                            ]
                            (ListModifier "post")
                            Nothing
                            empty) `shouldBe`
                 "[post] search-posts (\n  uuid blog-id,\n  text keyword,\n),"
             toCode (Method "search-posts"
-                           [ Parameter "blog-id" "uuid" Nothing
-                           , Parameter "keyword" "text" Nothing
+                           [ Parameter "blog-id" "uuid" empty
+                           , Parameter "keyword" "text" empty
                            ]
                            (ListModifier "post")
                            Nothing
@@ -140,8 +139,8 @@ spec = do
                 \  text keyword,\n\
                 \),"
             toCode (Method "search-posts"
-                           [ Parameter "blog-id" "uuid" Nothing
-                           , Parameter "keyword" "text" Nothing
+                           [ Parameter "blog-id" "uuid" empty
+                           , Parameter "keyword" "text" empty
                            ]
                            (ListModifier "post")
                            (Just "search-posts-error")
@@ -151,8 +150,8 @@ spec = do
                 \  text keyword,\n\
                 \) throws search-posts-error,"
             toCode (Method "search-posts"
-                           [ Parameter "blog-id" "uuid" Nothing
-                           , Parameter "keyword" "text" Nothing
+                           [ Parameter "blog-id" "uuid" empty
+                           , Parameter "keyword" "text" empty
                            ]
                            (ListModifier "post")
                            (Just "search-posts-error")
@@ -163,8 +162,8 @@ spec = do
                 \  text keyword,\n\
                 \) throws search-posts-error,"
             toCode (Method "search-posts"
-                           [ Parameter "blog-id" "uuid" $ Just "blog id..."
-                           , Parameter "keyword" "text" $ Just "keyword..."
+                           [ Parameter "blog-id" "uuid" $ singleDocs "blog id..."
+                           , Parameter "keyword" "text" $ singleDocs "keyword..."
                            ]
                            (ListModifier "post")
                            Nothing
@@ -176,8 +175,8 @@ spec = do
                 \  # keyword...\n\
                 \),"
             toCode (Method "search-posts"
-                           [ Parameter "blog-id" "uuid" $ Just "blog id..."
-                           , Parameter "keyword" "text" $ Just "keyword..."
+                           [ Parameter "blog-id" "uuid" $ singleDocs "blog id..."
+                           , Parameter "keyword" "text" $ singleDocs "keyword..."
                            ]
                            (ListModifier "post")
                            Nothing
@@ -190,8 +189,8 @@ spec = do
                 \  # keyword...\n\
                 \),"
             toCode (Method "search-posts"
-                           [ Parameter "blog-id" "uuid" $ Just "blog id..."
-                           , Parameter "keyword" "text" $ Just "keyword..."
+                           [ Parameter "blog-id" "uuid" $ singleDocs "blog id..."
+                           , Parameter "keyword" "text" $ singleDocs "keyword..."
                            ]
                            (ListModifier "post")
                            (Just "search-posts-error")
@@ -203,8 +202,8 @@ spec = do
                 \  # keyword...\n\
                 \) throws search-posts-error,"
             toCode (Method "search-posts"
-                           [ Parameter "blog-id" "uuid" $ Just "blog id..."
-                           , Parameter "keyword" "text" $ Just "keyword..."
+                           [ Parameter "blog-id" "uuid" $ singleDocs "blog id..."
+                           , Parameter "keyword" "text" $ singleDocs "keyword..."
                            ]
                            (ListModifier "post")
                            (Just "search-posts-error")
@@ -217,8 +216,8 @@ spec = do
                 \  # keyword...\n\
                 \) throws search-posts-error,"
             toCode (Method "search-posts"
-                           [ Parameter "blog-id" "uuid" $ Just "blog id..."
-                           , Parameter "keyword" "text" $ Just "keyword..."
+                           [ Parameter "blog-id" "uuid" $ singleDocs "blog id..."
+                           , Parameter "keyword" "text" $ singleDocs "keyword..."
                            ]
                            (ListModifier "post")
                            (Just "search-posts-error")

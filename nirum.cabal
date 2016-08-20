@@ -24,6 +24,7 @@ library
                  ,     Nirum.Constructs.Annotation.Internal
                  ,     Nirum.Constructs.Declaration
                  ,     Nirum.Constructs.DeclarationSet
+                 ,     Nirum.Constructs.Docs
                  ,     Nirum.Constructs.Identifier
                  ,     Nirum.Constructs.Module
                  ,     Nirum.Constructs.ModulePath
@@ -72,7 +73,7 @@ test-suite spec
   main-is:             Spec.hs
   other-modules:       Nirum.CliSpec
                ,       Nirum.Constructs.AnnotationSpec
-               ,       Nirum.Constructs.DeclarationSpec
+               ,       Nirum.Constructs.DocsSpec
                ,       Nirum.Constructs.DeclarationSetSpec
                ,       Nirum.Constructs.IdentifierSpec
                ,       Nirum.Constructs.ModuleSpec
@@ -85,6 +86,7 @@ test-suite spec
                ,       Nirum.ParserSpec
                ,       Nirum.Targets.PythonSpec
                ,       Nirum.VersionSpec
+               ,       Util
   default-language:    Haskell2010
   default-extensions:  OverloadedStrings
   build-depends:       base                     >=4.7     && <5

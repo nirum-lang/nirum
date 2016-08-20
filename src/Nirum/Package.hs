@@ -22,7 +22,7 @@ import qualified Data.Set as S
 import System.Directory (doesDirectoryExist, listDirectory)
 import System.FilePath ((</>))
 
-import Nirum.Constructs.Declaration (Docs)
+import Nirum.Constructs.Docs (Docs)
 import qualified Nirum.Constructs.DeclarationSet as DS
 import Nirum.Constructs.Identifier (Identifier)
 import qualified Nirum.Constructs.Module as Mod

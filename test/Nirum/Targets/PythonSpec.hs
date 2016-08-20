@@ -265,8 +265,8 @@ makeDummySource' pathPrefix m =
                        , TypeDeclaration "path-box" (BoxedType "path") empty
                        , TypeDeclaration "int-box" (BoxedType "bigint") empty
                        , TypeDeclaration "point"
-                                         (RecordType [ Field "x" "int64" Nothing
-                                                     , Field "y" "int64" Nothing
+                                         (RecordType [ Field "x" "int64" empty
+                                                     , Field "y" "int64" empty
                                                      ])
                                          empty
                        ] Nothing
@@ -588,7 +588,7 @@ spec = parallel $ do
             tT' aliasBoxed "Irum.__nirum_deserialize__('khj') == Irum('khj')"
         specify "enum type" $ do
             let members = [ "male"
-                          , EnumMember (Name "female" "yeoseong") Nothing
+                          , EnumMember (Name "female" "yeoseong") empty
                           ] :: DeclarationSet EnumMember
                 decl = TypeDeclaration "gender" (EnumType members) empty
             tT decl "type(Gender) is enum.EnumMeta"
@@ -621,8 +621,8 @@ spec = parallel $ do
             tT decl' "EvaChar.__nirum_deserialize__('soryu-asuka-langley') == \
                      \ EvaChar.soryu_asuka_langley"  -- to be robust
         specify "record type" $ do
-            let fields = [ Field (Name "left" "x") "bigint" Nothing
-                         , Field "top" "bigint" Nothing
+            let fields = [ Field (Name "left" "x") "bigint" empty
+                         , Field "top" "bigint" empty
                          ]
                 payload = "{'_type': 'point', 'x': 3, 'top': 14}" :: T.Text
                 decl = TypeDeclaration "point" (RecordType fields) empty
@@ -645,8 +645,8 @@ spec = parallel $ do
             tR' decl "TypeError" "Point(left=1, top='a')"
             tR' decl "TypeError" "Point(left='a', top=1)"
             tR' decl "TypeError" "Point(left='a', top='b')"
-            let fields' = [ Field "left" "int-box" Nothing
-                          , Field "top" "int-box" Nothing
+            let fields' = [ Field "left" "int-box" empty
+                          , Field "top" "int-box" empty
                           ]
                 decls = [ Import ["foo", "bar"] "int-box"
                         , TypeDeclaration "point" (RecordType fields') empty
@@ -675,8 +675,8 @@ spec = parallel $ do
                  "Point.__nirum_deserialize__({'_type': 'foo'})"
             tR'' decls "TypeError" "Point(left=IntBox(1), top='a')"
             tR'' decls "TypeError" "Point(left=IntBox(1), top=2)"
-            let fields'' = [ Field "xy" "point" Nothing
-                           , Field "z" "int64" Nothing
+            let fields'' = [ Field "xy" "point" empty
+                           , Field "z" "int64" empty
                            ]
                 decls' = [ Import ["foo", "bar"] "point"
                          , TypeDeclaration "point3d"
@@ -699,7 +699,7 @@ spec = parallel $ do
                               'z': 3
                           }) == Point3d(xy=Point(x=1, y=2), z=3)|]
         specify "record type with one field" $ do
-            let fields = [ Field "length" "bigint" Nothing ]
+            let fields = [ Field "length" "bigint" empty ]
                 payload = "{'_type': 'line', 'length': 3}" :: T.Text
                 decl = TypeDeclaration "line" (RecordType fields) empty
             tT decl "isinstance(Line, type)"
@@ -708,18 +708,18 @@ spec = parallel $ do
             tT decl [qq|Line(length=3).__nirum_serialize__() == $payload|]
         specify "union type" $ do
             let wasternNameTag =
-                    Tag "western-name" [ Field "first-name" "text" Nothing
-                                       , Field "middle-name" "text" Nothing
-                                       , Field "last-name" "text" Nothing
-                                       ] Nothing
+                    Tag "western-name" [ Field "first-name" "text" empty
+                                       , Field "middle-name" "text" empty
+                                       , Field "last-name" "text" empty
+                                       ] empty
                 eastAsianNameTag =
-                    Tag "east-asian-name" [ Field "family-name" "text" Nothing
-                                          , Field "given-name" "text" Nothing
-                                          ] Nothing
+                    Tag "east-asian-name" [ Field "family-name" "text" empty
+                                          , Field "given-name" "text" empty
+                                          ] empty
                 cultureAgnosticNameTag =
                     Tag "culture-agnostic-name"
-                        [ Field "fullname" "text" Nothing ]
-                        Nothing
+                        [ Field "fullname" "text" empty ]
+                        empty
                 tags = [ wasternNameTag
                        , eastAsianNameTag
                        , cultureAgnosticNameTag
@@ -808,8 +808,8 @@ spec = parallel $ do
         specify "union type with one tag" $ do
             let cultureAgnosticNameTag =
                     Tag "pop"
-                        [ Field "country" "text" Nothing ]
-                        Nothing
+                        [ Field "country" "text" empty ]
+                        empty
                 tags = [cultureAgnosticNameTag]
                 decl = TypeDeclaration "music" (UnionType tags) empty
             tT decl "Pop(country='KR').country == 'KR'"
@@ -820,15 +820,15 @@ spec = parallel $ do
         specify "union type with behind names" $ do
             let pop =
                     Tag (Name "pop" "popular_music")
-                        [ Field "country" "text" Nothing ]
-                        Nothing
+                        [ Field "country" "text" empty ]
+                        empty
                 tags = [pop]
                 decl = TypeDeclaration "music" (UnionType tags) empty
             tT decl "Pop(country='KR').__nirum_tag__.value == 'popular_music'"
         specify "service" $ do
             let null' = ServiceDeclaration "null-service" (Service []) empty
                 pingService = Service [Method "ping"
-                                              [Parameter "nonce" "text" Nothing]
+                                              [Parameter "nonce" "text" empty]
                                               "bool"
                                               Nothing
                                               empty]

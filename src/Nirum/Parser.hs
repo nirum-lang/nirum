@@ -68,7 +68,8 @@ import Text.Megaparsec.Text (Parser)
 import Text.Megaparsec.Lexer (charLiteral)
 
 import qualified Nirum.Constructs.Annotation as A
-import Nirum.Constructs.Declaration (Declaration, Docs(Docs))
+import Nirum.Constructs.Declaration (Declaration)
+import Nirum.Constructs.Docs (Docs(Docs))
 import Nirum.Constructs.DeclarationSet ( DeclarationSet
                                        , NameDuplication( BehindNameDuplication
                                                         , FacialNameDuplication
@@ -237,6 +238,10 @@ docs = do
                               }) (eol >> spaces) <?> "comments"
     return $ Docs $ T.unlines comments
 
+annotationsFromDocs :: Maybe Docs -> A.AnnotationSet
+annotationsFromDocs Nothing  = A.empty
+annotationsFromDocs (Just d) = A.singleton $ A.docs d
+
 aliasTypeDeclaration :: Parser TypeDeclaration
 aliasTypeDeclaration = do
     annotationSet' <- annotationSet <?> "type alias annotations"
@@ -286,7 +291,7 @@ enumMember = do
         d <- docs <?> "enum member docs"
         spaces
         return d
-    return $ EnumMember memberName docs'
+    return $ EnumMember memberName (annotationsFromDocs docs')
 
 handleNameDuplication :: Declaration a
                       => String -> [a]
@@ -340,14 +345,14 @@ enumTypeDeclaration = do
                                      annotationSet''
 
 fieldsOrParameters :: forall a. (String, String)
-                   -> (Name -> TypeExpression -> Maybe Docs -> a)
+                   -> (Name -> TypeExpression -> A.AnnotationSet -> a)
                    -> Parser [a]
 fieldsOrParameters (label, pluralLabel) make = do
     type' <- typeExpression <?> (label ++ " type")
     spaces1
     name' <- name <?> (label ++ " name")
     spaces
-    let makeWithDocs = make name' type'
+    let makeWithDocs = make name' type' . annotationsFromDocs
     followedByComma makeWithDocs <|> do
         d <- optional docs' <?> (label ++ " docs")
         return [makeWithDocs d]
@@ -413,7 +418,7 @@ tag = do
         d <- docs <?> "union tag docs"
         spaces
         return d
-    return $ Tag tagName fields' docs'
+    return $ Tag tagName fields' (annotationsFromDocs docs')
 
 unionTypeDeclaration :: Parser TypeDeclaration
 unionTypeDeclaration = do
