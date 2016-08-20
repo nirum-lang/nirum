@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedLists, OverloadedStrings #-}
 module Nirum.PackageSpec where
 
+import Data.Either (isRight)
 import qualified Data.Map.Strict as M
 import System.FilePath ((</>))
 import Test.Hspec.Meta
@@ -47,12 +48,12 @@ validPackage =
                   , (["foo"],        Module [] $ Just "foo")
                   , (["qux"],        Module [] $ Just "qux")
                   , ( ["abc"]
-                    , Module [TypeDeclaration "a" (Alias "text") Nothing empty]
+                    , Module [TypeDeclaration "a" (Alias "text") empty]
                              Nothing
                     )
                   , ( ["xyz"]
                     , Module [ Import ["abc"] "a"
-                             , TypeDeclaration "x" (Alias "text") Nothing empty
+                             , TypeDeclaration "x" (Alias "text") empty
                              ] Nothing
                     )
                   ]
@@ -64,7 +65,7 @@ missingImportsModules =
                        , Import ["baz"] "qux"
                        ] Nothing)
     , ( ["baz"]
-      , Module [ TypeDeclaration "qux" (Alias "text") Nothing empty ] Nothing
+      , Module [ TypeDeclaration "qux" (Alias "text") empty ] Nothing
       )
     , (["qux"], Module [ Import ["foo"] "abc" -- MissingImportError
                        , Import ["foo"] "def" -- MissingImportError
@@ -74,19 +75,19 @@ missingImportsModules =
 circularImportsModules :: M.Map ModulePath Module
 circularImportsModules =
     [ (["asdf"], Module [ Import ["asdf"] "foo"
-                        , TypeDeclaration "bar" (Alias "text") Nothing empty
+                        , TypeDeclaration "bar" (Alias "text") empty
                         ] Nothing)
     , (["abc", "def"], Module [ Import ["abc", "ghi"] "bar"
                               , TypeDeclaration
-                                    "foo" (Alias "text") Nothing empty
+                                    "foo" (Alias "text") empty
                               ] Nothing)
     , (["abc", "ghi"], Module [ Import ["abc", "xyz"] "baz"
                               , TypeDeclaration
-                                    "bar" (Alias "text") Nothing empty
+                                    "bar" (Alias "text") empty
                               ] Nothing)
     , (["abc", "xyz"], Module [ Import ["abc", "def"] "foo"
                               , TypeDeclaration
-                                    "baz" (Alias "text") Nothing empty
+                                    "baz" (Alias "text") empty
                               ] Nothing)
     ]
 
@@ -134,7 +135,9 @@ spec = do
                      ]
         specify "scanPackage" $ do
             let path = "." </> "examples"
-            Right package <- scanPackage path
+            package' <- scanPackage path
+            package' `shouldSatisfy` isRight
+            let Right package = package'
             Right builtinsM <- parseFile (path </> "builtins.nrm")
             Right productM <- parseFile (path </> "product.nrm")
             Right shapesM <- parseFile (path </> "shapes.nrm")
@@ -184,11 +187,9 @@ spec = do
             docs bm' `shouldBe` Just "foo"
         specify "types" $ do
             types bm `shouldBe` []
-            types abc `shouldBe` [TypeDeclaration
-                                      "a" (Alias "text") Nothing empty]
+            types abc `shouldBe` [TypeDeclaration "a" (Alias "text") empty]
             types xyz `shouldBe` [ Import ["abc"] "a"
-                                 , TypeDeclaration
-                                       "x" (Alias "text") Nothing empty
+                                 , TypeDeclaration "x" (Alias "text") empty
                                  ]
         specify "lookupType" $ do
             lookupType "a" bm `shouldBe` Missing

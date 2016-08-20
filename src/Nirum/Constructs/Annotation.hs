@@ -1,52 +1,34 @@
-{-# LANGUAGE OverloadedStrings, QuasiQuotes #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Nirum.Constructs.Annotation ( Annotation(Annotation)
-                                   , AnnotationSet(AnnotationSet)
+                                   , AnnotationSet
                                    , Metadata
                                    , NameDuplication(AnnotationNameDuplication)
                                    , annotations
+                                   , docs
                                    , empty
                                    , fromList
+                                   , insertDocs
+                                   , lookup
+                                   , lookupDocs
+                                   , singleton
                                    , toCode
                                    , toList
+                                   , union
                                    ) where
 
-import qualified Data.Char as C
+import Prelude hiding (lookup)
+
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
-import qualified Data.Text as T
-import Text.InterpolatedString.Perl6 (qq)
 
 import Nirum.Constructs (Construct (toCode))
+import Nirum.Constructs.Annotation.Internal
+import Nirum.Constructs.Declaration (Docs (Docs), annotationDocsName, toText)
 import Nirum.Constructs.Identifier (Identifier)
 
 
-type Metadata = T.Text
-
--- | Annotation for 'Declaration'.
-data Annotation = Annotation { name :: Identifier
-                             , metadata :: Maybe Metadata
-                             } deriving (Eq, Ord, Show)
-
-instance Construct Annotation where
-    toCode Annotation {name = n,  metadata = Just m} = [qq|@{toCode n}("$m'")|]
-      where
-        m' = (showLitString $ T.unpack m) ""
-        showLitString :: String -> ShowS
-        showLitString = foldr ((.) . showLitChar') id
-        showLitChar' :: Char -> ShowS
-        showLitChar' '"' = showString "\\\""
-        showLitChar' c   = C.showLitChar c
-    toCode Annotation {name = n,  metadata = Nothing} = [qq|@{toCode n}|]
-
-data AnnotationSet
-  -- | The set of 'Annotation' values.
-  -- Every annotation name has to be unique in the set.
-  = AnnotationSet { annotations :: M.Map Identifier Annotation }
-  deriving (Eq, Ord, Show)
-
-instance Construct AnnotationSet where
-    toCode AnnotationSet {annotations = annotations'} =
-        T.concat [s | e <- M.elems annotations', s <- [toCode e, "\n"]]
+docs :: Docs -> Annotation
+docs (Docs d) = Annotation { name = annotationDocsName, metadata = Just d }
 
 data NameDuplication = AnnotationNameDuplication Identifier
                      deriving (Eq, Ord, Show)
@@ -54,14 +36,18 @@ data NameDuplication = AnnotationNameDuplication Identifier
 empty :: AnnotationSet
 empty = AnnotationSet { annotations = M.empty }
 
+singleton :: Annotation -> AnnotationSet
+singleton Annotation { name = name', metadata = metadata' } =
+    AnnotationSet { annotations = M.singleton name' metadata' }
+
 fromList :: [Annotation] -> Either NameDuplication AnnotationSet
 fromList annotations' =
     case findDup names S.empty of
         Just duplication -> Left (AnnotationNameDuplication duplication)
-        _ -> Right AnnotationSet { annotations = M.fromList [ (name a, a)
-                                                            | a <- annotations'
-                                                            ]
-                                 }
+        _ -> Right $ AnnotationSet ( M.fromList [ (name a, metadata a)
+                                                | a <- annotations'
+                                                ]
+                                   )
   where
     names :: [Identifier]
     names = [name a | a <- annotations']
@@ -74,4 +60,28 @@ fromList annotations' =
             _ -> Nothing
 
 toList :: AnnotationSet -> [Annotation]
-toList AnnotationSet { annotations = annotations' } = M.elems annotations'
+toList AnnotationSet { annotations = annotations' } =
+    map fromTuple $ M.assocs annotations'
+
+union :: AnnotationSet -> AnnotationSet -> AnnotationSet
+union (AnnotationSet a) (AnnotationSet b) = AnnotationSet $ M.union a b
+
+lookup :: Identifier -> AnnotationSet -> Maybe Annotation
+lookup id' (AnnotationSet anno) = do
+    metadata' <- M.lookup id' anno
+    return Annotation { name = id', metadata = metadata' }
+
+lookupDocs :: AnnotationSet -> Maybe Docs
+lookupDocs annotationSet = do
+    Annotation _ m <- lookup annotationDocsName annotationSet
+    data' <- m
+    return $ Docs data'
+
+insertDocs :: (Monad m) => Docs -> AnnotationSet -> m AnnotationSet
+insertDocs docs' (AnnotationSet anno) =
+    case insertLookup annotationDocsName (Just $ toText docs') anno of
+        (Just _ , _    ) -> fail "<duplicated>"
+        (Nothing, anno') -> return $ AnnotationSet anno'
+  where
+    insertLookup :: Ord k => k -> a -> M.Map k a -> (Maybe a, M.Map k a)
+    insertLookup = M.insertLookupWithKey (\_ a _ -> a)

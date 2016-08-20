@@ -21,6 +21,7 @@ library
   exposed-modules:     Nirum.Cli
                  ,     Nirum.Constructs
                  ,     Nirum.Constructs.Annotation
+                 ,     Nirum.Constructs.Annotation.Internal
                  ,     Nirum.Constructs.Declaration
                  ,     Nirum.Constructs.DeclarationSet
                  ,     Nirum.Constructs.Identifier
@@ -76,6 +77,7 @@ test-suite spec
                ,       Nirum.Constructs.ModuleSpec
                ,       Nirum.Constructs.ModulePathSpec
                ,       Nirum.Constructs.NameSpec
+               ,       Nirum.Constructs.ServiceSpec
                ,       Nirum.Constructs.TypeDeclarationSpec
                ,       Nirum.Constructs.TypeExpressionSpec
                ,       Nirum.PackageSpec

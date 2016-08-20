@@ -1,19 +1,19 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Nirum.Constructs.Service ( Method ( Method
                                          , methodAnnotations
-                                         , methodDocs
                                          , methodName
                                          , parameters
                                          , returnType
                                          )
                                 , Parameter(Parameter)
                                 , Service(Service, methods)
+                                , methodDocs
                                 ) where
 
 import qualified Data.Text as T
 
 import Nirum.Constructs (Construct(toCode))
-import Nirum.Constructs.Annotation (AnnotationSet)
+import Nirum.Constructs.Annotation (AnnotationSet, lookupDocs)
 import Nirum.Constructs.Declaration ( Declaration(name, docs)
                                     , Docs
                                     , toCodeWithPrefix
@@ -44,14 +44,15 @@ data Method = Method { methodName :: Name
                      , parameters :: DeclarationSet Parameter
                      , returnType :: TypeExpression
                      , errorType  :: Maybe TypeExpression
-                     , methodDocs :: Maybe Docs
                      , methodAnnotations :: AnnotationSet
                      } deriving (Eq, Ord, Show)
+
+methodDocs :: Method -> Maybe Docs
+methodDocs = lookupDocs . methodAnnotations
 
 instance Construct Method where
     toCode method@Method { parameters = params
                          , errorType = error'
-                         , methodDocs = docs'
                          , methodAnnotations = annotationSet'
                          } =
         T.concat $ [ toCode annotationSet'
@@ -77,6 +78,8 @@ instance Construct Method where
       where
         params' :: [Parameter]
         params' = toList params
+        docs' :: Maybe Docs
+        docs' = lookupDocs annotationSet'
         indentedCode :: Construct a => a -> T.Text
         indentedCode c = T.concat [ "  "
                                   , T.intercalate "\n  " $ T.lines (toCode c)
