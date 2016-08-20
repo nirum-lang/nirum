@@ -1,4 +1,4 @@
-Serialziation format
+Serialization format
 ====================
 
 Identifier
@@ -51,14 +51,14 @@ Identifier normalization
 Every identifiers (e.g. behind names) has to be normalized in JSON
 representation.  Although we recommend to use hyphens to separate words
 when declare names in Nirum code, these hyphens must be replaced by underscores
-in JSON.  The following are normalization rules:
+in JSON. The following are normalization rules:
 
  -  Use lowercase alphabets instead of uppercases.
  -  Use underscores instead of hyphens.
     This rule may help to implement a runtime library for programming languages
     disallowing hyphens for identifiers.
 
-Although all serializers must to normalize names when they serialize Nirum
+Although all serializers must normalize names when they serialize Nirum
 objects, we recommend deserializers to accept denormalized names as well
 to follow a [general principle of robustness][1].
 
@@ -170,7 +170,7 @@ It's represented in JSON to:
 Record type
 -----------
 
-As `payload` records in the above example codes show, reocrd type defines
+As `payload` records in the above example codes show, record type defines
 a structure consists of fields which have their name and type.  For example:
 
     record name (
@@ -338,7 +338,7 @@ Map type
 --------
 
 Map types are serialized to array of objects rather than objects, although
-it is counterintuitive.  Because unlike JSON's object keys, Nirum's map keys
+it is counterintuitive. Unlike JSON's object keys, Nirum's map keys
 can be more complex than strings.
 
 For example:
