@@ -1,5 +1,4 @@
-{-# LANGUAGE OverloadedLists, OverloadedStrings, QuasiQuotes,
-             ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedLists, QuasiQuotes, ScopedTypeVariables #-}
 {-|
 This unit test module optionally depends on Python interpreter.
 It internally tries to popen python3 executable, and import nirum Python

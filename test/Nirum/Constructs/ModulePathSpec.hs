@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedLists, OverloadedStrings #-}
+{-# LANGUAGE OverloadedLists #-}
 module Nirum.Constructs.ModulePathSpec where
 
 import Control.Exception (evaluate)

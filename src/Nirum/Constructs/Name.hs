@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 module Nirum.Constructs.Name ( Name(Name)
                              , behindName
                              , facialName

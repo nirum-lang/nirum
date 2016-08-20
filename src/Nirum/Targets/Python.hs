@@ -1,5 +1,4 @@
-{-# LANGUAGE ExtendedDefaultRules, OverloadedLists, OverloadedStrings,
-             QuasiQuotes #-}
+{-# LANGUAGE ExtendedDefaultRules, OverloadedLists, QuasiQuotes #-}
 module Nirum.Targets.Python ( Code
                             , CodeGen( code
                                      , localImports

@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, QuasiQuotes #-}
+{-# LANGUAGE QuasiQuotes #-}
 module Nirum.Constructs.Annotation.Internal ( Annotation(..)
                                             , AnnotationSet(..)
                                             , Metadata

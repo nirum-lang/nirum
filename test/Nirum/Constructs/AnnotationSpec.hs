@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedLists, OverloadedStrings #-}
+{-# LANGUAGE OverloadedLists #-}
 module Nirum.Constructs.AnnotationSpec where
 
 import Test.Hspec.Meta

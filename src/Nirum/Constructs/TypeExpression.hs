@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 module Nirum.Constructs.TypeExpression (TypeExpression(..), toCode) where
 
 import Data.String (IsString(fromString))

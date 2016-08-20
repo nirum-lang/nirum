@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 module Nirum.Constructs.Declaration ( Declaration
                                     , Docs(Docs)
                                     , annotationDocsName

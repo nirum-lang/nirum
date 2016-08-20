@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 module Nirum.Constructs.Service ( Method ( Method
                                          , methodAnnotations
                                          , methodName

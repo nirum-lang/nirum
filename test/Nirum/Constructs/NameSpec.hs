@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 module Nirum.Constructs.NameSpec where
 
 import Test.Hspec.Meta

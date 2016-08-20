@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 module Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
                                         , Field(Field)
                                         , JsonType(..)
