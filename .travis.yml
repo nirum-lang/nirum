@@ -1,7 +1,7 @@
 language: c
 matrix:
   include:
-  - env: RESOLVER=lts-6.12 PY=3.5
+  - env: GHCVER=8.0.1 RESOLVER=nightly-2016-08-15 PY=3.5
     os: osx
     osx_image: xcode7.3
   - env: GHCVER=7.10.3 RESOLVER=lts-6.12 PY=3.4
