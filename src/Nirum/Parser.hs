@@ -40,6 +40,7 @@ import Data.Set (elems)
 import qualified Data.Text as T
 import Data.Text.IO (readFile)
 import Text.Megaparsec ( Token
+                       , choice
                        , eof
                        , many
                        , manyTill
@@ -100,6 +101,8 @@ import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
                                         , TypeDeclaration( Import
                                                          , ServiceDeclaration
                                                          , TypeDeclaration
+                                                         , serviceAnnotations
+                                                         , typeAnnotations
                                                          )
                                         )
 import Nirum.Constructs.TypeExpression ( TypeExpression( ListModifier
@@ -439,13 +442,31 @@ unionTypeDeclaration = do
         return $ TypeDeclaration typename (UnionType tagSet) annotationSet''
 
 typeDeclaration :: Parser TypeDeclaration
-typeDeclaration =
-    ( try aliasTypeDeclaration <|>
-      try boxedTypeDeclaration <|>
-      try enumTypeDeclaration <|>
-      try recordTypeDeclaration <|>
-      unionTypeDeclaration
-    ) <?> "type declaration (e.g. boxed, enum, record, union)"
+typeDeclaration = do
+    -- Preconsume the common prefix (annotations) to disambiguate
+    -- the continued branches of parsers.
+    spaces
+    annotationSet' <- annotationSet <?> "type annotations"
+    spaces
+    typeDecl <- choice
+        [ unless' ["union", "record", "enum", "boxed"] aliasTypeDeclaration
+        , unless' ["union", "record", "enum"] boxedTypeDeclaration
+        , unless' ["union", "record"] enumTypeDeclaration
+        , unless' ["union"] recordTypeDeclaration
+        , unionTypeDeclaration
+        ] <?> "type declaration (e.g. boxed, enum, record, union)"
+    -- In theory, though it preconsumes annotationSet' before parsing typeDecl
+    -- so that typeDecl itself has no annotations, to prepare for an
+    -- unlikely situation (that I bet it'll never happen)
+    -- unite the preconsumed annotationSet' with typeDecl's annotations
+    -- (that must be empty).
+    let annotations = A.union annotationSet' $ typeAnnotations typeDecl
+    return $ typeDecl { typeAnnotations = annotations }
+  where
+    unless' :: [String] -> Parser a -> Parser a
+    unless' [] _ = fail "no candidates"  -- Must never happen
+    unless' [s] p = notFollowedBy (string s) >> p
+    unless' (x:xs) p = notFollowedBy (string x) >> unless' xs p
 
 parameters :: Parser [Parameter]
 parameters = fieldsOrParameters ("parameter", "parameters") Parameter
@@ -560,8 +581,26 @@ module' = do
         spaces
         return importList
     types <- many $ do
-        typeDecl <- try typeDeclaration <|>
-                    (serviceDeclaration <?> "service declaration")
+        typeDecl <- do
+            -- Preconsume the common prefix (annotations) to disambiguate
+            -- the continued branches of parsers.
+            spaces
+            annotationSet' <- annotationSet <?> "annotations"
+            spaces
+            decl <- choice [ notFollowedBy (string "service") >> typeDeclaration
+                           , serviceDeclaration <?>  "service declaration"
+                           ]
+            -- In theory, though it preconsumes annotationSet' before parsing
+            -- decl so that decl itself has no annotations, to prepare for an
+            -- unlikely situation (that I bet it'll never happen)
+            -- unite the preconsumed annotationSet' with decl's annotations
+            -- (that must be empty).
+            return $ case decl of
+                TypeDeclaration { typeAnnotations = set } ->
+                    decl { typeAnnotations = A.union annotationSet' set }
+                ServiceDeclaration { serviceAnnotations = set } ->
+                    decl { serviceAnnotations = A.union annotationSet' set }
+                _ -> decl  -- Never happen!
         spaces
         return typeDecl
     handleNameDuplication "type" (types ++ [i | l <- importLists, i <- l]) $
