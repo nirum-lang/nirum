@@ -36,7 +36,6 @@ before_install:
     brew update
     brew install python3 || brew upgrade python3 || true
   fi
-- if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then brew install upx; fi
 - curl -o "$HOME/.local/bin/travis_long" -L https://raw.githubusercontent.com/futurice/fum2github/master/travis_long
 - chmod +x "$HOME/.local/bin/travis_long"
 install:
@@ -63,10 +62,8 @@ before_deploy:
 - export NIGHTLY_BINARY_PATH="/tmp/nirum-build/nirum-$(uname -s | tr '[A-Z]' '[a-z]')-$(uname -m)"
 - cp "$(stack path --local-bin-path)/nirum-static" "$NIGHTLY_BINARY_PATH"
 - |
-  if [[ "$TRAVIS_OS_NAME" = "osx" ]]
+  if [[ "$TRAVIS_OS_NAME" = "linux" ]]
   then
-    upx -9 "$NIGHTLY_BINARY_PATH"
-  else
     upx-ucl -9 "$NIGHTLY_BINARY_PATH"
   fi
 notifications:
