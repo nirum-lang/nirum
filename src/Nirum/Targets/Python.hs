@@ -212,7 +212,9 @@ compileUnionTag source parentname typename' fields = do
         nameNTypes = zip tagNames typeExprCodes
         slotTypes = toIndentedCodes
             (\(n, t) -> [qq|'{n}': {t}|]) nameNTypes ",\n        "
-        slots = toIndentedCodes (\n -> [qq|'{n}'|]) tagNames ",\n        "
+        slots = if length tagNames == 1
+                then [qq|'{head tagNames}'|] `T.snoc` ','
+                else toIndentedCodes (\n -> [qq|'{n}'|]) tagNames ",\n        "
         initialArgs = toIndentedCodes
             (\(n, t) -> [qq|{n}: {t}|]) nameNTypes ", "
         initialValues =
@@ -231,7 +233,7 @@ class $className($parentClass):
     # TODO: docstring
 
     __slots__ = (
-        $slots,
+        $slots
     )
     __nirum_tag__ = $parentClass.Tag.{toAttributeName' typename'}
     __nirum_tag_types__ = \{

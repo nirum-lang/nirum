@@ -825,6 +825,13 @@ spec = parallel $ do
                 tags = [pop]
                 decl = TypeDeclaration "music" (UnionType tags) empty
             tT decl "Pop(country='KR').__nirum_tag__.value == 'popular_music'"
+        specify "union type with tag has no field" $ do
+            let decl = TypeDeclaration
+                    "status"
+                    (UnionType [Tag "run" [] empty, Tag "stop" [] empty])
+                    empty
+            tT decl "Run().__nirum_tag__.value == 'run'"
+            tT decl "Stop().__nirum_tag__.value == 'stop'"
         specify "service" $ do
             let null' = ServiceDeclaration "null-service" (Service []) empty
                 pingService = Service [Method "ping"
