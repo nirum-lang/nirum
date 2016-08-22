@@ -18,6 +18,7 @@ run this unit test in the virtualenv (pyvenv).  E.g.:
 module Nirum.Targets.PythonSpec where
 
 import Control.Monad (forM_, void, unless)
+import Control.Monad.Except (throwError)
 import Data.Char (isSpace)
 import Data.Maybe (fromJust, isJust)
 import System.IO.Error (catchIOError)
@@ -333,6 +334,12 @@ spec = parallel $ do
             let codeGen' = do
                     insertStandardImport "sys"
                     _ <- fail "test"
+                    insertStandardImport "sys"
+            compileError codeGen' `shouldBe` Just "test"
+        specify "throwError" $ do
+            let codeGen' = do
+                    insertStandardImport "sys"
+                    _ <- throwError "test"
                     insertStandardImport "sys"
             compileError codeGen' `shouldBe` Just "test"
 

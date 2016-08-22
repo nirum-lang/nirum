@@ -37,7 +37,8 @@ module Nirum.Targets.Python ( Code
 
 import Control.Applicative (Applicative)
 import Control.Monad (Monad)
-import Control.Monad.State (MonadState, StateT, modify, runStateT)
+import Control.Monad.Except (MonadError)
+import Control.Monad.State (MonadState, StateT(StateT), modify, runStateT)
 import Data.Functor (Functor)
 import qualified Data.List as L
 import Data.Maybe (fromMaybe)
@@ -115,13 +116,28 @@ emptyContext = CodeGenContext { standardImports = []
                               }
 
 newtype CodeGen a = CodeGen (StateT CodeGenContext (Either CompileError) a)
-    deriving (Applicative, Functor, Monad, MonadState CodeGenContext)
+    deriving ( Applicative
+             , Functor
+             , MonadError CompileError
+             , MonadState CodeGenContext
+             )
+
+instance Monad CodeGen where
+    return a = CodeGen $ StateT $ \s -> return (a, s)
+    {-# INLINE return #-}
+    (CodeGen m) >>= k = CodeGen $ StateT $ \s -> do
+        ~(a, s') <- runStateT m s
+        let (CodeGen n) = k a
+        runStateT n s'
+    {-# INLINE (>>=) #-}
+    fail str = CodeGen $ StateT $ \_ -> Left $ T.pack str
+    {-# INLINE fail #-}
 
 runCodeGen :: CodeGen a -> CodeGenContext -> Either CompileError (a, CodeGenContext)
 runCodeGen (CodeGen a) = runStateT a
 
 compileError :: CodeGen a -> Maybe CompileError
-compileError (CodeGen a) = either Just (const Nothing) $ runStateT a emptyContext
+compileError cg = either Just (const Nothing) $ runCodeGen cg emptyContext
 
 insertStandardImport :: T.Text -> CodeGen ()
 insertStandardImport module' = modify insert'
