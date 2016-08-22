@@ -1,4 +1,5 @@
-{-# LANGUAGE ExtendedDefaultRules, OverloadedLists, QuasiQuotes #-}
+{-# LANGUAGE ExtendedDefaultRules, GeneralizedNewtypeDeriving,
+   OverloadedLists, QuasiQuotes #-}
 module Nirum.Targets.Python ( Code
                             , CodeGen
                             , CodeGenContext ( localImports
@@ -23,7 +24,6 @@ module Nirum.Targets.Python ( Code
                             , compileTypeDeclaration
                             , compileTypeExpression
                             , emptyContext
-                            , hasError
                             , toAttributeName
                             , toClassName
                             , toImportPath
@@ -32,11 +32,15 @@ module Nirum.Targets.Python ( Code
                             , insertLocalImport
                             , insertStandardImport
                             , insertThirdPartyImports
+                            , runCodeGen
                             ) where
 
-import Control.Monad.State (StateT, modify, runStateT)
+import Control.Applicative (Applicative)
+import Control.Monad (Monad)
+import Control.Monad.State (MonadState, StateT, modify, runStateT)
+import Data.Functor (Functor)
 import qualified Data.List as L
-import Data.Maybe (fromMaybe, isJust)
+import Data.Maybe (fromMaybe)
 import GHC.Exts (IsList(toList))
 
 import qualified Data.Map.Strict as M
@@ -110,13 +114,14 @@ emptyContext = CodeGenContext { standardImports = []
                               , localImports = []
                               }
 
-type CodeGen = StateT CodeGenContext (Either CompileError)
+newtype CodeGen a = CodeGen (StateT CodeGenContext (Either CompileError) a)
+    deriving (Applicative, Functor, Monad, MonadState CodeGenContext)
 
-hasError :: CodeGen a -> Bool
-hasError = isJust . compileError
+runCodeGen :: CodeGen a -> CodeGenContext -> Either CompileError (a, CodeGenContext)
+runCodeGen (CodeGen a) = runStateT a
 
 compileError :: CodeGen a -> Maybe CompileError
-compileError codegen = (either Just (\_ -> Nothing)) $ runStateT codegen emptyContext
+compileError (CodeGen a) = either Just (const Nothing) $ runStateT a emptyContext
 
 insertStandardImport :: T.Text -> CodeGen ()
 insertStandardImport module' = modify insert'
@@ -635,18 +640,17 @@ unionInstallRequires a b =
 
 compileModule :: Source -> Either CompileError (InstallRequires, Code)
 compileModule source =
-    case runStateT code' emptyContext of
+    case runCodeGen code' emptyContext of
         Left errMsg -> Left errMsg
-        Right (code, context) -> do
-            codeWithDeps context $ [qq|
-                {imports $ standardImports context}
+        Right (code, context) -> codeWithDeps context $ [qq|
+{imports $ standardImports context}
 
-                {fromImports $ localImports context}
+{fromImports $ localImports context}
 
-                {fromImports $ thirdPartyImports context}
+{fromImports $ thirdPartyImports context}
 
-                {code}
-            |]
+{code}
+|]
   where
     code' :: CodeGen T.Text
     code' = compileModuleBody source
