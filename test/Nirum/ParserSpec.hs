@@ -73,7 +73,10 @@ helperFuncs parser =
         col' <- mkPos col
         let parseResult = parse' inputString
         parseResult `shouldSatisfy` isLeft
-        erroredPos parseResult `shouldBe` (line', col')
+        let Left parseError = parseResult
+            msg = parseErrorPretty parseError
+        -- msg is just for debug print
+        (erroredPos parseResult, msg) `shouldBe` ((line', col'), msg)
 
 
 fooAnnotationSet :: AnnotationSet
@@ -408,6 +411,11 @@ spec = do
         specify "its name can't have behind name since \
                 \its canonical type's behind name would be used instead" $
             expectError "type path/error = text;" 1 10
+        it "fails to parse if trailing semicolon is missing" $ do
+            let (_, expectErr) = helperFuncs P.module'
+            expectErr "type a = text;\ntype b = text\ntype c = text;" 3 1
+            expectErr "boxed a (text);\ntype b = text\nboxed c (text);" 3 1
+            expectErr "type a = text;\nboxed b (text)\ntype c = text;" 3 1
 
     descTypeDecl "boxedTypeDeclaration" P.boxedTypeDeclaration $ \helpers -> do
         let (parse', expectError) = helpers
@@ -431,6 +439,11 @@ spec = do
                                     (A.union (singleDocs "docs\ndocs...\n")
                                              bazAnnotationSet)
             expectError "boxed offset/behind (float64);" 1 13
+        it "fails to parse if trailing semicolon is missing" $ do
+            let (_, expectErr) = helperFuncs P.module'
+            expectErr "boxed a (text);\nboxed b (text)\nboxed c (text);" 3 1
+            expectErr "type a = text;\nboxed b (text)\ntype c = text;" 3 1
+            expectErr "boxed a (text);\ntype b = text\nboxed c (text);" 3 1
 
     descTypeDecl "enumTypeDeclaration" P.enumTypeDeclaration $ \helpers -> do
         let (parse', expectError) = helpers
@@ -475,6 +488,11 @@ spec = do
                         \         | b/c\n\
                         \         | c/b\n\
                         \         ;" 4 10
+        it "fails to parse if trailing semicolon is missing" $ do
+            let (_, expectErr) = helperFuncs P.module'
+            expectErr "enum a = x | y;\nenum b = x | y\nenum c = x | y;" 3 1
+            expectErr "boxed a (text);\nenum b = x | y\nboxed c (text);" 3 1
+            expectErr "enum a = x | y;\nboxed b (text)\nenum c = x | y;" 3 1
 
     descTypeDecl "recordTypeDeclaration" P.recordTypeDeclaration $ \helpers -> do
         let (parse', expectError) = helpers
@@ -556,6 +574,14 @@ spec = do
         it "fails to parse if there's no space between field type and name" $ do
             expectError "record a (typename);" 1 11
             expectError "record a (typename\n#docs\n);" 1 11
+        it "fails to parse if trailing semicolon is missing" $ do
+            let (_, expectErr) = helperFuncs P.module'
+            expectErr
+                "record a (text x);\nrecord b (text y)\nrecord c (text z);"
+                3 1
+            expectErr "type a = text;\nrecord b (text x)\ntype c = text;" 3 1
+            expectErr "record a (text x);\ntype b = text\nrecord c (text y);"
+                      3 1
 
     descTypeDecl "unionTypeDeclaration" P.unionTypeDeclaration $ \helpers -> do
         let (parse', expectError) = helpers
@@ -608,6 +634,11 @@ spec = do
                         \    = a (text a/b, text b/c, text c/b)\n\
                         \    | b\n\
                         \    ;" 2 38
+        it "fails to parse if trailing semicolon is missing" $ do
+            let (_, expectErr) = helperFuncs P.module'
+            expectErr "union a = x | y;\nunion b = x | y\nunion c = x | y;" 3 1
+            expectErr "boxed a (text);\nunion b = x | y\nboxed c (text);" 3 1
+            expectErr "union a = x | y;\nboxed b (text)\nunion c = x | y;" 3 1
 
     describe "method" $ do
         let (parse', expectError) = helperFuncs P.method
@@ -811,6 +842,11 @@ spec = do
                         \  bool unique-name/same-name ()\n\
                         \  text different-facial-name/same-name (uuid id)\n\
                         \);" 3 3
+        it "fails to parse if trailing semicolon is missing" $ do
+            let (_, expectErr) = helperFuncs P.module'
+            expectErr "service a ();\nservice b ()\nservice c ();" 3 1
+            expectErr "type a = text;\nservice b ()\ntype c = text;" 3 1
+            expectErr "service a ();\ntype b = text\nservice c ();" 3 1
     let moduleParsers = [ ("module'", P.module')
                         , ("file", P.file)
                         ] :: [(String, Parser Module)]
@@ -830,9 +866,9 @@ spec = do
                 parse' "" `shouldBeRight` Module [] Nothing
                 parse' "# docs" `shouldBeRight` Module [] (Just "docs")
             it "errors if there are any duplicated facial names" $
-                expectError "type a = text;\ntype a/b = text;" 2 1
+                expectError "type a = text;\ntype a/b = text;" 2 7
             it "errors if there are any duplicated behind names" $
-                expectError "type b = text;\ntype a/b = text;" 2 1
+                expectError "type b = text;\ntype a/b = text;" 2 7
 
     describe "modulePath" $ do
         let (parse', expectError) = helperFuncs P.modulePath
