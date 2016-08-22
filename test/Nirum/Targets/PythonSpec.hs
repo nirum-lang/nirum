@@ -18,7 +18,6 @@ run this unit test in the virtualenv (pyvenv).  E.g.:
 module Nirum.Targets.PythonSpec where
 
 import Control.Monad (forM_, void, unless)
-import Control.Monad.Except (throwError)
 import Data.Char (isSpace)
 import Data.Maybe (fromJust, isJust)
 import System.IO.Error (catchIOError)
@@ -91,7 +90,6 @@ import Nirum.Targets.Python ( Source (Source)
                                               )
                             , addDependency
                             , addOptionalDependency
-                            , compileError
                             , compilePackage
                             , compilePrimitiveType
                             , compileTypeExpression
@@ -297,6 +295,10 @@ code = fst . run'
 codeContext :: CodeGen a -> CodeGenContext
 codeContext = snd . run'
 
+compileError :: CodeGen a -> Maybe CompileError
+compileError cg = either Just (const Nothing) $ runCodeGen cg emptyContext
+
+
 spec :: Spec
 spec = parallel $ do
     describe "CodeGen" $ do
@@ -330,18 +332,6 @@ spec = parallel $ do
             thirdPartyImports ctx2 `shouldBe` []
             localImports ctx2 `shouldBe` []
             compileError codeGen2 `shouldBe` Nothing
-        specify "fail" $ do
-            let codeGen' = do
-                    insertStandardImport "sys"
-                    _ <- fail "test"
-                    insertStandardImport "sys"
-            compileError codeGen' `shouldBe` Just "test"
-        specify "throwError" $ do
-            let codeGen' = do
-                    insertStandardImport "sys"
-                    _ <- throwError "test"
-                    insertStandardImport "sys"
-            compileError codeGen' `shouldBe` Just "test"
 
     specify "compilePrimitiveType" $ do
         code (compilePrimitiveType Bool) `shouldBe` "bool"

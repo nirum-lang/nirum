@@ -19,6 +19,7 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:     Nirum.Cli
+                 ,     Nirum.CodeGen
                  ,     Nirum.Constructs
                  ,     Nirum.Constructs.Annotation
                  ,     Nirum.Constructs.Annotation.Internal
@@ -73,6 +74,7 @@ test-suite spec
   hs-source-dirs:      test
   main-is:             Spec.hs
   other-modules:       Nirum.CliSpec
+               ,       Nirum.CodeGenSpec
                ,       Nirum.Constructs.AnnotationSpec
                ,       Nirum.Constructs.DocsSpec
                ,       Nirum.Constructs.DeclarationSetSpec

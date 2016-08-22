@@ -1,5 +1,4 @@
-{-# LANGUAGE ExtendedDefaultRules, GeneralizedNewtypeDeriving,
-   OverloadedLists, QuasiQuotes #-}
+{-# LANGUAGE ExtendedDefaultRules, OverloadedLists, QuasiQuotes #-}
 module Nirum.Targets.Python ( Code
                             , CodeGen
                             , CodeGenContext ( localImports
@@ -17,7 +16,6 @@ module Nirum.Targets.Python ( Code
                                     )
                             , addDependency
                             , addOptionalDependency
-                            , compileError
                             , compileModule
                             , compilePackage
                             , compilePrimitiveType
@@ -35,11 +33,7 @@ module Nirum.Targets.Python ( Code
                             , runCodeGen
                             ) where
 
-import Control.Applicative (Applicative)
-import Control.Monad (Monad)
-import Control.Monad.Except (MonadError)
-import Control.Monad.State (MonadState, StateT(StateT), modify, runStateT)
-import Data.Functor (Functor)
+import Control.Monad.State (modify)
 import qualified Data.List as L
 import Data.Maybe (fromMaybe)
 import GHC.Exts (IsList(toList))
@@ -50,6 +44,7 @@ import qualified Data.Text as T
 import System.FilePath (joinPath)
 import Text.InterpolatedString.Perl6 (qq)
 
+import qualified Nirum.CodeGen as C
 import qualified Nirum.Constructs.DeclarationSet as DS
 import Nirum.Constructs.Identifier ( Identifier
                                    , toPascalCaseText
@@ -115,29 +110,10 @@ emptyContext = CodeGenContext { standardImports = []
                               , localImports = []
                               }
 
-newtype CodeGen a = CodeGen (StateT CodeGenContext (Either CompileError) a)
-    deriving ( Applicative
-             , Functor
-             , MonadError CompileError
-             , MonadState CodeGenContext
-             )
-
-instance Monad CodeGen where
-    return a = CodeGen $ StateT $ \s -> return (a, s)
-    {-# INLINE return #-}
-    (CodeGen m) >>= k = CodeGen $ StateT $ \s -> do
-        ~(a, s') <- runStateT m s
-        let (CodeGen n) = k a
-        runStateT n s'
-    {-# INLINE (>>=) #-}
-    fail str = CodeGen $ StateT $ \_ -> Left $ T.pack str
-    {-# INLINE fail #-}
+type CodeGen = C.CodeGen CodeGenContext CompileError
 
 runCodeGen :: CodeGen a -> CodeGenContext -> Either CompileError (a, CodeGenContext)
-runCodeGen (CodeGen a) = runStateT a
-
-compileError :: CodeGen a -> Maybe CompileError
-compileError cg = either Just (const Nothing) $ runCodeGen cg emptyContext
+runCodeGen = C.runCodeGen
 
 insertStandardImport :: T.Text -> CodeGen ()
 insertStandardImport module' = modify insert'
