@@ -18,10 +18,12 @@ run this unit test in the virtualenv (pyvenv).  E.g.:
 module Nirum.Targets.PythonSpec where
 
 import Control.Monad (forM_, void, unless)
+import Control.Monad.State (runStateT)
 import Data.Char (isSpace)
 import Data.Maybe (fromJust, isJust)
 import System.IO.Error (catchIOError)
 
+import Data.Either (isRight)
 import Data.List (dropWhileEnd)
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
@@ -77,11 +79,11 @@ import Nirum.Package (BoundModule(modulePath), Package, resolveBoundModule)
 import Nirum.PackageSpec (createPackage)
 import Nirum.Targets.Python ( Source (Source)
                             , Code
-                            , CodeGen( code
-                                     , localImports
-                                     , standardImports
-                                     , thirdPartyImports
-                                     )
+                            , CodeGen
+                            , CodeGenContext ( localImports
+                                             , standardImports
+                                             , thirdPartyImports
+                                             )
                             , CompileError
                             , InstallRequires ( InstallRequires
                                               , dependencies
@@ -93,15 +95,15 @@ import Nirum.Targets.Python ( Source (Source)
                             , compilePackage
                             , compilePrimitiveType
                             , compileTypeExpression
-                            , hasError
+                            , emptyContext
                             , toAttributeName
                             , toClassName
                             , toImportPath
                             , toNamePair
                             , unionInstallRequires
-                            , withLocalImport
-                            , withStandardImport
-                            , withThirdPartyImports
+                            , insertLocalImport
+                            , insertStandardImport
+                            , insertThirdPartyImports
                             )
 
 codeGen :: a -> CodeGen a
@@ -283,141 +285,111 @@ makeDummySource' pathPrefix m =
 makeDummySource :: Module -> Source
 makeDummySource = makeDummySource' []
 
+run' :: CodeGen a -> (a, CodeGenContext)
+run' c = case runStateT c emptyContext of
+    Left errMsg  -> error $ T.unpack errMsg
+    Right a      -> a
+
+code :: CodeGen a -> a
+code = fst . run'
+
+codeContext :: CodeGen a -> CodeGenContext
+codeContext = snd . run'
+
 spec :: Spec
 spec = parallel $ do
     describe "CodeGen" $ do
-        let v = 123 :: Int
-            cg = return v :: CodeGen Int
-            f = return . g :: Int -> CodeGen Int
-            f' = return . h :: Int -> CodeGen Int
-            g = (+ 5) :: Int -> Int
-            h = (* 2) :: Int -> Int
-            g' = pure g :: CodeGen (Int -> Int)
-            h' = pure h :: CodeGen (Int -> Int)
-            id' x = x
-        context "Functor" $ do
-            specify "identity morphisms" $
-                fmap id' (return 123 :: CodeGen Int) `shouldBe` id' (return 123)
-            specify "composition of morphisms" $ do
-                fmap (g . h) cg `shouldBe` (fmap g . fmap h) cg
-                fmap (h . g) cg `shouldBe` (fmap h . fmap g) cg
-        context "Applicative" $ do
-            specify "identity law" $
-                (pure id' <*> cg) `shouldBe` cg
-            specify "homomorphism" $ do
-                let pure' = pure :: a -> CodeGen a
-                (pure g <*> pure v) `shouldBe` pure' (g v)
-                (pure h <*> pure v) `shouldBe` pure' (h v)
-            specify "interchange" $ do
-                (g' <*> pure v) `shouldBe` (pure ($ v) <*> g')
-                (h' <*> pure v) `shouldBe` (pure ($ v) <*> h')
-            specify "composition" $ do
-                (g' <*> (h' <*> cg)) `shouldBe` (pure (.) <*> g' <*> h' <*> cg)
-                (h' <*> (g' <*> cg)) `shouldBe` (pure (.) <*> h' <*> g' <*> cg)
         context "Monad" $ do
-            specify "left identity" $ do
-                (return v >>= f) `shouldBe` f v
-                (return v >>= f') `shouldBe` f' v
-            specify "right identity" $
-                (cg >>= return) `shouldBe` cg
-            specify "associativity" $ do
-                ((cg >>= f) >>= f') `shouldBe` (cg >>= (\x -> f x >>= f'))
-                ((cg >>= f') >>= f) `shouldBe` (cg >>= (\x -> f' x >>= f))
             specify "packages and imports" $ do
-                let (c :: CodeGen Int) = do
-                        a <- withStandardImport "sys" cg
-                        b <- withThirdPartyImports
-                            [("nirum", ["serialize_boxed_type"])]
-                            cg
-                        c' <- withLocalImport ".." "Gender" cg
-                        d <- withStandardImport "os" cg
-                        e <- withThirdPartyImports
-                            [("nirum", ["serialize_enum_type"])]
-                            cg
-                        f'' <- withLocalImport ".." "Path" cg
-                        return $ sum ([a, b, c', d, e, f''] :: [Int])
-                c `shouldSatisfy` (not . hasError)
-                standardImports c `shouldBe` ["os", "sys"]
-                thirdPartyImports c `shouldBe`
+                let c = do
+                        insertStandardImport "sys"
+                        insertThirdPartyImports [("nirum", ["serialize_boxed_type"])]
+                        insertLocalImport ".." "Gender"
+                        insertStandardImport "os"
+                        insertThirdPartyImports [("nirum", ["serialize_enum_type"])]
+                        insertLocalImport ".." "Path"
+                runStateT c emptyContext `shouldSatisfy` isRight
+                let Right (_, ctx) = runStateT c emptyContext
+                standardImports ctx `shouldBe` ["os", "sys"]
+                thirdPartyImports ctx `shouldBe`
                     [("nirum", ["serialize_boxed_type", "serialize_enum_type"])]
-                localImports c `shouldBe` [("..", ["Gender", "Path"])]
-                code c `shouldBe` (123 * 6)
-        specify "withStandardImport" $ do
-            let codeGen1 = withStandardImport "sys" (pure True)
-            codeGen1 `shouldSatisfy` (not . hasError)
-            standardImports codeGen1 `shouldBe` ["sys"]
-            thirdPartyImports codeGen1 `shouldBe` []
-            localImports codeGen1 `shouldBe` []
-            code codeGen1 `shouldBe` True
+                localImports ctx `shouldBe` [("..", ["Gender", "Path"])]
+        specify "insertStandardImport" $ do
+            let codeGen1 = insertStandardImport "sys"
+            runStateT codeGen1 emptyContext `shouldSatisfy` isRight
+            let Right (_, ctx1) = runStateT codeGen1 emptyContext
+            standardImports ctx1 `shouldBe` ["sys"]
+            thirdPartyImports ctx1 `shouldBe` []
+            localImports ctx1 `shouldBe` []
             compileError codeGen1 `shouldBe` Nothing
-            let codeGen2 = withStandardImport "os" codeGen1
-            codeGen2 `shouldSatisfy` (not . hasError)
-            standardImports codeGen2 `shouldBe` ["os", "sys"]
-            thirdPartyImports codeGen2 `shouldBe` []
-            localImports codeGen2 `shouldBe` []
-            code codeGen2 `shouldBe` True
+            let codeGen2 = codeGen1 >> insertStandardImport "os"
+            runStateT codeGen2 emptyContext `shouldSatisfy` isRight
+            let Right (_, ctx2) = runStateT codeGen2 emptyContext
+            standardImports ctx2 `shouldBe` ["os", "sys"]
+            thirdPartyImports ctx2 `shouldBe` []
+            localImports ctx2 `shouldBe` []
             compileError codeGen2 `shouldBe` Nothing
         specify "fail" $ do
             let codeGen' = do
-                    val <- withStandardImport "sys" (pure True)
+                    insertStandardImport "sys"
                     _ <- fail "test"
-                    withStandardImport "sys" (pure val)
+                    insertStandardImport "sys"
             compileError codeGen' `shouldBe` Just "test"
 
     specify "compilePrimitiveType" $ do
         code (compilePrimitiveType Bool) `shouldBe` "bool"
         code (compilePrimitiveType Bigint) `shouldBe` "int"
-        let decimal = compilePrimitiveType Decimal
-        code decimal `shouldBe` "decimal.Decimal"
-        standardImports decimal `shouldBe` ["decimal"]
+        let (decimalCode, decimalContext) = run' (compilePrimitiveType Decimal)
+        decimalCode `shouldBe` "decimal.Decimal"
+        standardImports decimalContext `shouldBe` ["decimal"]
         code (compilePrimitiveType Int32) `shouldBe` "int"
         code (compilePrimitiveType Int64) `shouldBe` "int"
         code (compilePrimitiveType Float32) `shouldBe` "float"
         code (compilePrimitiveType Float64) `shouldBe` "float"
         code (compilePrimitiveType Text) `shouldBe` "str"
         code (compilePrimitiveType Binary) `shouldBe` "bytes"
-        let date = compilePrimitiveType Date
-        code date `shouldBe` "datetime.date"
-        standardImports date `shouldBe` ["datetime"]
-        let datetime = compilePrimitiveType Datetime
-        code datetime `shouldBe` "datetime.datetime"
-        standardImports datetime `shouldBe` ["datetime"]
-        let uuid = compilePrimitiveType Uuid
-        code uuid `shouldBe` "uuid.UUID"
-        standardImports uuid `shouldBe` ["uuid"]
+        let (dateCode, dateContext) = run' (compilePrimitiveType Date)
+        dateCode `shouldBe` "datetime.date"
+        standardImports dateContext `shouldBe` ["datetime"]
+        let (datetimeCode, datetimeContext) = run' (compilePrimitiveType Datetime)
+        datetimeCode `shouldBe` "datetime.datetime"
+        standardImports datetimeContext `shouldBe` ["datetime"]
+        let (uuidCode, uuidContext) = run' (compilePrimitiveType Uuid)
+        uuidCode `shouldBe` "uuid.UUID"
+        standardImports uuidContext `shouldBe` ["uuid"]
         code (compilePrimitiveType Uri) `shouldBe` "str"
 
     describe "compileTypeExpression" $ do
         let s = makeDummySource $ Module [] Nothing
         specify "TypeIdentifier" $ do
             let c = compileTypeExpression s (TypeIdentifier "bigint")
-            c `shouldSatisfy` (not . hasError)
-            standardImports c `shouldBe` []
-            localImports c `shouldBe` []
+            runStateT c emptyContext `shouldSatisfy` isRight
+            standardImports (codeContext c) `shouldBe` []
+            localImports (codeContext c) `shouldBe` []
             code c `shouldBe` "int"
         specify "OptionModifier" $ do
             let c' = compileTypeExpression s (OptionModifier "text")
-            c' `shouldSatisfy` (not . hasError)
-            standardImports c' `shouldBe` ["typing"]
-            localImports c' `shouldBe` []
+            runStateT c' emptyContext `shouldSatisfy` isRight
+            standardImports (codeContext c') `shouldBe` ["typing"]
+            localImports (codeContext c') `shouldBe` []
             code c' `shouldBe` "typing.Optional[str]"
         specify "SetModifier" $ do
             let c'' = compileTypeExpression s (SetModifier "text")
-            c'' `shouldSatisfy` (not . hasError)
-            standardImports c'' `shouldBe` ["typing"]
-            localImports c'' `shouldBe` []
+            runStateT c'' emptyContext `shouldSatisfy` isRight
+            standardImports (codeContext c'') `shouldBe` ["typing"]
+            localImports (codeContext c'') `shouldBe` []
             code c'' `shouldBe` "typing.AbstractSet[str]"
         specify "ListModifier" $ do
             let c''' = compileTypeExpression s (ListModifier "text")
-            c''' `shouldSatisfy` (not . hasError)
-            standardImports c''' `shouldBe` ["typing"]
-            localImports c''' `shouldBe` []
+            runStateT c''' emptyContext `shouldSatisfy` isRight
+            standardImports (codeContext c''') `shouldBe` ["typing"]
+            localImports (codeContext c''') `shouldBe` []
             code c''' `shouldBe` "typing.Sequence[str]"
         specify "MapModifier" $ do
             let c'''' = compileTypeExpression s (MapModifier "uuid" "text")
-            c'''' `shouldSatisfy` (not . hasError)
-            standardImports c'''' `shouldBe` ["uuid", "typing"]
-            localImports c'''' `shouldBe` []
+            runStateT c'''' emptyContext `shouldSatisfy` isRight
+            standardImports (codeContext c'''') `shouldBe` ["uuid", "typing"]
+            localImports (codeContext c'''') `shouldBe` []
             code c'''' `shouldBe` "typing.Mapping[uuid.UUID, str]"
 
     describe "toClassName" $ do
