@@ -284,19 +284,17 @@ makeDummySource' pathPrefix m =
 makeDummySource :: Module -> Source
 makeDummySource = makeDummySource' []
 
-run' :: CodeGen a -> (a, CodeGenContext)
-run' c = case runCodeGen c emptyContext of
-    Left errMsg  -> error $ T.unpack errMsg
-    Right a      -> a
+run' :: CodeGen a -> (Either CompileError a, CodeGenContext)
+run' c = runCodeGen c emptyContext
 
 code :: CodeGen a -> a
-code = fst . run'
+code = either (const undefined) id . fst . run'
 
 codeContext :: CodeGen a -> CodeGenContext
 codeContext = snd . run'
 
 compileError :: CodeGen a -> Maybe CompileError
-compileError cg = either Just (const Nothing) $ runCodeGen cg emptyContext
+compileError cg = either Just (const Nothing) $ fst $ runCodeGen cg emptyContext
 
 
 spec :: Spec
@@ -311,23 +309,23 @@ spec = parallel $ do
                         insertStandardImport "os"
                         insertThirdPartyImports [("nirum", ["serialize_enum_type"])]
                         insertLocalImport ".." "Path"
-                runCodeGen c emptyContext `shouldSatisfy` isRight
-                let Right (_, ctx) = runCodeGen c emptyContext
+                let (e, ctx) = runCodeGen c emptyContext
+                e `shouldSatisfy` isRight
                 standardImports ctx `shouldBe` ["os", "sys"]
                 thirdPartyImports ctx `shouldBe`
                     [("nirum", ["serialize_boxed_type", "serialize_enum_type"])]
                 localImports ctx `shouldBe` [("..", ["Gender", "Path"])]
         specify "insertStandardImport" $ do
             let codeGen1 = insertStandardImport "sys"
-            runCodeGen codeGen1 emptyContext `shouldSatisfy` isRight
-            let Right (_, ctx1) = runCodeGen codeGen1 emptyContext
+            let (e1, ctx1) = runCodeGen codeGen1 emptyContext
+            e1 `shouldSatisfy` isRight
             standardImports ctx1 `shouldBe` ["sys"]
             thirdPartyImports ctx1 `shouldBe` []
             localImports ctx1 `shouldBe` []
             compileError codeGen1 `shouldBe` Nothing
             let codeGen2 = codeGen1 >> insertStandardImport "os"
-            runCodeGen codeGen2 emptyContext `shouldSatisfy` isRight
-            let Right (_, ctx2) = runCodeGen codeGen2 emptyContext
+            let (e2, ctx2) = runCodeGen codeGen2 emptyContext
+            e2 `shouldSatisfy` isRight
             standardImports ctx2 `shouldBe` ["os", "sys"]
             thirdPartyImports ctx2 `shouldBe` []
             localImports ctx2 `shouldBe` []
@@ -337,7 +335,7 @@ spec = parallel $ do
         code (compilePrimitiveType Bool) `shouldBe` "bool"
         code (compilePrimitiveType Bigint) `shouldBe` "int"
         let (decimalCode, decimalContext) = run' (compilePrimitiveType Decimal)
-        decimalCode `shouldBe` "decimal.Decimal"
+        decimalCode `shouldBe` Right "decimal.Decimal"
         standardImports decimalContext `shouldBe` ["decimal"]
         code (compilePrimitiveType Int32) `shouldBe` "int"
         code (compilePrimitiveType Int64) `shouldBe` "int"
@@ -346,48 +344,43 @@ spec = parallel $ do
         code (compilePrimitiveType Text) `shouldBe` "str"
         code (compilePrimitiveType Binary) `shouldBe` "bytes"
         let (dateCode, dateContext) = run' (compilePrimitiveType Date)
-        dateCode `shouldBe` "datetime.date"
+        dateCode `shouldBe` Right "datetime.date"
         standardImports dateContext `shouldBe` ["datetime"]
         let (datetimeCode, datetimeContext) = run' (compilePrimitiveType Datetime)
-        datetimeCode `shouldBe` "datetime.datetime"
+        datetimeCode `shouldBe` Right "datetime.datetime"
         standardImports datetimeContext `shouldBe` ["datetime"]
         let (uuidCode, uuidContext) = run' (compilePrimitiveType Uuid)
-        uuidCode `shouldBe` "uuid.UUID"
+        uuidCode `shouldBe` Right "uuid.UUID"
         standardImports uuidContext `shouldBe` ["uuid"]
         code (compilePrimitiveType Uri) `shouldBe` "str"
 
     describe "compileTypeExpression" $ do
         let s = makeDummySource $ Module [] Nothing
         specify "TypeIdentifier" $ do
-            let c = compileTypeExpression s (TypeIdentifier "bigint")
-            runCodeGen c emptyContext `shouldSatisfy` isRight
-            standardImports (codeContext c) `shouldBe` []
-            localImports (codeContext c) `shouldBe` []
-            code c `shouldBe` "int"
+            let (c, ctx) = run' $ compileTypeExpression s (TypeIdentifier "bigint")
+            standardImports ctx `shouldBe` []
+            localImports ctx `shouldBe` []
+            c `shouldBe` Right "int"
         specify "OptionModifier" $ do
-            let c' = compileTypeExpression s (OptionModifier "text")
-            runCodeGen c' emptyContext `shouldSatisfy` isRight
-            standardImports (codeContext c') `shouldBe` ["typing"]
-            localImports (codeContext c') `shouldBe` []
-            code c' `shouldBe` "typing.Optional[str]"
+            let (c', ctx') = run' $ compileTypeExpression s (OptionModifier "text")
+            standardImports ctx' `shouldBe` ["typing"]
+            localImports ctx' `shouldBe` []
+            c' `shouldBe` Right "typing.Optional[str]"
         specify "SetModifier" $ do
-            let c'' = compileTypeExpression s (SetModifier "text")
-            runCodeGen c'' emptyContext `shouldSatisfy` isRight
-            standardImports (codeContext c'') `shouldBe` ["typing"]
-            localImports (codeContext c'') `shouldBe` []
-            code c'' `shouldBe` "typing.AbstractSet[str]"
+            let (c'', ctx'') = run' $ compileTypeExpression s (SetModifier "text")
+            standardImports ctx'' `shouldBe` ["typing"]
+            localImports ctx'' `shouldBe` []
+            c'' `shouldBe` Right "typing.AbstractSet[str]"
         specify "ListModifier" $ do
-            let c''' = compileTypeExpression s (ListModifier "text")
-            runCodeGen c''' emptyContext `shouldSatisfy` isRight
-            standardImports (codeContext c''') `shouldBe` ["typing"]
-            localImports (codeContext c''') `shouldBe` []
-            code c''' `shouldBe` "typing.Sequence[str]"
+            let (c''', ctx''') = run' $ compileTypeExpression s (ListModifier "text")
+            standardImports ctx''' `shouldBe` ["typing"]
+            localImports ctx''' `shouldBe` []
+            c''' `shouldBe` Right "typing.Sequence[str]"
         specify "MapModifier" $ do
-            let c'''' = compileTypeExpression s (MapModifier "uuid" "text")
-            runCodeGen c'''' emptyContext `shouldSatisfy` isRight
-            standardImports (codeContext c'''') `shouldBe` ["uuid", "typing"]
-            localImports (codeContext c'''') `shouldBe` []
-            code c'''' `shouldBe` "typing.Mapping[uuid.UUID, str]"
+            let (c'''', ctx'''') = run' $ compileTypeExpression s (MapModifier "uuid" "text")
+            standardImports ctx'''' `shouldBe` ["uuid", "typing"]
+            localImports ctx'''' `shouldBe` []
+            c'''' `shouldBe` Right "typing.Mapping[uuid.UUID, str]"
 
     describe "toClassName" $ do
         it "transform the facial name of the argument into PascalCase" $ do

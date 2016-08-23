@@ -1,4 +1,5 @@
-{-# LANGUAGE ExtendedDefaultRules, OverloadedLists, QuasiQuotes #-}
+{-# LANGUAGE ExtendedDefaultRules, OverloadedLists, QuasiQuotes,
+  TypeSynonymInstances, MultiParamTypeClasses #-}
 module Nirum.Targets.Python ( Code
                             , CodeGen
                             , CodeGenContext ( localImports
@@ -45,6 +46,7 @@ import System.FilePath (joinPath)
 import Text.InterpolatedString.Perl6 (qq)
 
 import qualified Nirum.CodeGen as C
+import Nirum.CodeGen (Failure)
 import qualified Nirum.Constructs.DeclarationSet as DS
 import Nirum.Constructs.Identifier ( Identifier
                                    , toPascalCaseText
@@ -97,6 +99,9 @@ data Source = Source { sourcePackage :: Package
 type Code = T.Text
 type CompileError = T.Text
 
+instance Failure CodeGenContext CompileError where
+    fromString = return . T.pack
+
 data CodeGenContext
     = CodeGenContext { standardImports :: S.Set T.Text
                      , thirdPartyImports :: M.Map T.Text (S.Set T.Text)
@@ -112,7 +117,7 @@ emptyContext = CodeGenContext { standardImports = []
 
 type CodeGen = C.CodeGen CodeGenContext CompileError
 
-runCodeGen :: CodeGen a -> CodeGenContext -> Either CompileError (a, CodeGenContext)
+runCodeGen :: CodeGen a -> CodeGenContext -> (Either CompileError a, CodeGenContext)
 runCodeGen = C.runCodeGen
 
 insertStandardImport :: T.Text -> CodeGen ()
@@ -633,8 +638,8 @@ unionInstallRequires a b =
 compileModule :: Source -> Either CompileError (InstallRequires, Code)
 compileModule source =
     case runCodeGen code' emptyContext of
-        Left errMsg -> Left errMsg
-        Right (code, context) -> codeWithDeps context $ [qq|
+        (Left  errMsg, _      ) -> Left errMsg
+        (Right code  , context) -> codeWithDeps context $ [qq|
 {imports $ standardImports context}
 
 {fromImports $ localImports context}

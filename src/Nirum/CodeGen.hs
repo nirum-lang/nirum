@@ -1,33 +1,42 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, MultiParamTypeClasses #-}
 module Nirum.CodeGen ( CodeGen
+                     , Failure
+                     , fromString
                      , runCodeGen
                      ) where
 
 import Control.Applicative (Applicative)
 import Control.Monad (Monad)
-import Control.Monad.Except (MonadError)
-import Control.Monad.State (MonadState, StateT(StateT), runStateT)
+import Control.Monad.Except (MonadError, ExceptT(ExceptT), mapExceptT, runExceptT)
+import Control.Monad.State (MonadState, State, mapState, runState)
 import Data.Functor (Functor)
-import Data.String (IsString, fromString)
 
 
-newtype (IsString e) => CodeGen c e a = CodeGen (StateT c (Either e) a)
+newtype CodeGen s e a = CodeGen (ExceptT e (State s) a)
     deriving ( Applicative
              , Functor
              , MonadError e
-             , MonadState c
+             , MonadState s
              )
 
-instance (IsString e) => Monad (CodeGen c e) where
-    return a = CodeGen $ StateT $ \s -> return (a, s)
+class Failure s a where
+    fromString :: MonadState s m => String -> m a
+
+instance (Failure s e) => Monad (CodeGen s e) where
+    return a = CodeGen $ ExceptT $ return (Right a)
     {-# INLINE return #-}
-    (CodeGen m) >>= k = CodeGen $ StateT $ \s -> do
-        ~(a, s') <- runStateT m s
-        let (CodeGen n) = k a
-        runStateT n s'
+    (CodeGen m) >>= k = CodeGen $ ExceptT $ do
+        a <- runExceptT m
+        case a of
+            Left e -> return (Left e)
+            Right x -> let CodeGen n = k x in runExceptT n
     {-# INLINE (>>=) #-}
-    fail str = CodeGen $ StateT $ \_ -> Left $ fromString str
+    fail str = CodeGen $ mapExceptT mutate (fromString str)
+      where
+        mutate = mapState (\(a, s) -> case a of
+                                          Left _ -> undefined
+                                          Right e -> (Left e, s))
     {-# INLINE fail #-}
 
-runCodeGen :: (IsString e) => CodeGen c e a -> c -> Either e (a, c)
-runCodeGen (CodeGen a) = runStateT a
+runCodeGen :: CodeGen s e a -> s -> (Either e a, s)
+runCodeGen (CodeGen a) = runState (runExceptT a)
