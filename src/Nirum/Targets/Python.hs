@@ -1,10 +1,11 @@
-{-# LANGUAGE ExtendedDefaultRules, OverloadedLists, QuasiQuotes #-}
+{-# LANGUAGE ExtendedDefaultRules, OverloadedLists, QuasiQuotes,
+  TypeSynonymInstances, MultiParamTypeClasses #-}
 module Nirum.Targets.Python ( Code
-                            , CodeGen( code
-                                     , localImports
-                                     , standardImports
-                                     , thirdPartyImports
-                                     )
+                            , CodeGen
+                            , CodeGenContext ( localImports
+                                             , standardImports
+                                             , thirdPartyImports
+                                             )
                             , CompileError
                             , InstallRequires ( InstallRequires
                                               , dependencies
@@ -16,23 +17,24 @@ module Nirum.Targets.Python ( Code
                                     )
                             , addDependency
                             , addOptionalDependency
-                            , compileError
                             , compileModule
                             , compilePackage
                             , compilePrimitiveType
                             , compileTypeDeclaration
                             , compileTypeExpression
-                            , hasError
+                            , emptyContext
                             , toAttributeName
                             , toClassName
                             , toImportPath
                             , toNamePair
                             , unionInstallRequires
-                            , withLocalImport
-                            , withStandardImport
-                            , withThirdPartyImports
+                            , insertLocalImport
+                            , insertStandardImport
+                            , insertThirdPartyImports
+                            , runCodeGen
                             ) where
 
+import Control.Monad.State (modify)
 import qualified Data.List as L
 import Data.Maybe (fromMaybe)
 import GHC.Exts (IsList(toList))
@@ -43,6 +45,8 @@ import qualified Data.Text as T
 import System.FilePath (joinPath)
 import Text.InterpolatedString.Perl6 (qq)
 
+import qualified Nirum.CodeGen as C
+import Nirum.CodeGen (Failure)
 import qualified Nirum.Constructs.DeclarationSet as DS
 import Nirum.Constructs.Identifier ( Identifier
                                    , toPascalCaseText
@@ -95,65 +99,46 @@ data Source = Source { sourcePackage :: Package
 type Code = T.Text
 type CompileError = T.Text
 
-data CodeGen a = CodeGen { standardImports :: S.Set T.Text
-                         , thirdPartyImports :: M.Map T.Text (S.Set T.Text)
-                         , localImports :: M.Map T.Text (S.Set T.Text)
-                         , code :: a
-                         }
-               | CodeGenError CompileError
-               deriving (Eq, Ord, Show)
+instance Failure CodeGenContext CompileError where
+    fromString = return . T.pack
 
-instance Functor CodeGen where
-    fmap f codeGen = pure f <*> codeGen
+data CodeGenContext
+    = CodeGenContext { standardImports :: S.Set T.Text
+                     , thirdPartyImports :: M.Map T.Text (S.Set T.Text)
+                     , localImports :: M.Map T.Text (S.Set T.Text)
+                     }
+    deriving (Eq, Ord, Show)
 
-instance Applicative CodeGen where
-    pure = return
-    c@CodeGen { code = f } <*> codeGen = codeGen >>= \x -> c { code = f x }
-    (CodeGenError m) <*> _ = CodeGenError m
+emptyContext :: CodeGenContext
+emptyContext = CodeGenContext { standardImports = []
+                              , thirdPartyImports = []
+                              , localImports = []
+                              }
 
-instance Monad CodeGen where
-    return code' = CodeGen { standardImports = []
-                           , thirdPartyImports = []
-                           , localImports = []
-                           , code = code'
-                           }
-    (CodeGen si ti li c) >>= f = case f c of
-        (CodeGen si' ti' li' code') ->
-            let stdImports = S.union si si'
-                thirdPartyImports' = M.unionWith S.union ti ti'
-                localImports' = M.unionWith S.union li li'
-            in
-                CodeGen stdImports thirdPartyImports' localImports' code'
-        (CodeGenError m) -> CodeGenError m
-    (CodeGenError m) >>= _ = CodeGenError m
+type CodeGen = C.CodeGen CodeGenContext CompileError
 
-    fail = CodeGenError . T.pack
+runCodeGen :: CodeGen a -> CodeGenContext -> (Either CompileError a, CodeGenContext)
+runCodeGen = C.runCodeGen
 
-hasError :: CodeGen a -> Bool
-hasError (CodeGenError _) = True
-hasError _ = False
-
-compileError :: CodeGen a -> Maybe CompileError
-compileError CodeGen {} = Nothing
-compileError (CodeGenError m) = Just m
-
-withStandardImport :: T.Text -> CodeGen a -> CodeGen a
-withStandardImport module' c@CodeGen { standardImports = si } =
-    c { standardImports = S.insert module' si }
-withStandardImport _ c@(CodeGenError _) = c
-
-withThirdPartyImports :: [(T.Text, S.Set T.Text)] -> CodeGen a -> CodeGen a
-withThirdPartyImports imports c@CodeGen { thirdPartyImports = ti } =
-    c { thirdPartyImports = L.foldl (M.unionWith S.union) ti importList }
+insertStandardImport :: T.Text -> CodeGen ()
+insertStandardImport module' = modify insert'
   where
+    insert' c@CodeGenContext { standardImports = si } =
+        c { standardImports = S.insert module' si }
+
+insertThirdPartyImports :: [(T.Text, S.Set T.Text)] -> CodeGen ()
+insertThirdPartyImports imports = modify insert'
+  where
+    insert' c@CodeGenContext { thirdPartyImports = ti } =
+        c { thirdPartyImports = L.foldl (M.unionWith S.union) ti importList }
     importList :: [M.Map T.Text (S.Set T.Text)]
     importList = map (uncurry M.singleton) imports
-withThirdPartyImports _ c@(CodeGenError _) = c
 
-withLocalImport :: T.Text -> T.Text -> CodeGen a -> CodeGen a
-withLocalImport module' object c@CodeGen { localImports = li } =
-    c { localImports = M.insertWith S.union module' [object] li }
-withLocalImport _ _ c@(CodeGenError _) = c
+insertLocalImport :: T.Text -> T.Text -> CodeGen ()
+insertLocalImport module' object = modify insert'
+  where
+    insert' c@CodeGenContext { localImports = li } =
+        c { localImports = M.insertWith S.union module' [object] li }
 
 -- | The set of Python reserved keywords.
 -- See also: https://docs.python.org/3/reference/lexical_analysis.html#keywords
@@ -224,11 +209,11 @@ compileUnionTag source parentname typename' fields = do
             [name | Field name _ _ <- toList fields]
             ",\n        "
         parentClass = toClassName' parentname
-    withStandardImport "typing" $
-        withThirdPartyImports [ ("nirum.validate", ["validate_union_type"])
-                              , ("nirum.constructs", ["name_dict_type"])
-                              ] $
-            return [qq|
+    insertStandardImport "typing"
+    insertThirdPartyImports [ ("nirum.validate", ["validate_union_type"])
+                            , ("nirum.constructs", ["name_dict_type"])
+                            ]
+    return [qq|
 class $className($parentClass):
     # TODO: docstring
 
@@ -266,16 +251,16 @@ compilePrimitiveType primitiveTypeIdentifier =
     case primitiveTypeIdentifier of
         Bool -> return "bool"
         Bigint -> return "int"
-        Decimal -> withStandardImport "decimal" $ return "decimal.Decimal"
+        Decimal -> insertStandardImport "decimal" >> return "decimal.Decimal"
         Int32 -> return "int"
         Int64 -> return "int"
         Float32 -> return "float"
         Float64 -> return "float"
         Text -> return "str"
         Binary -> return "bytes"
-        Date -> withStandardImport "datetime" $ return "datetime.date"
-        Datetime -> withStandardImport "datetime" $ return "datetime.datetime"
-        Uuid -> withStandardImport "uuid" $ return"uuid.UUID"
+        Date -> insertStandardImport "datetime" >> return "datetime.date"
+        Datetime -> insertStandardImport "datetime" >> return "datetime.datetime"
+        Uuid -> insertStandardImport "uuid" >> return"uuid.UUID"
         Uri -> return "str"
 
 compileTypeExpression :: Source -> TypeExpression -> CodeGen Code
@@ -283,17 +268,19 @@ compileTypeExpression Source { sourceModule = boundModule } (TypeIdentifier i) =
     case lookupType i boundModule of
         Missing -> fail $ "undefined identifier: " ++ toString i
         Imported _ (PrimitiveType p _) -> compilePrimitiveType p
-        Imported m _ ->
-            withThirdPartyImports [(toImportPath m, [toClassName i])] $
-                return $ toClassName i
+        Imported m _ -> do
+            insertThirdPartyImports [(toImportPath m, [toClassName i])]
+            return $ toClassName i
         Local _ -> return $ toClassName i
 compileTypeExpression source (MapModifier k v) = do
     kExpr <- compileTypeExpression source k
     vExpr <- compileTypeExpression source v
-    withStandardImport "typing" $ return [qq|typing.Mapping[$kExpr, $vExpr]|]
+    insertStandardImport "typing"
+    return [qq|typing.Mapping[$kExpr, $vExpr]|]
 compileTypeExpression source modifier = do
     expr <- compileTypeExpression source typeExpr
-    withStandardImport "typing" $ return [qq|typing.$className[$expr]|]
+    insertStandardImport "typing"
+    return [qq|typing.$className[$expr]|]
   where
     typeExpr :: TypeExpression
     className :: T.Text
@@ -318,14 +305,12 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
                                            , type' = BoxedType itype } = do
     let className = toClassName' typename'
     itypeExpr <- compileTypeExpression src itype
-    withStandardImport "typing" $
-        withThirdPartyImports [ ("nirum.validate", ["validate_boxed_type"])
-                              , ("nirum.serialize", ["serialize_boxed_type"])
-                              , ( "nirum.deserialize"
-                                , ["deserialize_boxed_type"]
-                                )
-                              ] $
-            return [qq|
+    insertStandardImport "typing"
+    insertThirdPartyImports [ ("nirum.validate", ["validate_boxed_type"])
+                            , ("nirum.serialize", ["serialize_boxed_type"])
+                            , ("nirum.deserialize", ["deserialize_boxed_type"])
+                            ]
+    return [qq|
 class $className:
     # TODO: docstring
 
@@ -362,7 +347,8 @@ compileTypeDeclaration _ TypeDeclaration { typename = typename'
             [ [qq|{toAttributeName' memberName} = '{toSnakeCaseText bn}'|]
             | EnumMember memberName@(Name _ bn) _ <- toList members
             ]
-    withStandardImport "enum" $ return [qq|
+    insertStandardImport "enum"
+    return [qq|
 class $className(enum.Enum):
     # TODO: docstring
 
@@ -395,16 +381,13 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
             toNamePair
             [name | Field name _ _ <- toList fields]
             ",\n        "
-    withStandardImport "typing" $
-        withThirdPartyImports [ ( "nirum.validate"
-                                , ["validate_record_type"]
-                                )
-                              , ("nirum.serialize", ["serialize_record_type"])
-                              , ( "nirum.deserialize"
-                                , ["deserialize_record_type"])
-                              , ("nirum.constructs", ["name_dict_type"])
-                              ] $
-            return [qq|
+    insertStandardImport "typing"
+    insertThirdPartyImports [ ("nirum.validate", ["validate_record_type"])
+                            , ("nirum.serialize", ["serialize_record_type"])
+                            , ("nirum.deserialize", ["deserialize_record_type"])
+                            , ("nirum.constructs", ["name_dict_type"])
+                            ]
+    return [qq|
 class $className:
     # TODO: docstring
 
@@ -450,15 +433,13 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
         fieldCodes' = T.intercalate "\n\n" fieldCodes
         enumMembers = toIndentedCodes
             (\(t, b) -> [qq|$t = '{b}'|]) enumMembers' "\n        "
-    withStandardImport "typing" $
-        withStandardImport "enum" $
-            withThirdPartyImports [ ( "nirum.serialize"
-                                    , ["serialize_union_type"])
-                                  , ( "nirum.deserialize"
-                                    , ["deserialize_union_type"])
-                                  , ("nirum.constructs", ["name_dict_type"])
-                                  ] $
-                return [qq|
+    insertStandardImport "typing"
+    insertStandardImport "enum"
+    insertThirdPartyImports [ ("nirum.serialize", ["serialize_union_type"])
+                            , ("nirum.deserialize", ["deserialize_union_type"])
+                            , ("nirum.constructs", ["name_dict_type"])
+                            ]
+    return [qq|
 class $className:
 
     __nirum_union_behind_name__ = '{toSnakeCaseText $ N.behindName typename'}'
@@ -513,16 +494,16 @@ compileTypeDeclaration src ServiceDeclaration { serviceName = name
     clientMethods <- mapM compileClientMethod methods'
     let dummyMethods' = T.intercalate "\n\n" dummyMethods
         clientMethods' = T.intercalate "\n\n" clientMethods
-    withStandardImport "urllib.request" $
-        withStandardImport "json" $
-            withThirdPartyImports [ ("nirum.constructs", ["name_dict_type"])
-                                  , ("nirum.deserialize", ["deserialize_meta"])
-                                  , ("nirum.serialize", ["serialize_meta"])
-                                  , ("nirum.rpc", [ "service_type"
-                                                  , "client_type"
-                                                  ])
-                                  ] $
-                return [qq|
+    insertStandardImport "urllib.request"
+    insertStandardImport "json"
+    insertThirdPartyImports [ ("nirum.constructs", ["name_dict_type"])
+                            , ("nirum.deserialize", ["deserialize_meta"])
+                            , ("nirum.serialize", ["serialize_meta"])
+                            , ("nirum.rpc", [ "service_type"
+                                            , "client_type"
+                                            ])
+                            ]
+    return [qq|
 class $className(service_type):
 
     __nirum_service_methods__ = \{
@@ -568,12 +549,12 @@ class {className}_Client(client_type, $className):
         rtypeExpr <- compileTypeExpression src rtype
         paramMetadata <- mapM compileParameterMetadata params'
         let paramMetadata' = commaNl paramMetadata
-        withThirdPartyImports [("nirum.constructs", ["name_dict_type"])] $
-            return [qq|'{toAttributeName' mName}': \{
-                '_return': $rtypeExpr,
-                '_names': name_dict_type([{paramNameMap params'}]),
-                {paramMetadata'}
-            \}|]
+        insertThirdPartyImports [("nirum.constructs", ["name_dict_type"])]
+        return [qq|'{toAttributeName' mName}': \{
+            '_return': $rtypeExpr,
+            '_names': name_dict_type([{paramNameMap params'}]),
+            {paramMetadata'}
+        \}|]
     compileParameterMetadata :: Parameter -> CodeGen Code
     compileParameterMetadata (Parameter pName pType _) = do
         let pName' = toAttributeName' pName
@@ -658,17 +639,17 @@ unionInstallRequires a b =
 
 compileModule :: Source -> Either CompileError (InstallRequires, Code)
 compileModule source =
-    case code' of
-        CodeGenError errMsg -> Left errMsg
-        CodeGen {} -> codeWithDeps $ [qq|
-{imports $ standardImports code'}
+    case runCodeGen code' emptyContext of
+        (Left  errMsg, _      ) -> Left errMsg
+        (Right code  , context) -> codeWithDeps context $ [qq|
+{imports $ standardImports context}
 
-{fromImports $ localImports code'}
+{fromImports $ localImports context}
 
-{fromImports $ thirdPartyImports code'}
+{fromImports $ thirdPartyImports context}
 
-{code code'}
-    |]
+{code}
+|]
   where
     code' :: CodeGen T.Text
     code' = compileModuleBody source
@@ -689,14 +670,16 @@ compileModule source =
     require :: T.Text -> T.Text -> S.Set T.Text -> S.Set T.Text
     require pkg module' set =
         if set `has` module' then S.singleton pkg else S.empty
-    deps :: S.Set T.Text
-    deps = require "nirum" "nirum" $ M.keysSet $ thirdPartyImports code'
-    optDeps :: M.Map (Int, Int) (S.Set T.Text)
-    optDeps = [ ((3, 4), require "enum34" "enum" $ standardImports code')
-              , ((3, 5), require "typing" "typing" $ standardImports code')
-              ]
-    codeWithDeps :: Code -> Either CompileError (InstallRequires, Code)
-    codeWithDeps c = Right (InstallRequires deps optDeps, c)
+    codeWithDeps :: CodeGenContext -> Code -> Either CompileError (InstallRequires, Code)
+    codeWithDeps context c = Right (InstallRequires deps optDeps, c)
+      where
+        deps :: S.Set T.Text
+        deps = require "nirum" "nirum" $ M.keysSet $ thirdPartyImports context
+        optDeps :: M.Map (Int, Int) (S.Set T.Text)
+        optDeps =
+            [ ((3, 4), require "enum34" "enum" $ standardImports context)
+            , ((3, 5), require "typing" "typing" $ standardImports context)
+            ]
 
 compilePackageMetadata :: Package -> InstallRequires -> Code
 compilePackageMetadata package (InstallRequires deps optDeps) = [qq|
