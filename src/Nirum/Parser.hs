@@ -412,7 +412,9 @@ tag = do
     spaces
     paren <- optional $ char '('
     fields' <- case paren of
-        Just _ -> do { f <- fieldSet <?> "union tag fields"
+        Just _ -> do { spaces
+                     ; f <- fieldSet <?> "union tag fields"
+                     ; spaces
                      ; char ')'
                      ; return f
                      }

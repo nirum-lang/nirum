@@ -607,6 +607,17 @@ spec = do
                    \    | none\n\
                    \    ;" `shouldBeRight` a
             parse' "union shape\n\
+                   \    = circle (\n\
+                   \        point origin,\n\
+                   \        offset radius,\n\
+                   \      )\n\
+                   \    | rectangle (\n\
+                   \        point upper-left,\n\
+                   \        point lower-right,\n\
+                   \      )\n\
+                   \    | none\n\
+                   \    ;" `shouldBeRight` a
+            parse' "union shape\n\
                    \    # shape type\n\
                    \    = circle (point origin, \
                                  \offset radius,)\n\
