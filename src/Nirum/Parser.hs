@@ -413,6 +413,8 @@ recordTypeDeclaration = do
 
 tag :: Parser Tag
 tag = do
+    annotationSet' <- annotationSet <?> "union tag annotations"
+    spaces
     tagName <- name <?> "union tag name"
     spaces
     paren <- optional $ char '('
@@ -428,7 +430,10 @@ tag = do
         d <- docs <?> "union tag docs"
         spaces
         return d
-    return $ Tag tagName fields' (annotationsFromDocs docs')
+    annotationSet'' <- case docs' of
+        Just d  -> A.insertDocs d annotationSet'
+        Nothing -> return annotationSet'
+    return $ Tag tagName fields' annotationSet''
 
 unionTypeDeclaration :: Parser TypeDeclaration
 unionTypeDeclaration = do

@@ -42,7 +42,13 @@ import Nirum.Constructs.TypeDeclaration ( EnumMember (EnumMember)
                                         , Type (..)
                                         , TypeDeclaration (..)
                                         )
-import Nirum.Constructs.TypeExpression (TypeExpression (..))
+import Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
+                                                        , MapModifier
+                                                        , OptionModifier
+                                                        , SetModifier
+                                                        , TypeIdentifier
+                                                        )
+                                       )
 import Util (singleDocs)
 
 shouldBeRight :: (Eq l, Eq r, Show l, Show r) => Either l r -> r -> Expectation
@@ -600,10 +606,10 @@ spec = do
                 rectangleFields = [ Field "upper-left" "point" empty
                                   , Field "lower-right" "point" empty
                                   ]
-                tags' = [ Tag "circle" circleFields empty
-                        , Tag "rectangle" rectangleFields empty
-                        , Tag "none" [] empty
-                        ]
+                circleTag = Tag "circle" circleFields empty
+                rectTag = Tag "rectangle" rectangleFields empty
+                noneTag = Tag "none" [] empty
+                tags' = [circleTag, rectTag, noneTag]
                 union' = UnionType tags'
                 a = TypeDeclaration "shape" union' empty
                 b = a { typeAnnotations = singleDocs "shape type" }
@@ -633,6 +639,28 @@ spec = do
                                     \point lower-right,)\n\
                    \    | none\n\
                    \    ;" `shouldBeRight` b
+            parse' "@docs (\"shape type\\n\")\n\
+                   \union shape\n\
+                   \    = circle (point origin, \
+                                 \offset radius,)\n\
+                   \    | rectangle (point upper-left, \
+                                    \point lower-right,)\n\
+                   \    | none\n\
+                   \    ;" `shouldBeRight` b
+            parse' "union shape\n\
+                   \    = circle (point origin, \
+                                 \offset radius,)\n\
+                   \    | rectangle (point upper-left, \
+                                    \point lower-right,)\n\
+                   \    | @foo (\"bar\") none\n\
+                   \    ;"
+                `shouldBeRight`
+                    a { type' = union' { tags = [ circleTag
+                                                , rectTag
+                                                , Tag "none" [] fooAnnotationSet
+                                                ]
+                                       }
+                      }
         it "fails to parse if there are duplicated facial names" $ do
             expectError "union dup\n\
                         \    = a/b\n\

@@ -1,4 +1,16 @@
-module Nirum.Constructs.TypeExpression (TypeExpression(..), toCode) where
+module Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
+                                                        , MapModifier
+                                                        , OptionModifier
+                                                        , SetModifier
+                                                        , TypeIdentifier
+                                                        , elementType
+                                                        , identifier
+                                                        , keyType
+                                                        , type'
+                                                        , valueType
+                                                        )
+                                       , toCode
+                                       ) where
 
 import Data.String (IsString(fromString))
 
