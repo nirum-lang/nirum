@@ -456,6 +456,10 @@ spec = do
                                   , "female"
                                   , EnumMember "unknown" (singleDocs "docs2\n")
                                   ] :: DeclarationSet EnumMember
+                membersWithAnnots = [ EnumMember "male" fooAnnotationSet
+                                    , "female"
+                                    , "unknown"
+                                    ] :: DeclarationSet EnumMember
                 expected = TypeDeclaration "gender" (EnumType members') empty
             parse' "enum gender = male | female | unknown;"
                 `shouldBeRight` expected
@@ -477,6 +481,10 @@ spec = do
             parse' "@baz\nenum gender=male|female|unknown;"
                 `shouldBeRight`
                     TypeDeclaration "gender" (EnumType members')
+                                    bazAnnotationSet
+            parse' "@baz\nenum gender=\n@foo (\"bar\")\nmale|female|unknown;"
+                `shouldBeRight`
+                    TypeDeclaration "gender" (EnumType membersWithAnnots)
                                     bazAnnotationSet
         it "fails to parse if there are duplicated facial names" $
             expectError "enum dup = a/b\n\

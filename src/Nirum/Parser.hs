@@ -288,13 +288,18 @@ boxedTypeDeclaration = do
 
 enumMember :: Parser EnumMember
 enumMember = do
+    annotationSet' <- annotationSet <?> "enum member annotations"
+    spaces
     memberName <- name <?> "enum member name"
     spaces
     docs' <- optional $ do
         d <- docs <?> "enum member docs"
         spaces
         return d
-    return $ EnumMember memberName (annotationsFromDocs docs')
+    annotationSet'' <- case docs' of
+        Just d  -> A.insertDocs d annotationSet'
+        Nothing -> return annotationSet'
+    return $ EnumMember memberName annotationSet''
 
 handleNameDuplication :: Declaration a
                       => String -> [a]
