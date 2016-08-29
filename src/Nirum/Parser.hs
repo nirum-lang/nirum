@@ -245,6 +245,13 @@ annotationsFromDocs :: Maybe Docs -> A.AnnotationSet
 annotationsFromDocs Nothing  = A.empty
 annotationsFromDocs (Just d) = A.singleton $ A.docs d
 
+annotationsWithDocs :: Monad m
+                    => A.AnnotationSet
+                    -> Maybe Docs
+                    -> m A.AnnotationSet
+annotationsWithDocs set' (Just docs') = A.insertDocs docs' set'
+annotationsWithDocs set' Nothing = return set'
+
 aliasTypeDeclaration :: Parser TypeDeclaration
 aliasTypeDeclaration = do
     annotationSet' <- annotationSet <?> "type alias annotations"
@@ -259,9 +266,7 @@ aliasTypeDeclaration = do
     spaces
     char ';'
     docs' <- optional $ try $ spaces >> (docs <?> "type alias docs")
-    annotationSet'' <- case docs' of
-        Just d  -> A.insertDocs d annotationSet'
-        Nothing -> return annotationSet'
+    annotationSet'' <- annotationsWithDocs annotationSet' docs'
     return $ TypeDeclaration name' (Alias canonicalType) annotationSet''
 
 
@@ -281,9 +286,7 @@ boxedTypeDeclaration = do
     spaces
     char ';'
     docs' <- optional $ try $ spaces >> (docs <?> "boxed type docs")
-    annotationSet'' <- case docs' of
-        Just d  -> A.insertDocs d annotationSet'
-        Nothing -> return annotationSet'
+    annotationSet'' <- annotationsWithDocs annotationSet' docs'
     return $ TypeDeclaration name' (BoxedType innerType) annotationSet''
 
 enumMember :: Parser EnumMember
@@ -296,9 +299,7 @@ enumMember = do
         d <- docs <?> "enum member docs"
         spaces
         return d
-    annotationSet'' <- case docs' of
-        Just d  -> A.insertDocs d annotationSet'
-        Nothing -> return annotationSet'
+    annotationSet'' <- annotationsWithDocs annotationSet' docs'
     return $ EnumMember memberName annotationSet''
 
 handleNameDuplication :: Declaration a
@@ -334,9 +335,7 @@ enumTypeDeclaration = do
             d <- docs <?> "enum type docs"
             spaces
             return d
-    annotationSet'' <- case docs' of
-        Just d  -> A.insertDocs d annotationSet'
-        Nothing -> return annotationSet'
+    annotationSet'' <- annotationsWithDocs annotationSet' docs'
     members <- (enumMember `sepBy1` (spaces >> char '|' >> spaces))
                    <?> "enum members"
     case fromList members of
@@ -406,9 +405,7 @@ recordTypeDeclaration = do
     char ')'
     spaces
     char ';'
-    annotationSet'' <- case docs' of
-        Just d  -> A.insertDocs d annotationSet'
-        Nothing -> return annotationSet'
+    annotationSet'' <- annotationsWithDocs annotationSet' docs'
     return $ TypeDeclaration typename (RecordType fields') annotationSet''
 
 tag :: Parser Tag
@@ -430,9 +427,7 @@ tag = do
         d <- docs <?> "union tag docs"
         spaces
         return d
-    annotationSet'' <- case docs' of
-        Just d  -> A.insertDocs d annotationSet'
-        Nothing -> return annotationSet'
+    annotationSet'' <- annotationsWithDocs annotationSet' docs'
     return $ Tag tagName fields' annotationSet''
 
 unionTypeDeclaration :: Parser TypeDeclaration
@@ -452,9 +447,7 @@ unionTypeDeclaration = do
              <?> "union tags"
     spaces
     char ';'
-    annotationSet'' <- case docs' of
-        Just d  -> A.insertDocs d annotationSet'
-        Nothing -> return annotationSet'
+    annotationSet'' <- annotationsWithDocs annotationSet' docs'
     handleNameDuplication "tag" tags' $ \tagSet ->
         return $ TypeDeclaration typename (UnionType tagSet) annotationSet''
 
@@ -516,9 +509,7 @@ method = do
         e <- typeExpression <?> "method error type"
         spaces
         return e
-    annotationSet'' <- case docs' of
-        Just d  -> A.insertDocs d annotationSet'
-        Nothing -> return annotationSet'
+    annotationSet'' <- annotationsWithDocs annotationSet' docs'
     return $ Method methodName params returnType errorType annotationSet''
 
 methods :: Parser [Method]
@@ -547,9 +538,7 @@ serviceDeclaration = do
     char ')'
     spaces
     char ';'
-    annotationSet'' <- case docs' of
-        Just d  -> A.insertDocs d annotationSet'
-        Nothing -> return annotationSet'
+    annotationSet'' <- annotationsWithDocs annotationSet' docs'
     return $ ServiceDeclaration serviceName (Service methods') annotationSet''
 
 modulePath :: Parser ModulePath
