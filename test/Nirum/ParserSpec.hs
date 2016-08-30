@@ -37,8 +37,8 @@ import Nirum.Constructs.Service ( Method (Method)
                                 , Service (Service)
                                 )
 import Nirum.Constructs.TypeDeclaration ( EnumMember (EnumMember)
-                                        , Field (Field)
-                                        , Tag (Tag)
+                                        , Field (Field, fieldAnnotations)
+                                        , Tag (Tag, tagFields)
                                         , Type (..)
                                         , TypeDeclaration (..)
                                         )
@@ -511,10 +511,10 @@ spec = do
     descTypeDecl "recordTypeDeclaration" P.recordTypeDeclaration $ \helpers -> do
         let (parse', expectError) = helpers
         it "emits (TypeDeclaration (RecordType ...)) if succeeded to parse" $ do
-            let fields' = [ Field "name" "text" empty
-                          , Field "dob" "date" (singleDocs "date of birth")
-                          , Field "gender" "gender" empty
-                          ] :: DeclarationSet Field
+            let nameF = Field "name" "text" empty
+                dobF = Field "dob" "date" (singleDocs "date of birth")
+                genderF = Field "gender" "gender" empty
+                fields' = [nameF, dobF, genderF] :: DeclarationSet Field
                 record = RecordType fields'
                 a = TypeDeclaration "person" record empty
                 b = a { typeAnnotations = singleDocs "person record type" }
@@ -570,6 +570,38 @@ spec = do
                    \);"
                 `shouldBeRight`
                 TypeDeclaration "person" record bazAnnotationSet
+            -- with docs, last field with trailing comma,
+            -- and annotation without arguments
+            parse' "@baz\n\
+                   \record person (\n\
+                   \    # person record type\n\n\
+                   \    text name,\n\
+                   \    date dob,\n\
+                   \    # date of birth\n\
+                   \    gender gender,\n\
+                   \);"
+                `shouldBeRight`
+                    TypeDeclaration "person" record
+                        (union bazAnnotationSet $
+                                singleDocs "person record type")
+            -- without docs, last field with trailing comma,
+            -- and annotations on fields
+            parse' "record person (\n\
+                   \    text name,\n\
+                   \    @foo (\"bar\")\n\
+                   \    date dob,\n\
+                   \    # date of birth\n\
+                   \    @baz\n\
+                   \    gender gender,\n\
+                   \);"
+                `shouldBeRight`
+                    TypeDeclaration "person" (RecordType
+                        [ nameF
+                        , dobF { fieldAnnotations = union fooAnnotationSet $
+                                     singleDocs "date of birth"
+                               }
+                        , genderF { fieldAnnotations = bazAnnotationSet }
+                        ]) empty
         it "should have one or more fields" $ do
             expectError "record unit ();" 1 14
             expectError "record unit (\n# docs\n);" 3 1
@@ -600,12 +632,12 @@ spec = do
     descTypeDecl "unionTypeDeclaration" P.unionTypeDeclaration $ \helpers -> do
         let (parse', expectError) = helpers
         it "emits (TypeDeclaration (UnionType ...)) if succeeded to parse" $ do
-            let circleFields = [ Field "origin" "point" empty
-                               , Field "radius" "offset" empty
-                               ]
-                rectangleFields = [ Field "upper-left" "point" empty
-                                  , Field "lower-right" "point" empty
-                                  ]
+            let cOriginF = Field "origin" "point" empty
+                cRadiusF = Field "radius" "offset" empty
+                circleFields = [cOriginF, cRadiusF]
+                rUpperLeftF = Field "upper-left" "point" empty
+                rLowerRightF = Field "lower-right" "point" empty
+                rectangleFields = [rUpperLeftF, rLowerRightF]
                 circleTag = Tag "circle" circleFields empty
                 rectTag = Tag "rectangle" rectangleFields empty
                 noneTag = Tag "none" [] empty
@@ -660,6 +692,36 @@ spec = do
                                                 , Tag "none" [] fooAnnotationSet
                                                 ]
                                        }
+                      }
+            parse' "union shape\n\
+                   \    = circle (point origin, \
+                                 \@baz \
+                                 \offset radius,)\n\
+                   \    | rectangle (point upper-left, \
+                                    \@foo (\"bar\") \
+                                    \point lower-right,)\n\
+                   \    | none\n\
+                   \    ;"
+                `shouldBeRight`
+                    a { type' = union'
+                            { tags = [ circleTag
+                                           { tagFields =
+                                                 [ cOriginF
+                                                 , cRadiusF { fieldAnnotations =
+                                                              bazAnnotationSet }
+                                                 ]
+                                           }
+                                     , rectTag
+                                           { tagFields =
+                                                 [ rUpperLeftF
+                                                 , rLowerRightF
+                                                       { fieldAnnotations =
+                                                         fooAnnotationSet }
+                                                 ]
+                                           }
+                                     , noneTag
+                                     ]
+                             }
                       }
         it "fails to parse if there are duplicated facial names" $ do
             expectError "union dup\n\
@@ -785,15 +847,19 @@ spec = do
 
     describe "serviceDeclaration" $ do
         let (parse', expectError) = helperFuncs P.serviceDeclaration
+            getUserD = singleDocs "Gets an user by its id."
+            createUserD = singleDocs "Creates a new user"
+            noMethodsD = singleDocs "Service having no methods."
+            oneMethodD = singleDocs "Service having only one method."
+            multiMethodsD = singleDocs "Service having multiple methods."
+            userIdD = singleDocs "The unique user identifier."
         it "emits ServiceDeclaration if succeeded to parse" $ do
             parse' "service null-service();" `shouldBeRight`
                 ServiceDeclaration "null-service" (Service []) empty
             parse' "service null-service (\n\
                    \  # Service having no methods.\n\
                    \);" `shouldBeRight`
-                ServiceDeclaration "null-service"
-                                   (Service [])
-                                   (singleDocs "Service having no methods.")
+                ServiceDeclaration "null-service" (Service []) noMethodsD
             parse' "service one-method-service(\n\
                    \  user get-user(uuid user-id)\n\
                    \);" `shouldBeRight`
@@ -819,9 +885,9 @@ spec = do
                                       [Parameter "user-id" "uuid" empty]
                                       "user"
                                       (Just "get-user-error")
-                                      (singleDocs "Gets an user by its id.")
+                                      getUserD
                              ])
-                    (singleDocs "Service having only one method.")
+                    oneMethodD
             parse' "service user-service (\n\
                    \  # Service having multiple methods.\n\
                    \  user create-user (\n\
@@ -839,30 +905,70 @@ spec = do
                                       [Parameter "user" "user" empty]
                                       "user"
                                       Nothing
-                                      (singleDocs "Creates a new user")
+                                      createUserD
                              , Method "get-user"
                                       [Parameter "user-id" "uuid" empty]
                                       "user"
                                       Nothing
-                                      (singleDocs "Gets an user by its id.")
+                                      getUserD
                              ])
-                    (singleDocs "Service having multiple methods.")
+                    multiMethodsD
             parse' "@foo(\"bar\")\n\
                    \service null-service (\n\
                    \  # Service having no methods.\n\
                    \);" `shouldBeRight`
                 ServiceDeclaration "null-service"
                                    (Service [])
-                                   (A.union (singleDocs "Service having no methods.")
-                                            fooAnnotationSet)
+                                   (A.union noMethodsD fooAnnotationSet)
             parse' "@baz\n\
                    \service null-service (\n\
                    \  # Service having no methods.\n\
                    \);" `shouldBeRight`
                 ServiceDeclaration "null-service"
                                    (Service [])
-                                   (A.union (singleDocs "Service having no methods.")
-                                            bazAnnotationSet)
+                                   (A.union noMethodsD bazAnnotationSet)
+            parse' "service user-service (\n\
+                   \  @docs (\"Creates a new user\\n\")\n\
+                   \  user create-user (\n\
+                   \    user user\n\
+                   \  ),\n\
+                   \  @docs (\"Gets an user by its id.\\n\")\n\
+                   \  user get-user (\n\
+                   \    uuid user-id\n\
+                   \  ),\n\
+                   \);" `shouldBeRight`
+                ServiceDeclaration
+                    "user-service"
+                    (Service [ Method "create-user"
+                                      [Parameter "user" "user" empty]
+                                      "user"
+                                      Nothing
+                                      createUserD
+                             , Method "get-user"
+                                      [Parameter "user-id" "uuid" empty]
+                                      "user"
+                                      Nothing
+                                      getUserD
+                             ])
+                    empty
+            parse' "service user-service (\n\
+                   \  user get-user (\n\
+                   \    @baz\n\
+                   \    uuid user-id\n\
+                   \    # The unique user identifier.\n\
+                   \  ),\n\
+                   \);" `shouldBeRight`
+                ServiceDeclaration
+                    "user-service"
+                    (Service [ Method "get-user"
+                                      [ Parameter "user-id" "uuid" $
+                                            A.union bazAnnotationSet userIdD
+                                      ]
+                                      "user"
+                                      Nothing
+                                      empty
+                             ])
+                    empty
         it "fails to parse if there are methods of the same facial name" $ do
             expectError "service method-dups (\n\
                         \  bool same-name ()\n\

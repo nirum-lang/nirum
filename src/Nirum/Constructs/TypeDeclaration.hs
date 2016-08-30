@@ -1,8 +1,16 @@
 module Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
-                                        , Field(Field)
+                                        , Field ( Field
+                                                , fieldAnnotations
+                                                , fieldName
+                                                , fieldType
+                                                )
                                         , JsonType(..)
                                         , PrimitiveTypeIdentifier(..)
-                                        , Tag(Tag)
+                                        , Tag ( Tag
+                                              , tagAnnotations
+                                              , tagFields
+                                              , tagName
+                                              )
                                         , Type(..)
                                         , TypeDeclaration( Import
                                                          , ServiceDeclaration
@@ -64,7 +72,10 @@ instance IsString EnumMember where
     fromString s = EnumMember (fromString s) A.empty
 
 -- | Field of 'RecordType' and 'Tag'.
-data Field = Field Name TypeExpression AnnotationSet deriving (Eq, Ord, Show)
+data Field = Field { fieldName :: Name
+                   , fieldType :: TypeExpression
+                   , fieldAnnotations :: AnnotationSet
+                   } deriving (Eq, Ord, Show)
 
 instance Construct Field where
     toCode field@(Field name' typeExpr _) =
@@ -80,7 +91,10 @@ instance Declaration Field where
     annotations (Field _ _ anno') = anno'
 
 -- | Tag of 'UnionType'.
-data Tag = Tag Name (DeclarationSet Field) AnnotationSet deriving (Eq, Ord, Show)
+data Tag = Tag { tagName :: Name
+               , tagFields :: DeclarationSet Field
+               , tagAnnotations :: AnnotationSet
+               } deriving (Eq, Ord, Show)
 
 instance Construct Tag where
     toCode tag@(Tag name' fields' _) =

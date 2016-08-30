@@ -241,10 +241,6 @@ docs = do
                               }) (eol >> spaces) <?> "comments"
     return $ Docs $ T.unlines comments
 
-annotationsFromDocs :: Maybe Docs -> A.AnnotationSet
-annotationsFromDocs Nothing  = A.empty
-annotationsFromDocs (Just d) = A.singleton $ A.docs d
-
 annotationsWithDocs :: Monad m
                     => A.AnnotationSet
                     -> Maybe Docs
@@ -355,14 +351,18 @@ fieldsOrParameters :: forall a. (String, String)
                    -> (Name -> TypeExpression -> A.AnnotationSet -> a)
                    -> Parser [a]
 fieldsOrParameters (label, pluralLabel) make = do
+    annotationSet' <- annotationSet <?> (label ++ " annotations")
+    spaces
     type' <- typeExpression <?> (label ++ " type")
     spaces1
     name' <- name <?> (label ++ " name")
     spaces
-    let makeWithDocs = make name' type' . annotationsFromDocs
+    let makeWithDocs = make name' type' . A.union annotationSet'
+                                        . annotationsFromDocs
     followedByComma makeWithDocs <|> do
         d <- optional docs' <?> (label ++ " docs")
         return [makeWithDocs d]
+
   where
     recur :: Parser [a]
     recur = fieldsOrParameters (label, pluralLabel) make
@@ -378,6 +378,9 @@ fieldsOrParameters (label, pluralLabel) make = do
         d <- docs <?> (label ++ " docs")
         spaces
         return d
+    annotationsFromDocs :: Maybe Docs -> A.AnnotationSet
+    annotationsFromDocs Nothing  = A.empty
+    annotationsFromDocs (Just d) = A.singleton $ A.docs d
 
 fields :: Parser [Field]
 fields = fieldsOrParameters ("label", "labels") Field
