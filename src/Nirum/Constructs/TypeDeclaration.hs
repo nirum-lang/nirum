@@ -132,6 +132,7 @@ data TypeDeclaration
                          }
     | Import { modulePath :: ModulePath
              , importName :: Identifier
+             , importAnnotations :: AnnotationSet
              }
     deriving (Eq, Ord, Show)
 
@@ -222,12 +223,13 @@ instance Construct TypeDeclaration where
         methodsText = T.intercalate "\n" $ map toCode methods'
         docs' :: Maybe Docs
         docs' = A.lookupDocs annotations'
-    toCode (Import path ident) = T.concat [ "import "
-                                          , toCode path
-                                          , " ("
-                                          , toCode ident
-                                          , ");\n"
-                                          ]
+    toCode (Import path ident aSet) = T.concat [ "import "
+                                               , toCode path
+                                               , " ("
+                                               , toCode aSet
+                                               , toCode ident
+                                               , ");\n"
+                                               ]
 
 instance Declaration TypeDeclaration where
     name TypeDeclaration { typename = name' } = name'
@@ -235,4 +237,4 @@ instance Declaration TypeDeclaration where
     name Import { importName = id' } = Name id' id'
     annotations TypeDeclaration { typeAnnotations = anno' } = anno'
     annotations ServiceDeclaration { serviceAnnotations = anno' } = anno'
-    annotations Import { } = A.empty
+    annotations Import { importAnnotations = anno' } = anno'

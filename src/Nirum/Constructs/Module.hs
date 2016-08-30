@@ -56,7 +56,7 @@ instance Construct Module where
 
 imports :: Module -> M.Map ModulePath (S.Set Identifier)
 imports (Module decls _) =
-    M.fromListWith S.union [(p, [i]) | Import p i <- DS.toList decls]
+    M.fromListWith S.union [(p, [i]) | Import p i _ <- DS.toList decls]
 
 coreModulePath :: ModulePath
 coreModulePath = ["core"]

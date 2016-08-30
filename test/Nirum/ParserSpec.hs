@@ -1046,8 +1046,18 @@ spec = do
         let (parse', expectError) = helperFuncs P.imports
         it "emits Import values if succeeded to parse" $
             parse' "import foo.bar (a, b);" `shouldBeRight`
-                [ Import ["foo", "bar"] "a"
-                , Import ["foo", "bar"] "b"
+                [ Import ["foo", "bar"] "a" empty
+                , Import ["foo", "bar"] "b" empty
+                ]
+        it "can be annotated" $ do
+            parse' "import foo.bar (@foo (\"bar\") a, @baz b);" `shouldBeRight`
+                [ Import ["foo", "bar"] "a" fooAnnotationSet
+                , Import ["foo", "bar"] "b" bazAnnotationSet
+                ]
+            parse' "import foo.bar (@foo (\"bar\") @baz a, b);" `shouldBeRight`
+                [ Import ["foo", "bar"] "a" $
+                         union fooAnnotationSet bazAnnotationSet
+                , Import ["foo", "bar"] "b" empty
                 ]
         it "errors if parentheses have nothing" $
             expectError "import foo.bar ();" 1 17

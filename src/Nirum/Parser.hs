@@ -559,6 +559,13 @@ modulePath = do
     f Nothing i = Just $ ModuleName i
     f (Just p) i = Just $ ModulePath p i
 
+importName :: Parser (Identifier, A.AnnotationSet)
+importName = do
+    aSet <- annotationSet <?> "import annotations"
+    spaces
+    iName <- identifier <?> "name to import"
+    return (iName, aSet)
+
 imports :: Parser [TypeDeclaration]
 imports = do
     string' "import" <?> "import keyword"
@@ -567,14 +574,14 @@ imports = do
     spaces
     char '('
     spaces
-    idents <- sepBy1 (identifier <?> "name to import")
+    idents <- sepBy1 importName
                      (spaces >> char ',' >> spaces)
               <?> "names to import"
     spaces
     char ')'
     spaces
     char ';'
-    return [Import path ident | ident <- idents]
+    return [Import path ident aSet | (ident, aSet) <- idents]
 
 
 module' :: Parser Module

@@ -197,7 +197,7 @@ lookupType identifier boundModule =
         Nothing -> toType Mod.coreModulePath
             (DS.lookup identifier $ Mod.types Mod.coreModule)
         Just TypeDeclaration { type' = t } -> Local t
-        Just (Import path _) ->
+        Just (Import path _ _) ->
             case resolveModule path (boundPackage boundModule) of
                 Nothing -> Missing
                 Just (Mod.Module decls _) ->

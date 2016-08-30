@@ -183,7 +183,7 @@ spec = do
                     \service anno-service (bool ping ());"
                 -- TODO: more tests
         context "Import" $ do
-            let import' = Import ["foo", "bar"] "baz"
+            let import' = Import ["foo", "bar"] "baz" empty
             specify "name" $
                 name import' `shouldBe` "baz"
             specify "docs" $
