@@ -44,7 +44,7 @@ We currently provides the prebuilt binaries of the following platforms:
 - [Docker (`spoqa/nirum:latest`)][docker]
 
 
-Getting Started
+Getting started
 ---------------
 
 In order to compile a Nirum package (`examples/`) to a Python package:
