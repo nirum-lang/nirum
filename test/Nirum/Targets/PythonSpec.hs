@@ -262,7 +262,7 @@ makeDummySource' pathPrefix m =
     pkg = createPackage
             [ (mp ["foo"], m)
             , ( mp ["foo", "bar"]
-              , Module [ Import (mp ["qux"]) "path"
+              , Module [ Import (mp ["qux"]) "path" empty
                        , TypeDeclaration "path-box" (BoxedType "path") empty
                        , TypeDeclaration "int-box" (BoxedType "bigint") empty
                        , TypeDeclaration "point"
@@ -504,7 +504,7 @@ spec = parallel $ do
             tT decl "FloatBox.__nirum_deserialize__(3.14) == FloatBox(3.14)"
             tR' decl "TypeError" "FloatBox.__nirum_deserialize__('a')"
             tR' decl "TypeError" "FloatBox('a')"
-            let decls = [ Import ["foo", "bar"] "path-box"
+            let decls = [ Import ["foo", "bar"] "path-box" empty
                         , TypeDeclaration "imported-type-box"
                                           (BoxedType "path-box") empty
                         ]
@@ -532,7 +532,7 @@ spec = parallel $ do
             |]
             tR'' decls "TypeError" "ImportedTypeBox.__nirum_deserialize__(123)"
             tR'' decls "TypeError" "ImportedTypeBox(123)"
-            let boxedAlias = [ Import ["qux"] "path"
+            let boxedAlias = [ Import ["qux"] "path" empty
                              , TypeDeclaration "way"
                                                (BoxedType "path") empty
                              ]
@@ -540,7 +540,7 @@ spec = parallel $ do
             tT' boxedAlias "Way(Path('.')).value == '.'"
             tT' boxedAlias "Way.__nirum_deserialize__('.') == Way('.')"
             tT' boxedAlias "Way('.').__nirum_serialize__() == '.'"
-            let aliasBoxed = [ Import ["qux"] "name"
+            let aliasBoxed = [ Import ["qux"] "name" empty
                              , TypeDeclaration "irum" (Alias "name") empty
                              ]
             tT' aliasBoxed "Name('khj') == Irum('khj')"
@@ -610,7 +610,7 @@ spec = parallel $ do
             let fields' = [ Field "left" "int-box" empty
                           , Field "top" "int-box" empty
                           ]
-                decls = [ Import ["foo", "bar"] "int-box"
+                decls = [ Import ["foo", "bar"] "int-box" empty
                         , TypeDeclaration "point" (RecordType fields') empty
                         ]
                 payload' = "{'_type': 'point', 'left': 3, 'top': 14}" :: T.Text
@@ -640,7 +640,7 @@ spec = parallel $ do
             let fields'' = [ Field "xy" "point" empty
                            , Field "z" "int64" empty
                            ]
-                decls' = [ Import ["foo", "bar"] "point"
+                decls' = [ Import ["foo", "bar"] "point" empty
                          , TypeDeclaration "point3d"
                                            (RecordType fields'')
                                            empty

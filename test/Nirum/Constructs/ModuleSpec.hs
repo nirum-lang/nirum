@@ -21,11 +21,11 @@ spec =
             pathT = TypeDeclaration "path" (Alias "text") (singleton docsAnno)
             offsetT =
                 TypeDeclaration "offset" (BoxedType "float64") empty
-            decls = [ Import ["foo", "bar"] "baz"
-                    , Import ["foo", "bar"] "qux"
-                    , Import ["zzz"] "qqq"
-                    , Import ["zzz"] "ppp"
-                    , Import ["xyz"] "asdf"
+            decls = [ Import ["foo", "bar"] "baz" empty
+                    , Import ["foo", "bar"] "qux" empty
+                    , Import ["zzz"] "qqq" empty
+                    , Import ["zzz"] "ppp" empty
+                    , Import ["xyz"] "asdf" empty
                     , pathT
                     , offsetT
                     ] :: DeclarationSet TypeDeclaration

@@ -241,9 +241,12 @@ docs = do
                               }) (eol >> spaces) <?> "comments"
     return $ Docs $ T.unlines comments
 
-annotationsFromDocs :: Maybe Docs -> A.AnnotationSet
-annotationsFromDocs Nothing  = A.empty
-annotationsFromDocs (Just d) = A.singleton $ A.docs d
+annotationsWithDocs :: Monad m
+                    => A.AnnotationSet
+                    -> Maybe Docs
+                    -> m A.AnnotationSet
+annotationsWithDocs set' (Just docs') = A.insertDocs docs' set'
+annotationsWithDocs set' Nothing = return set'
 
 aliasTypeDeclaration :: Parser TypeDeclaration
 aliasTypeDeclaration = do
@@ -259,9 +262,7 @@ aliasTypeDeclaration = do
     spaces
     char ';'
     docs' <- optional $ try $ spaces >> (docs <?> "type alias docs")
-    annotationSet'' <- case docs' of
-        Just d  -> A.insertDocs d annotationSet'
-        Nothing -> return annotationSet'
+    annotationSet'' <- annotationsWithDocs annotationSet' docs'
     return $ TypeDeclaration name' (Alias canonicalType) annotationSet''
 
 
@@ -281,20 +282,21 @@ boxedTypeDeclaration = do
     spaces
     char ';'
     docs' <- optional $ try $ spaces >> (docs <?> "boxed type docs")
-    annotationSet'' <- case docs' of
-        Just d  -> A.insertDocs d annotationSet'
-        Nothing -> return annotationSet'
+    annotationSet'' <- annotationsWithDocs annotationSet' docs'
     return $ TypeDeclaration name' (BoxedType innerType) annotationSet''
 
 enumMember :: Parser EnumMember
 enumMember = do
+    annotationSet' <- annotationSet <?> "enum member annotations"
+    spaces
     memberName <- name <?> "enum member name"
     spaces
     docs' <- optional $ do
         d <- docs <?> "enum member docs"
         spaces
         return d
-    return $ EnumMember memberName (annotationsFromDocs docs')
+    annotationSet'' <- annotationsWithDocs annotationSet' docs'
+    return $ EnumMember memberName annotationSet''
 
 handleNameDuplication :: Declaration a
                       => String -> [a]
@@ -329,9 +331,7 @@ enumTypeDeclaration = do
             d <- docs <?> "enum type docs"
             spaces
             return d
-    annotationSet'' <- case docs' of
-        Just d  -> A.insertDocs d annotationSet'
-        Nothing -> return annotationSet'
+    annotationSet'' <- annotationsWithDocs annotationSet' docs'
     members <- (enumMember `sepBy1` (spaces >> char '|' >> spaces))
                    <?> "enum members"
     case fromList members of
@@ -351,14 +351,18 @@ fieldsOrParameters :: forall a. (String, String)
                    -> (Name -> TypeExpression -> A.AnnotationSet -> a)
                    -> Parser [a]
 fieldsOrParameters (label, pluralLabel) make = do
+    annotationSet' <- annotationSet <?> (label ++ " annotations")
+    spaces
     type' <- typeExpression <?> (label ++ " type")
     spaces1
     name' <- name <?> (label ++ " name")
     spaces
-    let makeWithDocs = make name' type' . annotationsFromDocs
+    let makeWithDocs = make name' type' . A.union annotationSet'
+                                        . annotationsFromDocs
     followedByComma makeWithDocs <|> do
         d <- optional docs' <?> (label ++ " docs")
         return [makeWithDocs d]
+
   where
     recur :: Parser [a]
     recur = fieldsOrParameters (label, pluralLabel) make
@@ -374,6 +378,9 @@ fieldsOrParameters (label, pluralLabel) make = do
         d <- docs <?> (label ++ " docs")
         spaces
         return d
+    annotationsFromDocs :: Maybe Docs -> A.AnnotationSet
+    annotationsFromDocs Nothing  = A.empty
+    annotationsFromDocs (Just d) = A.singleton $ A.docs d
 
 fields :: Parser [Field]
 fields = fieldsOrParameters ("label", "labels") Field
@@ -401,13 +408,13 @@ recordTypeDeclaration = do
     char ')'
     spaces
     char ';'
-    annotationSet'' <- case docs' of
-        Just d  -> A.insertDocs d annotationSet'
-        Nothing -> return annotationSet'
+    annotationSet'' <- annotationsWithDocs annotationSet' docs'
     return $ TypeDeclaration typename (RecordType fields') annotationSet''
 
 tag :: Parser Tag
 tag = do
+    annotationSet' <- annotationSet <?> "union tag annotations"
+    spaces
     tagName <- name <?> "union tag name"
     spaces
     paren <- optional $ char '('
@@ -423,7 +430,8 @@ tag = do
         d <- docs <?> "union tag docs"
         spaces
         return d
-    return $ Tag tagName fields' (annotationsFromDocs docs')
+    annotationSet'' <- annotationsWithDocs annotationSet' docs'
+    return $ Tag tagName fields' annotationSet''
 
 unionTypeDeclaration :: Parser TypeDeclaration
 unionTypeDeclaration = do
@@ -442,9 +450,7 @@ unionTypeDeclaration = do
              <?> "union tags"
     spaces
     char ';'
-    annotationSet'' <- case docs' of
-        Just d  -> A.insertDocs d annotationSet'
-        Nothing -> return annotationSet'
+    annotationSet'' <- annotationsWithDocs annotationSet' docs'
     handleNameDuplication "tag" tags' $ \tagSet ->
         return $ TypeDeclaration typename (UnionType tagSet) annotationSet''
 
@@ -506,9 +512,7 @@ method = do
         e <- typeExpression <?> "method error type"
         spaces
         return e
-    annotationSet'' <- case docs' of
-        Just d  -> A.insertDocs d annotationSet'
-        Nothing -> return annotationSet'
+    annotationSet'' <- annotationsWithDocs annotationSet' docs'
     return $ Method methodName params returnType errorType annotationSet''
 
 methods :: Parser [Method]
@@ -537,9 +541,7 @@ serviceDeclaration = do
     char ')'
     spaces
     char ';'
-    annotationSet'' <- case docs' of
-        Just d  -> A.insertDocs d annotationSet'
-        Nothing -> return annotationSet'
+    annotationSet'' <- annotationsWithDocs annotationSet' docs'
     return $ ServiceDeclaration serviceName (Service methods') annotationSet''
 
 modulePath :: Parser ModulePath
@@ -557,6 +559,13 @@ modulePath = do
     f Nothing i = Just $ ModuleName i
     f (Just p) i = Just $ ModulePath p i
 
+importName :: Parser (Identifier, A.AnnotationSet)
+importName = do
+    aSet <- annotationSet <?> "import annotations"
+    spaces
+    iName <- identifier <?> "name to import"
+    return (iName, aSet)
+
 imports :: Parser [TypeDeclaration]
 imports = do
     string' "import" <?> "import keyword"
@@ -565,14 +574,14 @@ imports = do
     spaces
     char '('
     spaces
-    idents <- sepBy1 (identifier <?> "name to import")
+    idents <- sepBy1 importName
                      (spaces >> char ',' >> spaces)
               <?> "names to import"
     spaces
     char ')'
     spaces
     char ';'
-    return [Import path ident | ident <- idents]
+    return [Import path ident aSet | (ident, aSet) <- idents]
 
 
 module' :: Parser Module

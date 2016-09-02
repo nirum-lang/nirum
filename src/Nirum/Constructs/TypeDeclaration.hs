@@ -1,8 +1,16 @@
 module Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
-                                        , Field(Field)
+                                        , Field ( Field
+                                                , fieldAnnotations
+                                                , fieldName
+                                                , fieldType
+                                                )
                                         , JsonType(..)
                                         , PrimitiveTypeIdentifier(..)
-                                        , Tag(Tag)
+                                        , Tag ( Tag
+                                              , tagAnnotations
+                                              , tagFields
+                                              , tagName
+                                              )
                                         , Type(..)
                                         , TypeDeclaration( Import
                                                          , ServiceDeclaration
@@ -64,7 +72,10 @@ instance IsString EnumMember where
     fromString s = EnumMember (fromString s) A.empty
 
 -- | Field of 'RecordType' and 'Tag'.
-data Field = Field Name TypeExpression AnnotationSet deriving (Eq, Ord, Show)
+data Field = Field { fieldName :: Name
+                   , fieldType :: TypeExpression
+                   , fieldAnnotations :: AnnotationSet
+                   } deriving (Eq, Ord, Show)
 
 instance Construct Field where
     toCode field@(Field name' typeExpr _) =
@@ -80,7 +91,10 @@ instance Declaration Field where
     annotations (Field _ _ anno') = anno'
 
 -- | Tag of 'UnionType'.
-data Tag = Tag Name (DeclarationSet Field) AnnotationSet deriving (Eq, Ord, Show)
+data Tag = Tag { tagName :: Name
+               , tagFields :: DeclarationSet Field
+               , tagAnnotations :: AnnotationSet
+               } deriving (Eq, Ord, Show)
 
 instance Construct Tag where
     toCode tag@(Tag name' fields' _) =
@@ -118,6 +132,7 @@ data TypeDeclaration
                          }
     | Import { modulePath :: ModulePath
              , importName :: Identifier
+             , importAnnotations :: AnnotationSet
              }
     deriving (Eq, Ord, Show)
 
@@ -208,12 +223,13 @@ instance Construct TypeDeclaration where
         methodsText = T.intercalate "\n" $ map toCode methods'
         docs' :: Maybe Docs
         docs' = A.lookupDocs annotations'
-    toCode (Import path ident) = T.concat [ "import "
-                                          , toCode path
-                                          , " ("
-                                          , toCode ident
-                                          , ");\n"
-                                          ]
+    toCode (Import path ident aSet) = T.concat [ "import "
+                                               , toCode path
+                                               , " ("
+                                               , toCode aSet
+                                               , toCode ident
+                                               , ");\n"
+                                               ]
 
 instance Declaration TypeDeclaration where
     name TypeDeclaration { typename = name' } = name'
@@ -221,4 +237,4 @@ instance Declaration TypeDeclaration where
     name Import { importName = id' } = Name id' id'
     annotations TypeDeclaration { typeAnnotations = anno' } = anno'
     annotations ServiceDeclaration { serviceAnnotations = anno' } = anno'
-    annotations Import { } = A.empty
+    annotations Import { importAnnotations = anno' } = anno'

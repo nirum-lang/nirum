@@ -52,7 +52,7 @@ validPackage =
                              Nothing
                     )
                   , ( ["xyz"]
-                    , Module [ Import ["abc"] "a"
+                    , Module [ Import ["abc"] "a" empty
                              , TypeDeclaration "x" (Alias "text") empty
                              ] Nothing
                     )
@@ -60,32 +60,34 @@ validPackage =
 
 missingImportsModules :: M.Map ModulePath Module
 missingImportsModules =
-    [ (["foo"], Module [ Import ["foo", "bar"] "xyz" -- MissingModulePathError
-                       , Import ["foo", "bar"] "zzz" -- MissingModulePathError
-                       , Import ["baz"] "qux"
-                       ] Nothing)
+    [ ( ["foo"]
+      , Module [ Import ["foo", "bar"] "xyz" empty -- MissingModulePathError
+               , Import ["foo", "bar"] "zzz" empty -- MissingModulePathError
+               , Import ["baz"] "qux" empty
+               ] Nothing
+      )
     , ( ["baz"]
       , Module [ TypeDeclaration "qux" (Alias "text") empty ] Nothing
       )
-    , (["qux"], Module [ Import ["foo"] "abc" -- MissingImportError
-                       , Import ["foo"] "def" -- MissingImportError
+    , (["qux"], Module [ Import ["foo"] "abc" empty -- MissingImportError
+                       , Import ["foo"] "def" empty -- MissingImportError
                        ] Nothing)
     ]
 
 circularImportsModules :: M.Map ModulePath Module
 circularImportsModules =
-    [ (["asdf"], Module [ Import ["asdf"] "foo"
+    [ (["asdf"], Module [ Import ["asdf"] "foo" empty
                         , TypeDeclaration "bar" (Alias "text") empty
                         ] Nothing)
-    , (["abc", "def"], Module [ Import ["abc", "ghi"] "bar"
+    , (["abc", "def"], Module [ Import ["abc", "ghi"] "bar" empty
                               , TypeDeclaration
                                     "foo" (Alias "text") empty
                               ] Nothing)
-    , (["abc", "ghi"], Module [ Import ["abc", "xyz"] "baz"
+    , (["abc", "ghi"], Module [ Import ["abc", "xyz"] "baz" empty
                               , TypeDeclaration
                                     "bar" (Alias "text") empty
                               ] Nothing)
-    , (["abc", "xyz"], Module [ Import ["abc", "def"] "foo"
+    , (["abc", "xyz"], Module [ Import ["abc", "def"] "foo" empty
                               , TypeDeclaration
                                     "baz" (Alias "text") empty
                               ] Nothing)
@@ -188,7 +190,7 @@ spec = do
         specify "types" $ do
             types bm `shouldBe` []
             types abc `shouldBe` [TypeDeclaration "a" (Alias "text") empty]
-            types xyz `shouldBe` [ Import ["abc"] "a"
+            types xyz `shouldBe` [ Import ["abc"] "a" empty
                                  , TypeDeclaration "x" (Alias "text") empty
                                  ]
         specify "lookupType" $ do
