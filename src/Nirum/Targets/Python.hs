@@ -202,7 +202,7 @@ compileUnionTag source parentname typename' fields = do
                 else toIndentedCodes (\n -> [qq|'{n}'|]) tagNames ",\n        "
         hashTuple = if null tagNames
             then "self.__nirum_tag__"
-            else [qq|tuple([self.__class__, {attributes}])|] :: T.Text
+            else [qq|tuple([{attributes}])|] :: T.Text
           where
             attributes :: T.Text
             attributes = toIndentedCodes (\n -> [qq|self.{n}|]) tagNames ", "
@@ -334,7 +334,7 @@ class $className:
                 self.value == other.value)
 
     def __hash__(self) -> int:
-        return hash((self.__class__, self.value))
+        return hash(self.value)
 
     def __nirum_serialize__(self) -> typing.Any:
         return serialize_boxed_type(self)
@@ -372,7 +372,6 @@ class $className(enum.Enum):
     @classmethod
     def __nirum_deserialize__(cls: type, value: str) -> '{className}':
         return cls(value.replace('-', '_'))  # FIXME: validate input
-
     |]
 compileTypeDeclaration src TypeDeclaration { typename = typename'
                                            , type' = RecordType fields } = do
@@ -394,7 +393,7 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
             toNamePair
             [name | Field name _ _ <- toList fields]
             ",\n        "
-        hashTuple = [qq|(self.__class__, {attributes})|] :: T.Text
+        hashTuple = [qq|tuple([{attributes}])|] :: T.Text
           where
             attributes = toIndentedCodes (\n -> [qq|self.{n}|]) fieldNames ","
     insertStandardImport "typing"
@@ -443,7 +442,7 @@ class $className:
         return deserialize_record_type(cls, value)
 
     def __hash__(self) -> int:
-        return hash(($hashTuple,))
+        return hash($hashTuple)
                         |]
 compileTypeDeclaration src TypeDeclaration { typename = typename'
                                            , type' = UnionType tags } = do
