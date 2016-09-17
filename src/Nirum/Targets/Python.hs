@@ -35,7 +35,7 @@ module Nirum.Targets.Python ( Code
                             , unionInstallRequires
                             ) where
 
-import Control.Monad.State (modify)
+import Control.Monad.State as ST (get, modify)
 import qualified Data.List as L
 import Data.Maybe (fromMaybe)
 import GHC.Exts (IsList (toList))
@@ -118,18 +118,21 @@ data CodeGenContext
     = CodeGenContext { standardImports :: S.Set T.Text
                      , thirdPartyImports :: M.Map T.Text (S.Set T.Text)
                      , localImports :: M.Map T.Text (S.Set T.Text)
+                     , pythonVersion :: PythonVersion
                      }
     deriving (Eq, Ord, Show)
 
-versionToText :: PythonVersion -> T.Text
-versionToText Python2 = "python2"
-versionToText Python3 = "python3"
+python3SourceDirectory :: T.Text
+python3SourceDirectory = "src"
+python2SourceDirectory :: T.Text
+python2SourceDirectory = "src-py2"
 
-emptyContext :: CodeGenContext
-emptyContext = CodeGenContext { standardImports = []
-                              , thirdPartyImports = []
-                              , localImports = []
-                              }
+emptyContext :: PythonVersion -> CodeGenContext
+emptyContext pythonVersion' = CodeGenContext { standardImports = []
+                                             , thirdPartyImports = []
+                                             , localImports = []
+                                             , pythonVersion = pythonVersion'
+                                             }
 
 type CodeGen = C.CodeGen CodeGenContext CompileError
 
@@ -157,6 +160,19 @@ insertLocalImport module' object = modify insert'
   where
     insert' c@CodeGenContext { localImports = li } =
         c { localImports = M.insertWith S.union module' [object] li }
+
+insertTypingImport :: CodeGen ()
+insertTypingImport = do
+    pyVer <- getPythonVersion
+    case pyVer of
+        Python2 -> return ()
+        Python3 -> insertStandardImport "typing"
+
+insertEnumImport :: CodeGen ()
+insertEnumImport = insertStandardImport "enum"
+
+getPythonVersion :: CodeGen PythonVersion
+getPythonVersion = ST.get >>= return . pythonVersion
 
 -- | The set of Python reserved keywords.
 -- See also: https://docs.python.org/3/reference/lexical_analysis.html#keywords
@@ -217,6 +233,21 @@ toIndentedCodes :: (a -> T.Text) -> [a] -> T.Text -> T.Text
 toIndentedCodes f traversable concatenator =
     T.intercalate concatenator $ map f traversable
 
+quote :: T.Text -> T.Text
+quote s = '\'' `T.cons` s `T.snoc` '\''
+
+
+typeHelpers :: CodeGen (T.Text -> T.Text -> T.Text, T.Text -> T.Text)
+typeHelpers = getPythonVersion >>= typeHelpers'
+  where
+    typeHelpers' pyVer = return (arg, ret)
+      where
+        arg name ty = case pyVer of
+                          Python2 -> name
+                          Python3 -> [qq|$name: $ty|]
+        ret ty = case pyVer of
+                     Python2 -> ""
+                     Python3 -> [qq| -> $ty|]
 
 compileUnionTag :: Source
                 -> Name
@@ -249,7 +280,7 @@ compileUnionTag source parentname typename' fields = do
             (map fieldName $ toList fields)
             ",\n        "
         parentClass = toClassName' parentname
-    insertStandardImport "typing"
+    insertTypingImport
     insertThirdPartyImports [ ("nirum.validate", ["validate_union_type"])
                             , ("nirum.constructs", ["name_dict_type"])
                             ]
@@ -290,23 +321,25 @@ class $className($parentClass):
             |]
 
 compilePrimitiveType :: PrimitiveTypeIdentifier -> CodeGen Code
-compilePrimitiveType primitiveTypeIdentifier =
-    case primitiveTypeIdentifier of
-        Bool -> return "bool"
-        Bigint -> return "int"
-        Decimal -> insertStandardImport "decimal" >> return "decimal.Decimal"
-        Int32 -> return "int"
-        Int64 -> return "int"
-        Float32 -> return "float"
-        Float64 -> return "float"
-        Text -> return "str"
-        Binary -> return "bytes"
-        Date -> insertStandardImport "datetime" >> return "datetime.date"
-        Datetime -> do
-            insertStandardImport "datetime"
-            return "datetime.datetime"
-        Uuid -> insertStandardImport "uuid" >> return "uuid.UUID"
-        Uri -> return "str"
+compilePrimitiveType primitiveTypeIdentifier = do
+    pyVer <- getPythonVersion
+    case (primitiveTypeIdentifier, pyVer) of
+        (Bool, _) -> return "bool"
+        (Bigint, _) -> return "int"
+        (Decimal, _) -> insertStandardImport "decimal" >> return "decimal.Decimal"
+        (Int32, _) -> return "int"
+        (Int64, Python2) -> return "long"
+        (Int64, Python3) -> return "int"
+        (Float32, _) -> return "float"
+        (Float64, _) -> return "float"
+        (Text, Python2) -> return "unicode"
+        (Text, Python3) -> return "str"
+        (Binary, _) -> return "bytes"
+        (Date, _) -> insertStandardImport "datetime" >> return "datetime.date"
+        (Datetime, _) -> insertStandardImport "datetime" >> return "datetime.datetime"
+        (Uuid, _) -> insertStandardImport "uuid" >> return"uuid.UUID"
+        (Uri, Python2) -> return "unicode"
+        (Uri, Python3) -> return "str"
 
 compileTypeExpression :: Source -> TypeExpression -> CodeGen Code
 compileTypeExpression Source { sourceModule = boundModule } (TypeIdentifier i) =
@@ -320,11 +353,11 @@ compileTypeExpression Source { sourceModule = boundModule } (TypeIdentifier i) =
 compileTypeExpression source (MapModifier k v) = do
     kExpr <- compileTypeExpression source k
     vExpr <- compileTypeExpression source v
-    insertStandardImport "typing"
+    insertTypingImport
     return [qq|typing.Mapping[$kExpr, $vExpr]|]
 compileTypeExpression source modifier = do
     expr <- compileTypeExpression source typeExpr
-    insertStandardImport "typing"
+    insertTypingImport
     return [qq|typing.$className[$expr]|]
   where
     typeExpr :: TypeExpression
@@ -349,38 +382,42 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
 compileTypeDeclaration src TypeDeclaration { typename = typename'
                                            , type' = UnboxedType itype } = do
     let className = toClassName' typename'
+    pyVer <- getPythonVersion
+    let classSig = case pyVer of
+                       Python2 -> className `T.append` "(object)"
+                       Python3 -> className
     itypeExpr <- compileTypeExpression src itype
-    insertStandardImport "typing"
-    insertThirdPartyImports
-        [ ("nirum.validate", ["validate_unboxed_type"])
-        , ("nirum.serialize", ["serialize_unboxed_type"])
-        , ("nirum.deserialize", ["deserialize_unboxed_type"])
-        ]
+    insertTypingImport
+    insertThirdPartyImports [ ("nirum.validate", ["validate_boxed_type"])
+                            , ("nirum.serialize", ["serialize_boxed_type"])
+                            , ("nirum.deserialize", ["deserialize_boxed_type"])
+                            ]
+    (arg, ret) <- typeHelpers
     return [qq|
-class $className:
+class $classSig:
     # TODO: docstring
 
     __nirum_inner_type__ = $itypeExpr
 
-    def __init__(self, value: $itypeExpr) -> None:
-        validate_unboxed_type(value, $itypeExpr)
+    def __init__(self, { arg "value" itypeExpr }){ ret "None" }:
+        validate_boxed_type(value, $itypeExpr)
         self.value = value  # type: $itypeExpr
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other){ ret "bool" }:
         return (isinstance(other, $className) and
                 self.value == other.value)
 
-    def __hash__(self) -> int:
+    def __hash__(self){ ret "int" }:
         return hash(self.value)
 
-    def __nirum_serialize__(self) -> typing.Any:
-        return serialize_unboxed_type(self)
+    def __nirum_serialize__(self){ ret "typing.Any" }:
+        return serialize_boxed_type(self)
 
     @classmethod
-    def __nirum_deserialize__(cls: type, value: typing.Any) -> '{className}':
-        return deserialize_unboxed_type(cls, value)
+    def __nirum_deserialize__({ arg "cls" "type" }, { arg "value" "typing.Any" }){ ret $ quote className }:
+        return deserialize_boxed_type(cls, value)
 
-    def __repr__(self) -> str:
+    def __repr__(self){ ret "str" }:
         return '\{0.__module__\}.\{0.__qualname__\}(\{1!r\})'.format(
             type(self), self.value
         )
@@ -396,18 +433,19 @@ compileTypeDeclaration _ TypeDeclaration { typename = typename'
             [ [qq|{toAttributeName' memberName} = '{toSnakeCaseText bn}'|]
             | EnumMember memberName@(Name _ bn) _ <- toList members
             ]
-    insertStandardImport "enum"
+    insertEnumImport
+    (arg, ret) <- typeHelpers
     return [qq|
 class $className(enum.Enum):
     # TODO: docstring
 
     $memberNames
 
-    def __nirum_serialize__(self) -> str:
+    def __nirum_serialize__(self){ ret "str" }:
         return self.value
 
     @classmethod
-    def __nirum_deserialize__(cls: type, value: str) -> '{className}':
+    def __nirum_deserialize__({ arg "cls" "type" }, { arg "value" "str" }) -> '{className}':
         return cls(value.replace('-', '_'))  # FIXME: validate input
     |]
 compileTypeDeclaration src TypeDeclaration { typename = typename'
@@ -430,15 +468,13 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
             toNamePair
             (map fieldName $ toList fields)
             ",\n        "
-        hashTuple = [qq|({attributes},)|] :: T.Text
-          where
-            attributes = toIndentedCodes (\ n -> [qq|self.{n}|]) fieldNames ","
-    insertStandardImport "typing"
+    insertTypingImport
     insertThirdPartyImports [ ("nirum.validate", ["validate_record_type"])
                             , ("nirum.serialize", ["serialize_record_type"])
                             , ("nirum.deserialize", ["deserialize_record_type"])
                             , ("nirum.constructs", ["name_dict_type"])
                             ]
+    (arg, ret) <- typeHelpers
     return [qq|
 class $className:
     # TODO: docstring
@@ -475,7 +511,7 @@ class $className:
         return serialize_record_type(self)
 
     @classmethod
-    def __nirum_deserialize__(cls: type, value) -> '{className}':
+    def __nirum_deserialize__({ arg "cls" "type" }, value){ ret $ quote className }:
         return deserialize_record_type(cls, value)
 
     def __hash__(self) -> int:
@@ -487,13 +523,14 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
     let className = toClassName' typename'
         fieldCodes' = T.intercalate "\n\n" fieldCodes
         enumMembers = toIndentedCodes
-            (\ (t, b) -> [qq|$t = '{b}'|]) enumMembers' "\n        "
-    insertStandardImport "typing"
-    insertStandardImport "enum"
+            (\(t, b) -> [qq|$t = '{b}'|]) enumMembers' "\n        "
+    insertTypingImport
+    insertEnumImport
     insertThirdPartyImports [ ("nirum.serialize", ["serialize_union_type"])
                             , ("nirum.deserialize", ["deserialize_union_type"])
                             , ("nirum.constructs", ["name_dict_type"])
                             ]
+    (arg, ret) <- typeHelpers
     return [qq|
 class $className:
 
@@ -514,11 +551,11 @@ class $className:
             )
         )
 
-    def __nirum_serialize__(self) -> typing.Mapping[str, typing.Any]:
+    def __nirum_serialize__(self){ ret "typing.Mapping[str, typing.Any]" }:
         return serialize_union_type(self)
 
     @classmethod
-    def __nirum_deserialize__(cls: type, value) -> '{className}':
+    def __nirum_deserialize__({ arg "cls" "type" }, value){ ret $ quote className }:
         return deserialize_union_type(cls, value)
 
 
@@ -549,7 +586,6 @@ compileTypeDeclaration src ServiceDeclaration { serviceName = name'
     clientMethods <- mapM compileClientMethod methods'
     let dummyMethods' = T.intercalate "\n\n" dummyMethods
         clientMethods' = T.intercalate "\n\n" clientMethods
-    insertStandardImport "urllib.request"
     insertStandardImport "json"
     insertThirdPartyImports [ ("nirum.constructs", ["name_dict_type"])
                             , ("nirum.deserialize", ["deserialize_meta"])
@@ -692,9 +728,11 @@ unionInstallRequires a b =
                                                    (optionalDependencies b)
       }
 
-compileModule :: Source -> Either CompileError (InstallRequires, Code)
-compileModule source =
-    case runCodeGen code' emptyContext of
+compileModule :: PythonVersion
+              -> Source
+              -> Either CompileError (InstallRequires, Code)
+compileModule pythonVersion' source =
+    case runCodeGen code' $ emptyContext pythonVersion' of
         (Left errMsg, _) -> Left errMsg
         (Right code, context) -> codeWithDeps context $ [qq|
 {imports $ standardImports context}
@@ -779,10 +817,10 @@ else:
     extras_require = \{}
 
 
+SOURCE_ROOT = '{python3SourceDirectory}'
+
 if sys.version_info[0] == 2:
-    pacakages = [ {pPackages Python2} ]
-if sys.version_info[0] == 3:
-    pacakages = [ {pPackages Python3} ]
+    SOURCE_ROOT = '{python2SourceDirectory}'
 
 # TODO: description, long_description, url, license,
 #       keywords, classifiers
@@ -791,8 +829,9 @@ setup(
     version='{pVersion}',
     author=$author,
     author_email=$authorEmail,
-    packages=pacakages,
-    provides=pacakages,
+    package_dir={'': SOURCE_ROOT},
+    packages=[$pPackages],
+    provides=[$pPackages],
     requires=[$pInstallRequires],
     setup_requires=setup_requires,
     install_requires=install_requires,
@@ -815,15 +854,8 @@ setup(
     authorEmail = csStrings [ decodeUtf8 (E.toByteString e)
                             | Author { email = Just e } <- authors metadata'
                             ]
-    versionAttachedPacakage :: PythonVersion -> ModulePath -> Code
-    versionAttachedPacakage version' modulePath' =
-        T.intercalate "/" [ "src"
-                          , versionToText version'
-                          , toImportPath modulePath'
-                          ]
-    pPackages :: PythonVersion -> Code
-    pPackages pythonVersion = strings $
-        map (versionAttachedPacakage pythonVersion) $ MS.keys $ modules package
+    pPackages :: Code
+    pPackages = strings $ map toImportPath $ MS.keys $ modules package
     pInstallRequires :: Code
     pInstallRequires = strings $ S.toList deps
     pPolyfillRequires :: Code
@@ -850,25 +882,27 @@ compilePackage package =
     toPythonFilename mp = [ T.unpack (toAttributeName i)
                           | i <- toList mp
                           ] ++ ["__init__.py"]
-    toFilename :: PythonVersion -> ModulePath -> FilePath
-    toFilename pythonVersion mp =
-        joinPath $ [ "src"
-                   , T.unpack $ versionToText pythonVersion
-                   ] ++ toPythonFilename mp
+    versionDirectoryList :: [(T.Text, PythonVersion)]
+    versionDirectoryList = [ (python2SourceDirectory, Python2)
+                           , (python3SourceDirectory, Python3)
+                           ]
+    toFilename :: FilePath -> ModulePath -> FilePath
+    toFilename sourceRootDirectory mp =
+        joinPath $ [ sourceRootDirectory ] ++ toPythonFilename mp
     initFiles :: [(FilePath, Either CompileError Code)]
-    initFiles = [ (toFilename pythonVersion mp', Right "")
+    initFiles = [ (toFilename sourceRootDirectory mp', Right "")
                 | mp <- MS.keys (modules package)
                 , mp' <- S.elems (ancestors mp)
-                , pythonVersion <- [Python2, Python3]
+                , (sourceRootDirectory, _) <- versionDirectoryList
                 ]
     modules' :: [(FilePath, Either CompileError (InstallRequires, Code))]
     modules' =
-        [ ( toFilename pythonVersion modulePath'
-          , compileModule $ Source package boundModule
+        [ ( toFilename sourceRootDirectory modulePath'
+          , compileModule pythonVersion' $ Source package boundModule
           )
         | (modulePath', _) <- MS.toAscList (modules package)
         , Just boundModule <- [resolveBoundModule modulePath' package]
-        , pythonVersion <- [Python2, Python3]
+        , (sourceRootDirectory, pythonVersion') <- versionDirectoryList
         ]
     installRequires :: InstallRequires
     installRequires = foldl unionInstallRequires
