@@ -599,10 +599,6 @@ spec = parallel $ do
             tT decl "Point(left=3, top=14) != Point(left=4, top=15)"
             tT decl "Point(left=3, top=14) != 'foo'"
             tT decl "hash(Point(left=3, top=14))"
-            tT decl [q|hash(Point(left=3, top=14)) ==
-                       hash(Point(left=3, top=14))|]
-            tT decl [q|hash(Point(left=3, top=14)) !=
-                       hash(Point(left=1, top=592))|]
             tT decl [q|Point(left=3, top=14).__nirum_serialize__() ==
                        {'_type': 'point', 'x': 3, 'top': 14}|]
             tT decl [qq|Point.__nirum_deserialize__($payload) ==
@@ -676,16 +672,11 @@ spec = parallel $ do
             tT decl "Line.__slots__ == ('length', )"
             tT decl [qq|Line(length=3).__nirum_serialize__() == $payload|]
         specify "union type" $ do
-            let wasternNameTag =
+            let westernNameTag =
                     Tag "western-name" [ Field "first-name" "text" empty
                                        , Field "middle-name" "text" empty
                                        , Field "last-name" "text" empty
                                        ] empty
-            let wasternNameTag2 =
-                    Tag "western-name2" [ Field "first-name" "text" empty
-                                        , Field "middle-name" "text" empty
-                                        , Field "last-name" "text" empty
-                                        ] empty
                 eastAsianNameTag =
                     Tag "east-asian-name" [ Field "family-name" "text" empty
                                           , Field "given-name" "text" empty
@@ -694,8 +685,7 @@ spec = parallel $ do
                     Tag "culture-agnostic-name"
                         [ Field "fullname" "text" empty ]
                         empty
-                tags = [ wasternNameTag
-                       , wasternNameTag2
+                tags = [ westernNameTag
                        , eastAsianNameTag
                        , cultureAgnosticNameTag
                        ]
@@ -747,18 +737,6 @@ spec = parallel $ do
                        WesternName(first_name='foo', middle_name='bar',
                                    last_name='baz')|]
             tT decl [q|hash(WesternName(first_name='foo', middle_name='bar',
-                                        last_name='baz'))|]
-            tT decl [q|hash(WesternName(first_name='foo', middle_name='bar',
-                                        last_name='baz')) ==
-                       hash(WesternName(first_name='foo', middle_name='bar',
-                                        last_name='baz'))|]
-            tT decl [q|hash(WesternName(first_name='foo', middle_name='bar',
-                                        last_name='baz')) !=
-                       hash(WesternName(first_name='hello', middle_name='bar',
-                                        last_name='baz'))|]
-            tT decl [q|hash(WesternName(first_name='foo', middle_name='bar',
-                                        last_name='baz')) !=
-                       hash(WesternName2(first_name='foo', middle_name='bar',
                                         last_name='baz'))|]
             tT decl "isinstance(EastAsianName, type)"
             tT decl "issubclass(EastAsianName, Name)"
