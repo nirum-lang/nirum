@@ -202,7 +202,7 @@ compileUnionTag source parentname typename' fields = do
                 else toIndentedCodes (\n -> [qq|'{n}'|]) tagNames ",\n        "
         hashTuple = if null tagNames
             then "self.__nirum_tag__"
-            else [qq|tuple([{attributes}])|] :: T.Text
+            else [qq|({attributes},)|] :: T.Text
           where
             attributes :: T.Text
             attributes = toIndentedCodes (\n -> [qq|self.{n}|]) tagNames ", "
@@ -393,7 +393,7 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
             toNamePair
             [name | Field name _ _ <- toList fields]
             ",\n        "
-        hashTuple = [qq|tuple([{attributes}])|] :: T.Text
+        hashTuple = [qq|({attributes},)|] :: T.Text
           where
             attributes = toIndentedCodes (\n -> [qq|self.{n}|]) fieldNames ","
     insertStandardImport "typing"
