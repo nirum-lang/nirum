@@ -502,6 +502,8 @@ spec = parallel $ do
             tT decl "FloatBox(3.14).__nirum_serialize__() == 3.14"
             tT decl "FloatBox.__nirum_deserialize__(3.14) == FloatBox(3.14)"
             tT decl "FloatBox.__nirum_deserialize__(3.14) == FloatBox(3.14)"
+            tT decl "hash(FloatBox(3.14))"
+            tT decl "hash(FloatBox(3.14)) != 3.14"
             tR' decl "TypeError" "FloatBox.__nirum_deserialize__('a')"
             tR' decl "TypeError" "FloatBox('a')"
             let decls = [ Import ["foo", "bar"] "path-box" empty
@@ -596,6 +598,7 @@ spec = parallel $ do
             tT decl "Point(left=3, top=14) != Point(left=4, top=14)"
             tT decl "Point(left=3, top=14) != Point(left=4, top=15)"
             tT decl "Point(left=3, top=14) != 'foo'"
+            tT decl "hash(Point(left=3, top=14))"
             tT decl [q|Point(left=3, top=14).__nirum_serialize__() ==
                        {'_type': 'point', 'x': 3, 'top': 14}|]
             tT decl [qq|Point.__nirum_deserialize__($payload) ==
@@ -669,7 +672,7 @@ spec = parallel $ do
             tT decl "Line.__slots__ == ('length', )"
             tT decl [qq|Line(length=3).__nirum_serialize__() == $payload|]
         specify "union type" $ do
-            let wasternNameTag =
+            let westernNameTag =
                     Tag "western-name" [ Field "first-name" "text" empty
                                        , Field "middle-name" "text" empty
                                        , Field "last-name" "text" empty
@@ -682,7 +685,7 @@ spec = parallel $ do
                     Tag "culture-agnostic-name"
                         [ Field "fullname" "text" empty ]
                         empty
-                tags = [ wasternNameTag
+                tags = [ westernNameTag
                        , eastAsianNameTag
                        , cultureAgnosticNameTag
                        ]
@@ -733,6 +736,8 @@ spec = parallel $ do
                                    last_name='wrong') !=
                        WesternName(first_name='foo', middle_name='bar',
                                    last_name='baz')|]
+            tT decl [q|hash(WesternName(first_name='foo', middle_name='bar',
+                                        last_name='baz'))|]
             tT decl "isinstance(EastAsianName, type)"
             tT decl "issubclass(EastAsianName, Name)"
             tT decl [q|EastAsianName(family_name='foo',

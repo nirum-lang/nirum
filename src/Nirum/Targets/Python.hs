@@ -200,6 +200,12 @@ compileUnionTag source parentname typename' fields = do
         slots = if length tagNames == 1
                 then [qq|'{head tagNames}'|] `T.snoc` ','
                 else toIndentedCodes (\n -> [qq|'{n}'|]) tagNames ",\n        "
+        hashTuple = if null tagNames
+            then "self.__nirum_tag__"
+            else [qq|({attributes},)|] :: T.Text
+          where
+            attributes :: T.Text
+            attributes = toIndentedCodes (\n -> [qq|self.{n}|]) tagNames ", "
         initialArgs = toIndentedCodes
             (\(n, t) -> [qq|{n}: {t}|]) nameNTypes ", "
         initialValues =
@@ -244,6 +250,9 @@ class $className($parentClass):
             getattr(self, attr) == getattr(other, attr)
             for attr in self.__slots__
         )
+
+    def __hash__(self) -> int:
+        return hash($hashTuple)
             |]
 
 compilePrimitiveType :: PrimitiveTypeIdentifier -> CodeGen Code
@@ -338,6 +347,9 @@ class $className:
         return '\{0.__module__\}.\{0.__qualname__\}(\{1!r\})'.format(
             type(self), self.value
         )
+
+    def __hash__(self) -> int:
+        return hash(self.value)
             |]
 compileTypeDeclaration _ TypeDeclaration { typename = typename'
                                          , type' = EnumType members } = do
@@ -381,6 +393,9 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
             toNamePair
             [name | Field name _ _ <- toList fields]
             ",\n        "
+        hashTuple = [qq|({attributes},)|] :: T.Text
+          where
+            attributes = toIndentedCodes (\n -> [qq|self.{n}|]) fieldNames ","
     insertStandardImport "typing"
     insertThirdPartyImports [ ("nirum.validate", ["validate_record_type"])
                             , ("nirum.serialize", ["serialize_record_type"])
@@ -425,6 +440,9 @@ class $className:
     @classmethod
     def __nirum_deserialize__(cls: type, value) -> '{className}':
         return deserialize_record_type(cls, value)
+
+    def __hash__(self) -> int:
+        return hash($hashTuple)
                         |]
 compileTypeDeclaration src TypeDeclaration { typename = typename'
                                            , type' = UnionType tags } = do
