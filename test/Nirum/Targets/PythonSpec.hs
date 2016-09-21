@@ -504,7 +504,11 @@ spec = parallel $ do
             tT decl "FloatBox.__nirum_deserialize__(3.14) == FloatBox(3.14)"
             tT decl "hash(FloatBox(3.14))"
             tT decl "hash(FloatBox(3.14)) != 3.14"
-            tR' decl "TypeError" "FloatBox.__nirum_deserialize__('a')"
+            -- FIXME: Is TypeError/ValueError is appropriate exception type
+            -- for deserialization error?  For such case, json.loads() raises
+            -- JSONDecodeError (which inherits ValueError).
+            tR' decl "(TypeError, ValueError)"
+                     "FloatBox.__nirum_deserialize__('a')"
             tR' decl "TypeError" "FloatBox('a')"
             let decls = [ Import ["foo", "bar"] "path-box" empty
                         , TypeDeclaration "imported-type-box"
@@ -532,7 +536,11 @@ spec = parallel $ do
                 ImportedTypeBox.__nirum_deserialize__('/path/string') ==
                 ImportedTypeBox(PathBox('/path/string'))
             |]
-            tR'' decls "TypeError" "ImportedTypeBox.__nirum_deserialize__(123)"
+            -- FIXME: Is TypeError/ValueError is appropriate exception type
+            -- for deserialization error?  For such case, json.loads() raises
+            -- JSONDecodeError (which inherits ValueError).
+            tR'' decls "(TypeError, ValueError)"
+                       "ImportedTypeBox.__nirum_deserialize__(123)"
             tR'' decls "TypeError" "ImportedTypeBox(123)"
             let boxedAlias = [ Import ["qux"] "path" empty
                              , TypeDeclaration "way"
