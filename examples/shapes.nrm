@@ -1,28 +1,25 @@
 # Module consists zero or more type declarations.
 
 boxed offset (float64);
-# If there's only one field which omit its identifier in a value type,
-# it's defined as a boxed type of the field type.
+# The key difference between boxed type and reocrd type consisting of a single
+# field is that the former has the same JSON representation to its target type,
+# while the latter has thicker JSON representation than its only field.
 #
-# The key difference between boxed type and value type consisting of single
-# consturctor of a field is that the former has the same JSON representation
-# to its boxing target type, while the latter has thicker JSON representation
-# than its only field.
-#
-# For example, a boxed type `value offset (float);` is represented in JSON as:
+# For example, a value of `boxed offset (float);` type is represented
+# in JSON as:
 #
 #     120.5
 #
-# While a value type `value offset (float position);` is represented in JSON as:
+# While a value of `record offset (float position);` type is represented
+# in JSON as:
 #
 #     {"position": 120.5}
 #
-# What does it mean?  It means you can safely change a value type `float`
-# to its boxed type `offset` with backward compatibility.
+# What does it mean?  It means, for instance, you can safely change a primitive
+# type `float` to its unboxed type `offset` with backward compatibility.
 
 record point (
-    # Value type definition `value t = t (...);` can be shortened as
-    # `value t (...);`.
+    # Record type definition.
 
     offset left/x,
     # for backward compatibility, you can specify *behind name*.
