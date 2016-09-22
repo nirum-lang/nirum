@@ -31,7 +31,7 @@ install:
 - C:\Python35\python -m venv C:\pyvenv
 - >
     C:\pyvenv\Scripts\Activate.bat &
-    pip install --upgrade setuptools pip &
+    python -m pip install --upgrade setuptools pip &
     pip install git+git://github.com/spoqa/nirum-python.git
 build_script:
 - stack --no-terminal build --copy-bins
