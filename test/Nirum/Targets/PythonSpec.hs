@@ -57,9 +57,9 @@ import Nirum.Constructs.TypeDeclaration ( Field(Field)
                                         , PrimitiveTypeIdentifier(..)
                                         , Tag(Tag)
                                         , Type( Alias
-                                              , BoxedType
                                               , EnumType
                                               , RecordType
+                                              , UnboxedType
                                               , UnionType
                                               )
                                         , TypeDeclaration ( Import
@@ -263,8 +263,9 @@ makeDummySource' pathPrefix m =
             [ (mp ["foo"], m)
             , ( mp ["foo", "bar"]
               , Module [ Import (mp ["qux"]) "path" empty
-                       , TypeDeclaration "path-box" (BoxedType "path") empty
-                       , TypeDeclaration "int-box" (BoxedType "bigint") empty
+                       , TypeDeclaration "path-unbox" (UnboxedType "path") empty
+                       , TypeDeclaration "int-unbox"
+                                         (UnboxedType "bigint") empty
                        , TypeDeclaration "point"
                                          (RecordType [ Field "x" "int64" empty
                                                      , Field "y" "int64" empty
@@ -275,7 +276,7 @@ makeDummySource' pathPrefix m =
             , ( mp ["qux"]
               , Module
                   [ TypeDeclaration "path" (Alias "text") empty
-                  , TypeDeclaration "name" (BoxedType "text") empty
+                  , TypeDeclaration "name" (UnboxedType "text") empty
                   ]
                   Nothing
               )
@@ -300,21 +301,21 @@ compileError cg = either Just (const Nothing) $ fst $ runCodeGen cg emptyContext
 spec :: Spec
 spec = parallel $ do
     describe "CodeGen" $ do
-        context "Monad" $
-            specify "packages and imports" $ do
-                let c = do
-                        insertStandardImport "sys"
-                        insertThirdPartyImports [("nirum", ["serialize_boxed_type"])]
-                        insertLocalImport ".." "Gender"
-                        insertStandardImport "os"
-                        insertThirdPartyImports [("nirum", ["serialize_enum_type"])]
-                        insertLocalImport ".." "Path"
-                let (e, ctx) = runCodeGen c emptyContext
-                e `shouldSatisfy` isRight
-                standardImports ctx `shouldBe` ["os", "sys"]
-                thirdPartyImports ctx `shouldBe`
-                    [("nirum", ["serialize_boxed_type", "serialize_enum_type"])]
-                localImports ctx `shouldBe` [("..", ["Gender", "Path"])]
+        specify "packages and imports" $ do
+            let c = do
+                    insertStandardImport "sys"
+                    insertThirdPartyImports
+                        [("nirum", ["serialize_unboxed_type"])]
+                    insertLocalImport ".." "Gender"
+                    insertStandardImport "os"
+                    insertThirdPartyImports [("nirum", ["serialize_enum_type"])]
+                    insertLocalImport ".." "Path"
+            let (e, ctx) = runCodeGen c emptyContext
+            e `shouldSatisfy` isRight
+            standardImports ctx `shouldBe` ["os", "sys"]
+            thirdPartyImports ctx `shouldBe`
+                [("nirum", ["serialize_unboxed_type", "serialize_enum_type"])]
+            localImports ctx `shouldBe` [("..", ["Gender", "Path"])]
         specify "insertStandardImport" $ do
             let codeGen1 = insertStandardImport "sys"
             let (e1, ctx1) = runCodeGen codeGen1 emptyContext
@@ -491,73 +492,76 @@ spec = parallel $ do
                             let Just result = out
                             T.strip (T.pack result) `shouldBe` expected
             test testRunner source T.empty
-        specify "boxed type" $ do
-            let decl = TypeDeclaration "float-box" (BoxedType "float64") empty
-            tT decl "isinstance(FloatBox, type)"
-            tT decl "FloatBox(3.14).value == 3.14"
-            tT decl "FloatBox(3.14) == FloatBox(3.14)"
-            tT decl "FloatBox(3.14) != FloatBox(1.0)"
-            tT decl [q|{FloatBox(3.14), FloatBox(3.14), FloatBox(1.0)} ==
-                       {FloatBox(3.14), FloatBox(1.0)}|]
-            tT decl "FloatBox(3.14).__nirum_serialize__() == 3.14"
-            tT decl "FloatBox.__nirum_deserialize__(3.14) == FloatBox(3.14)"
-            tT decl "FloatBox.__nirum_deserialize__(3.14) == FloatBox(3.14)"
-            tT decl "hash(FloatBox(3.14))"
-            tT decl "hash(FloatBox(3.14)) != 3.14"
+        specify "unboxed type" $ do
+            let decl = TypeDeclaration "float-unbox" (UnboxedType "float64")
+                                       empty
+            tT decl "isinstance(FloatUnbox, type)"
+            tT decl "FloatUnbox(3.14).value == 3.14"
+            tT decl "FloatUnbox(3.14) == FloatUnbox(3.14)"
+            tT decl "FloatUnbox(3.14) != FloatUnbox(1.0)"
+            tT decl [q|{FloatUnbox(3.14), FloatUnbox(3.14), FloatUnbox(1.0)} ==
+                       {FloatUnbox(3.14), FloatUnbox(1.0)}|]
+            tT decl "FloatUnbox(3.14).__nirum_serialize__() == 3.14"
+            tT decl "FloatUnbox.__nirum_deserialize__(3.14) == FloatUnbox(3.14)"
+            tT decl "FloatUnbox.__nirum_deserialize__(3.14) == FloatUnbox(3.14)"
+            tT decl "hash(FloatUnbox(3.14))"
+            tT decl "hash(FloatUnbox(3.14)) != 3.14"
             -- FIXME: Is TypeError/ValueError is appropriate exception type
             -- for deserialization error?  For such case, json.loads() raises
             -- JSONDecodeError (which inherits ValueError).
             tR' decl "(TypeError, ValueError)"
-                     "FloatBox.__nirum_deserialize__('a')"
-            tR' decl "TypeError" "FloatBox('a')"
-            let decls = [ Import ["foo", "bar"] "path-box" empty
-                        , TypeDeclaration "imported-type-box"
-                                          (BoxedType "path-box") empty
+                     "FloatUnbox.__nirum_deserialize__('a')"
+            tR' decl "TypeError" "FloatUnbox('a')"
+            let decls = [ Import ["foo", "bar"] "path-unbox" empty
+                        , TypeDeclaration "imported-type-unbox"
+                                          (UnboxedType "path-unbox") empty
                         ]
-            tT' decls "isinstance(ImportedTypeBox, type)"
-            tT' decls [q|ImportedTypeBox(PathBox('/path/string')).value.value ==
-                         '/path/string'|]
-            tT' decls [q|ImportedTypeBox(PathBox('/path/string')) ==
-                         ImportedTypeBox(PathBox('/path/string'))|]
-            tT' decls [q|ImportedTypeBox(PathBox('/path/string')) !=
-                         ImportedTypeBox(PathBox('/other/path'))|]
-            tT' decls [q|{ImportedTypeBox(PathBox('/path/string')),
-                          ImportedTypeBox(PathBox('/path/string')),
-                          ImportedTypeBox(PathBox('/other/path')),
-                          ImportedTypeBox(PathBox('/path/string')),
-                          ImportedTypeBox(PathBox('/other/path'))} ==
-                         {ImportedTypeBox(PathBox('/path/string')),
-                          ImportedTypeBox(PathBox('/other/path'))}|]
+            tT' decls "isinstance(ImportedTypeUnbox, type)"
             tT' decls [q|
-                ImportedTypeBox(PathBox('/path/string')).__nirum_serialize__()
-                == '/path/string'
+                ImportedTypeUnbox(PathUnbox('/path/string')).value.value ==
+                '/path/string'
+            |]
+            tT' decls [q|ImportedTypeUnbox(PathUnbox('/path/string')) ==
+                         ImportedTypeUnbox(PathUnbox('/path/string'))|]
+            tT' decls [q|ImportedTypeUnbox(PathUnbox('/path/string')) !=
+                         ImportedTypeUnbox(PathUnbox('/other/path'))|]
+            tT' decls [q|{ImportedTypeUnbox(PathUnbox('/path/string')),
+                          ImportedTypeUnbox(PathUnbox('/path/string')),
+                          ImportedTypeUnbox(PathUnbox('/other/path')),
+                          ImportedTypeUnbox(PathUnbox('/path/string')),
+                          ImportedTypeUnbox(PathUnbox('/other/path'))} ==
+                         {ImportedTypeUnbox(PathUnbox('/path/string')),
+                          ImportedTypeUnbox(PathUnbox('/other/path'))}|]
+            tT' decls [q|
+                ImportedTypeUnbox(PathUnbox('/path/string')
+                    ).__nirum_serialize__() == '/path/string'
             |]
             tT' decls [q|
-                ImportedTypeBox.__nirum_deserialize__('/path/string') ==
-                ImportedTypeBox(PathBox('/path/string'))
+                ImportedTypeUnbox.__nirum_deserialize__('/path/string') ==
+                ImportedTypeUnbox(PathUnbox('/path/string'))
             |]
             -- FIXME: Is TypeError/ValueError is appropriate exception type
             -- for deserialization error?  For such case, json.loads() raises
             -- JSONDecodeError (which inherits ValueError).
             tR'' decls "(TypeError, ValueError)"
-                       "ImportedTypeBox.__nirum_deserialize__(123)"
-            tR'' decls "TypeError" "ImportedTypeBox(123)"
+                       "ImportedTypeUnbox.__nirum_deserialize__(123)"
+            tR'' decls "TypeError" "ImportedTypeUnbox(123)"
             let boxedAlias = [ Import ["qux"] "path" empty
                              , TypeDeclaration "way"
-                                               (BoxedType "path") empty
+                                               (UnboxedType "path") empty
                              ]
             tT' boxedAlias "Way('.').value == '.'"
             tT' boxedAlias "Way(Path('.')).value == '.'"
             tT' boxedAlias "Way.__nirum_deserialize__('.') == Way('.')"
             tT' boxedAlias "Way('.').__nirum_serialize__() == '.'"
-            let aliasBoxed = [ Import ["qux"] "name" empty
-                             , TypeDeclaration "irum" (Alias "name") empty
-                             ]
-            tT' aliasBoxed "Name('khj') == Irum('khj')"
-            tT' aliasBoxed "Irum.__nirum_deserialize__('khj') == Irum('khj')"
-            tT' aliasBoxed "Irum('khj').__nirum_serialize__() == 'khj'"
-            tT' aliasBoxed "Irum.__nirum_deserialize__('khj') == Name('khj')"
-            tT' aliasBoxed "Irum.__nirum_deserialize__('khj') == Irum('khj')"
+            let aliasUnboxed = [ Import ["qux"] "name" empty
+                               , TypeDeclaration "irum" (Alias "name") empty
+                               ]
+            tT' aliasUnboxed "Name('khj') == Irum('khj')"
+            tT' aliasUnboxed "Irum.__nirum_deserialize__('khj') == Irum('khj')"
+            tT' aliasUnboxed "Irum('khj').__nirum_serialize__() == 'khj'"
+            tT' aliasUnboxed "Irum.__nirum_deserialize__('khj') == Name('khj')"
+            tT' aliasUnboxed "Irum.__nirum_deserialize__('khj') == Irum('khj')"
         specify "enum type" $ do
             let members = [ "male"
                           , EnumMember (Name "female" "yeoseong") empty
@@ -618,36 +622,38 @@ spec = parallel $ do
             tR' decl "TypeError" "Point(left=1, top='a')"
             tR' decl "TypeError" "Point(left='a', top=1)"
             tR' decl "TypeError" "Point(left='a', top='b')"
-            let fields' = [ Field "left" "int-box" empty
-                          , Field "top" "int-box" empty
+            let fields' = [ Field "left" "int-unbox" empty
+                          , Field "top" "int-unbox" empty
                           ]
-                decls = [ Import ["foo", "bar"] "int-box" empty
+                decls = [ Import ["foo", "bar"] "int-unbox" empty
                         , TypeDeclaration "point" (RecordType fields') empty
                         ]
                 payload' = "{'_type': 'point', 'left': 3, 'top': 14}" :: T.Text
             tT' decls "isinstance(Point, type)"
-            tT' decls "Point(left=IntBox(3), top=IntBox(14)).left == IntBox(3)"
-            tT' decls "Point(left=IntBox(3), top=IntBox(14)).top == IntBox(14)"
-            tT' decls [q|Point(left=IntBox(3), top=IntBox(14)) ==
-                         Point(left=IntBox(3), top=IntBox(14))|]
-            tT' decls [q|Point(left=IntBox(3), top=IntBox(14)) !=
-                         Point(left=IntBox(3), top=IntBox(15))|]
-            tT' decls [q|Point(left=IntBox(3), top=IntBox(14)) !=
-                         Point(left=IntBox(4), top=IntBox(14))|]
-            tT' decls [q|Point(left=IntBox(3), top=IntBox(14)) !=
-                         Point(left=IntBox(4), top=IntBox(15))|]
-            tT' decls "Point(left=IntBox(3), top=IntBox(14)) != 'foo'"
-            tT' decls [q|Point(left=IntBox(3),
-                               top=IntBox(14)).__nirum_serialize__() ==
+            tT' decls [q|Point(left=IntUnbox(3), top=IntUnbox(14)).left ==
+                         IntUnbox(3)|]
+            tT' decls [q|Point(left=IntUnbox(3), top=IntUnbox(14)).top ==
+                         IntUnbox(14)|]
+            tT' decls [q|Point(left=IntUnbox(3), top=IntUnbox(14)) ==
+                         Point(left=IntUnbox(3), top=IntUnbox(14))|]
+            tT' decls [q|Point(left=IntUnbox(3), top=IntUnbox(14)) !=
+                         Point(left=IntUnbox(3), top=IntUnbox(15))|]
+            tT' decls [q|Point(left=IntUnbox(3), top=IntUnbox(14)) !=
+                         Point(left=IntUnbox(4), top=IntUnbox(14))|]
+            tT' decls [q|Point(left=IntUnbox(3), top=IntUnbox(14)) !=
+                         Point(left=IntUnbox(4), top=IntUnbox(15))|]
+            tT' decls "Point(left=IntUnbox(3), top=IntUnbox(14)) != 'foo'"
+            tT' decls [q|Point(left=IntUnbox(3),
+                               top=IntUnbox(14)).__nirum_serialize__() ==
                          {'_type': 'point', 'left': 3, 'top': 14}|]
             tT' decls [qq|Point.__nirum_deserialize__($payload') ==
-                          Point(left=IntBox(3), top=IntBox(14))|]
+                          Point(left=IntUnbox(3), top=IntUnbox(14))|]
             tR'' decls "ValueError"
                  "Point.__nirum_deserialize__({'left': 3, 'top': 14})"
             tR'' decls "ValueError"
                  "Point.__nirum_deserialize__({'_type': 'foo'})"
-            tR'' decls "TypeError" "Point(left=IntBox(1), top='a')"
-            tR'' decls "TypeError" "Point(left=IntBox(1), top=2)"
+            tR'' decls "TypeError" "Point(left=IntUnbox(1), top='a')"
+            tR'' decls "TypeError" "Point(left=IntUnbox(1), top=2)"
             let fields'' = [ Field "xy" "point" empty
                            , Field "z" "int64" empty
                            ]

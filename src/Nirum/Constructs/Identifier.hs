@@ -52,12 +52,12 @@ import Nirum.Constructs (Construct(toCode))
 data Identifier = Identifier T.Text deriving (Show)
 
 reservedKeywords :: S.Set Identifier
-reservedKeywords = [ "boxed"
-                   , "enum"
+reservedKeywords = [ "enum"
                    , "record"
                    , "service"
                    , "throws"
                    , "type"
+                   , "unboxed"
                    , "union"
                    ]
 

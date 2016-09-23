@@ -120,8 +120,8 @@ spec = do
         it "fails to parse an identifier containing disallowed chars" $ do
             expectError "무효한-식별자" 1 1
             expectError "invalid-식별자" 1 9
-        let keywords = [ "boxed", "enum", "record", "type", "union"
-                       , "BOXED", "Enum", "rEcord", "tyPE", "unioN"
+        let keywords = [ "enum", "record", "type", "unboxed", "union"
+                       , "Enum", "rEcord", "tyPE", "UNBOXED", "unioN"
                        ] :: [T.Text]
         it "fails to parse bare identifier if it's a reserved keyword" $
             forM_ keywords $ \kwd ->
@@ -174,8 +174,8 @@ spec = do
             parse' "`enum`" `shouldBeRight` Name "enum" "enum"
             parse' "facial/behind" `shouldBeRight` Name "facial" "behind"
             parse' "facial / behind" `shouldBeRight` Name "facial" "behind"
-            parse' "`enum`/`boxed`" `shouldBeRight` Name "enum" "boxed"
-            parse' "`enum` / `boxed`" `shouldBeRight` Name "enum" "boxed"
+            parse' "`enum`/`unboxed`" `shouldBeRight` Name "enum" "unboxed"
+            parse' "`enum` / `unboxed`" `shouldBeRight` Name "enum" "unboxed"
 
     describe "annotation" $ do
         let (parse', expectError) = helperFuncs P.annotation
@@ -420,36 +420,37 @@ spec = do
         it "fails to parse if trailing semicolon is missing" $ do
             let (_, expectErr) = helperFuncs P.module'
             expectErr "type a = text;\ntype b = text\ntype c = text;" 3 1
-            expectErr "boxed a (text);\ntype b = text\nboxed c (text);" 3 1
-            expectErr "type a = text;\nboxed b (text)\ntype c = text;" 3 1
+            expectErr "unboxed a (text);\ntype b = text\nunboxed c (text);" 3 1
+            expectErr "type a = text;\nunboxed b (text)\ntype c = text;" 3 1
 
-    descTypeDecl "boxedTypeDeclaration" P.boxedTypeDeclaration $ \helpers -> do
-        let (parse', expectError) = helpers
-        it "emits (TypeDeclaration (BoxedType ...)) if succeeded to parse" $ do
-            parse' "boxed offset (float64);" `shouldBeRight`
-                TypeDeclaration "offset" (BoxedType "float64") empty
-            parse' "boxed offset (float64);\n# docs" `shouldBeRight`
-                TypeDeclaration "offset" (BoxedType "float64")
+    descTypeDecl "unboxedTypeDeclaration" P.unboxedTypeDeclaration $ \funs -> do
+        let (parse', expectError) = funs
+        it "emits (TypeDeclaration (UnboxedType ..)) if succeeded to parse" $ do
+            parse' "unboxed offset (float64);" `shouldBeRight`
+                TypeDeclaration "offset" (UnboxedType "float64") empty
+            parse' "unboxed offset (float64);\n# docs" `shouldBeRight`
+                TypeDeclaration "offset" (UnboxedType "float64")
                                 (singleDocs "docs\n")
-            parse' "boxed offset (float64);\n# docs\n# docs..." `shouldBeRight`
-                TypeDeclaration "offset" (BoxedType "float64")
+            parse' "unboxed offset (float64);\n# docs\n# docs..." `shouldBeRight`
+                TypeDeclaration "offset" (UnboxedType "float64")
                                 (singleDocs "docs\ndocs...\n")
-            parse' "@foo(\"bar\")\nboxed offset (float64);\n# docs\n# docs..."
+            parse' "@foo(\"bar\")\nunboxed offset (float64);\n# docs\n# docs..."
                 `shouldBeRight`
-                    TypeDeclaration "offset" (BoxedType "float64")
+                    TypeDeclaration "offset" (UnboxedType "float64")
                                     (A.union (singleDocs "docs\ndocs...\n")
                                              fooAnnotationSet)
-            parse' "@baz\nboxed offset (float64);\n# docs\n# docs..."
+            parse' "@baz\nunboxed offset (float64);\n# docs\n# docs..."
                 `shouldBeRight`
-                    TypeDeclaration "offset" (BoxedType "float64")
+                    TypeDeclaration "offset" (UnboxedType "float64")
                                     (A.union (singleDocs "docs\ndocs...\n")
                                              bazAnnotationSet)
-            expectError "boxed offset/behind (float64);" 1 13
+            expectError "unboxed offset/behind (float64);" 1 15
         it "fails to parse if trailing semicolon is missing" $ do
             let (_, expectErr) = helperFuncs P.module'
-            expectErr "boxed a (text);\nboxed b (text)\nboxed c (text);" 3 1
-            expectErr "type a = text;\nboxed b (text)\ntype c = text;" 3 1
-            expectErr "boxed a (text);\ntype b = text\nboxed c (text);" 3 1
+            expectErr "unboxed a (text);\nunboxed b (text)\nunboxed c (text);"
+                      3 1
+            expectErr "type a = text;\nunboxed b (text)\ntype c = text;" 3 1
+            expectErr "unboxed a (text);\ntype b = text\nunboxed c (text);" 3 1
 
     descTypeDecl "enumTypeDeclaration" P.enumTypeDeclaration $ \helpers -> do
         let (parse', expectError) = helpers
@@ -505,8 +506,8 @@ spec = do
         it "fails to parse if trailing semicolon is missing" $ do
             let (_, expectErr) = helperFuncs P.module'
             expectErr "enum a = x | y;\nenum b = x | y\nenum c = x | y;" 3 1
-            expectErr "boxed a (text);\nenum b = x | y\nboxed c (text);" 3 1
-            expectErr "enum a = x | y;\nboxed b (text)\nenum c = x | y;" 3 1
+            expectErr "unboxed a (text);\nenum b = x | y\nunboxed c (text);" 3 1
+            expectErr "enum a = x | y;\nunboxed b (text)\nenum c = x | y;" 3 1
 
     descTypeDecl "recordTypeDeclaration" P.recordTypeDeclaration $ \helpers -> do
         let (parse', expectError) = helpers
@@ -746,8 +747,9 @@ spec = do
         it "fails to parse if trailing semicolon is missing" $ do
             let (_, expectErr) = helperFuncs P.module'
             expectErr "union a = x | y;\nunion b = x | y\nunion c = x | y;" 3 1
-            expectErr "boxed a (text);\nunion b = x | y\nboxed c (text);" 3 1
-            expectErr "union a = x | y;\nboxed b (text)\nunion c = x | y;" 3 1
+            expectErr "unboxed a (text);\nunion b = x | y\nunboxed c (text);"
+                      3 1
+            expectErr "union a = x | y;\nunboxed b (text)\nunion c = x | y;" 3 1
 
     describe "method" $ do
         let (parse', expectError) = helperFuncs P.method
@@ -1009,12 +1011,13 @@ spec = do
             it "emits Module if succeeded to parse" $ do
                 let decls = [ TypeDeclaration "path" (Alias "text") empty
                             , TypeDeclaration "offset"
-                                              (BoxedType "float64") empty
+                                              (UnboxedType "float64") empty
                             ]
-                parse' "type path = text; boxed offset (float64);"
+                parse' "type path = text; unboxed offset (float64);"
                     `shouldBeRight` Module decls Nothing
-                parse' "#docs\n#...\ntype path = text; boxed offset (float64);"
-                    `shouldBeRight` Module decls (Just "docs\n...")
+                parse'
+                    "#docs\n#...\ntype path = text; unboxed offset (float64);"
+                        `shouldBeRight` Module decls (Just "docs\n...")
             it "may have no type declarations" $ do
                 parse' "" `shouldBeRight` Module [] Nothing
                 parse' "# docs" `shouldBeRight` Module [] (Just "docs")

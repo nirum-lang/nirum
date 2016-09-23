@@ -1,11 +1,11 @@
 # Module consists zero or more type declarations.
 
-boxed offset (float64);
-# The key difference between boxed type and reocrd type consisting of a single
+unboxed offset (float64);
+# The key difference between unboxed type and reocrd type consisting of a single
 # field is that the former has the same JSON representation to its target type,
 # while the latter has thicker JSON representation than its only field.
 #
-# For example, a value of `boxed offset (float);` type is represented
+# For example, a value of `unboxed offset (float);` type is represented
 # in JSON as:
 #
 #     120.5
