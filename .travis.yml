@@ -49,7 +49,7 @@ install:
     if [[ ! -f "$HOME/.pyvenv/bin/activate" ]]; then virtualenv -p "$(which python$PY)" "$HOME/.pyvenv"; fi
   fi
 - '"$HOME/.pyvenv/bin/pip" install --upgrade pip setuptools'
-- '"$HOME/.pyvenv/bin/pip" install git+git://github.com/spoqa/nirum-python.git'
+- '"$HOME/.pyvenv/bin/pip" install --upgrade git+git://github.com/spoqa/nirum-python.git'
 - if [[ "$PY" = "3.4" ]]; then "$HOME/.pyvenv/bin/pip" install --upgrade typing; fi  # FIXME
 - 'sed -E "s/resolver\s*:\s*.*/resolver: $RESOLVER/" stack.yaml > stack-new.yaml'
 - mv stack-new.yaml stack.yaml
