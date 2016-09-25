@@ -86,13 +86,13 @@ It's represented in JSON to:
     }
 
 
-Boxed type
-----------
+Unboxed type
+------------
 
-Boxed type is equivalent to 1-member record type in runtime, but it's equivalent
-to its internal type in JSON representation.  For example:
+Unboxed type is equivalent to 1-member record type in runtime,
+but it's equivalent to its internal type in JSON representation.  For example:
 
-    boxed offset (float64);
+    unboxed offset (float64);
 
     record payload (
         offset left,
@@ -112,7 +112,7 @@ The internal type might be a record type as well:
         float64 top,
     );
 
-    boxed coord (point);
+    unboxed coord (point);
 
     record payload (
         coord location,
@@ -131,14 +131,14 @@ It's represented in JSON as:
 
 The internal type also can be a option/set/list/map type:
 
-    boxed box-option (text?);
+    unboxed box-option (text?);
 
     enum color = red | green | blue;
-    boxed box-set ({color});
+    unboxed box-set ({color});
 
-    boxed box-list ([float64]);
+    unboxed box-list ([float64]);
 
-    boxed box-map ({uuid: datetime});
+    unboxed box-map ({uuid: datetime});
 
     record payload (
         box-option a,

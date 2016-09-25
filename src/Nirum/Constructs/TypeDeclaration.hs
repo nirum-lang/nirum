@@ -47,7 +47,7 @@ import Nirum.Constructs.TypeExpression (TypeExpression)
 
 data Type
     = Alias { canonicalType :: TypeExpression }
-    | BoxedType { innerType :: TypeExpression }
+    | UnboxedType { innerType :: TypeExpression }
     | EnumType { members :: DeclarationSet EnumMember }
     | RecordType { fields :: DeclarationSet Field }
     | UnionType { tags :: DeclarationSet Tag }
@@ -143,9 +143,9 @@ instance Construct TypeDeclaration where
                  , " = ", toCode cname, ";"
                  , toCodeWithPrefix "\n" (A.lookupDocs annotationSet')
                  ]
-    toCode (TypeDeclaration name' (BoxedType itype) annotationSet') =
+    toCode (TypeDeclaration name' (UnboxedType itype) annotationSet') =
         T.concat [ toCode annotationSet'
-                 , "boxed ", toCode name'
+                 , "unboxed ", toCode name'
                  , " (", toCode itype, ");"
                  , toCodeWithPrefix "\n" (A.lookupDocs annotationSet')]
     toCode (TypeDeclaration name' (EnumType members') annotationSet') =

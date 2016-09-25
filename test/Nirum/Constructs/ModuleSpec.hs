@@ -20,7 +20,7 @@ spec =
         let docsAnno = A.docs "path string"
             pathT = TypeDeclaration "path" (Alias "text") (singleton docsAnno)
             offsetT =
-                TypeDeclaration "offset" (BoxedType "float64") empty
+                TypeDeclaration "offset" (UnboxedType "float64") empty
             decls = [ Import ["foo", "bar"] "baz" empty
                     , Import ["foo", "bar"] "qux" empty
                     , Import ["zzz"] "qqq" empty
@@ -45,7 +45,7 @@ import zzz (ppp, qqq);
 type path = text;
 # path string
 
-boxed offset (float64);
+unboxed offset (float64);
 |]
             toCode mod2 `shouldBe` [q|# module level docs...
 # blahblah
@@ -56,5 +56,5 @@ import zzz (ppp, qqq);
 type path = text;
 # path string
 
-boxed offset (float64);
+unboxed offset (float64);
 |]

@@ -46,10 +46,10 @@ spec = do
             specify "toCode" $ do
                 toCode a `shouldBe` "type path = text;"
                 toCode b `shouldBe` "type path = text;\n# docs"
-        context "BoxedType" $ do
-            let boxed = BoxedType "float64"
+        context "UnboxedType" $ do
+            let unboxed = UnboxedType "float64"
                 a = TypeDeclaration { typename = "offset"
-                                    , type' = boxed
+                                    , type' = unboxed
                                     , typeAnnotations = empty
                                     }
                 b = a { typeAnnotations = singleDocs "docs" }
@@ -60,8 +60,8 @@ spec = do
                 docs a `shouldBe` Nothing
                 docs b `shouldBe` Just "docs"
             specify "toCode" $ do
-                toCode a `shouldBe` "boxed offset (float64);"
-                toCode b `shouldBe` "boxed offset (float64);\n# docs"
+                toCode a `shouldBe` "unboxed offset (float64);"
+                toCode b `shouldBe` "unboxed offset (float64);\n# docs"
         context "EnumType" $ do
             let enumMembers = [ EnumMember "kr" empty
                               , EnumMember "jp" (singleDocs "Japan")

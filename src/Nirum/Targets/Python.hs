@@ -69,10 +69,10 @@ import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
                                         , PrimitiveTypeIdentifier(..)
                                         , Tag(Tag)
                                         , Type( Alias
-                                              , BoxedType
                                               , EnumType
                                               , PrimitiveType
                                               , RecordType
+                                              , UnboxedType
                                               , UnionType
                                               )
                                         , TypeDeclaration(..)
@@ -311,22 +311,23 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
 {toClassName' typename'} = $ctypeExpr
     |]
 compileTypeDeclaration src TypeDeclaration { typename = typename'
-                                           , type' = BoxedType itype } = do
+                                           , type' = UnboxedType itype } = do
     let className = toClassName' typename'
     itypeExpr <- compileTypeExpression src itype
     insertStandardImport "typing"
-    insertThirdPartyImports [ ("nirum.validate", ["validate_boxed_type"])
-                            , ("nirum.serialize", ["serialize_boxed_type"])
-                            , ("nirum.deserialize", ["deserialize_boxed_type"])
-                            ]
+    insertThirdPartyImports
+        [ ("nirum.validate", ["validate_unboxed_type"])
+        , ("nirum.serialize", ["serialize_unboxed_type"])
+        , ("nirum.deserialize", ["deserialize_unboxed_type"])
+        ]
     return [qq|
 class $className:
     # TODO: docstring
 
-    __nirum_boxed_type__ = $itypeExpr
+    __nirum_inner_type__ = $itypeExpr
 
     def __init__(self, value: $itypeExpr) -> None:
-        validate_boxed_type(value, $itypeExpr)
+        validate_unboxed_type(value, $itypeExpr)
         self.value = value  # type: $itypeExpr
 
     def __eq__(self, other) -> bool:
@@ -337,11 +338,11 @@ class $className:
         return hash(self.value)
 
     def __nirum_serialize__(self) -> typing.Any:
-        return serialize_boxed_type(self)
+        return serialize_unboxed_type(self)
 
     @classmethod
     def __nirum_deserialize__(cls: type, value: typing.Any) -> '{className}':
-        return deserialize_boxed_type(cls, value)
+        return deserialize_unboxed_type(cls, value)
 
     def __repr__(self) -> str:
         return '\{0.__module__\}.\{0.__qualname__\}(\{1!r\})'.format(

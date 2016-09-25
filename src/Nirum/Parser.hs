@@ -5,7 +5,6 @@ module Nirum.Parser ( Parser
                     , aliasTypeDeclaration
                     , annotation
                     , annotationSet
-                    , boxedTypeDeclaration
                     , docs
                     , enumTypeDeclaration
                     , file
@@ -28,6 +27,7 @@ module Nirum.Parser ( Parser
                     , typeExpression
                     , typeExpressionWithoutOptionModifier
                     , typeIdentifier
+                    , unboxedTypeDeclaration
                     , unionTypeDeclaration
                     ) where
 
@@ -94,9 +94,9 @@ import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
                                         , Field(Field)
                                         , Tag(Tag)
                                         , Type( Alias
-                                              , BoxedType
                                               , EnumType
                                               , RecordType
+                                              , UnboxedType
                                               , UnionType
                                               )
                                         , TypeDeclaration( Import
@@ -266,24 +266,24 @@ aliasTypeDeclaration = do
     return $ TypeDeclaration name' (Alias canonicalType) annotationSet''
 
 
-boxedTypeDeclaration :: Parser TypeDeclaration
-boxedTypeDeclaration = do
-    annotationSet' <- annotationSet <?> "boxed type annotations"
-    string' "boxed" <?> "boxed type keyword"
+unboxedTypeDeclaration :: Parser TypeDeclaration
+unboxedTypeDeclaration = do
+    annotationSet' <- annotationSet <?> "unboxed type annotations"
+    string' "unboxed" <?> "unboxed type keyword"
     spaces
-    typename <- identifier <?> "boxed type name"
+    typename <- identifier <?> "unboxed type name"
     let name' = Name typename typename
     spaces
     char '('
     spaces
-    innerType <- typeExpression <?> "inner type of boxed type"
+    innerType <- typeExpression <?> "inner type of unboxed type"
     spaces
     char ')'
     spaces
     char ';'
-    docs' <- optional $ try $ spaces >> (docs <?> "boxed type docs")
+    docs' <- optional $ try $ spaces >> (docs <?> "unboxed type docs")
     annotationSet'' <- annotationsWithDocs annotationSet' docs'
-    return $ TypeDeclaration name' (BoxedType innerType) annotationSet''
+    return $ TypeDeclaration name' (UnboxedType innerType) annotationSet''
 
 enumMember :: Parser EnumMember
 enumMember = do
@@ -462,12 +462,12 @@ typeDeclaration = do
     annotationSet' <- annotationSet <?> "type annotations"
     spaces
     typeDecl <- choice
-        [ unless' ["union", "record", "enum", "boxed"] aliasTypeDeclaration
-        , unless' ["union", "record", "enum"] boxedTypeDeclaration
+        [ unless' ["union", "record", "enum", "unboxed"] aliasTypeDeclaration
+        , unless' ["union", "record", "enum"] unboxedTypeDeclaration
         , unless' ["union", "record"] enumTypeDeclaration
         , unless' ["union"] recordTypeDeclaration
         , unionTypeDeclaration
-        ] <?> "type declaration (e.g. boxed, enum, record, union)"
+        ] <?> "type declaration (e.g. enum, record, unboxed, union)"
     -- In theory, though it preconsumes annotationSet' before parsing typeDecl
     -- so that typeDecl itself has no annotations, to prepare for an
     -- unlikely situation (that I bet it'll never happen)
