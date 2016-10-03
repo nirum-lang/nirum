@@ -2,9 +2,14 @@
 module Nirum.PackageSpec where
 
 import Data.Either (isRight)
+import System.IO.Error (isDoesNotExistError)
+
 import qualified Data.Map.Strict as M
+import Data.SemVer (Version, initial, version)
 import System.FilePath ((</>))
 import Test.Hspec.Meta
+import qualified Text.Parsec.Error as PE
+import Text.Parsec.Pos (sourceColumn, sourceLine)
 
 import Nirum.Constructs.Annotation (empty)
 import Nirum.Constructs.Module (Module(Module), coreModulePath)
@@ -21,8 +26,13 @@ import Nirum.Package ( BoundModule(boundPackage, modulePath)
                                    , MissingImportError
                                    , MissingModulePathError
                                    )
+                     , MetadataError ( FieldError
+                                     , FieldTypeError
+                                     , FieldValueError
+                                     , FormatError
+                                     )
                      , Package
-                     , PackageError (ImportError)
+                     , PackageError (ImportError, MetadataError, ScanError)
                      , TypeLookup(Imported, Local, Missing)
                      , docs
                      , lookupType
@@ -35,11 +45,14 @@ import Nirum.Package ( BoundModule(boundPackage, modulePath)
                      )
 import Nirum.Parser (parseFile)
 
-createPackage :: M.Map ModulePath Module -> Package
-createPackage modules' =
-    case makePackage modules' of
+createPackage' :: Version -> M.Map ModulePath Module -> Package
+createPackage' ver modules' =
+    case makePackage ver modules' of
         Right pkg -> pkg
         Left e -> error $ "errored: " ++ show e
+
+createPackage :: M.Map ModulePath Module -> Package
+createPackage = createPackage' initial
 
 validPackage :: Package
 validPackage =
@@ -110,13 +123,13 @@ spec = do
             modulePath bm `shouldBe` ["foo"]
             resolveBoundModule ["baz"] validPackage `shouldBe` Nothing
         specify "detectMissingImports" $
-            makePackage missingImportsModules `shouldBe`
+            makePackage initial missingImportsModules `shouldBe`
                 Left [ MissingModulePathError ["foo"] ["foo", "bar"]
                      , MissingImportError ["qux"] ["foo"] "abc"
                      , MissingImportError ["qux"] ["foo"] "def"
                      ]
         specify "detectCircularImports" $
-            makePackage circularImportsModules `shouldBe`
+            makePackage initial circularImportsModules `shouldBe`
                 Left [ CircularImportError [["asdf"], ["asdf"]]
                      , MissingImportError ["asdf"] ["asdf"] "foo"
                      , CircularImportError [ ["abc", "def"]
@@ -135,28 +148,60 @@ spec = do
                                            , ["abc", "xyz"]
                                            ]
                      ]
-        specify "scanPackage" $ do
-            let path = "." </> "examples"
-            package' <- scanPackage path
-            package' `shouldSatisfy` isRight
-            let Right package = package'
-            Right builtinsM <- parseFile (path </> "builtins.nrm")
-            Right productM <- parseFile (path </> "product.nrm")
-            Right shapesM <- parseFile (path </> "shapes.nrm")
-            Right countriesM <- parseFile (path </> "countries.nrm")
-            Right addressM <- parseFile (path </> "address.nrm")
-            Right pdfServiceM <- parseFile (path </> "pdf-service.nrm")
-            let modules = [ (["builtins"], builtinsM)
-                          , (["product"], productM)
-                          , (["shapes"], shapesM)
-                          , (["countries"], countriesM)
-                          , (["address"], addressM)
-                          , (["pdf-service"], pdfServiceM)
-                          ] :: M.Map ModulePath Module
-            package `shouldBe` createPackage modules
-            Left error' <- scanPackage $ "." </> "test" </> "import_error"
-            error' `shouldBe`
-                ImportError [MissingModulePathError ["import_error"] ["foo"]]
+        describe "scanPackage" $ do
+            it "returns Package value when all is well" $ do
+                let path = "." </> "examples"
+                package' <- scanPackage path
+                package' `shouldSatisfy` isRight
+                let Right package = package'
+                Right builtinsM <- parseFile (path </> "builtins.nrm")
+                Right productM <- parseFile (path </> "product.nrm")
+                Right shapesM <- parseFile (path </> "shapes.nrm")
+                Right countriesM <- parseFile (path </> "countries.nrm")
+                Right addressM <- parseFile (path </> "address.nrm")
+                Right pdfServiceM <- parseFile (path </> "pdf-service.nrm")
+                let modules = [ (["builtins"], builtinsM)
+                              , (["product"], productM)
+                              , (["shapes"], shapesM)
+                              , (["countries"], countriesM)
+                              , (["address"], addressM)
+                              , (["pdf-service"], pdfServiceM)
+                              ] :: M.Map ModulePath Module
+                package `shouldBe` createPackage' (version 0 2 0 [] []) modules
+            let testDir = "." </> "test"
+            it "returns ScanError if the directory lacks package.toml" $ do
+                Left (ScanError filePath ioError') <-
+                    scanPackage $ testDir </> "scan_error"
+                filePath `shouldBe` testDir </> "scan_error" </> "package.toml"
+                ioError' `shouldSatisfy` isDoesNotExistError
+            it "returns MetadataError (FormatError) if the package.toml is \
+               \not a valid TOML file" $ do
+                Left (MetadataError (FormatError e)) <-
+                    scanPackage $ testDir </> "metadata_format_error"
+                sourceLine (PE.errorPos e) `shouldBe` 3
+                sourceColumn (PE.errorPos e) `shouldBe` 14
+            it "returns MetadataError (FieldError) if the package.toml lacks \
+               \any required fields" $ do
+                Left (MetadataError (FieldError field)) <-
+                    scanPackage $ testDir </> "metadata_field_error"
+                field `shouldBe` "version"
+            it "returns MetadataError (FieldTypeError) if some fields of \
+               \the package.toml has a value of unexpected type" $ do
+                Left (MetadataError (FieldTypeError fName fExpected fActual))
+                    <- scanPackage $ testDir </> "metadata_field_type_error"
+                fName `shouldBe` "version"
+                fExpected `shouldBe` "string"
+                fActual `shouldBe` "integer (123)"
+            it "returns MetadataError (FieldValueError) if some fields of \
+               \the package.toml has an invalid/malformed value" $ do
+                Left (MetadataError (FieldValueError fieldName msg))
+                    <- scanPackage $ testDir </> "metadata_field_value_error"
+                fieldName `shouldBe` "version"
+                msg `shouldBe`
+                    "expected a semver string (e.g. \"1.2.3\"), not \"0/2/0\""
+            it "returns ImportError if a module imports an absent module" $ do
+                Left (ImportError l) <- scanPackage $ testDir </> "import_error"
+                l `shouldBe` [MissingModulePathError ["import_error"] ["foo"]]
         specify "scanModules" $ do
             let path = "." </> "examples"
             mods <- scanModules "."
@@ -169,6 +214,9 @@ spec = do
                 , (["examples", "pdf-service"], path </> "pdf-service.nrm")
                 , ( ["test", "import_error", "import_error"]
                   , "." </> "test" </> "import_error" </> "import_error.nrm"
+                  )
+                , ( ["test", "scan_error", "scan_error"]
+                  , "." </> "test" </> "scan_error" </> "scan_error.nrm"
                   )
                 ]
             mods' <- scanModules path

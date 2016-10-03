@@ -3,13 +3,25 @@ module Nirum.Package ( BoundModule(boundPackage, modulePath)
                                    , MissingImportError
                                    , MissingModulePathError
                                    )
-                     , Package(modules)
-                     , PackageError(ImportError, ParseError, ScanError)
-                     , TypeLookup(Imported, Local, Missing)
+                     , MetadataError ( FieldError
+                                     , FieldTypeError
+                                     , FieldValueError
+                                     , FormatError
+                                     )
+                     , MetadataField
+                     , MetadataFieldType
+                     , Package (modules, version)
+                     , PackageError ( ImportError
+                                    , MetadataError
+                                    , ParseError
+                                    , ScanError
+                                    )
+                     , TypeLookup (Imported, Local, Missing)
                      , docs
                      , findInBoundModule
                      , lookupType
                      , makePackage
+                     , metadataFilename
                      , resolveBoundModule
                      , resolveModule
                      , scanModules
@@ -17,10 +29,34 @@ module Nirum.Package ( BoundModule(boundPackage, modulePath)
                      , types
                      ) where
 
+import System.IO.Error (catchIOError)
+
+import Control.Monad.Except ( ExceptT
+                            , MonadError(throwError)
+                            , liftIO
+                            , runExceptT
+                            )
+import qualified Data.HashMap.Strict as HM
 import qualified Data.Map.Strict as M
+import qualified Data.SemVer as SV
 import qualified Data.Set as S
+import qualified Data.Text as T
+import qualified Data.Text.IO as TI
 import System.Directory (doesDirectoryExist, listDirectory)
 import System.FilePath ((</>))
+import qualified Text.Parsec.Error as PE
+import Text.Toml (parseTomlDoc)
+import Text.Toml.Types (Node ( VArray
+                             , VBoolean
+                             , VDatetime
+                             , VFloat
+                             , VInteger
+                             , VString
+                             , VTable
+                             , VTArray
+                             )
+                       , Table
+                       )
 
 import Nirum.Constructs.Docs (Docs)
 import qualified Nirum.Constructs.DeclarationSet as DS
@@ -36,23 +72,30 @@ import Nirum.Constructs.TypeDeclaration ( Type
                                         )
 import Nirum.Parser (ParseError, parseFile)
 
+-- | The filename of Nirum package metadata.
+metadataFilename :: FilePath
+metadataFilename = "package.toml"
+
 -- | Represents a package which consists of modules.
-data Package = Package { modules :: M.Map ModulePath Mod.Module
+data Package = Package { version :: SV.Version
+                       , modules :: M.Map ModulePath Mod.Module
                        } deriving (Eq, Ord, Show)
--- TODO: uri, version, dependencies
+-- TODO: uri, dependencies
 
 data ImportError = CircularImportError [ModulePath]
                  | MissingModulePathError ModulePath ModulePath
                  | MissingImportError ModulePath ModulePath Identifier
                  deriving (Eq, Ord, Show)
 
-makePackage :: M.Map ModulePath Mod.Module -> Either (S.Set ImportError) Package
-makePackage modules'
+makePackage :: SV.Version
+            -> M.Map ModulePath Mod.Module
+            -> Either (S.Set ImportError) Package
+makePackage version' modules'
     | S.null importErrors = Right package
     | otherwise = Left importErrors
   where
     package :: Package
-    package = Package modules'
+    package = Package version' modules'
     importErrors :: S.Set ImportError
     importErrors = detectImportErrors package
 
@@ -117,20 +160,37 @@ detectCircularImports Package { modules = ms } =
 data PackageError = ScanError FilePath IOError
                   | ParseError ModulePath ParseError
                   | ImportError (S.Set ImportError)
+                  | MetadataError MetadataError
                   deriving (Eq, Show)
+
+type MetadataField = T.Text
+type MetadataFieldType = T.Text
+
+data MetadataError
+    = FieldError MetadataField
+    | FieldTypeError MetadataField MetadataFieldType MetadataFieldType
+    | FieldValueError MetadataField String
+    | FormatError PE.ParseError
+    deriving (Eq, Show)
 
 -- | Scan the given package path, and then return the read package.
 scanPackage :: FilePath -> IO (Either PackageError Package)
-scanPackage packagePath = do
-    modulePaths <- scanModules packagePath
-    -- FIXME: catch IO errors
-    modules' <- mapM parseFile modulePaths
-    return $ case M.foldrWithKey excludeFailedParse (Right M.empty) modules' of
-        Right parsedModules -> case makePackage parsedModules of
-            Right p -> Right p
-            Left errors -> Left $ ImportError errors
-        Left error' -> Left error'
+scanPackage packagePath = runExceptT $ do
+    metadataText <- catch (TI.readFile metadataPath) $ ScanError metadataPath
+    table <- case parseTomlDoc metadataPath metadataText of
+        Left e -> throwError $ MetadataError $ FormatError e
+        Right t -> return t
+    version' <- versionField "version" table
+    modulePaths <- liftIO $ scanModules packagePath
+    modules' <- mapM (\p -> catch (parseFile p) $ ScanError p) modulePaths
+    case M.foldrWithKey excludeFailedParse (Right M.empty) modules' of
+        Right parsedModules -> case makePackage version' parsedModules of
+            Right p -> return p
+            Left errors -> throwError $ ImportError errors
+        Left error' -> throwError error'
   where
+    metadataPath :: FilePath
+    metadataPath = packagePath </> metadataFilename
     excludeFailedParse :: ModulePath
                        -> Either ParseError Mod.Module
                        -> Either PackageError (M.Map ModulePath Mod.Module)
@@ -139,6 +199,55 @@ scanPackage packagePath = do
     excludeFailedParse path (Left error') _ = Left $ ParseError path error'
     excludeFailedParse path (Right module') (Right map') =
         Right (M.insert path module' map')
+    catch :: IO a -> (IOError -> e) -> ExceptT e IO a
+    catch op onError = do
+        result <- liftIO $ catchIOError (fmap Right op)
+                                        (return . Left . onError)
+        case result of
+            Left err -> throwError err
+            Right val -> return val
+    show' :: Show a => a -> T.Text
+    show' = T.pack . show
+    printNode :: Node -> MetadataFieldType
+    printNode (VTable t) = T.concat ["table of ", show' (length t), " items"]
+    printNode (VTArray a) = T.concat ["array of ", show' (length a), " tables"]
+    printNode (VString s) = T.concat ["string (", show' s, ")"]
+    printNode (VInteger i) = T.concat ["integer (", show' i, ")"]
+    printNode (VFloat f) = T.concat ["float (", show' f, ")"]
+    printNode (VBoolean True) = "boolean (true)"
+    printNode (VBoolean False) = "boolean (false)"
+    printNode (VDatetime d) = T.concat ["datetime (", show' d, ")"]
+    printNode (VArray a) = T.concat ["array of ", show' (length a), " values"]
+    field :: MetadataField -> Table -> ExceptT PackageError IO Node
+    field field' table =
+        case HM.lookup field' table of
+            Just node -> return node
+            Nothing -> throwError $ MetadataError $ FieldError field'
+    typedField :: MetadataFieldType
+               -> (Node -> Maybe v)
+               -> MetadataField
+               -> Table
+               -> ExceptT PackageError IO v
+    typedField typename match field' table = do
+        node <- field field' table
+        case match node of
+            Just value -> return value
+            Nothing -> let error' = FieldTypeError field' typename $
+                                                   printNode node
+                       in throwError $ MetadataError error'
+    stringField :: MetadataField -> Table -> ExceptT PackageError IO T.Text
+    stringField = typedField "string" $ \n -> case n of
+                                                   VString s -> Just s
+                                                   _ -> Nothing
+    versionField :: MetadataField -> Table -> ExceptT PackageError IO SV.Version
+    versionField field' table = do
+        s <- stringField field' table
+        case SV.fromText s of
+            Right v -> return v
+            Left _ ->
+                let msg = "expected a semver string (e.g. \"1.2.3\"), not " ++
+                          show s
+                in throwError $ MetadataError $ FieldValueError field' msg
 
 -- | Scan the given path recursively, and then return the map of
 -- detected module paths.

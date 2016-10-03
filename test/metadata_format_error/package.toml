@@ -1,0 +1,3 @@
+# Invalid TOML format
+# lack of ------v------ closing quote is intended
+version = 0.2.0
