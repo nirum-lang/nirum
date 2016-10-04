@@ -23,7 +23,10 @@ import Nirum.Constructs.Identifier (Identifier, fromText)
 data ModulePath = ModulePath { path :: ModulePath
                              , moduleName :: Identifier }
                 | ModuleName { moduleName :: Identifier }
-                deriving (Eq, Ord, Show)
+                deriving (Eq, Show)
+
+instance Ord ModulePath where
+    a <= b = toList a <= toList b
 
 instance Construct ModulePath where
     toCode = intercalate "." . map toCode . toList
