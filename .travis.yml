@@ -54,7 +54,6 @@ install:
 - 'sed -E "s/resolver\s*:\s*.*/resolver: $RESOLVER/" stack.yaml > stack-new.yaml'
 - mv stack-new.yaml stack.yaml
 - travis_long stack --no-terminal setup
-- travis_long stack --no-terminal install scan
 script:
 - source "$HOME/.pyvenv/bin/activate" && stack --no-terminal test
 before_deploy:
@@ -67,7 +66,6 @@ before_deploy:
   then
     upx-ucl -9 "$NIGHTLY_BINARY_PATH"
   fi
-- stack exec -- scan $(find src test -name '*.hs')
 notifications:
   webhooks:
     urls: ['https://webhooks.gitter.im/e/29cc2477daa438db4e9d']

@@ -1,8 +1,4 @@
 module Nirum.Package ( BoundModule(boundPackage, modulePath)
-                     , ImportError ( CircularImportError
-                                   , MissingImportError
-                                   , MissingModulePathError
-                                   )
                      , MetadataError ( FieldError
                                      , FieldTypeError
                                      , FieldValueError
@@ -10,7 +6,7 @@ module Nirum.Package ( BoundModule(boundPackage, modulePath)
                                      )
                      , MetadataField
                      , MetadataFieldType
-                     , Package (modules, version)
+                     , Package (Package, modules, version)
                      , PackageError ( ImportError
                                     , MetadataError
                                     , ParseError
@@ -20,7 +16,6 @@ module Nirum.Package ( BoundModule(boundPackage, modulePath)
                      , docs
                      , findInBoundModule
                      , lookupType
-                     , makePackage
                      , metadataFilename
                      , resolveBoundModule
                      , resolveModule
@@ -70,6 +65,7 @@ import Nirum.Constructs.TypeDeclaration ( Type
                                                           , type'
                                                           )
                                         )
+import qualified Nirum.Package.ModuleSet as MS
 import Nirum.Parser (ParseError, parseFile)
 
 -- | The filename of Nirum package metadata.
@@ -78,29 +74,12 @@ metadataFilename = "package.toml"
 
 -- | Represents a package which consists of modules.
 data Package = Package { version :: SV.Version
-                       , modules :: M.Map ModulePath Mod.Module
+                       , modules :: MS.ModuleSet
                        } deriving (Eq, Ord, Show)
 -- TODO: uri, dependencies
 
-data ImportError = CircularImportError [ModulePath]
-                 | MissingModulePathError ModulePath ModulePath
-                 | MissingImportError ModulePath ModulePath Identifier
-                 deriving (Eq, Ord, Show)
-
-makePackage :: SV.Version
-            -> M.Map ModulePath Mod.Module
-            -> Either (S.Set ImportError) Package
-makePackage version' modules'
-    | S.null importErrors = Right package
-    | otherwise = Left importErrors
-  where
-    package :: Package
-    package = Package version' modules'
-    importErrors :: S.Set ImportError
-    importErrors = detectImportErrors package
-
 resolveModule :: ModulePath -> Package -> Maybe Mod.Module
-resolveModule path Package { modules = ms } = M.lookup path ms
+resolveModule path Package { modules = ms } = MS.lookup path ms
 
 resolveBoundModule :: ModulePath -> Package -> Maybe BoundModule
 resolveBoundModule path package =
@@ -108,58 +87,9 @@ resolveBoundModule path package =
         Just _ -> Just $ BoundModule package path
         Nothing -> Nothing
 
-detectImportErrors :: Package -> S.Set ImportError
-detectImportErrors package = detectMissingImports package `S.union`
-                             detectCircularImports package
-
-detectMissingImports :: Package -> S.Set ImportError
-detectMissingImports package@Package { modules = ms } =
-    S.fromList [e | (path, module') <- M.toList ms, e <- detect path module']
-  where
-    detect :: ModulePath -> Mod.Module -> [ImportError]
-    detect path module' =
-        [ e
-        | (path', idents) <- M.toList (Mod.imports module')
-        , e <- case resolveModule path' package of
-                Nothing -> [MissingModulePathError path path']
-                Just (Mod.Module decls _) ->
-                    [ e
-                    | i <- S.toList idents
-                    , e <- case DS.lookup i decls of
-                        Just TypeDeclaration {} -> []
-                        Just ServiceDeclaration {} -> []
-                        Just Import {} -> [MissingImportError path path' i]
-                        Nothing -> [MissingImportError path path' i]
-                    ]
-        ]
-
-detectCircularImports :: Package -> S.Set ImportError
-detectCircularImports Package { modules = ms } =
-    S.fromList [e | path <- M.keys ms, e <- detect path []]
-  where
-    moduleImports :: M.Map ModulePath (S.Set ModulePath)
-    moduleImports =
-        M.fromList [ (path, M.keysSet $ Mod.imports module')
-                   | (path, module') <- M.toList ms
-                   ]
-    detect :: ModulePath -> [ModulePath] -> [ImportError]
-    detect path reversedCycle
-        | path `elem` reversedCycle =
-            [CircularImportError $ reverse reversedCycle']
-        | otherwise =
-            case M.lookup path moduleImports of
-                Just paths -> [ e
-                              | path' <- S.toList paths
-                              , e <- detect path' reversedCycle'
-                              ]
-                Nothing -> []
-      where
-        reversedCycle' :: [ModulePath]
-        reversedCycle' = path : reversedCycle
-
 data PackageError = ScanError FilePath IOError
                   | ParseError ModulePath ParseError
-                  | ImportError (S.Set ImportError)
+                  | ImportError (S.Set MS.ImportError)
                   | MetadataError MetadataError
                   deriving (Eq, Show)
 
@@ -184,8 +114,8 @@ scanPackage packagePath = runExceptT $ do
     modulePaths <- liftIO $ scanModules packagePath
     modules' <- mapM (\p -> catch (parseFile p) $ ScanError p) modulePaths
     case M.foldrWithKey excludeFailedParse (Right M.empty) modules' of
-        Right parsedModules -> case makePackage version' parsedModules of
-            Right p -> return p
+        Right parsedModules -> case MS.fromMap parsedModules of
+            Right ms -> return $ Package version' ms
             Left errors -> throwError $ ImportError errors
         Left error' -> throwError error'
   where
@@ -285,7 +215,7 @@ findInBoundModule valueWhenExist valueWhenNotExist
                   BoundModule { boundPackage = Package { modules = ms }
                               , modulePath = path
                               } =
-    case M.lookup path ms of
+    case MS.lookup path ms of
         Nothing -> valueWhenNotExist
         Just mod' -> valueWhenExist mod'
 

@@ -91,6 +91,7 @@ import Nirum.Package ( BoundModule
                      , resolveBoundModule
                      , types
                      )
+import qualified Nirum.Package.ModuleSet as MS
 
 data Source = Source { sourcePackage :: Package
                      , sourceModule :: BoundModule
@@ -759,7 +760,7 @@ setup(
     strings :: [Code] -> Code
     strings values = T.intercalate ", " . L.sort $ [[qq|'{v}'|] | v <- values]
     pPackages :: Code
-    pPackages = strings $ map toImportPath $ M.keys $ modules package
+    pPackages = strings $ map toImportPath $ MS.keys $ modules package
     pInstallRequires :: Code
     pInstallRequires = strings $ S.toList deps
     pPolyfillRequires :: Code
@@ -789,7 +790,7 @@ compilePackage package =
                    ] ++ ["__init__.py"]
     initFiles :: [(FilePath, Either CompileError Code)]
     initFiles = [ (toFilename mp', Right "")
-                | mp <- M.keys (modules package)
+                | mp <- MS.keys (modules package)
                 , mp' <- S.elems (ancestors mp)
                 ]
     modules' :: [(FilePath, Either CompileError (InstallRequires, Code))]
@@ -797,7 +798,7 @@ compilePackage package =
         [ ( toFilename modulePath'
           , compileModule $ Source package boundModule
           )
-        | (modulePath', _) <- M.assocs (modules package)
+        | (modulePath', _) <- MS.toAscList (modules package)
         , Just boundModule <- [resolveBoundModule modulePath' package]
         ]
     installRequires :: InstallRequires

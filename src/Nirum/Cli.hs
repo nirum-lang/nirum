@@ -40,13 +40,14 @@ import Nirum.Package ( PackageError ( ImportError
                                     , ParseError
                                     , ScanError
                                     )
-                     , ImportError ( CircularImportError
-                                   , MissingImportError
-                                   , MissingModulePathError
-                                   )
                      , scanModules
                      , scanPackage
                      )
+import Nirum.Package.ModuleSet ( ImportError ( CircularImportError
+                                             , MissingImportError
+                                             , MissingModulePathError
+                                             )
+                               )
 import Nirum.Targets.Python (compilePackage)
 import Nirum.Version (versionString)
 

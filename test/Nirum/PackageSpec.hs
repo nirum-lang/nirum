@@ -4,7 +4,6 @@ module Nirum.PackageSpec where
 import Data.Either (isRight)
 import System.IO.Error (isDoesNotExistError)
 
-import qualified Data.Map.Strict as M
 import Data.SemVer (Version, initial, version)
 import System.FilePath ((</>))
 import Test.Hspec.Meta
@@ -22,89 +21,39 @@ import Nirum.Constructs.TypeDeclaration ( JsonType(String)
                                                           )
                                         )
 import Nirum.Package ( BoundModule(boundPackage, modulePath)
-                     , ImportError ( CircularImportError
-                                   , MissingImportError
-                                   , MissingModulePathError
-                                   )
                      , MetadataError ( FieldError
                                      , FieldTypeError
                                      , FieldValueError
                                      , FormatError
                                      )
-                     , Package
+                     , Package (Package)
                      , PackageError (ImportError, MetadataError, ScanError)
                      , TypeLookup(Imported, Local, Missing)
                      , docs
                      , lookupType
-                     , makePackage
                      , resolveBoundModule
                      , resolveModule
                      , scanModules
                      , scanPackage
                      , types
                      )
+import Nirum.Package.ModuleSet ( ImportError (MissingModulePathError)
+                               , fromList
+                               )
+import Nirum.Package.ModuleSetSpec (validModules)
 import Nirum.Parser (parseFile)
 
-createPackage' :: Version -> M.Map ModulePath Module -> Package
+createPackage' :: Version -> [(ModulePath, Module)] -> Package
 createPackage' ver modules' =
-    case makePackage ver modules' of
-        Right pkg -> pkg
+    case fromList modules' of
+        Right ms -> Package ver ms
         Left e -> error $ "errored: " ++ show e
 
-createPackage :: M.Map ModulePath Module -> Package
+createPackage :: [(ModulePath, Module)] -> Package
 createPackage = createPackage' initial
 
 validPackage :: Package
-validPackage =
-    createPackage [ (["foo", "bar"], Module [] $ Just "foo.bar")
-                  , (["foo", "baz"], Module [] $ Just "foo.baz")
-                  , (["foo"],        Module [] $ Just "foo")
-                  , (["qux"],        Module [] $ Just "qux")
-                  , ( ["abc"]
-                    , Module [TypeDeclaration "a" (Alias "text") empty]
-                             Nothing
-                    )
-                  , ( ["xyz"]
-                    , Module [ Import ["abc"] "a" empty
-                             , TypeDeclaration "x" (Alias "text") empty
-                             ] Nothing
-                    )
-                  ]
-
-missingImportsModules :: M.Map ModulePath Module
-missingImportsModules =
-    [ ( ["foo"]
-      , Module [ Import ["foo", "bar"] "xyz" empty -- MissingModulePathError
-               , Import ["foo", "bar"] "zzz" empty -- MissingModulePathError
-               , Import ["baz"] "qux" empty
-               ] Nothing
-      )
-    , ( ["baz"]
-      , Module [ TypeDeclaration "qux" (Alias "text") empty ] Nothing
-      )
-    , (["qux"], Module [ Import ["foo"] "abc" empty -- MissingImportError
-                       , Import ["foo"] "def" empty -- MissingImportError
-                       ] Nothing)
-    ]
-
-circularImportsModules :: M.Map ModulePath Module
-circularImportsModules =
-    [ (["asdf"], Module [ Import ["asdf"] "foo" empty
-                        , TypeDeclaration "bar" (Alias "text") empty
-                        ] Nothing)
-    , (["abc", "def"], Module [ Import ["abc", "ghi"] "bar" empty
-                              , TypeDeclaration
-                                    "foo" (Alias "text") empty
-                              ] Nothing)
-    , (["abc", "ghi"], Module [ Import ["abc", "xyz"] "baz" empty
-                              , TypeDeclaration
-                                    "bar" (Alias "text") empty
-                              ] Nothing)
-    , (["abc", "xyz"], Module [ Import ["abc", "def"] "foo" empty
-                              , TypeDeclaration
-                                    "baz" (Alias "text") empty
-                              ] Nothing)
-    ]
+validPackage = createPackage validModules
 
 spec :: Spec
 spec = do
@@ -122,32 +71,6 @@ spec = do
             boundPackage bm `shouldBe` validPackage
             modulePath bm `shouldBe` ["foo"]
             resolveBoundModule ["baz"] validPackage `shouldBe` Nothing
-        specify "detectMissingImports" $
-            makePackage initial missingImportsModules `shouldBe`
-                Left [ MissingModulePathError ["foo"] ["foo", "bar"]
-                     , MissingImportError ["qux"] ["foo"] "abc"
-                     , MissingImportError ["qux"] ["foo"] "def"
-                     ]
-        specify "detectCircularImports" $
-            makePackage initial circularImportsModules `shouldBe`
-                Left [ CircularImportError [["asdf"], ["asdf"]]
-                     , MissingImportError ["asdf"] ["asdf"] "foo"
-                     , CircularImportError [ ["abc", "def"]
-                                           , ["abc", "ghi"]
-                                           , ["abc", "xyz"]
-                                           , ["abc", "def"]
-                                           ]
-                     , CircularImportError [ ["abc", "ghi"]
-                                           , ["abc", "xyz"]
-                                           , ["abc", "def"]
-                                           , ["abc", "ghi"]
-                                           ]
-                     , CircularImportError [ ["abc", "xyz"]
-                                           , ["abc", "def"]
-                                           , ["abc", "ghi"]
-                                           , ["abc", "xyz"]
-                                           ]
-                     ]
         describe "scanPackage" $ do
             it "returns Package value when all is well" $ do
                 let path = "." </> "examples"
@@ -166,7 +89,7 @@ spec = do
                               , (["countries"], countriesM)
                               , (["address"], addressM)
                               , (["pdf-service"], pdfServiceM)
-                              ] :: M.Map ModulePath Module
+                              ] :: [(ModulePath, Module)]
                 package `shouldBe` createPackage' (version 0 2 0 [] []) modules
             let testDir = "." </> "test"
             it "returns ScanError if the directory lacks package.toml" $ do

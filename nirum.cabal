@@ -40,6 +40,7 @@ library
                  ,     Nirum.Constructs.TypeDeclaration
                  ,     Nirum.Constructs.TypeExpression
                  ,     Nirum.Package
+                 ,     Nirum.Package.ModuleSet
                  ,     Nirum.Parser
                  ,     Nirum.Targets.Python
                  ,     Nirum.Version
@@ -96,6 +97,7 @@ test-suite spec
                ,       Nirum.Constructs.ServiceSpec
                ,       Nirum.Constructs.TypeDeclarationSpec
                ,       Nirum.Constructs.TypeExpressionSpec
+               ,       Nirum.Package.ModuleSetSpec
                ,       Nirum.PackageSpec
                ,       Nirum.ParserSpec
                ,       Nirum.Targets.PythonSpec
