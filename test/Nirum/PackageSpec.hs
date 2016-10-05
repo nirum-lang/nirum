@@ -4,7 +4,7 @@ module Nirum.PackageSpec where
 import Data.Either (isRight)
 import System.IO.Error (isDoesNotExistError)
 
-import Data.SemVer (Version, initial, version)
+import Data.SemVer (initial, version)
 import System.FilePath ((</>))
 import Test.Hspec.Meta
 import qualified Text.Parsec.Error as PE
@@ -21,11 +21,6 @@ import Nirum.Constructs.TypeDeclaration ( JsonType(String)
                                                           )
                                         )
 import Nirum.Package ( BoundModule(boundPackage, modulePath)
-                     , MetadataError ( FieldError
-                                     , FieldTypeError
-                                     , FieldValueError
-                                     , FormatError
-                                     )
                      , Package (Package)
                      , PackageError (ImportError, MetadataError, ScanError)
                      , TypeLookup(Imported, Local, Missing)
@@ -37,20 +32,23 @@ import Nirum.Package ( BoundModule(boundPackage, modulePath)
                      , scanPackage
                      , types
                      )
+import Nirum.Package.Metadata ( Metadata (Metadata)
+                              , MetadataError (FormatError)
+                              )
 import Nirum.Package.ModuleSet ( ImportError (MissingModulePathError)
                                , fromList
                                )
 import Nirum.Package.ModuleSetSpec (validModules)
 import Nirum.Parser (parseFile)
 
-createPackage' :: Version -> [(ModulePath, Module)] -> Package
-createPackage' ver modules' =
+createPackage' :: Metadata -> [(ModulePath, Module)] -> Package
+createPackage' metadata' modules' =
     case fromList modules' of
-        Right ms -> Package ver ms
+        Right ms -> Package metadata' ms
         Left e -> error $ "errored: " ++ show e
 
 createPackage :: [(ModulePath, Module)] -> Package
-createPackage = createPackage' initial
+createPackage = createPackage' (Metadata initial)
 
 validPackage :: Package
 validPackage = createPackage validModules
@@ -90,38 +88,19 @@ spec = do
                               , (["address"], addressM)
                               , (["pdf-service"], pdfServiceM)
                               ] :: [(ModulePath, Module)]
-                package `shouldBe` createPackage' (version 0 3 0 [] []) modules
+                package `shouldBe`
+                    createPackage' (Metadata (version 0 3 0 [] [])) modules
             let testDir = "." </> "test"
             it "returns ScanError if the directory lacks package.toml" $ do
                 Left (ScanError filePath ioError') <-
                     scanPackage $ testDir </> "scan_error"
                 filePath `shouldBe` testDir </> "scan_error" </> "package.toml"
                 ioError' `shouldSatisfy` isDoesNotExistError
-            it "returns MetadataError (FormatError) if the package.toml is \
-               \not a valid TOML file" $ do
+            it "returns MetadataError if the package.toml is invalid" $ do
                 Left (MetadataError (FormatError e)) <-
-                    scanPackage $ testDir </> "metadata_format_error"
+                    scanPackage $ testDir </> "metadata_error"
                 sourceLine (PE.errorPos e) `shouldBe` 3
                 sourceColumn (PE.errorPos e) `shouldBe` 14
-            it "returns MetadataError (FieldError) if the package.toml lacks \
-               \any required fields" $ do
-                Left (MetadataError (FieldError field)) <-
-                    scanPackage $ testDir </> "metadata_field_error"
-                field `shouldBe` "version"
-            it "returns MetadataError (FieldTypeError) if some fields of \
-               \the package.toml has a value of unexpected type" $ do
-                Left (MetadataError (FieldTypeError fName fExpected fActual))
-                    <- scanPackage $ testDir </> "metadata_field_type_error"
-                fName `shouldBe` "version"
-                fExpected `shouldBe` "string"
-                fActual `shouldBe` "integer (123)"
-            it "returns MetadataError (FieldValueError) if some fields of \
-               \the package.toml has an invalid/malformed value" $ do
-                Left (MetadataError (FieldValueError fieldName msg))
-                    <- scanPackage $ testDir </> "metadata_field_value_error"
-                fieldName `shouldBe` "version"
-                msg `shouldBe`
-                    "expected a semver string (e.g. \"1.2.3\"), not \"0/3/0\""
             it "returns ImportError if a module imports an absent module" $ do
                 Left (ImportError l) <- scanPackage $ testDir </> "import_error"
                 l `shouldBe` [MissingModulePathError ["import_error"] ["foo"]]

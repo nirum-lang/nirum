@@ -40,6 +40,7 @@ library
                  ,     Nirum.Constructs.TypeDeclaration
                  ,     Nirum.Constructs.TypeExpression
                  ,     Nirum.Package
+                 ,     Nirum.Package.Metadata
                  ,     Nirum.Package.ModuleSet
                  ,     Nirum.Parser
                  ,     Nirum.Targets.Python
