@@ -1,5 +1,5 @@
 name:                nirum
-version:             0.2.0
+version:             0.3.0
 synopsis:            IDL compiler and RPC/distributed object framework for
                      microservices
 description:         Nirum is an IDL compiler and RPC/distributed object

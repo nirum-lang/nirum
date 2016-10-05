@@ -90,7 +90,7 @@ spec = do
                               , (["address"], addressM)
                               , (["pdf-service"], pdfServiceM)
                               ] :: [(ModulePath, Module)]
-                package `shouldBe` createPackage' (version 0 2 0 [] []) modules
+                package `shouldBe` createPackage' (version 0 3 0 [] []) modules
             let testDir = "." </> "test"
             it "returns ScanError if the directory lacks package.toml" $ do
                 Left (ScanError filePath ioError') <-
@@ -121,7 +121,7 @@ spec = do
                     <- scanPackage $ testDir </> "metadata_field_value_error"
                 fieldName `shouldBe` "version"
                 msg `shouldBe`
-                    "expected a semver string (e.g. \"1.2.3\"), not \"0/2/0\""
+                    "expected a semver string (e.g. \"1.2.3\"), not \"0/3/0\""
             it "returns ImportError if a module imports an absent module" $ do
                 Left (ImportError l) <- scanPackage $ testDir </> "import_error"
                 l `shouldBe` [MissingModulePathError ["import_error"] ["foo"]]
