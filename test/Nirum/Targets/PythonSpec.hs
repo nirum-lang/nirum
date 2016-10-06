@@ -25,6 +25,7 @@ import System.IO.Error (catchIOError)
 import Data.Either (isRight)
 import Data.List (dropWhileEnd)
 import qualified Data.Map.Strict as M
+import qualified Data.SemVer as SV
 import qualified Data.Text as T
 import qualified Data.Text.IO as TI
 import System.Directory (createDirectoryIfMissing)
@@ -75,6 +76,7 @@ import Nirum.Constructs.TypeExpression ( TypeExpression( ListModifier
                                                        )
                                        )
 import Nirum.Package (BoundModule(modulePath), Package, resolveBoundModule)
+import Nirum.Package.Metadata (Metadata (Metadata, version))
 import Nirum.PackageSpec (createPackage)
 import Nirum.Targets.Python ( Source (Source)
                             , Code
@@ -156,9 +158,9 @@ findPython cwd' = installedPythonPaths cwd' >>= findPython'
         pyVerM <- getPythonVersion cwd' x
         case pyVerM of
             Nothing -> findPython' xs
-            Just version -> if version >= PyVersion 3 3 0
-                            then return $ Just x
-                            else findPython' xs
+            Just version' -> if version' >= PyVersion 3 3 0
+                             then return $ Just x
+                             else findPython' xs
     findPython' [] = return Nothing
 
 runPython' :: Maybe FilePath -> [String] -> String -> IO (Maybe String)
@@ -258,8 +260,11 @@ makeDummySource' pathPrefix m =
   where
     mp :: [Identifier] -> ModulePath
     mp identifiers = fromJust $ fromIdentifiers (pathPrefix ++ identifiers)
+    metadata' :: Metadata
+    metadata' = Metadata { version = SV.version 1 2 3 [] [] }
     pkg :: Package
     pkg = createPackage
+            metadata'
             [ (mp ["foo"], m)
             , ( mp ["foo", "bar"]
               , Module [ Import (mp ["qux"]) "path" empty
@@ -469,8 +474,7 @@ spec = parallel $ do
                 ]
         specify "setup.py" $ do
             let setupPyFields = [ ("--name", "TestPackage")
-                                , ("--version", "0.1.0")
-                                , ("--version", "0.1.0")
+                                , ("--version", "1.2.3")
                                 , ("--provides", "foo\nfoo.bar\nqux")
                                 , ("--requires", "nirum")
                                 ] :: [(String, T.Text)]

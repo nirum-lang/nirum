@@ -41,17 +41,14 @@ import Nirum.Package.ModuleSet ( ImportError (MissingModulePathError)
 import Nirum.Package.ModuleSetSpec (validModules)
 import Nirum.Parser (parseFile)
 
-createPackage' :: Metadata -> [(ModulePath, Module)] -> Package
-createPackage' metadata' modules' =
+createPackage :: Metadata -> [(ModulePath, Module)] -> Package
+createPackage metadata' modules' =
     case fromList modules' of
         Right ms -> Package metadata' ms
         Left e -> error $ "errored: " ++ show e
 
-createPackage :: [(ModulePath, Module)] -> Package
-createPackage = createPackage' (Metadata initial)
-
 validPackage :: Package
-validPackage = createPackage validModules
+validPackage = createPackage (Metadata initial) validModules
 
 spec :: Spec
 spec = do
@@ -89,7 +86,7 @@ spec = do
                               , (["pdf-service"], pdfServiceM)
                               ] :: [(ModulePath, Module)]
                 package `shouldBe`
-                    createPackage' (Metadata (version 0 3 0 [] [])) modules
+                    createPackage (Metadata (version 0 3 0 [] [])) modules
             let testDir = "." </> "test"
             it "returns ScanError if the directory lacks package.toml" $ do
                 Left (ScanError filePath ioError') <-

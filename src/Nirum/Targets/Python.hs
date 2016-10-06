@@ -40,6 +40,7 @@ import Data.Maybe (fromMaybe)
 import GHC.Exts (IsList(toList))
 
 import qualified Data.Map.Strict as M
+import qualified Data.SemVer as SV
 import qualified Data.Set as S
 import qualified Data.Text as T
 import System.FilePath (joinPath)
@@ -85,12 +86,13 @@ import Nirum.Constructs.TypeExpression ( TypeExpression( ListModifier
                                                        )
                                        )
 import Nirum.Package ( BoundModule
-                     , Package(modules)
+                     , Package(Package, metadata, modules)
                      , TypeLookup(Imported, Local, Missing)
                      , lookupType
                      , resolveBoundModule
                      , types
                      )
+import Nirum.Package.Metadata (Metadata (version))
 import qualified Nirum.Package.ModuleSet as MS
 
 data Source = Source { sourcePackage :: Package
@@ -702,7 +704,9 @@ compileModule source =
             ]
 
 compilePackageMetadata :: Package -> InstallRequires -> Code
-compilePackageMetadata package (InstallRequires deps optDeps) = [qq|
+compilePackageMetadata package@Package { metadata = metadata' }
+                       (InstallRequires deps optDeps) =
+    [qq|
 import sys
 
 from setuptools import setup, __version__ as setuptools_version
@@ -756,7 +760,7 @@ setup(
     pName :: Code
     pName = "TestPackage"  -- FIXME
     pVersion :: Code
-    pVersion = "0.1.0"  -- FIXME
+    pVersion = SV.toText $ version metadata'
     strings :: [Code] -> Code
     strings values = T.intercalate ", " . L.sort $ [[qq|'{v}'|] | v <- values]
     pPackages :: Code
