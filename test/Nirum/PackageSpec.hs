@@ -4,7 +4,7 @@ module Nirum.PackageSpec where
 import Data.Either (isRight)
 import System.IO.Error (isDoesNotExistError)
 
-import Data.SemVer (initial, version)
+import qualified Data.SemVer as SV
 import System.FilePath ((</>))
 import Test.Hspec.Meta
 import qualified Text.Parsec.Error as PE
@@ -32,7 +32,7 @@ import Nirum.Package ( BoundModule(boundPackage, modulePath)
                      , scanPackage
                      , types
                      )
-import Nirum.Package.Metadata ( Metadata (Metadata)
+import Nirum.Package.Metadata ( Metadata (Metadata, authors, version)
                               , MetadataError (FormatError)
                               )
 import Nirum.Package.ModuleSet ( ImportError (MissingModulePathError)
@@ -48,7 +48,9 @@ createPackage metadata' modules' =
         Left e -> error $ "errored: " ++ show e
 
 validPackage :: Package
-validPackage = createPackage (Metadata initial) validModules
+validPackage = createPackage Metadata { version = SV.initial
+                                      , authors = []
+                                      } validModules
 
 spec :: Spec
 spec = do
@@ -86,7 +88,9 @@ spec = do
                               , (["pdf-service"], pdfServiceM)
                               ] :: [(ModulePath, Module)]
                 package `shouldBe`
-                    createPackage (Metadata (version 0 3 0 [] [])) modules
+                    createPackage Metadata { version = SV.version 0 3 0 [] []
+                                           , authors = []
+                                           } modules
             let testDir = "." </> "test"
             it "returns ScanError if the directory lacks package.toml" $ do
                 Left (ScanError filePath ioError') <-

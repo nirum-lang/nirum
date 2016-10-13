@@ -43,19 +43,77 @@ spec =
                 let Left (FieldError field) = parse ""
                 field `shouldBe` "version"
             it "returns MetadataError (FieldTypeError) if some fields of \
-               \the package.toml has a value of unexpected type" $ do
-                let Left e = parse [q|version = 123|]
-                    FieldTypeError field expected actual = e
-                field `shouldBe` "version"
-                expected `shouldBe` "string"
-                actual `shouldBe` "integer (123)"
+               \the package.toml has a value of unexpected type" $
+                forM_ [ ( "version = 123"
+                        , "version"
+                        , "string"
+                        , "integer (123)"
+                        )
+                      , ( [q|version = "1.2.3"
+                             [authors]
+                             name = "John Doe"
+                          |]
+                        , "authors"
+                        , "array of tables"
+                        , "table of an item"
+                        )
+                      , ( [q|version = "1.2.3"
+                             [[authors]]
+                             name = 123
+                          |]
+                        , "name"
+                        , "string"
+                        , "integer (123)"
+                        )
+                      , ( [q|version = "1.2.3"
+                             [[authors]]
+                             name = "John Doe"
+                             [[authors]]
+                             name = 456
+                          |]
+                        , "name"
+                        , "string"
+                        , "integer (456)"
+                        )
+                      , ( [q|version = "1.2.3"
+                             [[authors]]
+                             name = "John Doe"
+                             email = "john@example.com"
+                             [[authors]]
+                             name = "Hong Minhee"
+                             email = []
+                          |]
+                        , "email"
+                        , "string"
+                        , "array of 0 values"
+                        )
+                      ] $ \(toml, field, expected, actual) -> do
+                        let Left e = parse toml
+                            FieldTypeError field' expected' actual' = e
+                        field' `shouldBe` field
+                        expected' `shouldBe` expected
+                        actual' `shouldBe` actual
             it "returns MetadataError (FieldValueError) if some fields of \
-               \the package.toml has an invalid/malformed value" $ do
-                let Left e = parse [q|version = "0/3/0"|]
-                    FieldValueError field msg = e
-                field `shouldBe` "version"
-                msg `shouldBe`
-                    "expected a semver string (e.g. \"1.2.3\"), not \"0/3/0\""
+               \the package.toml has an invalid/malformed value" $
+                forM_ [ ( [q|version = "0/3/0"|]
+                        , "version"
+                        , "expected a semver string (e.g. \"1.2.3\"), \
+                          \not \"0/3/0\""
+                        )
+                      , ( [q|version = "1.2.3"
+                             [[authors]]
+                             name = "John Doe"
+                             email = "invalid#email"
+                          |]
+                        , "email"
+                        , "expected an email address, not invalid#email; \
+                          \@: not enough input"
+                        )
+                      ] $ \(toml, field, msg) -> do
+                        let Left e = parse toml
+                            FieldValueError field' msg' = e
+                        field' `shouldBe` field
+                        msg' `shouldBe` msg
         let examplePackagePath = "." </> "examples"
             samplePackagePath = "." </> "test" </> "metadata_error"
         describe "readMetadata" $ do

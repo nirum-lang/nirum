@@ -49,10 +49,11 @@ library
                ,       containers               >=0.5.6.2 && <0.6
                ,       cmdargs                  >=0.10.14 && <0.11
                ,       directory                >=1.2.5   && <1.3
+               ,       email-validate           >=2.0.0   && <3.0.0
                ,       filepath                 >=1.4     && <1.5
                ,       htoml                    >=1.0.0.0 && <1.1.0.0
                ,       interpolatedstring-perl6 >=1.0.0   && <1.1.0
-               ,       megaparsec               >=5       && <5.1
+               ,       megaparsec               >=5       && <5.2
                ,       mtl                      >=2.2.1   && <3
                ,       parsec
                        -- only for dealing with htoml's ParserError
@@ -60,6 +61,7 @@ library
                ,       text                     >=0.9.1.0 && <1.3
                ,       unordered-containers
                        -- only for dealing with htoml's data structures
+               ,       uri                      >=0.1     && <1.0
   hs-source-dirs:      src
   default-language:    Haskell2010
   default-extensions:  OverloadedStrings
@@ -109,12 +111,13 @@ test-suite spec
   build-depends:       base                     >=4.7     && <5
                ,       containers               >=0.5.6.2 && <0.6
                ,       directory
+               ,       email-validate           >=2.0.0   && <3.0.0
                ,       filepath                 >=1.4     && <1.5
                ,       hspec
                ,       hspec-core
                ,       hspec-meta
                ,       interpolatedstring-perl6 >=1.0.0   && <1.1.0
-               ,       megaparsec               >=5       && <5.1
+               ,       megaparsec               >=5       && <5.2
                ,       mtl                      >=2.2.1   && <3
                ,       nirum
                ,       parsec

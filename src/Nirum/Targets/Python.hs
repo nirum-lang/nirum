@@ -23,27 +23,31 @@ module Nirum.Targets.Python ( Code
                             , compileTypeDeclaration
                             , compileTypeExpression
                             , emptyContext
+                            , insertLocalImport
+                            , insertStandardImport
+                            , insertThirdPartyImports
+                            , runCodeGen
+                            , stringLiteral
                             , toAttributeName
                             , toClassName
                             , toImportPath
                             , toNamePair
                             , unionInstallRequires
-                            , insertLocalImport
-                            , insertStandardImport
-                            , insertThirdPartyImports
-                            , runCodeGen
                             ) where
 
 import Control.Monad.State (modify)
 import qualified Data.List as L
 import Data.Maybe (fromMaybe)
 import GHC.Exts (IsList(toList))
+import Text.Printf (printf)
 
 import qualified Data.Map.Strict as M
 import qualified Data.SemVer as SV
 import qualified Data.Set as S
 import qualified Data.Text as T
+import Data.Text.Encoding (decodeUtf8)
 import System.FilePath (joinPath)
+import qualified Text.Email.Validate as E
 import Text.InterpolatedString.Perl6 (qq)
 
 import qualified Nirum.CodeGen as C
@@ -66,7 +70,7 @@ import Nirum.Constructs.Service ( Method( Method
                                 , Service(Service)
                                 )
 import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
-                                        , Field(Field)
+                                        , Field (Field, fieldName)
                                         , PrimitiveTypeIdentifier(..)
                                         , Tag(Tag)
                                         , Type( Alias
@@ -92,7 +96,9 @@ import Nirum.Package ( BoundModule
                      , resolveBoundModule
                      , types
                      )
-import Nirum.Package.Metadata (Metadata (version))
+import Nirum.Package.Metadata ( Author (Author, name, email)
+                              , Metadata (authors, version)
+                              )
 import qualified Nirum.Package.ModuleSet as MS
 
 data Source = Source { sourcePackage :: Package
@@ -180,6 +186,24 @@ toImportPath = T.intercalate "." . map toAttributeName . toList
 toNamePair :: Name -> T.Text
 toNamePair (Name f b) = [qq|('{toAttributeName f}', '{toSnakeCaseText b}')|]
 
+stringLiteral :: T.Text -> T.Text
+stringLiteral string =
+    open $ T.concatMap esc string `T.snoc` '"'
+  where
+    open :: T.Text -> T.Text
+    open = if T.any (> '\xff') string then T.append [qq|u"|] else T.cons '"'
+    esc :: Char -> T.Text
+    esc '"' = "\\\""
+    esc '\\' = "\\\\"
+    esc '\t' = "\\t"
+    esc '\n' = "\\n"
+    esc '\r' = "\\r"
+    esc c
+        | c >= '\x10000' = T.pack $ printf "\\U%08x" c
+        | c >= '\xff' = T.pack $ printf "\\u%04x" c
+        | c < ' ' || c >= '\x7f' = T.pack $ printf "\\x%02x" c
+        | otherwise = T.singleton c
+
 toIndentedCodes :: (a -> T.Text) -> [a] -> T.Text -> T.Text
 toIndentedCodes f traversable concatenator =
     T.intercalate concatenator $ map f traversable
@@ -194,9 +218,7 @@ compileUnionTag source parentname typename' fields = do
     typeExprCodes <- mapM (compileTypeExpression source)
         [typeExpr | (Field _ typeExpr _) <- toList fields]
     let className = toClassName' typename'
-        tagNames = map toAttributeName' [ name
-                                        | (Field name _ _) <- toList fields
-                                        ]
+        tagNames = map (toAttributeName' . fieldName) (toList fields)
         nameNTypes = zip tagNames typeExprCodes
         slotTypes = toIndentedCodes
             (\(n, t) -> [qq|'{n}': {t}|]) nameNTypes ",\n        "
@@ -215,7 +237,7 @@ compileUnionTag source parentname typename' fields = do
             toIndentedCodes (\n -> [qq|self.{n} = {n}|]) tagNames "\n        "
         nameMaps = toIndentedCodes
             toNamePair
-            [name | Field name _ _ <- toList fields]
+            (map fieldName $ toList fields)
             ",\n        "
         parentClass = toClassName' parentname
     insertStandardImport "typing"
@@ -382,8 +404,8 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
     typeExprCodes <- mapM (compileTypeExpression src)
         [typeExpr | (Field _ typeExpr _) <- toList fields]
     let className = toClassName' typename'
-        fieldNames = map toAttributeName' [ name
-                                          | (Field name _ _) <- toList fields
+        fieldNames = map toAttributeName' [ name'
+                                          | (Field name' _ _) <- toList fields
                                           ]
         nameNTypes = zip fieldNames typeExprCodes
         slotTypes = toIndentedCodes
@@ -395,7 +417,7 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
             (\n -> [qq|self.{n} = {n}|]) fieldNames "\n        "
         nameMaps = toIndentedCodes
             toNamePair
-            [name | Field name _ _ <- toList fields]
+            (map fieldName $ toList fields)
             ",\n        "
         hashTuple = [qq|({attributes},)|] :: T.Text
           where
@@ -505,9 +527,9 @@ $fieldCodes'
     nameMaps :: T.Text
     nameMaps = toIndentedCodes
         toNamePair
-        [name | (name, _) <- tagNameNFields]
+        [name' | (name', _) <- tagNameNFields]
         ",\n        "
-compileTypeDeclaration src ServiceDeclaration { serviceName = name
+compileTypeDeclaration src ServiceDeclaration { serviceName = name'
                                               , service = Service methods } = do
     let methods' = toList methods
     methodMetadata <- mapM compileMethodMetadata methods'
@@ -546,7 +568,7 @@ class {className}_Client(client_type, $className):
 |]
   where
     className :: T.Text
-    className = toClassName' name
+    className = toClassName' name'
     commaNl :: [T.Text] -> T.Text
     commaNl = T.intercalate ",\n"
     compileMethod :: Method -> CodeGen Code
@@ -706,7 +728,7 @@ compileModule source =
 compilePackageMetadata :: Package -> InstallRequires -> Code
 compilePackageMetadata package@Package { metadata = metadata' }
                        (InstallRequires deps optDeps) =
-    [qq|
+    [qq|# -*- coding: utf-8 -*-
 import sys
 
 from setuptools import setup, __version__ as setuptools_version
@@ -743,11 +765,13 @@ else:
     setup_requires = []
     extras_require = \{}
 
-# TODO: description, long_description, url, author, author_email, license,
+# TODO: description, long_description, url, license,
 #       keywords, classifiers
 setup(
     name='{pName}',
     version='{pVersion}',
+    author=$author,
+    author_email=$authorEmail,
     packages=[$pPackages],
     provides=[$pPackages],
     requires=[$pInstallRequires],
@@ -757,12 +781,21 @@ setup(
 )
 |]
   where
+    csStrings :: [T.Text] -> T.Text
+    csStrings [] = "None"
+    csStrings s = stringLiteral $ T.intercalate ", " s
     pName :: Code
     pName = "TestPackage"  -- FIXME
     pVersion :: Code
     pVersion = SV.toText $ version metadata'
     strings :: [Code] -> Code
-    strings values = T.intercalate ", " . L.sort $ [[qq|'{v}'|] | v <- values]
+    strings values = T.intercalate ", " $ map stringLiteral (L.sort values)
+    author :: Code
+    author = csStrings [aName | Author { name = aName } <- authors metadata']
+    authorEmail :: Code
+    authorEmail = csStrings [ decodeUtf8 (E.toByteString e)
+                            | Author { email = Just e } <- authors metadata'
+                            ]
     pPackages :: Code
     pPackages = strings $ map toImportPath $ MS.keys $ modules package
     pInstallRequires :: Code

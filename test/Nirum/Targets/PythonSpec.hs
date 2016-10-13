@@ -39,6 +39,7 @@ import System.Process ( CreateProcess(cwd)
                       , readCreateProcessWithExitCode
                       )
 import Test.Hspec.Meta
+import Text.Email.Validate (emailAddress)
 import Text.InterpolatedString.Perl6 (q, qq)
 import Text.Megaparsec (char, digitChar, runParser, some, space, string')
 import Text.Megaparsec.String (Parser)
@@ -76,7 +77,9 @@ import Nirum.Constructs.TypeExpression ( TypeExpression( ListModifier
                                                        )
                                        )
 import Nirum.Package (BoundModule(modulePath), Package, resolveBoundModule)
-import Nirum.Package.Metadata (Metadata (Metadata, version))
+import Nirum.Package.Metadata ( Author (Author, email, name, uri)
+                              , Metadata (Metadata, authors, version)
+                              )
 import Nirum.PackageSpec (createPackage)
 import Nirum.Targets.Python ( Source (Source)
                             , Code
@@ -96,6 +99,7 @@ import Nirum.Targets.Python ( Source (Source)
                             , compilePrimitiveType
                             , compileTypeExpression
                             , emptyContext
+                            , stringLiteral
                             , toAttributeName
                             , toClassName
                             , toImportPath
@@ -261,7 +265,16 @@ makeDummySource' pathPrefix m =
     mp :: [Identifier] -> ModulePath
     mp identifiers = fromJust $ fromIdentifiers (pathPrefix ++ identifiers)
     metadata' :: Metadata
-    metadata' = Metadata { version = SV.version 1 2 3 [] [] }
+    metadata' = Metadata
+        { version = SV.version 1 2 3 [] []
+        , authors =
+              [ Author
+                    { name = "John Doe"
+                    , email = Just (fromJust $ emailAddress "john@example.com")
+                    , uri = Nothing
+                    }
+              ]
+        }
     pkg :: Package
     pkg = createPackage
             metadata'
@@ -420,6 +433,15 @@ spec = parallel $ do
             toNamePair (Name "abc" "lambda") `shouldBe` "('abc', 'lambda')"
             toNamePair (Name "lambda" "abc") `shouldBe` "('lambda_', 'abc')"
 
+    specify "stringLiteral" $ do
+        stringLiteral "asdf" `shouldBe` [q|"asdf"|]
+        stringLiteral [q|Say 'hello world'|]
+            `shouldBe` [q|"Say 'hello world'"|]
+        stringLiteral [q|Say "hello world"|]
+            `shouldBe` [q|"Say \"hello world\""|]
+        stringLiteral [q|Say '안녕'|]
+            `shouldBe` [q|u"Say '\uc548\ub155'"|]
+
     let test testRunner (Source pkg boundM) testCode =
             case errors of
                 error':_ -> fail $ T.unpack error'
@@ -474,6 +496,8 @@ spec = parallel $ do
                 ]
         specify "setup.py" $ do
             let setupPyFields = [ ("--name", "TestPackage")
+                                , ("--author", "John Doe")
+                                , ("--author-email", "john@example.com")
                                 , ("--version", "1.2.3")
                                 , ("--provides", "foo\nfoo.bar\nqux")
                                 , ("--requires", "nirum")
