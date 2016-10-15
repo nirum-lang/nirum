@@ -11,19 +11,19 @@ import qualified Text.Parsec.Error as PE
 import Text.Parsec.Pos (sourceColumn, sourceLine)
 
 import Nirum.Constructs.Annotation (empty)
-import Nirum.Constructs.Module (Module(Module), coreModulePath)
+import Nirum.Constructs.Module (Module (Module), coreModulePath)
 import Nirum.Constructs.ModulePath (ModulePath)
-import Nirum.Constructs.TypeDeclaration ( JsonType(String)
-                                        , PrimitiveTypeIdentifier(Text)
-                                        , Type(Alias, PrimitiveType)
+import Nirum.Constructs.TypeDeclaration ( JsonType (String)
+                                        , PrimitiveTypeIdentifier (Text)
+                                        , Type (Alias, PrimitiveType)
                                         , TypeDeclaration ( Import
                                                           , TypeDeclaration
                                                           )
                                         )
-import Nirum.Package ( BoundModule(boundPackage, modulePath)
+import Nirum.Package ( BoundModule (boundPackage, modulePath)
                      , Package (Package)
                      , PackageError (ImportError, MetadataError, ScanError)
-                     , TypeLookup(Imported, Local, Missing)
+                     , TypeLookup (Imported, Local, Missing)
                      , docs
                      , lookupType
                      , resolveBoundModule

@@ -54,8 +54,10 @@ install:
 - 'sed -E "s/resolver\s*:\s*.*/resolver: $RESOLVER/" stack.yaml > stack-new.yaml'
 - mv stack-new.yaml stack.yaml
 - travis_long stack --no-terminal setup
+- travis_long stack --no-terminal install scan
 script:
 - source "$HOME/.pyvenv/bin/activate" && stack --no-terminal test
+- ./lint.sh
 before_deploy:
 - stack build --no-terminal --copy-bins
 - mkdir -p /tmp/nirum-build

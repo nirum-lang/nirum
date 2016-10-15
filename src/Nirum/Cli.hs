@@ -2,7 +2,7 @@
 module Nirum.Cli (main, writeFiles) where
 
 import Control.Monad (forM_)
-import GHC.Exts (IsList(toList))
+import GHC.Exts (IsList (toList))
 import System.IO.Error (catchIOError, ioeGetErrorString)
 
 import qualified Data.Map.Strict as M
@@ -27,12 +27,12 @@ import System.FilePath (takeDirectory, (</>))
 import Text.InterpolatedString.Perl6 (qq)
 import Text.Megaparsec (Token)
 import Text.Megaparsec.Error ( Dec
-                             , ParseError(errorPos)
+                             , ParseError (errorPos)
                              , parseErrorPretty
                              )
-import Text.Megaparsec.Pos (SourcePos(sourceLine, sourceColumn), unPos)
+import Text.Megaparsec.Pos (SourcePos (sourceLine, sourceColumn), unPos)
 
-import Nirum.Constructs (Construct(toCode))
+import Nirum.Constructs (Construct (toCode))
 import Nirum.Constructs.Identifier (toText)
 import Nirum.Constructs.ModulePath (ModulePath)
 import Nirum.Package ( PackageError ( ImportError
@@ -136,8 +136,8 @@ main' = do
     scanResult <- scanPackage src
     case scanResult of
         Left (ParseError modulePath error') -> do
-            -- FIXME: find more efficient way to determine filename from
-            --        the given module path
+            {- FIXME: find more efficient way to determine filename from
+                      the given module path -}
             filePaths <- scanModules src
             case M.lookup modulePath filePaths of
                 Just filePath' -> do
@@ -154,7 +154,7 @@ main' = do
 
 writeFiles :: FilePath -> M.Map FilePath (Either T.Text T.Text) -> IO ()
 writeFiles obj m =
-    forM_ files $ \(filePath, result) ->
+    forM_ files $ \ (filePath, result) ->
         case result of
             Left compileError -> putStrLn [qq|error: $filePath: $compileError|]
             Right code -> do

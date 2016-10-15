@@ -1,44 +1,73 @@
-module Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
+module Nirum.Constructs.TypeDeclaration ( EnumMember (EnumMember)
                                         , Field ( Field
                                                 , fieldAnnotations
                                                 , fieldName
                                                 , fieldType
                                                 )
-                                        , JsonType(..)
-                                        , PrimitiveTypeIdentifier(..)
+                                        , JsonType ( Boolean
+                                                   , Number
+                                                   , String
+                                                   )
+                                        , PrimitiveTypeIdentifier ( Bigint
+                                                                  , Binary
+                                                                  , Bool
+                                                                  , Date
+                                                                  , Datetime
+                                                                  , Decimal
+                                                                  , Float32
+                                                                  , Float64
+                                                                  , Int32
+                                                                  , Int64
+                                                                  , Text
+                                                                  , Uri
+                                                                  , Uuid
+                                                                  )
                                         , Tag ( Tag
                                               , tagAnnotations
                                               , tagFields
                                               , tagName
                                               )
-                                        , Type(..)
-                                        , TypeDeclaration( Import
-                                                         , ServiceDeclaration
-                                                         , TypeDeclaration
-                                                         , importName
-                                                         , modulePath
-                                                         , service
-                                                         , serviceAnnotations
-                                                         , serviceName
-                                                         , type'
-                                                         , typeAnnotations
-                                                         , typename
-                                                         )
+                                        , Type ( Alias
+                                               , EnumType
+                                               , PrimitiveType
+                                               , RecordType
+                                               , UnboxedType
+                                               , UnionType
+                                               , canonicalType
+                                               , fields
+                                               , innerType
+                                               , jsonType
+                                               , members
+                                               , primitiveTypeIdentifier
+                                               , tags
+                                               )
+                                        , TypeDeclaration ( Import
+                                                          , ServiceDeclaration
+                                                          , TypeDeclaration
+                                                          , importName
+                                                          , modulePath
+                                                          , service
+                                                          , serviceAnnotations
+                                                          , serviceName
+                                                          , type'
+                                                          , typeAnnotations
+                                                          , typename
+                                                          )
                                         ) where
 
 import Data.Maybe (isJust)
-import Data.String (IsString(fromString))
+import Data.String (IsString (fromString))
 
 import qualified Data.Text as T
 
-import Nirum.Constructs (Construct(toCode))
+import Nirum.Constructs (Construct (toCode))
 import Nirum.Constructs.Annotation as A (AnnotationSet, empty, lookupDocs)
-import Nirum.Constructs.Declaration (Declaration(..), docs)
-import Nirum.Constructs.Docs (Docs(..), toCodeWithPrefix)
+import Nirum.Constructs.Declaration (Declaration (annotations, name), docs)
+import Nirum.Constructs.Docs (Docs (Docs), toCodeWithPrefix)
 import Nirum.Constructs.DeclarationSet (DeclarationSet, null', toList)
 import Nirum.Constructs.Identifier (Identifier)
 import Nirum.Constructs.ModulePath (ModulePath)
-import Nirum.Constructs.Name (Name(Name))
+import Nirum.Constructs.Name (Name (Name))
 import Nirum.Constructs.Service ( Method
                                 , Service (Service)
                                 , methodDocs

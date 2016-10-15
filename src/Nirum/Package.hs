@@ -1,4 +1,4 @@
-module Nirum.Package ( BoundModule(boundPackage, modulePath)
+module Nirum.Package ( BoundModule (boundPackage, modulePath)
                      , Package (Package, metadata, modules)
                      , PackageError ( ImportError
                                     , MetadataError
@@ -19,7 +19,7 @@ module Nirum.Package ( BoundModule(boundPackage, modulePath)
 import System.IO.Error (catchIOError)
 
 import Control.Monad.Except ( ExceptT
-                            , MonadError(throwError)
+                            , MonadError (throwError)
                             , liftIO
                             , runExceptT
                             )
@@ -43,7 +43,7 @@ import Nirum.Constructs.TypeDeclaration ( Type
 import Nirum.Package.Metadata ( Metadata
                               , MetadataError
                               , metadataPath
-                              , readFromPackage 
+                              , readFromPackage
                               )
 import qualified Nirum.Package.ModuleSet as MS
 import Nirum.Parser (ParseError, parseFile)
@@ -77,7 +77,7 @@ scanPackage packagePath = runExceptT $ do
         Right m -> return m
         Left e -> throwError $ MetadataError e
     modulePaths <- liftIO $ scanModules packagePath
-    modules' <- mapM (\p -> catch (parseFile p) $ ScanError p) modulePaths
+    modules' <- mapM (\ p -> catch (parseFile p) $ ScanError p) modulePaths
     case M.foldrWithKey excludeFailedParse (Right M.empty) modules' of
         Right parsedModules -> case MS.fromMap parsedModules of
             Right ms -> return $ Package metadata' ms
@@ -108,7 +108,7 @@ scanModules packagePath = do
     return $ M.fromList files
   where
     isNotHidden :: FilePath -> Bool
-    isNotHidden ('.':_) = False
+    isNotHidden ('.' : _) = False
     isNotHidden _ = True
     scanFiles :: FilePath -> IO [(ModulePath, FilePath)]
     scanFiles path = do

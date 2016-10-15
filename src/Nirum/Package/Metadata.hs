@@ -11,7 +11,7 @@ module Nirum.Package.Metadata ( Author (Author, email, name, uri)
                               , metadataFilename
                               , metadataPath
                               , parseMetadata
-                              , readFromPackage 
+                              , readFromPackage
                               , readMetadata
                               ) where
 
@@ -131,9 +131,9 @@ optional (Left (FieldError _)) = Right Nothing
 optional (Left error') = Left error'
 
 stringField :: MetadataField -> Table -> Either MetadataError Text
-stringField = typedField "string" $ \n -> case n of
-                                               VString s -> Just s
-                                               _ -> Nothing
+stringField = typedField "string" $ \ n -> case n of
+                                                VString s -> Just s
+                                                _ -> Nothing
 
 tableArrayField :: MetadataField -> Table -> Either MetadataError VTArray
 tableArrayField f t =
@@ -143,7 +143,7 @@ tableArrayField f t =
         Left error' -> Left error'
   where
     arrayF :: MetadataField -> Table -> Either MetadataError VTArray
-    arrayF = typedField "array of tables" $ \node ->
+    arrayF = typedField "array of tables" $ \ node ->
         case node of
             VTArray array -> Just array
             _ -> Nothing

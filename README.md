@@ -72,7 +72,7 @@ Building
 If you already installed [Haskell Platform][5] or [Haskell Stack][6],
 you can build the project in the same way to build other Haskell projects.
 
-Using Stack:
+Using Haskell Stack:
 
     $ stack build
 
@@ -82,6 +82,12 @@ Using vanilla Cabal:
     $ cabal install --only-dependencies
     $ cabal configure
     $ cabal build
+
+You can run the test suite of Nirum:
+
+    $ stack test  # using Hasekll Stack
+    $ cabal test  # using Haskell Platform
+    $ ./lint.sh   # run style lint as well
 
 [5]: https://www.haskell.org/platform/
 [6]: https://www.haskellstack.org/

@@ -21,7 +21,7 @@ module Nirum.Constructs.Identifier ( Identifier
 
 import Data.Char (toLower, toUpper)
 import Data.Maybe (fromMaybe)
-import Data.String (IsString(fromString))
+import Data.String (IsString (fromString))
 
 import qualified Data.Text as T
 import qualified Data.Set as S
@@ -29,26 +29,28 @@ import qualified Text.Megaparsec as P
 import Text.Megaparsec.Char (oneOf, satisfy)
 import Text.Megaparsec.Text (Parser)
 
-import Nirum.Constructs (Construct(toCode))
+import Nirum.Constructs (Construct (toCode))
 
--- | Case-insensitive identifier.  It also doesn't distinguish hyphens
--- from underscores.
---
--- It has more restrict rules than the most of programming languages:
---
--- * It can't start with digits or hyphens/underscores.
--- * Hyphens/underscores can't continuously appear more than once.
--- * Only roman alphabets, Arabic numerals, hyphens and underscores
---   are allowed.
--- 
--- These rules are for portability between various programming languages.
--- For example, @BOOK_CATEGORY@ and @Book-Category@ are all normalized
--- to @book-category@, and it can be translated to:
--- 
--- [snake_case] @book_category@
--- [camelCase] @bookCategory@
--- [PascalCase] @BookCategory@
--- [lisp-case] @book-category@
+{- |
+Case-insensitive identifier.  It also doesn't distinguish hyphens
+from underscores.
+
+It has more restrict rules than the most of programming languages:
+
+* It can't start with digits or hyphens/underscores.
+* Hyphens/underscores can't continuously appear more than once.
+* Only roman alphabets, Arabic numerals, hyphens and underscores
+  are allowed.
+
+These rules are for portability between various programming languages.
+For example, @BOOK_CATEGORY@ and @Book-Category@ are all normalized
+to @book-category@, and it can be translated to:
+
+[snake_case] @book_category@
+[camelCase] @bookCategory@
+[PascalCase] @BookCategory@
+[lisp-case] @book-category@
+-}
 data Identifier = Identifier T.Text deriving (Show)
 
 reservedKeywords :: S.Set Identifier
@@ -68,7 +70,7 @@ identifierRule = do
     restWords <- P.many $ do
         sep <- oneOf ("-_" :: String)
         chars <- P.some $ satisfy isAlnum
-        return $ T.pack $ sep:chars
+        return $ T.pack $ sep : chars
     return $ Identifier $ T.concat $ T.pack (firstChar : restChars) : restWords
   where
     isAlpha :: Char -> Bool
@@ -78,7 +80,7 @@ identifierRule = do
     isAlnum :: Char -> Bool
     isAlnum c = isAlpha c || isDigit c
 
--- | Constructs a 'Identifier' value from the given identifier string.
+-- | Constructs an 'Identifier' value from the given identifier string.
 -- It could return 'Nothing' if the given identifier is invalid.
 fromText :: T.Text -> Maybe Identifier
 fromText text =
@@ -94,7 +96,7 @@ fromText text =
 
 normalize :: Identifier -> Identifier
 normalize (Identifier i) =
-    Identifier $ T.map (\c -> if c == '_' then '-' else toLower c) i
+    Identifier $ T.map (\ c -> if c == '_' then '-' else toLower c) i
 
 toText :: Identifier -> T.Text
 toText (Identifier text) = text

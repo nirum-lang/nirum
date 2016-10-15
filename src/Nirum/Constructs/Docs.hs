@@ -1,16 +1,16 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Nirum.Constructs.Docs ( Docs(Docs)
+module Nirum.Constructs.Docs ( Docs (Docs)
                              , annotationDocsName
                              , toCode
                              , toCodeWithPrefix
                              , toText
                              ) where
 
-import Data.String (IsString(fromString))
+import Data.String (IsString (fromString))
 
 import qualified Data.Text as T
 
-import Nirum.Constructs (Construct(toCode))
+import Nirum.Constructs (Construct (toCode))
 import Nirum.Constructs.Identifier (Identifier)
 
 annotationDocsName :: Identifier
@@ -26,8 +26,8 @@ toText (Docs docs') = docs'
 -- | Similar to 'toCode' except it takes 'Maybe Docs' instead of 'Docs'.
 -- If the given docs is 'Nothing' it simply returns an empty string.
 -- Otherwise it returns a code string with the prefix.
-toCodeWithPrefix :: T.Text     -- | The prefix to be prepended if not empty.
-                 -> Maybe Docs -- | The docs to convert to code.
+toCodeWithPrefix :: T.Text     -- ^ The prefix to be prepended if not empty.
+                 -> Maybe Docs -- ^ The docs to convert to code.
                  -> T.Text
 toCodeWithPrefix _ Nothing = ""
 toCodeWithPrefix prefix (Just docs') = T.append prefix $ toCode docs'

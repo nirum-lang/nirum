@@ -1,17 +1,17 @@
 {-# LANGUAGE OverloadedLists #-}
-module Nirum.Constructs.DeclarationSetSpec (SampleDecl(..), spec) where
+module Nirum.Constructs.DeclarationSetSpec (SampleDecl (..), spec) where
 
 import Control.Exception.Base (evaluate)
-import Data.String (IsString(..))
+import Data.String (IsString (..))
 
 import Test.Hspec.Meta
 
-import Nirum.Constructs (Construct(..))
+import Nirum.Constructs (Construct (..))
 import qualified Nirum.Constructs.Annotation as A
 import Nirum.Constructs.Annotation (AnnotationSet)
-import Nirum.Constructs.Declaration (Declaration(..))
+import Nirum.Constructs.Declaration (Declaration (..))
 import Nirum.Constructs.DeclarationSet ( DeclarationSet
-                                       , NameDuplication(..)
+                                       , NameDuplication (..)
                                        , empty
                                        , fromList
                                        , lookup'
@@ -21,7 +21,7 @@ import Nirum.Constructs.DeclarationSet ( DeclarationSet
                                        , union
                                        , (!)
                                        )
-import Nirum.Constructs.Name (Name(Name))
+import Nirum.Constructs.Name (Name (Name))
 
 data SampleDecl = SampleDecl Name AnnotationSet deriving (Eq, Ord, Show)
 

@@ -12,11 +12,11 @@ module Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
                                        , toCode
                                        ) where
 
-import Data.String (IsString(fromString))
+import Data.String (IsString (fromString))
 
 import qualified Data.Text as T
 
-import Nirum.Constructs (Construct(toCode))
+import Nirum.Constructs (Construct (toCode))
 import Nirum.Constructs.Identifier (Identifier)
 
 -- | Refers a type.

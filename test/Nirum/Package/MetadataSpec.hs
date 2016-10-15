@@ -2,6 +2,7 @@
 module Nirum.Package.MetadataSpec where
 
 import Control.Monad (forM_)
+import Data.Char (isSpace)
 
 import qualified Data.SemVer as SV
 import Data.Text (Text)
@@ -24,6 +25,11 @@ import Nirum.Package.Metadata ( Metadata (Metadata, version)
                               , readMetadata
                               )
 
+stripPrefix :: String -> String
+stripPrefix = dropWhile isSpace
+ignoreLines :: String -> String
+ignoreLines = concatMap stripPrefix . lines
+
 spec :: Spec
 spec =
     describe "Metadata" $ do
@@ -33,17 +39,17 @@ spec =
                     Metadata { version = v } = metadata
                 in
                     v `shouldBe` SV.version 1 2 3 [] []
-            it "returns MetadataError (FormatError) if the package.toml is \
-               \not a valid TOML file" $ do
+            it ("returns MetadataError (FormatError) if the package.toml is " ++
+                "not a valid TOML file") $ do
                 let Left (FormatError e) = parse "version = 0.3.0"
                 sourceLine (PE.errorPos e) `shouldBe` 1
                 sourceColumn (PE.errorPos e) `shouldBe` 14
-            it "returns MetadataError (FieldError) if the package.toml lacks \
-               \any required fields" $ do
+            it ("returns MetadataError (FieldError) if the package.toml " ++
+                "lacks any required fields") $ do
                 let Left (FieldError field) = parse ""
                 field `shouldBe` "version"
-            it "returns MetadataError (FieldTypeError) if some fields of \
-               \the package.toml has a value of unexpected type" $
+            it ("returns MetadataError (FieldTypeError) if some fields of " ++
+                "the package.toml has a value of unexpected type") $
                 forM_ [ ( "version = 123"
                         , "version"
                         , "string"
@@ -87,18 +93,18 @@ spec =
                         , "string"
                         , "array of 0 values"
                         )
-                      ] $ \(toml, field, expected, actual) -> do
+                      ] $ \ (toml, field, expected, actual) -> do
                         let Left e = parse toml
                             FieldTypeError field' expected' actual' = e
                         field' `shouldBe` field
                         expected' `shouldBe` expected
                         actual' `shouldBe` actual
-            it "returns MetadataError (FieldValueError) if some fields of \
-               \the package.toml has an invalid/malformed value" $
+            it ("returns MetadataError (FieldValueError) if some fields of " ++
+                "the package.toml has an invalid/malformed value") $
                 forM_ [ ( [q|version = "0/3/0"|]
                         , "version"
-                        , "expected a semver string (e.g. \"1.2.3\"), \
-                          \not \"0/3/0\""
+                        , [q|expected a semver string (e.g. "1.2.3")
+                             , not "0/3/0"|]
                         )
                       , ( [q|version = "1.2.3"
                              [[authors]]
@@ -106,14 +112,14 @@ spec =
                              email = "invalid#email"
                           |]
                         , "email"
-                        , "expected an email address, not invalid#email; \
-                          \@: not enough input"
+                        , [q|expected an email address, not invalid#email
+                             ; @: not enough input|]
                         )
-                      ] $ \(toml, field, msg) -> do
+                      ] $ \ (toml, field, msg) -> do
                         let Left e = parse toml
                             FieldValueError field' msg' = e
                         field' `shouldBe` field
-                        msg' `shouldBe` msg
+                        msg' `shouldBe` ignoreLines msg
         let examplePackagePath = "." </> "examples"
             samplePackagePath = "." </> "test" </> "metadata_error"
         describe "readMetadata" $ do
@@ -129,7 +135,7 @@ spec =
         specify "metadataPath" $
             metadataPath "asdf" `shouldBe` "asdf" </> metadataFilename
         specify "readFromPackage" $
-            forM_ [examplePackagePath, samplePackagePath] $ \pkgPath -> do
+            forM_ [examplePackagePath, samplePackagePath] $ \ pkgPath -> do
                 r <- readFromPackage pkgPath
                 r' <- readMetadata $ metadataPath pkgPath
                 r `shouldBe` r'

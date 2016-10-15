@@ -1,9 +1,9 @@
 {-# LANGUAGE TypeFamilies #-}
-module Nirum.Constructs.ModulePath ( ModulePath( ModuleName
-                                               , ModulePath
-                                               , moduleName
-                                               , path
-                                               )
+module Nirum.Constructs.ModulePath ( ModulePath ( ModuleName
+                                                , ModulePath
+                                                , moduleName
+                                                , path
+                                                )
                                    , ancestors
                                    , fromFilePath
                                    , fromIdentifiers
@@ -11,17 +11,18 @@ module Nirum.Constructs.ModulePath ( ModulePath( ModuleName
 
 import Data.Char (toLower)
 import Data.Maybe (fromMaybe, mapMaybe)
-import GHC.Exts (IsList(Item, fromList, toList))
+import GHC.Exts (IsList (Item, fromList, toList))
 
 import Data.Set (Set, insert, singleton)
 import Data.Text (intercalate, pack)
 import System.FilePath (splitDirectories, stripExtension)
 
-import Nirum.Constructs (Construct(toCode))
+import Nirum.Constructs (Construct (toCode))
 import Nirum.Constructs.Identifier (Identifier, fromText)
 
 data ModulePath = ModulePath { path :: ModulePath
-                             , moduleName :: Identifier }
+                             , moduleName :: Identifier
+                             }
                 | ModuleName { moduleName :: Identifier }
                 deriving (Eq, Show)
 
@@ -61,7 +62,7 @@ ancestors m@(ModulePath parent _) = m `insert` ancestors parent
 instance IsList ModulePath where
     type Item ModulePath = Identifier
     fromList identifiers =
-        fromMaybe (error "ModulePath cannot be empty") 
+        fromMaybe (error "ModulePath cannot be empty")
                   (fromIdentifiers identifiers)
     toList (ModuleName identifier) = [identifier]
     toList (ModulePath path' identifier) = toList path' ++ [identifier]

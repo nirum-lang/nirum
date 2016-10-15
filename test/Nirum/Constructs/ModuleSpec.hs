@@ -4,14 +4,14 @@ module Nirum.Constructs.ModuleSpec where
 import Test.Hspec.Meta
 import Text.InterpolatedString.Perl6 (q)
 
-import Nirum.Constructs (Construct(toCode))
+import Nirum.Constructs (Construct (toCode))
 import Nirum.Constructs.Annotation as A (docs, empty, singleton)
 import Nirum.Constructs.DeclarationSet (DeclarationSet)
-import Nirum.Constructs.Module (Module(..), imports)
-import Nirum.Constructs.TypeDeclaration ( Type(..)
-                                        , TypeDeclaration( Import
-                                                         , TypeDeclaration
-                                                         )
+import Nirum.Constructs.Module (Module (..), imports)
+import Nirum.Constructs.TypeDeclaration ( Type (..)
+                                        , TypeDeclaration ( Import
+                                                          , TypeDeclaration
+                                                          )
                                         )
 
 spec :: Spec

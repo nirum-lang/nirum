@@ -2,7 +2,7 @@ module Nirum.Constructs.NameSpec where
 
 import Test.Hspec.Meta
 
-import Nirum.Constructs.Name (Name(Name), isComplex, isSimple, toCode)
+import Nirum.Constructs.Name (Name (Name), isComplex, isSimple, toCode)
 
 spec :: Spec
 spec =
