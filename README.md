@@ -55,7 +55,7 @@ In order to compile a Nirum package (`examples/`) to a Python package:
 For more infomration, use `--help` option:
 
     $ nirum --help
-    Nirum Compiler 0.1.0
+    Nirum Compiler 0.3.0
 
     nirum [OPTIONS] DIR
 

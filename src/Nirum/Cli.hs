@@ -35,14 +35,19 @@ import Text.Megaparsec.Pos (SourcePos(sourceLine, sourceColumn), unPos)
 import Nirum.Constructs (Construct(toCode))
 import Nirum.Constructs.Identifier (toText)
 import Nirum.Constructs.ModulePath (ModulePath)
-import Nirum.Package ( PackageError(ParseError, ImportError, ScanError)
-                     , ImportError ( CircularImportError
-                                   , MissingImportError
-                                   , MissingModulePathError
-                                   )
+import Nirum.Package ( PackageError ( ImportError
+                                    , MetadataError
+                                    , ParseError
+                                    , ScanError
+                                    )
                      , scanModules
                      , scanPackage
                      )
+import Nirum.Package.ModuleSet ( ImportError ( CircularImportError
+                                             , MissingImportError
+                                             , MissingModulePathError
+                                             )
+                               )
 import Nirum.Targets.Python (compilePackage)
 import Nirum.Version (versionString)
 
@@ -144,6 +149,7 @@ main' = do
 {importErrorsToPrettyMessage importErrors}
 |]
         Left (ScanError _ error') -> putStrLn [qq|Scan error: $error'|]
+        Left (MetadataError error') -> putStrLn [qq|Metadata error: $error'|]
         Right pkg -> writeFiles obj $ compilePackage pkg
 
 writeFiles :: FilePath -> M.Map FilePath (Either T.Text T.Text) -> IO ()

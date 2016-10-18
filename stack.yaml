@@ -1,6 +1,7 @@
-resolver: nightly-2016-08-15
+resolver: nightly-2016-10-10
 flags: {}
 packages:
 - '.'
-extra-deps: []
+extra-deps:
+- uri-0.1.6.4
 extra-package-dbs: []

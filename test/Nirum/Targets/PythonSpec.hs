@@ -25,6 +25,7 @@ import System.IO.Error (catchIOError)
 import Data.Either (isRight)
 import Data.List (dropWhileEnd)
 import qualified Data.Map.Strict as M
+import qualified Data.SemVer as SV
 import qualified Data.Text as T
 import qualified Data.Text.IO as TI
 import System.Directory (createDirectoryIfMissing)
@@ -38,6 +39,7 @@ import System.Process ( CreateProcess(cwd)
                       , readCreateProcessWithExitCode
                       )
 import Test.Hspec.Meta
+import Text.Email.Validate (emailAddress)
 import Text.InterpolatedString.Perl6 (q, qq)
 import Text.Megaparsec (char, digitChar, runParser, some, space, string')
 import Text.Megaparsec.String (Parser)
@@ -75,6 +77,9 @@ import Nirum.Constructs.TypeExpression ( TypeExpression( ListModifier
                                                        )
                                        )
 import Nirum.Package (BoundModule(modulePath), Package, resolveBoundModule)
+import Nirum.Package.Metadata ( Author (Author, email, name, uri)
+                              , Metadata (Metadata, authors, version)
+                              )
 import Nirum.PackageSpec (createPackage)
 import Nirum.Targets.Python ( Source (Source)
                             , Code
@@ -94,6 +99,7 @@ import Nirum.Targets.Python ( Source (Source)
                             , compilePrimitiveType
                             , compileTypeExpression
                             , emptyContext
+                            , stringLiteral
                             , toAttributeName
                             , toClassName
                             , toImportPath
@@ -156,9 +162,9 @@ findPython cwd' = installedPythonPaths cwd' >>= findPython'
         pyVerM <- getPythonVersion cwd' x
         case pyVerM of
             Nothing -> findPython' xs
-            Just version -> if version >= PyVersion 3 3 0
-                            then return $ Just x
-                            else findPython' xs
+            Just version' -> if version' >= PyVersion 3 3 0
+                             then return $ Just x
+                             else findPython' xs
     findPython' [] = return Nothing
 
 runPython' :: Maybe FilePath -> [String] -> String -> IO (Maybe String)
@@ -258,8 +264,20 @@ makeDummySource' pathPrefix m =
   where
     mp :: [Identifier] -> ModulePath
     mp identifiers = fromJust $ fromIdentifiers (pathPrefix ++ identifiers)
+    metadata' :: Metadata
+    metadata' = Metadata
+        { version = SV.version 1 2 3 [] []
+        , authors =
+              [ Author
+                    { name = "John Doe"
+                    , email = Just (fromJust $ emailAddress "john@example.com")
+                    , uri = Nothing
+                    }
+              ]
+        }
     pkg :: Package
     pkg = createPackage
+            metadata'
             [ (mp ["foo"], m)
             , ( mp ["foo", "bar"]
               , Module [ Import (mp ["qux"]) "path" empty
@@ -415,6 +433,15 @@ spec = parallel $ do
             toNamePair (Name "abc" "lambda") `shouldBe` "('abc', 'lambda')"
             toNamePair (Name "lambda" "abc") `shouldBe` "('lambda_', 'abc')"
 
+    specify "stringLiteral" $ do
+        stringLiteral "asdf" `shouldBe` [q|"asdf"|]
+        stringLiteral [q|Say 'hello world'|]
+            `shouldBe` [q|"Say 'hello world'"|]
+        stringLiteral [q|Say "hello world"|]
+            `shouldBe` [q|"Say \"hello world\""|]
+        stringLiteral [q|Say '안녕'|]
+            `shouldBe` [q|u"Say '\uc548\ub155'"|]
+
     let test testRunner (Source pkg boundM) testCode =
             case errors of
                 error':_ -> fail $ T.unpack error'
@@ -469,8 +496,9 @@ spec = parallel $ do
                 ]
         specify "setup.py" $ do
             let setupPyFields = [ ("--name", "TestPackage")
-                                , ("--version", "0.1.0")
-                                , ("--version", "0.1.0")
+                                , ("--author", "John Doe")
+                                , ("--author-email", "john@example.com")
+                                , ("--version", "1.2.3")
                                 , ("--provides", "foo\nfoo.bar\nqux")
                                 , ("--requires", "nirum")
                                 ] :: [(String, T.Text)]

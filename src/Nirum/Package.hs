@@ -1,15 +1,14 @@
 module Nirum.Package ( BoundModule(boundPackage, modulePath)
-                     , ImportError ( CircularImportError
-                                   , MissingImportError
-                                   , MissingModulePathError
-                                   )
-                     , Package(modules)
-                     , PackageError(ImportError, ParseError, ScanError)
-                     , TypeLookup(Imported, Local, Missing)
+                     , Package (Package, metadata, modules)
+                     , PackageError ( ImportError
+                                    , MetadataError
+                                    , ParseError
+                                    , ScanError
+                                    )
+                     , TypeLookup (Imported, Local, Missing)
                      , docs
                      , findInBoundModule
                      , lookupType
-                     , makePackage
                      , resolveBoundModule
                      , resolveModule
                      , scanModules
@@ -17,6 +16,13 @@ module Nirum.Package ( BoundModule(boundPackage, modulePath)
                      , types
                      ) where
 
+import System.IO.Error (catchIOError)
+
+import Control.Monad.Except ( ExceptT
+                            , MonadError(throwError)
+                            , liftIO
+                            , runExceptT
+                            )
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import System.Directory (doesDirectoryExist, listDirectory)
@@ -34,30 +40,21 @@ import Nirum.Constructs.TypeDeclaration ( Type
                                                           , type'
                                                           )
                                         )
+import Nirum.Package.Metadata ( Metadata
+                              , MetadataError
+                              , metadataPath
+                              , readFromPackage 
+                              )
+import qualified Nirum.Package.ModuleSet as MS
 import Nirum.Parser (ParseError, parseFile)
 
 -- | Represents a package which consists of modules.
-data Package = Package { modules :: M.Map ModulePath Mod.Module
+data Package = Package { metadata :: Metadata
+                       , modules :: MS.ModuleSet
                        } deriving (Eq, Ord, Show)
--- TODO: uri, version, dependencies
-
-data ImportError = CircularImportError [ModulePath]
-                 | MissingModulePathError ModulePath ModulePath
-                 | MissingImportError ModulePath ModulePath Identifier
-                 deriving (Eq, Ord, Show)
-
-makePackage :: M.Map ModulePath Mod.Module -> Either (S.Set ImportError) Package
-makePackage modules'
-    | S.null importErrors = Right package
-    | otherwise = Left importErrors
-  where
-    package :: Package
-    package = Package modules'
-    importErrors :: S.Set ImportError
-    importErrors = detectImportErrors package
 
 resolveModule :: ModulePath -> Package -> Maybe Mod.Module
-resolveModule path Package { modules = ms } = M.lookup path ms
+resolveModule path Package { modules = ms } = MS.lookup path ms
 
 resolveBoundModule :: ModulePath -> Package -> Maybe BoundModule
 resolveBoundModule path package =
@@ -65,71 +62,27 @@ resolveBoundModule path package =
         Just _ -> Just $ BoundModule package path
         Nothing -> Nothing
 
-detectImportErrors :: Package -> S.Set ImportError
-detectImportErrors package = detectMissingImports package `S.union`
-                             detectCircularImports package
-
-detectMissingImports :: Package -> S.Set ImportError
-detectMissingImports package@Package { modules = ms } =
-    S.fromList [e | (path, module') <- M.toList ms, e <- detect path module']
-  where
-    detect :: ModulePath -> Mod.Module -> [ImportError]
-    detect path module' =
-        [ e
-        | (path', idents) <- M.toList (Mod.imports module')
-        , e <- case resolveModule path' package of
-                Nothing -> [MissingModulePathError path path']
-                Just (Mod.Module decls _) ->
-                    [ e
-                    | i <- S.toList idents
-                    , e <- case DS.lookup i decls of
-                        Just TypeDeclaration {} -> []
-                        Just ServiceDeclaration {} -> []
-                        Just Import {} -> [MissingImportError path path' i]
-                        Nothing -> [MissingImportError path path' i]
-                    ]
-        ]
-
-detectCircularImports :: Package -> S.Set ImportError
-detectCircularImports Package { modules = ms } =
-    S.fromList [e | path <- M.keys ms, e <- detect path []]
-  where
-    moduleImports :: M.Map ModulePath (S.Set ModulePath)
-    moduleImports =
-        M.fromList [ (path, M.keysSet $ Mod.imports module')
-                   | (path, module') <- M.toList ms
-                   ]
-    detect :: ModulePath -> [ModulePath] -> [ImportError]
-    detect path reversedCycle
-        | path `elem` reversedCycle =
-            [CircularImportError $ reverse reversedCycle']
-        | otherwise =
-            case M.lookup path moduleImports of
-                Just paths -> [ e
-                              | path' <- S.toList paths
-                              , e <- detect path' reversedCycle'
-                              ]
-                Nothing -> []
-      where
-        reversedCycle' :: [ModulePath]
-        reversedCycle' = path : reversedCycle
-
 data PackageError = ScanError FilePath IOError
                   | ParseError ModulePath ParseError
-                  | ImportError (S.Set ImportError)
+                  | ImportError (S.Set MS.ImportError)
+                  | MetadataError MetadataError
                   deriving (Eq, Show)
 
 -- | Scan the given package path, and then return the read package.
 scanPackage :: FilePath -> IO (Either PackageError Package)
-scanPackage packagePath = do
-    modulePaths <- scanModules packagePath
-    -- FIXME: catch IO errors
-    modules' <- mapM parseFile modulePaths
-    return $ case M.foldrWithKey excludeFailedParse (Right M.empty) modules' of
-        Right parsedModules -> case makePackage parsedModules of
-            Right p -> Right p
-            Left errors -> Left $ ImportError errors
-        Left error' -> Left error'
+scanPackage packagePath = runExceptT $ do
+    metadataE <- catch (readFromPackage packagePath)
+                       (ScanError $ metadataPath packagePath)
+    metadata' <- case metadataE of
+        Right m -> return m
+        Left e -> throwError $ MetadataError e
+    modulePaths <- liftIO $ scanModules packagePath
+    modules' <- mapM (\p -> catch (parseFile p) $ ScanError p) modulePaths
+    case M.foldrWithKey excludeFailedParse (Right M.empty) modules' of
+        Right parsedModules -> case MS.fromMap parsedModules of
+            Right ms -> return $ Package metadata' ms
+            Left errors -> throwError $ ImportError errors
+        Left error' -> throwError error'
   where
     excludeFailedParse :: ModulePath
                        -> Either ParseError Mod.Module
@@ -139,6 +92,13 @@ scanPackage packagePath = do
     excludeFailedParse path (Left error') _ = Left $ ParseError path error'
     excludeFailedParse path (Right module') (Right map') =
         Right (M.insert path module' map')
+    catch :: IO a -> (IOError -> e) -> ExceptT e IO a
+    catch op onError = do
+        result <- liftIO $ catchIOError (fmap Right op)
+                                        (return . Left . onError)
+        case result of
+            Left err -> throwError err
+            Right val -> return val
 
 -- | Scan the given path recursively, and then return the map of
 -- detected module paths.
@@ -176,7 +136,7 @@ findInBoundModule valueWhenExist valueWhenNotExist
                   BoundModule { boundPackage = Package { modules = ms }
                               , modulePath = path
                               } =
-    case M.lookup path ms of
+    case MS.lookup path ms of
         Nothing -> valueWhenNotExist
         Just mod' -> valueWhenExist mod'
 

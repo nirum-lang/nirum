@@ -2,6 +2,7 @@
 module Nirum.Constructs.ModulePathSpec where
 
 import Control.Exception (evaluate)
+import Data.List (sort)
 import GHC.Exts (IsList(fromList, toList))
 
 import System.FilePath ((</>))
@@ -70,3 +71,14 @@ spec =
                 toList fooBar `shouldBe` ["foo", "bar"]
                 toList fooBarBaz `shouldBe` ["foo", "bar", "baz"]
                 toList fooBarBaz2 `shouldBe` ["foo", "bar-baz2"]
+        context "Ord" $
+            specify "<=" $ do
+                ["abc"] `shouldSatisfy` (<= foo)
+                foo `shouldSatisfy` (<= fooBar)
+                fooBar `shouldNotSatisfy` (<= foo)
+                fooBar `shouldSatisfy` (<= fooBarBaz)
+                fooBarBaz `shouldNotSatisfy` (<= fooBar)
+                fooBarBaz `shouldSatisfy` (<= fooBarBaz2)
+                fooBarBaz2 `shouldNotSatisfy` (<= fooBarBaz)
+                sort [["abc"], foo, fooBar, fooBarBaz, fooBarBaz2]
+                    `shouldBe` [["abc"], foo, fooBar, fooBarBaz, fooBarBaz2]
