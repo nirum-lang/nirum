@@ -2,7 +2,7 @@ module Nirum.Constructs.TypeExpressionSpec where
 
 import Test.Hspec.Meta
 
-import Nirum.Constructs.TypeExpression (TypeExpression(..), toCode)
+import Nirum.Constructs.TypeExpression (TypeExpression (..), toCode)
 
 spec :: Spec
 spec =

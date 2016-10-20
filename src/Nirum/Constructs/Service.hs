@@ -4,16 +4,16 @@ module Nirum.Constructs.Service ( Method ( Method
                                          , parameters
                                          , returnType
                                          )
-                                , Parameter(Parameter)
-                                , Service(Service, methods)
+                                , Parameter (Parameter)
+                                , Service (Service, methods)
                                 , methodDocs
                                 ) where
 
 import qualified Data.Text as T
 
-import Nirum.Constructs (Construct(toCode))
+import Nirum.Constructs (Construct (toCode))
 import Nirum.Constructs.Annotation (AnnotationSet, empty, lookupDocs)
-import Nirum.Constructs.Declaration (Declaration(annotations, name), docs)
+import Nirum.Constructs.Declaration (Declaration (annotations, name), docs)
 import Nirum.Constructs.Docs (Docs, toCodeWithPrefix)
 import Nirum.Constructs.DeclarationSet (DeclarationSet, toList)
 import Nirum.Constructs.Name (Name)
@@ -40,7 +40,7 @@ instance Declaration Parameter where
 data Method = Method { methodName :: Name
                      , parameters :: DeclarationSet Parameter
                      , returnType :: TypeExpression
-                     , errorType  :: Maybe TypeExpression
+                     , errorType :: Maybe TypeExpression
                      , methodAnnotations :: AnnotationSet
                      } deriving (Eq, Ord, Show)
 

@@ -40,10 +40,10 @@ validModules =
       , Module [TypeDeclaration "a" (Alias "text") empty]
                Nothing
       )
-    , (["foo"],        Module [] $ Just "foo")
+    , (["foo"], Module [] $ Just "foo")
     , (["foo", "bar"], fooBarModule)
     , (["foo", "baz"], Module [] $ Just "foo.baz")
-    , (["qux"],        Module [] $ Just "qux")
+    , (["qux"], Module [] $ Just "qux")
     , ( ["xyz"]
       , Module [ Import ["abc"] "a" empty
                , TypeDeclaration "x" (Alias "text") empty

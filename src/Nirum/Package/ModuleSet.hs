@@ -118,4 +118,3 @@ detectCircularImports (ModuleSet ms) =
       where
         reversedCycle' :: [ModulePath]
         reversedCycle' = path : reversedCycle
-

@@ -1,7 +1,7 @@
-module Nirum.Constructs.Annotation ( Annotation(Annotation)
+module Nirum.Constructs.Annotation ( Annotation (Annotation)
                                    , AnnotationSet
                                    , Metadata
-                                   , NameDuplication(AnnotationNameDuplication)
+                                   , NameDuplication (AnnotationNameDuplication)
                                    , annotations
                                    , docs
                                    , empty
@@ -53,9 +53,9 @@ fromList annotations' =
     findDup :: [Identifier] -> S.Set Identifier -> Maybe Identifier
     findDup identifiers dups =
         case identifiers of
-            x:xs -> if x `S.member` dups
-                    then Just x
-                    else findDup xs $ S.insert x dups
+            x : xs -> if x `S.member` dups
+                      then Just x
+                      else findDup xs $ S.insert x dups
             _ -> Nothing
 
 toList :: AnnotationSet -> [Annotation]
@@ -79,8 +79,8 @@ lookupDocs annotationSet = do
 insertDocs :: (Monad m) => Docs -> AnnotationSet -> m AnnotationSet
 insertDocs docs' (AnnotationSet anno) =
     case insertLookup annotationDocsName (Just $ toText docs') anno of
-        (Just _ , _    ) -> fail "<duplicated>"
+        (Just _ , _) -> fail "<duplicated>"
         (Nothing, anno') -> return $ AnnotationSet anno'
   where
     insertLookup :: Ord k => k -> a -> M.Map k a -> (Maybe a, M.Map k a)
-    insertLookup = M.insertLookupWithKey (\_ a _ -> a)
+    insertLookup = M.insertLookupWithKey $ \ _ a _ -> a

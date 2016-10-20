@@ -125,6 +125,7 @@ test-suite spec
                ,       process                  >=1.1     && <2
                ,       semigroups
                ,       semver                   >=0.3.0   && <1.0
+               ,       string-qq                >=0.0.2   && <0.1.0
                ,       temporary                >=1.2     && <1.3
                ,       text                     >=0.9.1.0 && <1.3
   ghc-options:         -Wall -Werror

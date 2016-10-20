@@ -1,26 +1,27 @@
-{-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE OverloadedLists, QuasiQuotes #-}
 module Nirum.Constructs.TypeDeclarationSpec where
 
 import Data.Either (rights)
+import Data.String.QQ (s)
 import qualified Data.Text as T
 import Test.Hspec.Meta
 
-import Nirum.Constructs (Construct(toCode))
+import Nirum.Constructs (Construct (toCode))
 import Nirum.Constructs.Annotation ( Annotation (Annotation)
                                    , AnnotationSet
                                    , fromList
                                    , empty
                                    )
-import Nirum.Constructs.Declaration (Declaration(name), docs)
+import Nirum.Constructs.Declaration (Declaration (name), docs)
 import Nirum.Constructs.DeclarationSet (DeclarationSet)
-import Nirum.Constructs.Service (Method(Method), Service(Service))
-import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
-                                        , Field(Field)
-                                        , JsonType(String)
-                                        , PrimitiveTypeIdentifier(Text)
-                                        , Tag(Tag)
-                                        , Type(..)
-                                        , TypeDeclaration(..)
+import Nirum.Constructs.Service (Method (Method), Service (Service))
+import Nirum.Constructs.TypeDeclaration ( EnumMember (EnumMember)
+                                        , Field (Field)
+                                        , JsonType (String)
+                                        , PrimitiveTypeIdentifier (Text)
+                                        , Tag (Tag)
+                                        , Type (..)
+                                        , TypeDeclaration (..)
                                         )
 import Util (singleDocs)
 
@@ -74,21 +75,23 @@ spec = do
                                     }
                 b = a { typeAnnotations = singleDocs "country codes" }
             specify "toCode" $ do
-                toCode a `shouldBe` "enum country\n\
-                                    \    = kr\n\
-                                    \    | jp\n\
-                                    \    # Japan\n\
-                                    \    | us\n\
-                                    \    # United States\n\
-                                    \    ;"
-                toCode b `shouldBe` "enum country\n\
-                                    \    # country codes\n\
-                                    \    = kr\n\
-                                    \    | jp\n\
-                                    \    # Japan\n\
-                                    \    | us\n\
-                                    \    # United States\n\
-                                    \    ;"
+                toCode a `shouldBe` [s|
+enum country
+    = kr
+    | jp
+    # Japan
+    | us
+    # United States
+    ;|]
+                toCode b `shouldBe` [s|
+enum country
+    # country codes
+    = kr
+    | jp
+    # Japan
+    | us
+    # United States
+    ;|]
         context "RecordType" $ do
             let fields' = [ Field "name" "text" empty
                           , Field "dob" "date" (singleDocs "date of birth")
@@ -101,19 +104,22 @@ spec = do
                                     }
                 b = a { typeAnnotations = singleDocs "person record type" }
             specify "toCode" $ do
-                toCode a `shouldBe` "record person (\n\
-                                    \    text name,\n\
-                                    \    date dob,\n\
-                                    \    # date of birth\n\
-                                    \    gender gender,\n\
-                                    \);"
-                toCode b `shouldBe` "record person (\n\
-                                    \    # person record type\n\n\
-                                    \    text name,\n\
-                                    \    date dob,\n\
-                                    \    # date of birth\n\
-                                    \    gender gender,\n\
-                                    \);"
+                toCode a `shouldBe` [s|
+record person (
+    text name,
+    date dob,
+    # date of birth
+    gender gender,
+);|]
+                toCode b `shouldBe` [s|
+record person (
+    # person record type
+
+    text name,
+    date dob,
+    # date of birth
+    gender gender,
+);|]
         context "UnionType" $ do
             let circleFields = [ Field "origin" "point" empty
                                , Field "radius" "offset" empty
@@ -132,21 +138,19 @@ spec = do
                                     }
                 b = a { typeAnnotations = singleDocs "shape type" }
             specify "toCode" $ do
-                toCode a `shouldBe` "union shape\n\
-                                    \    = circle (point origin, \
-                                                  \offset radius,)\n\
-                                    \    | rectangle (point upper-left, \
-                                                     \point lower-right,)\n\
-                                    \    | none\n\
-                                    \    ;"
-                toCode b `shouldBe` "union shape\n\
-                                    \    # shape type\n\
-                                    \    = circle (point origin, \
-                                                  \offset radius,)\n\
-                                    \    | rectangle (point upper-left, \
-                                                     \point lower-right,)\n\
-                                    \    | none\n\
-                                    \    ;"
+                toCode a `shouldBe` [s|
+union shape
+    = circle (point origin, offset radius,)
+    | rectangle (point upper-left, point lower-right,)
+    | none
+    ;|]
+                toCode b `shouldBe` [s|
+union shape
+    # shape type
+    = circle (point origin, offset radius,)
+    | rectangle (point upper-left, point lower-right,)
+    | none
+    ;|]
         context "PrimitiveType" $ do
             let primitiveType = PrimitiveType Text String
                 decl = TypeDeclaration "text" primitiveType empty
@@ -168,19 +172,19 @@ spec = do
                                               barAnnotationSet
             specify "toCode" $ do
                 toCode nullDecl `shouldBe` "service null-service ();"
-                toCode nullDecl' `shouldBe` "service null-service (\n\
-                                            \    # Null service declaration.\n\
-                                            \);"
+                toCode nullDecl' `shouldBe` [s|
+service null-service (
+    # Null service declaration.
+);|]
                 toCode pingDecl `shouldBe`
                     "service ping-service (bool ping ());"
-                toCode pingDecl' `shouldBe`
-                    "service ping-service (\n\
-                    \    # Ping service declaration.\n\
-                    \    bool ping ()\n\
-                    \);"
+                toCode pingDecl' `shouldBe` [s|
+service ping-service (
+    # Ping service declaration.
+    bool ping ()
+);|]
                 toCode annoDecl `shouldBe`
-                    "@bar(\"baz\")\n\
-                    \service anno-service (bool ping ());"
+                    "@bar(\"baz\")\nservice anno-service (bool ping ());"
                 -- TODO: more tests
         context "Import" $ do
             let import' = Import ["foo", "bar"] "baz" empty

@@ -51,8 +51,8 @@ spec = do
                 `shouldBe` Nothing
             fromText "identifier_cannot_have_two__or_more_continued_underscores"
                 `shouldBe` Nothing
-            fromText "무효한-식별자" `shouldBe` Nothing
-            fromText "invalid-식별자" `shouldBe` Nothing
+            fromText "\xbb34\xd6a8\xd55c-\xc2dd\xbcc4\xc790" `shouldBe` Nothing
+            fromText "invalid-\xc2dd\xbcc4\xc790" `shouldBe` Nothing
             fromText "identifier cannot contain whitepsaces" `shouldBe` Nothing
         it "returns Just Identifier if nothing goes wrong" $ do
             toText "datetime" `shouldBe` "datetime"
@@ -109,7 +109,7 @@ spec = do
         let normalizers = [ toNormalizedText
                           , toLispCaseText
                           ] :: [Identifier -> Text]
-        forM_ normalizers $ \normalizer -> do
+        forM_ normalizers $ \ normalizer -> do
             it "returns lowercased identifier text" $ do
                 normalizer "IDENTIFIER" `shouldBe` "identifier"
                 normalizer "Identifier" `shouldBe` "identifier"

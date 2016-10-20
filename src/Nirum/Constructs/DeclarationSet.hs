@@ -1,8 +1,8 @@
 {-# LANGUAGE OverloadedLists, TypeFamilies #-}
-module Nirum.Constructs.DeclarationSet ( DeclarationSet()
-                                       , NameDuplication( BehindNameDuplication
-                                                        , FacialNameDuplication
-                                                        )
+module Nirum.Constructs.DeclarationSet ( DeclarationSet ()
+                                       , NameDuplication ( BehindNameDuplication
+                                                         , FacialNameDuplication
+                                                         )
                                        , empty
                                        , fromList
                                        , lookup
@@ -22,9 +22,9 @@ import Prelude hiding (lookup, null)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 
-import Nirum.Constructs.Declaration (Declaration(name))
+import Nirum.Constructs.Declaration (Declaration (name))
 import Nirum.Constructs.Identifier (Identifier)
-import Nirum.Constructs.Name (Name(Name, behindName, facialName))
+import Nirum.Constructs.Name (Name (Name, behindName, facialName))
 
 data Declaration a => DeclarationSet a
     -- | The set of 'Declaration' values.
@@ -62,10 +62,10 @@ fromList declarations' =
     findDup :: [Name] -> (Name -> Identifier) -> S.Set Identifier -> Maybe Name
     findDup names' f dups =
         case names' of
-            x:xs -> let name' = f x
-                    in if name' `S.member` dups
-                       then Just x
-                       else findDup xs f $ S.insert name' dups
+            x : xs -> let name' = f x
+                      in if name' `S.member` dups
+                         then Just x
+                         else findDup xs f $ S.insert name' dups
             _ -> Nothing
 
 toList :: Declaration a => DeclarationSet a -> [a]

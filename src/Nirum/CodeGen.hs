@@ -7,7 +7,11 @@ module Nirum.CodeGen ( CodeGen
 
 import Control.Applicative (Applicative)
 import Control.Monad (Monad)
-import Control.Monad.Except (MonadError, ExceptT(ExceptT), mapExceptT, runExceptT)
+import Control.Monad.Except ( MonadError
+                            , ExceptT (ExceptT)
+                            , mapExceptT
+                            , runExceptT
+                            )
 import Control.Monad.State (MonadState, State, mapState, runState)
 import Data.Functor (Functor)
 
@@ -33,7 +37,7 @@ instance (Failure s e) => Monad (CodeGen s e) where
     {-# INLINE (>>=) #-}
     fail str = CodeGen $ mapExceptT mutate (fromString str)
       where
-        mutate = mapState (\(a, s) -> case a of
+        mutate = mapState (\ (a, s) -> case a of
                                           Left _ -> undefined
                                           Right e -> (Left e, s))
     {-# INLINE fail #-}

@@ -17,7 +17,7 @@ import Nirum.Cli (writeFiles)
 expectWriteFiles :: FilePath -> [(FilePath, Text)] -> IO [FilePath]
 expectWriteFiles tmpDir files = do
     writeFiles tmpDir $ M.fromList [(f, Right c) | (f, c) <- files]
-    forM_ files $ \(f, expectedContent) -> do
+    forM_ files $ \ (f, expectedContent) -> do
         content <- TI.readFile (tmpDir </> f)
         content `shouldBe` expectedContent
     fileList <- listDirectory tmpDir
@@ -27,14 +27,14 @@ spec :: Spec
 spec =
     describe "writeFiles" $ do
         it "writes root files" $
-            withSystemTempDirectory "writeFiles-rootFiles" $ \tmpDir -> do
+            withSystemTempDirectory "writeFiles-rootFiles" $ \ tmpDir -> do
                 let files = [ ("a.txt", "content A")
                             , ("b.txt", "content B")
                             ]
                 fileList <- expectWriteFiles tmpDir files
                 fileList `shouldBe` sort [f | (f, _) <- files]
         it "makes directories if necessary" $
-            withSystemTempDirectory "writeFiles-directories" $ \tmpDir -> do
+            withSystemTempDirectory "writeFiles-directories" $ \ tmpDir -> do
                 let files = [ ("a.txt", "content A")
                             , ("b.txt", "content B")
                             , ("d/a.txt", "content d/a")

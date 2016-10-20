@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedLists, QuasiQuotes, ScopedTypeVariables #-}
-{-|
+{- |
 This unit test module optionally depends on Python interpreter.
 It internally tries to popen python3 executable, and import nirum Python
 package.  If any of these prerequisites are not satisfied, tests depending
@@ -29,11 +29,11 @@ import qualified Data.SemVer as SV
 import qualified Data.Text as T
 import qualified Data.Text.IO as TI
 import System.Directory (createDirectoryIfMissing)
-import System.Exit (ExitCode(ExitSuccess))
+import System.Exit (ExitCode (ExitSuccess))
 import System.FilePath (isValid, takeDirectory, (</>))
 import System.Info (os)
 import System.IO.Temp (withSystemTempDirectory)
-import System.Process ( CreateProcess(cwd)
+import System.Process ( CreateProcess (cwd)
                       , proc
                       , readCreateProcess
                       , readCreateProcessWithExitCode
@@ -47,36 +47,36 @@ import Text.Megaparsec.String (Parser)
 import Nirum.Constructs.Annotation (empty)
 import Nirum.Constructs.DeclarationSet (DeclarationSet)
 import Nirum.Constructs.Identifier (Identifier)
-import Nirum.Constructs.Module (Module(Module))
+import Nirum.Constructs.Module (Module (Module))
 import Nirum.Constructs.ModulePath (ModulePath, fromIdentifiers)
-import Nirum.Constructs.Name (Name(Name))
+import Nirum.Constructs.Name (Name (Name))
 import Nirum.Constructs.Service ( Method (Method)
                                 , Parameter (Parameter)
                                 , Service (Service)
                                 )
-import Nirum.Constructs.TypeDeclaration ( Field(Field)
-                                        , EnumMember(EnumMember)
-                                        , PrimitiveTypeIdentifier(..)
-                                        , Tag(Tag)
-                                        , Type( Alias
-                                              , EnumType
-                                              , RecordType
-                                              , UnboxedType
-                                              , UnionType
-                                              )
+import Nirum.Constructs.TypeDeclaration ( Field (Field)
+                                        , EnumMember (EnumMember)
+                                        , PrimitiveTypeIdentifier (..)
+                                        , Tag (Tag)
+                                        , Type ( Alias
+                                               , EnumType
+                                               , RecordType
+                                               , UnboxedType
+                                               , UnionType
+                                               )
                                         , TypeDeclaration ( Import
                                                           , ServiceDeclaration
                                                           , TypeDeclaration
                                                           )
                                         )
-import Nirum.Constructs.TypeExpression ( TypeExpression( ListModifier
-                                                       , MapModifier
-                                                       , OptionModifier
-                                                       , SetModifier
-                                                       , TypeIdentifier
-                                                       )
+import Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
+                                                        , MapModifier
+                                                        , OptionModifier
+                                                        , SetModifier
+                                                        , TypeIdentifier
+                                                        )
                                        )
-import Nirum.Package (BoundModule(modulePath), Package, resolveBoundModule)
+import Nirum.Package (BoundModule (modulePath), Package, resolveBoundModule)
 import Nirum.Package.Metadata ( Author (Author, email, name, uri)
                               , Metadata (Metadata, authors, version)
                               )
@@ -127,9 +127,14 @@ installedPythonPaths cwd' = do
         _ -> []
   where
     proc' :: CreateProcess
-    proc' = (if windows then proc "where.exe" ["python"] else proc "which" ["python3"]) { cwd = cwd' }
+    proc' = (if windows
+             then proc "where.exe" ["python"]
+             else proc "which" ["python3"]) { cwd = cwd' }
     lines' :: String -> [String]
-    lines' = map T.unpack . filter (not . T.null) . map T.strip . T.lines . T.pack
+    lines' = map T.unpack . filter (not . T.null)
+                          . map T.strip
+                          . T.lines
+                          . T.pack
 
 getPythonVersion :: Maybe FilePath -> FilePath -> IO (Maybe PyVersion)
 getPythonVersion cwd' path' = do
@@ -158,7 +163,7 @@ findPython :: Maybe FilePath -> IO (Maybe FilePath)
 findPython cwd' = installedPythonPaths cwd' >>= findPython'
   where
     findPython' :: [FilePath] -> IO (Maybe FilePath)
-    findPython' (x:xs) = do
+    findPython' (x : xs) = do
         pyVerM <- getPythonVersion cwd' x
         case pyVerM of
             Nothing -> findPython' xs
@@ -188,7 +193,7 @@ runPython' cwd' args stdinStr = do
 
 runPython :: Maybe FilePath -> String -> IO (Maybe String)
 runPython cwd' code' =
-    catchIOError (runPython' cwd' [] code') $ \e -> do
+    catchIOError (runPython' cwd' [] code') $ \ e -> do
         putStrLn "\nThe following IO error was raised:\n"
         putStrLn $ indent "  " $ show e
         putStrLn "\n... while the following code was executed:\n"
@@ -217,8 +222,8 @@ else: print('T')
                                 expectationFailure $
                                 T.unpack ("Test failed: " `T.append` testCode)
                         Nothing -> return ()
-                _ -> putStrLn "The nirum Python package cannot be imported; \
-                              \skipped..."
+                _ -> putStrLn ("The nirum Python package cannot be " ++
+                               "imported; skipped...")
         Nothing -> return ()
   where
     strip :: String -> String
@@ -365,7 +370,8 @@ spec = parallel $ do
         let (dateCode, dateContext) = run' (compilePrimitiveType Date)
         dateCode `shouldBe` Right "datetime.date"
         standardImports dateContext `shouldBe` ["datetime"]
-        let (datetimeCode, datetimeContext) = run' (compilePrimitiveType Datetime)
+        let (datetimeCode, datetimeContext) =
+                run' (compilePrimitiveType Datetime)
         datetimeCode `shouldBe` Right "datetime.datetime"
         standardImports datetimeContext `shouldBe` ["datetime"]
         let (uuidCode, uuidContext) = run' (compilePrimitiveType Uuid)
@@ -376,27 +382,32 @@ spec = parallel $ do
     describe "compileTypeExpression" $ do
         let s = makeDummySource $ Module [] Nothing
         specify "TypeIdentifier" $ do
-            let (c, ctx) = run' $ compileTypeExpression s (TypeIdentifier "bigint")
+            let (c, ctx) = run' $
+                    compileTypeExpression s (TypeIdentifier "bigint")
             standardImports ctx `shouldBe` []
             localImports ctx `shouldBe` []
             c `shouldBe` Right "int"
         specify "OptionModifier" $ do
-            let (c', ctx') = run' $ compileTypeExpression s (OptionModifier "text")
+            let (c', ctx') = run' $
+                    compileTypeExpression s (OptionModifier "text")
             standardImports ctx' `shouldBe` ["typing"]
             localImports ctx' `shouldBe` []
             c' `shouldBe` Right "typing.Optional[str]"
         specify "SetModifier" $ do
-            let (c'', ctx'') = run' $ compileTypeExpression s (SetModifier "text")
+            let (c'', ctx'') = run' $
+                    compileTypeExpression s (SetModifier "text")
             standardImports ctx'' `shouldBe` ["typing"]
             localImports ctx'' `shouldBe` []
             c'' `shouldBe` Right "typing.AbstractSet[str]"
         specify "ListModifier" $ do
-            let (c''', ctx''') = run' $ compileTypeExpression s (ListModifier "text")
+            let (c''', ctx''') = run' $
+                    compileTypeExpression s (ListModifier "text")
             standardImports ctx''' `shouldBe` ["typing"]
             localImports ctx''' `shouldBe` []
             c''' `shouldBe` Right "typing.Sequence[str]"
         specify "MapModifier" $ do
-            let (c'''', ctx'''') = run' $ compileTypeExpression s (MapModifier "uuid" "text")
+            let (c'''', ctx'''') = run' $
+                    compileTypeExpression s (MapModifier "uuid" "text")
             standardImports ctx'''' `shouldBe` ["uuid", "typing"]
             localImports ctx'''' `shouldBe` []
             c'''' `shouldBe` Right "typing.Mapping[uuid.UUID, str]"
@@ -439,22 +450,22 @@ spec = parallel $ do
             `shouldBe` [q|"Say 'hello world'"|]
         stringLiteral [q|Say "hello world"|]
             `shouldBe` [q|"Say \"hello world\""|]
-        stringLiteral [q|Say '안녕'|]
+        stringLiteral "Say '\xc548\xb155'"
             `shouldBe` [q|u"Say '\uc548\ub155'"|]
 
     let test testRunner (Source pkg boundM) testCode =
             case errors of
-                error':_ -> fail $ T.unpack error'
-                [] -> withSystemTempDirectory "nirumpy." $ \dir -> do
-                    forM_ codes $ \(filePath, code') -> do
+                error' : _ -> fail $ T.unpack error'
+                [] -> withSystemTempDirectory "nirumpy." $ \ dir -> do
+                    forM_ codes $ \ (filePath, code') -> do
                         let filePath' = dir </> filePath
                             dirName = takeDirectory filePath'
                         createDirectoryIfMissing True dirName
                         TI.writeFile filePath' code'
-                        {--  <- Remove '{' to print debug log
+                        {-- <- Remove '{' to print debug log
                         TI.putStrLn $ T.pack filePath'
                         TI.putStrLn code'
-                        -- --}
+                        -- -}
                     testRunner (Just dir) defCode testCode
           where
             files :: M.Map FilePath (Either CompileError Code)
@@ -504,7 +515,7 @@ spec = parallel $ do
                                 ] :: [(String, T.Text)]
                 source = makeDummySource $ Module [] Nothing
                 testRunner cwd' _ _ =
-                    {--  <- remove '{' to print debug log
+                    {-- -- <- remove '{' to print debug log
                     do
                         let spath = case cwd' of
                                         Just c -> c </> "setup.py"
@@ -513,8 +524,8 @@ spec = parallel $ do
                         TI.putStrLn "=========== setup.py ==========="
                         TI.putStrLn contents
                         TI.putStrLn "=========== /setup.py =========="
-                    -- --}
-                        forM_ setupPyFields $ \(option, expected) -> do
+                    -- -}
+                        forM_ setupPyFields $ \ (option, expected) -> do
                             out <- runPython' cwd' ["setup.py", option] ""
                             out `shouldSatisfy` isJust
                             let Just result = out
@@ -612,18 +623,20 @@ spec = parallel $ do
                            ] :: DeclarationSet EnumMember
                 decl' = TypeDeclaration "eva-char" (EnumType members') empty
             tT decl' "type(EvaChar) is enum.EnumMeta"
-            tT decl' "set(EvaChar) == {EvaChar.soryu_asuka_langley, \
-                                     \ EvaChar.ayanami_rei, \
-                                     \ EvaChar.ikari_shinji, \
-                                     \ EvaChar.katsuragi_misato, \
-                                     \ EvaChar.nagisa_kaworu}"
+            tT decl' [q|
+                set(EvaChar) == {EvaChar.soryu_asuka_langley,
+                                 EvaChar.ayanami_rei,
+                                 EvaChar.ikari_shinji,
+                                 EvaChar.katsuragi_misato,
+                                 EvaChar.nagisa_kaworu}
+            |]
             tT decl' "EvaChar.soryu_asuka_langley.value=='soryu_asuka_langley'"
-            tT decl' "EvaChar.soryu_asuka_langley.__nirum_serialize__() == \
-                     \ 'soryu_asuka_langley'"
-            tT decl' "EvaChar.__nirum_deserialize__('soryu_asuka_langley') == \
-                     \ EvaChar.soryu_asuka_langley"
-            tT decl' "EvaChar.__nirum_deserialize__('soryu-asuka-langley') == \
-                     \ EvaChar.soryu_asuka_langley"  -- to be robust
+            tT decl' [q|EvaChar.soryu_asuka_langley.__nirum_serialize__() ==
+                        'soryu_asuka_langley'|]
+            tT decl' [q|EvaChar.__nirum_deserialize__('soryu_asuka_langley') ==
+                        EvaChar.soryu_asuka_langley|]
+            tT decl' [q|EvaChar.__nirum_deserialize__('soryu-asuka-langley') ==
+                        EvaChar.soryu_asuka_langley|]  -- to be robust
         specify "record type" $ do
             let fields = [ Field (Name "left" "x") "bigint" empty
                          , Field "top" "bigint" empty
@@ -851,8 +864,8 @@ spec = parallel $ do
                 ping' = ServiceDeclaration "ping-service" pingService empty
             tT null' "issubclass(NullService, __import__('nirum').rpc.Service)"
             tT ping' "issubclass(PingService, __import__('nirum').rpc.Service)"
-            tT ping' "set(PingService.ping.__annotations__) == \
-                     \    {'nonce', 'return'}"
+            tT ping' [q|set(PingService.ping.__annotations__) ==
+                            {'nonce', 'return'}|]
             tT ping' "PingService.ping.__annotations__['nonce'] is str"
             tT ping' "PingService.ping.__annotations__['return'] is bool"
             tR' ping' "NotImplementedError" "PingService().ping('nonce')"

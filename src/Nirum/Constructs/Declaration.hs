@@ -11,7 +11,7 @@ import Nirum.Constructs.Name (Name)
 
 -- 'Construct' which has its own unique 'name' and can has its 'docs'.
 class Construct a => Declaration a where
-    name        :: a -> Name
+    name :: a -> Name
     annotations :: a -> AnnotationSet
 
 docs :: Declaration a => a -> Maybe Docs

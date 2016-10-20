@@ -1,25 +1,25 @@
-module Nirum.Constructs.Name ( Name(Name)
-                             , behindName
-                             , facialName
+module Nirum.Constructs.Name ( Name (Name, behindName, facialName)
                              , isComplex
                              , isSimple
                              , toCode
                              ) where
 
-import Data.String (IsString(fromString))
+import Data.String (IsString (fromString))
 
 import Data.Text (append, snoc)
 
 import Nirum.Constructs (Construct)
 import Nirum.Constructs.Identifier (Identifier, toCode)
 
--- | Name consists of a 'facialName' and a 'behindName'.
--- The 'behindName' is for internal coding, while the 'facialName' is for
--- human-readable identifier of programming language bindings.
---
--- If 'behind_Name' is omitted, 'facialName' is used also for
--- 'behindName'.  Explicit 'behindName' is useful to maintain
--- old name for backward compatibility with new 'facialName'.
+{- |
+Name consists of a 'facialName' and a 'behindName'.
+The 'behindName' is for internal coding, while the 'facialName' is for
+human-readable identifier of programming language bindings.
+
+If 'behind_Name' is omitted, 'facialName' is used also for
+'behindName'.  Explicit 'behindName' is useful to maintain
+old name for backward compatibility with new 'facialName'.
+-}
 data Name = Name { facialName :: Identifier
                  , behindName :: Identifier
                  } deriving (Eq, Ord, Show)

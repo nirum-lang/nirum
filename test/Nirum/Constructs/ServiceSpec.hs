@@ -1,15 +1,16 @@
-{-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE OverloadedLists, QuasiQuotes #-}
 module Nirum.Constructs.ServiceSpec where
 
+import Data.String.QQ (s)
 import Test.Hspec.Meta
 
-import Nirum.Constructs.Annotation (Annotation (Annotation)
+import Nirum.Constructs.Annotation ( Annotation (Annotation)
                                    , empty
                                    , fromList
                                    , union
                                    )
 import Nirum.Constructs.Docs (toCode)
-import Nirum.Constructs.Service (Method(Method), Parameter(Parameter))
+import Nirum.Constructs.Service (Method (Method), Parameter (Parameter))
 import Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
                                                         , OptionModifier
                                                         )
@@ -78,46 +79,50 @@ spec = do
                            [Parameter "user-id" "uuid" empty]
                            (OptionModifier "user")
                            (Just "get-user-error")
-                           docsAnno) `shouldBe`
-                "user? get-user (\n\
-                \  # docs...\n\
-                \  uuid user-id,\n\
-                \) throws get-user-error,"
+                           docsAnno) `shouldBe` [s|
+user? get-user (
+  # docs...
+  uuid user-id,
+) throws get-user-error,|]
             toCode (Method "get-user"
-                           [Parameter "user-id" "uuid" $ singleDocs "param docs..."]
+                           [Parameter "user-id" "uuid" $
+                                      singleDocs "param docs..."]
                            (OptionModifier "user")
                            Nothing
                            empty) `shouldBe`
                 "user? get-user (\n  uuid user-id,\n  # param docs...\n),"
             toCode (Method "get-user"
-                           [Parameter "user-id" "uuid" $ singleDocs "param docs..."]
+                           [Parameter "user-id" "uuid" $
+                                      singleDocs "param docs..."]
                            (OptionModifier "user")
                            Nothing
-                           docsAnno) `shouldBe`
-                "user? get-user (\n\
-                \  # docs...\n\
-                \  uuid user-id,\n\
-                \  # param docs...\n\
-                \),"
+                           docsAnno) `shouldBe` [s|
+user? get-user (
+  # docs...
+  uuid user-id,
+  # param docs...
+),|]
             toCode (Method "get-user"
-                           [Parameter "user-id" "uuid" $ singleDocs "param docs..."]
+                           [Parameter "user-id" "uuid" $
+                                      singleDocs "param docs..."]
                            (OptionModifier "user")
                            (Just "get-user-error")
-                           empty) `shouldBe`
-                "user? get-user (\n\
-                \  uuid user-id,\n\
-                \  # param docs...\n\
-                \) throws get-user-error,"
+                           empty) `shouldBe` [s|
+user? get-user (
+  uuid user-id,
+  # param docs...
+) throws get-user-error,|]
             toCode (Method "get-user"
-                           [Parameter "user-id" "uuid" $ singleDocs "param docs..."]
+                           [Parameter "user-id" "uuid" $
+                                      singleDocs "param docs..."]
                            (OptionModifier "user")
                            (Just "get-user-error")
-                           docsAnno) `shouldBe`
-                "user? get-user (\n\
-                \  # docs...\n\
-                \  uuid user-id,\n\
-                \  # param docs...\n\
-                \) throws get-user-error,"
+                           docsAnno) `shouldBe` [s|
+user? get-user (
+  # docs...
+  uuid user-id,
+  # param docs...
+) throws get-user-error,|]
             toCode (Method "search-posts"
                            [ Parameter "blog-id" "uuid" empty
                            , Parameter "keyword" "text" empty
@@ -132,101 +137,111 @@ spec = do
                            ]
                            (ListModifier "post")
                            Nothing
-                           docsAnno) `shouldBe`
-                "[post] search-posts (\n\
-                \  # docs...\n\
-                \  uuid blog-id,\n\
-                \  text keyword,\n\
-                \),"
+                           docsAnno) `shouldBe` [s|
+[post] search-posts (
+  # docs...
+  uuid blog-id,
+  text keyword,
+),|]
             toCode (Method "search-posts"
                            [ Parameter "blog-id" "uuid" empty
                            , Parameter "keyword" "text" empty
                            ]
                            (ListModifier "post")
                            (Just "search-posts-error")
-                           empty) `shouldBe`
-                "[post] search-posts (\n\
-                \  uuid blog-id,\n\
-                \  text keyword,\n\
-                \) throws search-posts-error,"
+                           empty) `shouldBe` [s|
+[post] search-posts (
+  uuid blog-id,
+  text keyword,
+) throws search-posts-error,|]
             toCode (Method "search-posts"
                            [ Parameter "blog-id" "uuid" empty
                            , Parameter "keyword" "text" empty
                            ]
                            (ListModifier "post")
                            (Just "search-posts-error")
-                           docsAnno) `shouldBe`
-                "[post] search-posts (\n\
-                \  # docs...\n\
-                \  uuid blog-id,\n\
-                \  text keyword,\n\
-                \) throws search-posts-error,"
+                           docsAnno) `shouldBe` [s|
+[post] search-posts (
+  # docs...
+  uuid blog-id,
+  text keyword,
+) throws search-posts-error,|]
             toCode (Method "search-posts"
-                           [ Parameter "blog-id" "uuid" $ singleDocs "blog id..."
-                           , Parameter "keyword" "text" $ singleDocs "keyword..."
+                           [ Parameter "blog-id" "uuid" $
+                                       singleDocs "blog id..."
+                           , Parameter "keyword" "text" $
+                                       singleDocs "keyword..."
                            ]
                            (ListModifier "post")
                            Nothing
-                           empty) `shouldBe`
-                "[post] search-posts (\n\
-                \  uuid blog-id,\n\
-                \  # blog id...\n\
-                \  text keyword,\n\
-                \  # keyword...\n\
-                \),"
+                           empty) `shouldBe` [s|
+[post] search-posts (
+  uuid blog-id,
+  # blog id...
+  text keyword,
+  # keyword...
+),|]
             toCode (Method "search-posts"
-                           [ Parameter "blog-id" "uuid" $ singleDocs "blog id..."
-                           , Parameter "keyword" "text" $ singleDocs "keyword..."
+                           [ Parameter "blog-id" "uuid" $
+                                       singleDocs "blog id..."
+                           , Parameter "keyword" "text" $
+                                       singleDocs "keyword..."
                            ]
                            (ListModifier "post")
                            Nothing
-                           docsAnno) `shouldBe`
-                "[post] search-posts (\n\
-                \  # docs...\n\
-                \  uuid blog-id,\n\
-                \  # blog id...\n\
-                \  text keyword,\n\
-                \  # keyword...\n\
-                \),"
+                           docsAnno) `shouldBe` [s|
+[post] search-posts (
+  # docs...
+  uuid blog-id,
+  # blog id...
+  text keyword,
+  # keyword...
+),|]
             toCode (Method "search-posts"
-                           [ Parameter "blog-id" "uuid" $ singleDocs "blog id..."
-                           , Parameter "keyword" "text" $ singleDocs "keyword..."
+                           [ Parameter "blog-id" "uuid" $
+                                       singleDocs "blog id..."
+                           , Parameter "keyword" "text" $
+                                       singleDocs "keyword..."
                            ]
                            (ListModifier "post")
                            (Just "search-posts-error")
-                           empty) `shouldBe`
-                "[post] search-posts (\n\
-                \  uuid blog-id,\n\
-                \  # blog id...\n\
-                \  text keyword,\n\
-                \  # keyword...\n\
-                \) throws search-posts-error,"
+                           empty) `shouldBe` [s|
+[post] search-posts (
+  uuid blog-id,
+  # blog id...
+  text keyword,
+  # keyword...
+) throws search-posts-error,|]
             toCode (Method "search-posts"
-                           [ Parameter "blog-id" "uuid" $ singleDocs "blog id..."
-                           , Parameter "keyword" "text" $ singleDocs "keyword..."
+                           [ Parameter "blog-id" "uuid" $
+                                       singleDocs "blog id..."
+                           , Parameter "keyword" "text" $
+                                       singleDocs "keyword..."
                            ]
                            (ListModifier "post")
                            (Just "search-posts-error")
-                           docsAnno) `shouldBe`
-                "[post] search-posts (\n\
-                \  # docs...\n\
-                \  uuid blog-id,\n\
-                \  # blog id...\n\
-                \  text keyword,\n\
-                \  # keyword...\n\
-                \) throws search-posts-error,"
+                           docsAnno) `shouldBe` [s|
+[post] search-posts (
+  # docs...
+  uuid blog-id,
+  # blog id...
+  text keyword,
+  # keyword...
+) throws search-posts-error,|]
             toCode (Method "search-posts"
-                           [ Parameter "blog-id" "uuid" $ singleDocs "blog id..."
-                           , Parameter "keyword" "text" $ singleDocs "keyword..."
+                           [ Parameter "blog-id" "uuid" $
+                                       singleDocs "blog id..."
+                           , Parameter "keyword" "text" $
+                                       singleDocs "keyword..."
                            ]
                            (ListModifier "post")
                            (Just "search-posts-error")
-                           (docsAnno `union` methodAnno)) `shouldBe`
-                "@http-get(\"/ping/\")\n\
-                \[post] search-posts (\n\
-                \  # docs...\n\
-                \  uuid blog-id,\n\
-                \  # blog id...\n\
-                \  text keyword,\n\
-                \  # keyword...\n\
-                \) throws search-posts-error,"
+                           (docsAnno `union` methodAnno)) `shouldBe` [s|
+@http-get("/ping/")
+[post] search-posts (
+  # docs...
+  uuid blog-id,
+  # blog id...
+  text keyword,
+  # keyword...
+) throws search-posts-error,|]

@@ -11,10 +11,10 @@ module Nirum.Targets.Python ( Code
                                               , dependencies
                                               , optionalDependencies
                                               )
-                            , Source( Source
-                                    , sourceModule
-                                    , sourcePackage
-                                    )
+                            , Source ( Source
+                                     , sourceModule
+                                     , sourcePackage
+                                     )
                             , addDependency
                             , addOptionalDependency
                             , compileModule
@@ -38,7 +38,7 @@ module Nirum.Targets.Python ( Code
 import Control.Monad.State (modify)
 import qualified Data.List as L
 import Data.Maybe (fromMaybe)
-import GHC.Exts (IsList(toList))
+import GHC.Exts (IsList (toList))
 import Text.Printf (printf)
 
 import qualified Data.Map.Strict as M
@@ -59,39 +59,39 @@ import Nirum.Constructs.Identifier ( Identifier
                                    , toString
                                    )
 import Nirum.Constructs.ModulePath (ModulePath, ancestors)
-import Nirum.Constructs.Name (Name(Name))
+import Nirum.Constructs.Name (Name (Name))
 import qualified Nirum.Constructs.Name as N
-import Nirum.Constructs.Service ( Method( Method
-                                        , methodName
-                                        , parameters
-                                        , returnType
-                                        )
-                                , Parameter(Parameter)
-                                , Service(Service)
+import Nirum.Constructs.Service ( Method ( Method
+                                         , methodName
+                                         , parameters
+                                         , returnType
+                                         )
+                                , Parameter (Parameter)
+                                , Service (Service)
                                 )
-import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
+import Nirum.Constructs.TypeDeclaration ( EnumMember (EnumMember)
                                         , Field (Field, fieldName)
-                                        , PrimitiveTypeIdentifier(..)
-                                        , Tag(Tag)
-                                        , Type( Alias
-                                              , EnumType
-                                              , PrimitiveType
-                                              , RecordType
-                                              , UnboxedType
-                                              , UnionType
-                                              )
-                                        , TypeDeclaration(..)
+                                        , PrimitiveTypeIdentifier (..)
+                                        , Tag (Tag)
+                                        , Type ( Alias
+                                               , EnumType
+                                               , PrimitiveType
+                                               , RecordType
+                                               , UnboxedType
+                                               , UnionType
+                                               )
+                                        , TypeDeclaration (..)
                                         )
-import Nirum.Constructs.TypeExpression ( TypeExpression( ListModifier
-                                                       , MapModifier
-                                                       , OptionModifier
-                                                       , SetModifier
-                                                       , TypeIdentifier
-                                                       )
+import Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
+                                                        , MapModifier
+                                                        , OptionModifier
+                                                        , SetModifier
+                                                        , TypeIdentifier
+                                                        )
                                        )
 import Nirum.Package ( BoundModule
-                     , Package(Package, metadata, modules)
-                     , TypeLookup(Imported, Local, Missing)
+                     , Package (Package, metadata, modules)
+                     , TypeLookup (Imported, Local, Missing)
                      , lookupType
                      , resolveBoundModule
                      , types
@@ -126,7 +126,9 @@ emptyContext = CodeGenContext { standardImports = []
 
 type CodeGen = C.CodeGen CodeGenContext CompileError
 
-runCodeGen :: CodeGen a -> CodeGenContext -> (Either CompileError a, CodeGenContext)
+runCodeGen :: CodeGen a
+           -> CodeGenContext
+           -> (Either CompileError a, CodeGenContext)
 runCodeGen = C.runCodeGen
 
 insertStandardImport :: T.Text -> CodeGen ()
@@ -221,20 +223,20 @@ compileUnionTag source parentname typename' fields = do
         tagNames = map (toAttributeName' . fieldName) (toList fields)
         nameNTypes = zip tagNames typeExprCodes
         slotTypes = toIndentedCodes
-            (\(n, t) -> [qq|'{n}': {t}|]) nameNTypes ",\n        "
+            (\ (n, t) -> [qq|'{n}': {t}|]) nameNTypes ",\n        "
         slots = if length tagNames == 1
                 then [qq|'{head tagNames}'|] `T.snoc` ','
-                else toIndentedCodes (\n -> [qq|'{n}'|]) tagNames ",\n        "
+                else toIndentedCodes (\ n -> [qq|'{n}'|]) tagNames ",\n        "
         hashTuple = if null tagNames
             then "self.__nirum_tag__"
             else [qq|({attributes},)|] :: T.Text
           where
             attributes :: T.Text
-            attributes = toIndentedCodes (\n -> [qq|self.{n}|]) tagNames ", "
+            attributes = toIndentedCodes (\ n -> [qq|self.{n}|]) tagNames ", "
         initialArgs = toIndentedCodes
-            (\(n, t) -> [qq|{n}: {t}|]) nameNTypes ", "
+            (\ (n, t) -> [qq|{n}: {t}|]) nameNTypes ", "
         initialValues =
-            toIndentedCodes (\n -> [qq|self.{n} = {n}|]) tagNames "\n        "
+            toIndentedCodes (\ n -> [qq|self.{n} = {n}|]) tagNames "\n        "
         nameMaps = toIndentedCodes
             toNamePair
             (map fieldName $ toList fields)
@@ -293,8 +295,10 @@ compilePrimitiveType primitiveTypeIdentifier =
         Text -> return "str"
         Binary -> return "bytes"
         Date -> insertStandardImport "datetime" >> return "datetime.date"
-        Datetime -> insertStandardImport "datetime" >> return "datetime.datetime"
-        Uuid -> insertStandardImport "uuid" >> return"uuid.UUID"
+        Datetime -> do
+            insertStandardImport "datetime"
+            return "datetime.datetime"
+        Uuid -> insertStandardImport "uuid" >> return "uuid.UUID"
         Uri -> return "str"
 
 compileTypeExpression :: Source -> TypeExpression -> CodeGen Code
@@ -326,7 +330,7 @@ compileTypeExpression source modifier = do
         MapModifier _ _ -> undefined  -- never happen!
 
 compileTypeDeclaration :: Source -> TypeDeclaration -> CodeGen Code
-compileTypeDeclaration _ TypeDeclaration { type' = PrimitiveType { } } =
+compileTypeDeclaration _ TypeDeclaration { type' = PrimitiveType {} } =
     return ""  -- never used
 compileTypeDeclaration src TypeDeclaration { typename = typename'
                                            , type' = Alias ctype } = do
@@ -409,19 +413,19 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
                                           ]
         nameNTypes = zip fieldNames typeExprCodes
         slotTypes = toIndentedCodes
-            (\(n, t) -> [qq|'{n}': {t}|]) nameNTypes ",\n        "
-        slots = toIndentedCodes (\n -> [qq|'{n}'|]) fieldNames ",\n        "
+            (\ (n, t) -> [qq|'{n}': {t}|]) nameNTypes ",\n        "
+        slots = toIndentedCodes (\ n -> [qq|'{n}'|]) fieldNames ",\n        "
         initialArgs = toIndentedCodes
-            (\(n, t) -> [qq|{n}: {t}|]) nameNTypes ", "
+            (\ (n, t) -> [qq|{n}: {t}|]) nameNTypes ", "
         initialValues = toIndentedCodes
-            (\n -> [qq|self.{n} = {n}|]) fieldNames "\n        "
+            (\ n -> [qq|self.{n} = {n}|]) fieldNames "\n        "
         nameMaps = toIndentedCodes
             toNamePair
             (map fieldName $ toList fields)
             ",\n        "
         hashTuple = [qq|({attributes},)|] :: T.Text
           where
-            attributes = toIndentedCodes (\n -> [qq|self.{n}|]) fieldNames ","
+            attributes = toIndentedCodes (\ n -> [qq|self.{n}|]) fieldNames ","
     insertStandardImport "typing"
     insertThirdPartyImports [ ("nirum.validate", ["validate_record_type"])
                             , ("nirum.serialize", ["serialize_record_type"])
@@ -476,7 +480,7 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
     let className = toClassName' typename'
         fieldCodes' = T.intercalate "\n\n" fieldCodes
         enumMembers = toIndentedCodes
-            (\(t, b) -> [qq|$t = '{b}'|]) enumMembers' "\n        "
+            (\ (t, b) -> [qq|$t = '{b}'|]) enumMembers' "\n        "
     insertStandardImport "typing"
     insertStandardImport "enum"
     insertThirdPartyImports [ ("nirum.serialize", ["serialize_union_type"])
@@ -639,7 +643,7 @@ class {className}_Client(client_type, $className):
         )
 |]
 
-compileTypeDeclaration _ Import { } =
+compileTypeDeclaration _ Import {} =
     return ""  -- Nothing to compile
 
 compileModuleBody :: Source -> CodeGen Code
@@ -662,8 +666,8 @@ addDependency requires package =
     requires { dependencies = S.insert package $ dependencies requires }
 
 addOptionalDependency :: InstallRequires
-                      -> (Int, Int)       -- | Python version already stasified
-                      -> T.Text           -- | PyPI package name
+                      -> (Int, Int)       -- ^ Python version already stasified
+                      -> T.Text           -- ^ PyPI package name
                       -> InstallRequires
 addOptionalDependency requires pyVer package =
     requires { optionalDependencies = newOptDeps }
@@ -684,8 +688,8 @@ unionInstallRequires a b =
 compileModule :: Source -> Either CompileError (InstallRequires, Code)
 compileModule source =
     case runCodeGen code' emptyContext of
-        (Left  errMsg, _      ) -> Left errMsg
-        (Right code  , context) -> codeWithDeps context $ [qq|
+        (Left errMsg, _) -> Left errMsg
+        (Right code, context) -> codeWithDeps context $ [qq|
 {imports $ standardImports context}
 
 {fromImports $ localImports context}
@@ -714,7 +718,9 @@ compileModule source =
     require :: T.Text -> T.Text -> S.Set T.Text -> S.Set T.Text
     require pkg module' set =
         if set `has` module' then S.singleton pkg else S.empty
-    codeWithDeps :: CodeGenContext -> Code -> Either CompileError (InstallRequires, Code)
+    codeWithDeps :: CodeGenContext
+                 -> Code
+                 -> Either CompileError (InstallRequires, Code)
     codeWithDeps context c = Right (InstallRequires deps optDeps, c)
       where
         deps :: S.Set T.Text

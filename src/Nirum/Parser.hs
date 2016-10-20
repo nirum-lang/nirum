@@ -70,11 +70,11 @@ import Text.Megaparsec.Lexer (charLiteral)
 
 import qualified Nirum.Constructs.Annotation as A
 import Nirum.Constructs.Declaration (Declaration)
-import Nirum.Constructs.Docs (Docs(Docs))
+import Nirum.Constructs.Docs (Docs (Docs))
 import Nirum.Constructs.DeclarationSet ( DeclarationSet
-                                       , NameDuplication( BehindNameDuplication
-                                                        , FacialNameDuplication
-                                                        )
+                                       , NameDuplication ( BehindNameDuplication
+                                                         , FacialNameDuplication
+                                                         )
                                        , empty
                                        , fromList
                                        )
@@ -83,35 +83,35 @@ import Nirum.Constructs.Identifier ( Identifier
                                    , reservedKeywords
                                    , toString
                                    )
-import Nirum.Constructs.Module (Module(Module))
-import Nirum.Constructs.ModulePath (ModulePath(ModulePath, ModuleName))
-import Nirum.Constructs.Name (Name(Name))
-import Nirum.Constructs.Service ( Method(Method)
-                                , Parameter(Parameter)
-                                , Service(Service)
+import Nirum.Constructs.Module (Module (Module))
+import Nirum.Constructs.ModulePath (ModulePath (ModulePath, ModuleName))
+import Nirum.Constructs.Name (Name (Name))
+import Nirum.Constructs.Service ( Method (Method)
+                                , Parameter (Parameter)
+                                , Service (Service)
                                 )
-import Nirum.Constructs.TypeDeclaration ( EnumMember(EnumMember)
-                                        , Field(Field)
-                                        , Tag(Tag)
-                                        , Type( Alias
-                                              , EnumType
-                                              , RecordType
-                                              , UnboxedType
-                                              , UnionType
-                                              )
-                                        , TypeDeclaration( Import
-                                                         , ServiceDeclaration
-                                                         , TypeDeclaration
-                                                         , serviceAnnotations
-                                                         , typeAnnotations
-                                                         )
+import Nirum.Constructs.TypeDeclaration ( EnumMember (EnumMember)
+                                        , Field (Field)
+                                        , Tag (Tag)
+                                        , Type ( Alias
+                                               , EnumType
+                                               , RecordType
+                                               , UnboxedType
+                                               , UnionType
+                                               )
+                                        , TypeDeclaration ( Import
+                                                          , ServiceDeclaration
+                                                          , TypeDeclaration
+                                                          , serviceAnnotations
+                                                          , typeAnnotations
+                                                          )
                                         )
-import Nirum.Constructs.TypeExpression ( TypeExpression( ListModifier
-                                                       , MapModifier
-                                                       , OptionModifier
-                                                       , SetModifier
-                                                       , TypeIdentifier
-                                                       )
+import Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
+                                                        , MapModifier
+                                                        , OptionModifier
+                                                        , SetModifier
+                                                        , TypeIdentifier
+                                                        )
                                        )
 
 type ParseError = E.ParseError (Token T.Text) E.Dec
@@ -234,11 +234,12 @@ mapModifier = do
 
 docs :: Parser Docs
 docs = do
-    comments <- sepEndBy1 (do { char '#'
-                              ; void $ optional $ char ' '
-                              ; line <- many $ noneOf ("\r\n" :: String)
-                              ; return $ T.pack line
-                              }) (eol >> spaces) <?> "comments"
+    comments <- sepEndBy1 (do
+            char '#'
+            void $ optional $ char ' '
+            line <- many $ noneOf ("\r\n" :: String)
+            return $ T.pack line
+        ) (eol >> spaces) <?> "comments"
     return $ Docs $ T.unlines comments
 
 annotationsWithDocs :: Monad m
@@ -347,7 +348,7 @@ enumTypeDeclaration = do
             return $ TypeDeclaration typename (EnumType memberSet)
                                      annotationSet''
 
-fieldsOrParameters :: forall a. (String, String)
+fieldsOrParameters :: forall a . (String, String)
                    -> (Name -> TypeExpression -> A.AnnotationSet -> a)
                    -> Parser [a]
 fieldsOrParameters (label, pluralLabel) make = do
@@ -379,7 +380,7 @@ fieldsOrParameters (label, pluralLabel) make = do
         spaces
         return d
     annotationsFromDocs :: Maybe Docs -> A.AnnotationSet
-    annotationsFromDocs Nothing  = A.empty
+    annotationsFromDocs Nothing = A.empty
     annotationsFromDocs (Just d) = A.singleton $ A.docs d
 
 fields :: Parser [Field]
@@ -419,12 +420,12 @@ tag = do
     spaces
     paren <- optional $ char '('
     fields' <- case paren of
-        Just _ -> do { spaces
-                     ; f <- fieldSet <?> "union tag fields"
-                     ; spaces
-                     ; char ')'
-                     ; return f
-                     }
+        Just _ -> do
+            spaces
+            f <- fieldSet <?> "union tag fields"
+            spaces
+            char ')'
+            return f
         Nothing -> return empty
     docs' <- optional $ do
         d <- docs <?> "union tag docs"
@@ -451,7 +452,7 @@ unionTypeDeclaration = do
     spaces
     char ';'
     annotationSet'' <- annotationsWithDocs annotationSet' docs'
-    handleNameDuplication "tag" tags' $ \tagSet ->
+    handleNameDuplication "tag" tags' $ \ tagSet ->
         return $ TypeDeclaration typename (UnionType tagSet) annotationSet''
 
 typeDeclaration :: Parser TypeDeclaration
@@ -479,7 +480,7 @@ typeDeclaration = do
     unless' :: [String] -> Parser a -> Parser a
     unless' [] _ = fail "no candidates"  -- Must never happen
     unless' [s] p = notFollowedBy (string s) >> p
-    unless' (x:xs) p = notFollowedBy (string x) >> unless' xs p
+    unless' (x : xs) p = notFollowedBy (string x) >> unless' xs p
 
 parameters :: Parser [Parameter]
 parameters = fieldsOrParameters ("parameter", "parameters") Parameter
@@ -604,7 +605,7 @@ module' = do
             annotationSet' <- annotationSet <?> "annotations"
             spaces
             decl <- choice [ notFollowedBy (string "service") >> typeDeclaration
-                           , serviceDeclaration <?>  "service declaration"
+                           , serviceDeclaration <?> "service declaration"
                            ]
             -- In theory, though it preconsumes annotationSet' before parsing
             -- decl so that decl itself has no annotations, to prepare for an
@@ -620,7 +621,7 @@ module' = do
         spaces
         return typeDecl
     handleNameDuplication "type" (types ++ [i | l <- importLists, i <- l]) $
-                          \typeSet -> return $ Module typeSet docs'
+                          \ typeSet -> return $ Module typeSet docs'
 
 file :: Parser Module
 file = do
@@ -628,12 +629,12 @@ file = do
     eof
     return mod'
 
-parse :: FilePath -- | Source path (although it's only used for error message)
-      -> T.Text   -- | Input source code
+parse :: FilePath -- ^ Source path (although it's only used for error message)
+      -> T.Text   -- ^ Input source code
       -> Either ParseError Module
 parse = runParser file
 
-parseFile :: FilePath -- | Source path
+parseFile :: FilePath -- ^ Source path
           -> IO (Either ParseError Module)
 parseFile path = do
     code <- readFile path

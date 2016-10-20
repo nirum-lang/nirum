@@ -58,11 +58,12 @@ spec = do
             let Right a = fromList [annotation, loremAnno]
             let Right b = fromList [docsAnno, escapeCharAnno]
             let c = AnnotationSet [("foo", Just "bar")]
-            A.union a b `shouldBe` AnnotationSet [ ("foo", Nothing)
-                                                 , ("lorem", Just "ipsum")
-                                                 , ("quote", Just "\"")
-                                                 , ("docs", Just "Description\n")
-                                                 ]
+            A.union a b `shouldBe`
+                AnnotationSet [ ("foo", Nothing)
+                              , ("lorem", Just "ipsum")
+                              , ("quote", Just "\"")
+                              , ("docs", Just "Description\n")
+                              ]
             A.union a c `shouldBe` a
         let Right annotationSet = fromList [ annotation
                                            , loremAnno
@@ -78,8 +79,10 @@ spec = do
                 A.lookup "FOO" annotationSet `shouldBe` Just annotation
                 A.lookup "lorem" annotationSet `shouldBe` Just loremAnno
                 A.lookup "quote" annotationSet `shouldBe` Just escapeCharAnno
-                A.lookup "long-cat-is-long" annotationSet `shouldBe` Just longNameAnno
-                A.lookup "long_cat_is_long" annotationSet `shouldBe` Just longNameAnno
+                A.lookup "long-cat-is-long" annotationSet
+                    `shouldBe` Just longNameAnno
+                A.lookup "long_cat_is_long" annotationSet
+                    `shouldBe` Just longNameAnno
                 A.lookup "docs" annotationSet `shouldBe` Just docsAnno
             it "should be Nothing if lookup fails" $ do
                 A.lookup "bar" annotationSet `shouldBe` Nothing

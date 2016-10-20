@@ -2,8 +2,8 @@ module Nirum.Constructs.DocsSpec where
 
 import Test.Hspec.Meta
 
-import Nirum.Constructs (Construct(..))
-import Nirum.Constructs.Docs (Docs(Docs), toCodeWithPrefix)
+import Nirum.Constructs (Construct (..))
+import Nirum.Constructs.Docs (Docs (Docs), toCodeWithPrefix)
 
 spec :: Spec
 spec =

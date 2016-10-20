@@ -1,5 +1,5 @@
-{-# LANGUAGE OverloadedLists, QuasiQuotes  #-}
-module Nirum.Constructs.Module ( Module(Module, docs, types)
+{-# LANGUAGE OverloadedLists, QuasiQuotes #-}
+module Nirum.Constructs.Module ( Module (Module, docs, types)
                                , coreModule
                                , coreModulePath
                                , coreTypes
@@ -11,16 +11,34 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import Text.InterpolatedString.Perl6 (q)
 
-import Nirum.Constructs (Construct(toCode))
+import Nirum.Constructs (Construct (toCode))
 import Nirum.Constructs.Annotation (empty)
 import Nirum.Constructs.Docs (Docs)
 import qualified Nirum.Constructs.DeclarationSet as DS
 import Nirum.Constructs.Identifier (Identifier)
 import Nirum.Constructs.ModulePath (ModulePath)
-import Nirum.Constructs.TypeDeclaration ( JsonType(..)
-                                        , PrimitiveTypeIdentifier(..)
-                                        , Type(..)
-                                        , TypeDeclaration(..)
+import Nirum.Constructs.TypeDeclaration ( JsonType (Boolean, Number, String)
+                                        , PrimitiveTypeIdentifier ( Bigint
+                                                                  , Binary
+                                                                  , Bool
+                                                                  , Date
+                                                                  , Datetime
+                                                                  , Decimal
+                                                                  , Float32
+                                                                  , Float64
+                                                                  , Int32
+                                                                  , Int64
+                                                                  , Text
+                                                                  , Uri
+                                                                  , Uuid
+                                                                  )
+                                        , Type (PrimitiveType)
+                                        , TypeDeclaration ( Import
+                                                          , TypeDeclaration
+                                                          , type'
+                                                          , typeAnnotations
+                                                          , typename
+                                                          )
                                         )
 
 data Module = Module { types :: DS.DeclarationSet TypeDeclaration

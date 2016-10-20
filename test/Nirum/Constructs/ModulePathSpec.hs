@@ -3,13 +3,13 @@ module Nirum.Constructs.ModulePathSpec where
 
 import Control.Exception (evaluate)
 import Data.List (sort)
-import GHC.Exts (IsList(fromList, toList))
+import GHC.Exts (IsList (fromList, toList))
 
 import System.FilePath ((</>))
 import Test.Hspec.Meta
 
-import Nirum.Constructs (Construct(toCode))
-import Nirum.Constructs.ModulePath ( ModulePath(ModuleName, ModulePath)
+import Nirum.Constructs (Construct (toCode))
+import Nirum.Constructs.ModulePath ( ModulePath (ModuleName, ModulePath)
                                    , ancestors
                                    , fromFilePath
                                    , fromIdentifiers
