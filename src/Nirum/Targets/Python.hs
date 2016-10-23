@@ -101,6 +101,9 @@ import Nirum.Package.Metadata ( Author (Author, name, email)
                               )
 import qualified Nirum.Package.ModuleSet as MS
 
+data PythonVersion = Python2
+                   | Python3
+                   deriving (Eq, Ord, Show)
 data Source = Source { sourcePackage :: Package
                      , sourceModule :: BoundModule
                      } deriving (Eq, Ord, Show)
@@ -117,6 +120,10 @@ data CodeGenContext
                      , localImports :: M.Map T.Text (S.Set T.Text)
                      }
     deriving (Eq, Ord, Show)
+
+versionToText :: PythonVersion -> T.Text
+versionToText Python2 = "python2"
+versionToText Python3 = "python3"
 
 emptyContext :: CodeGenContext
 emptyContext = CodeGenContext { standardImports = []
@@ -771,6 +778,12 @@ else:
     setup_requires = []
     extras_require = \{}
 
+
+if sys.version_info[0] == 2:
+    pacakages = [ {pPackages Python2} ]
+if sys.version_info[0] == 3:
+    pacakages = [ {pPackages Python3} ]
+
 # TODO: description, long_description, url, license,
 #       keywords, classifiers
 setup(
@@ -778,8 +791,8 @@ setup(
     version='{pVersion}',
     author=$author,
     author_email=$authorEmail,
-    packages=[$pPackages],
-    provides=[$pPackages],
+    packages=pacakages,
+    provides=pacakages,
     requires=[$pInstallRequires],
     setup_requires=setup_requires,
     install_requires=install_requires,
@@ -802,8 +815,15 @@ setup(
     authorEmail = csStrings [ decodeUtf8 (E.toByteString e)
                             | Author { email = Just e } <- authors metadata'
                             ]
-    pPackages :: Code
-    pPackages = strings $ map toImportPath $ MS.keys $ modules package
+    versionAttachedPacakage :: PythonVersion -> ModulePath -> Code
+    versionAttachedPacakage version' modulePath' =
+        T.intercalate "/" [ "src"
+                          , versionToText version'
+                          , toImportPath modulePath'
+                          ]
+    pPackages :: PythonVersion -> Code
+    pPackages pythonVersion = strings $
+        map (versionAttachedPacakage pythonVersion) $ MS.keys $ modules package
     pInstallRequires :: Code
     pInstallRequires = strings $ S.toList deps
     pPolyfillRequires :: Code
@@ -826,23 +846,29 @@ compilePackage package =
         ] ++
         [("setup.py", Right $ compilePackageMetadata package installRequires)]
   where
-    toFilename :: ModulePath -> FilePath
-    toFilename mp =
-        joinPath $ [ T.unpack (toAttributeName i)
-                   | i <- toList mp
-                   ] ++ ["__init__.py"]
+    toPythonFilename :: ModulePath -> [FilePath]
+    toPythonFilename mp = [ T.unpack (toAttributeName i)
+                          | i <- toList mp
+                          ] ++ ["__init__.py"]
+    toFilename :: PythonVersion -> ModulePath -> FilePath
+    toFilename pythonVersion mp =
+        joinPath $ [ "src"
+                   , T.unpack $ versionToText pythonVersion
+                   ] ++ toPythonFilename mp
     initFiles :: [(FilePath, Either CompileError Code)]
-    initFiles = [ (toFilename mp', Right "")
+    initFiles = [ (toFilename pythonVersion mp', Right "")
                 | mp <- MS.keys (modules package)
                 , mp' <- S.elems (ancestors mp)
+                , pythonVersion <- [Python2, Python3]
                 ]
     modules' :: [(FilePath, Either CompileError (InstallRequires, Code))]
     modules' =
-        [ ( toFilename modulePath'
+        [ ( toFilename pythonVersion modulePath'
           , compileModule $ Source package boundModule
           )
         | (modulePath', _) <- MS.toAscList (modules package)
         , Just boundModule <- [resolveBoundModule modulePath' package]
+        , pythonVersion <- [Python2, Python3]
         ]
     installRequires :: InstallRequires
     installRequires = foldl unionInstallRequires
