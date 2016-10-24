@@ -242,9 +242,9 @@ typeHelpers = getPythonVersion >>= typeHelpers'
   where
     typeHelpers' pyVer = return (arg, ret)
       where
-        arg name ty = case pyVer of
-                          Python2 -> name
-                          Python3 -> [qq|$name: $ty|]
+        arg name' ty = case pyVer of
+                          Python2 -> name'
+                          Python3 -> [qq|$name': $ty|]
         ret ty = case pyVer of
                      Python2 -> ""
                      Python3 -> [qq| -> $ty|]
@@ -468,6 +468,7 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
             toNamePair
             (map fieldName $ toList fields)
             ",\n        "
+        hashTuple = T.intercalate ", " fieldNames
     insertTypingImport
     insertThirdPartyImports [ ("nirum.validate", ["validate_record_type"])
                             , ("nirum.serialize", ["serialize_record_type"])
@@ -516,7 +517,8 @@ class $className:
 
     def __hash__(self) -> int:
         return hash($hashTuple)
-                        |]
+|]
+
 compileTypeDeclaration src TypeDeclaration { typename = typename'
                                            , type' = UnionType tags } = do
     fieldCodes <- mapM (uncurry (compileUnionTag src typename')) tagNameNFields
@@ -829,7 +831,7 @@ setup(
     version='{pVersion}',
     author=$author,
     author_email=$authorEmail,
-    package_dir={'': SOURCE_ROOT},
+    pacakage_dir=\{'': SOURCE_ROOT},
     packages=[$pPackages],
     provides=[$pPackages],
     requires=[$pInstallRequires],
@@ -886,9 +888,9 @@ compilePackage package =
     versionDirectoryList = [ (python2SourceDirectory, Python2)
                            , (python3SourceDirectory, Python3)
                            ]
-    toFilename :: FilePath -> ModulePath -> FilePath
+    toFilename :: T.Text -> ModulePath -> FilePath
     toFilename sourceRootDirectory mp =
-        joinPath $ [ sourceRootDirectory ] ++ toPythonFilename mp
+        joinPath $ [T.unpack sourceRootDirectory] ++ toPythonFilename mp
     initFiles :: [(FilePath, Either CompileError Code)]
     initFiles = [ (toFilename sourceRootDirectory mp', Right "")
                 | mp <- MS.keys (modules package)
