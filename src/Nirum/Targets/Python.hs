@@ -271,8 +271,8 @@ compileUnionTag source parentname typename' fields = do
           where
             attributes :: T.Text
             attributes = toIndentedCodes (\ n -> [qq|self.{n}|]) tagNames ", "
-        initialArgs = toIndentedCodes
-            (\ (n, t) -> [qq|{n}: {t}|]) nameNTypes ", "
+        initialArgs gen = toIndentedCodes
+            (\ (n, t) -> gen n t) nameNTypes ", "
         initialValues =
             toIndentedCodes (\ n -> [qq|self.{n} = {n}|]) tagNames "\n        "
         nameMaps = toIndentedCodes
@@ -284,6 +284,7 @@ compileUnionTag source parentname typename' fields = do
     insertThirdPartyImports [ ("nirum.validate", ["validate_union_type"])
                             , ("nirum.constructs", ["name_dict_type"])
                             ]
+    (arg, ret) <- typeHelpers
     return [qq|
 class $className($parentClass):
     # TODO: docstring
@@ -299,27 +300,27 @@ class $className($parentClass):
         $nameMaps
     ])
 
-    def __init__(self, $initialArgs) -> None:
+    def __init__(self, {initialArgs arg}){ ret "None" }:
         $initialValues
         validate_union_type(self)
 
-    def __repr__(self) -> str:
-        return '\{0.__module__\}.\{0.__qualname__\}(\{1\})'.format(
+    def __repr__(self){ ret "str" }:
+        return '\{0.__module__\}.\{1\}(\{2\})'.format(
             type(self),
+            typing._type_repr(self),
             ', '.join('\{\}=\{\}'.format(attr, getattr(self, attr))
                       for attr in self.__slots__)
         )
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other){ ret "bool" }:
         return isinstance(other, $className) and all(
             getattr(self, attr) == getattr(other, attr)
             for attr in self.__slots__
         )
 
-    def __hash__(self) -> int:
+    def __hash__(self){ ret "int" }:
         return hash($hashTuple)
-            |]
-
+|]
 compilePrimitiveType :: PrimitiveTypeIdentifier -> CodeGen Code
 compilePrimitiveType primitiveTypeIdentifier = do
     pyVer <- getPythonVersion
@@ -382,10 +383,6 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
 compileTypeDeclaration src TypeDeclaration { typename = typename'
                                            , type' = UnboxedType itype } = do
     let className = toClassName' typename'
-    pyVer <- getPythonVersion
-    let classSig = case pyVer of
-                       Python2 -> className `T.append` "(object)"
-                       Python3 -> className
     itypeExpr <- compileTypeExpression src itype
     insertTypingImport
     insertThirdPartyImports [ ("nirum.validate", ["validate_boxed_type"])
@@ -394,7 +391,7 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
                             ]
     (arg, ret) <- typeHelpers
     return [qq|
-class $classSig:
+class $className(object):
     # TODO: docstring
 
     __nirum_inner_type__ = $itypeExpr
@@ -424,7 +421,7 @@ class $classSig:
 
     def __hash__(self) -> int:
         return hash(self.value)
-            |]
+|]
 compileTypeDeclaration _ TypeDeclaration { typename = typename'
                                          , type' = EnumType members } = do
     let className = toClassName' typename'
@@ -445,9 +442,9 @@ class $className(enum.Enum):
         return self.value
 
     @classmethod
-    def __nirum_deserialize__({ arg "cls" "type" }, { arg "value" "str" }) -> '{className}':
+    def __nirum_deserialize__({ arg "cls" "type" }, { arg "value" "str" }){ ret $ quote className }:
         return cls(value.replace('-', '_'))  # FIXME: validate input
-    |]
+|]
 compileTypeDeclaration src TypeDeclaration { typename = typename'
                                            , type' = RecordType fields } = do
     typeExprCodes <- mapM (compileTypeExpression src)
@@ -460,15 +457,15 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
         slotTypes = toIndentedCodes
             (\ (n, t) -> [qq|'{n}': {t}|]) nameNTypes ",\n        "
         slots = toIndentedCodes (\ n -> [qq|'{n}'|]) fieldNames ",\n        "
-        initialArgs = toIndentedCodes
-            (\ (n, t) -> [qq|{n}: {t}|]) nameNTypes ", "
+        initialArgs gen = toIndentedCodes
+            (\ (n, t) -> gen n t) nameNTypes ", "
         initialValues = toIndentedCodes
             (\ n -> [qq|self.{n} = {n}|]) fieldNames "\n        "
         nameMaps = toIndentedCodes
             toNamePair
             (map fieldName $ toList fields)
             ",\n        "
-        hashTuple = T.intercalate ", " fieldNames
+        hashText = toIndentedCodes (\ n -> [qq|self.{n}|]) fieldNames ", "
     insertTypingImport
     insertThirdPartyImports [ ("nirum.validate", ["validate_record_type"])
                             , ("nirum.serialize", ["serialize_record_type"])
@@ -477,7 +474,7 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
                             ]
     (arg, ret) <- typeHelpers
     return [qq|
-class $className:
+class $className(object):
     # TODO: docstring
 
     __slots__ = (
@@ -491,32 +488,33 @@ class $className:
         $nameMaps
     ])
 
-    def __init__(self, $initialArgs) -> None:
+    def __init__(self, {initialArgs arg}){ret "None"}:
         $initialValues
         validate_record_type(self)
 
-    def __repr__(self) -> str:
-        return '\{0.__module__\}.\{0.__qualname__\}(\{1\})'.format(
+    def __repr__(self){ret "bool"}:
+        return '\{0.__module__\}.\{1}(\{2\})'.format(
             type(self),
+            typing._type_repr(self),
             ', '.join('\{\}=\{\}'.format(attr, getattr(self, attr))
                       for attr in self.__slots__)
         )
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other){ret "bool"}:
         return isinstance(other, $className) and all(
             getattr(self, attr) == getattr(other, attr)
             for attr in self.__slots__
         )
 
-    def __nirum_serialize__(self) -> typing.Mapping[str, typing.Any]:
+    def __nirum_serialize__(self){ret "typing.Mapping[str, typing.Any]"}:
         return serialize_record_type(self)
 
     @classmethod
     def __nirum_deserialize__({ arg "cls" "type" }, value){ ret $ quote className }:
         return deserialize_record_type(cls, value)
 
-    def __hash__(self) -> int:
-        return hash($hashTuple)
+    def __hash__(self){ret "int"}:
+        return hash(($hashText,))
 |]
 
 compileTypeDeclaration src TypeDeclaration { typename = typename'
@@ -534,7 +532,7 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
                             ]
     (arg, ret) <- typeHelpers
     return [qq|
-class $className:
+class $className(object):
 
     __nirum_union_behind_name__ = '{toSnakeCaseText $ N.behindName typename'}'
     __nirum_field_names__ = name_dict_type([
@@ -625,14 +623,16 @@ class {className}_Client(client_type, $className):
         let mName' = toAttributeName' mName
         params' <- mapM compileParameter $ toList params
         rtypeExpr <- compileTypeExpression src rtype
+        (_, ret) <- typeHelpers
         return [qq|
-    def {mName'}(self, {commaNl params'}) -> $rtypeExpr:
+    def {mName'}(self, {commaNl params'}){ ret rtypeExpr }:
         raise NotImplementedError('$className has to implement {mName'}()')
 |]
     compileParameter :: Parameter -> CodeGen Code
     compileParameter (Parameter pName pType _) = do
         pTypeExpr <- compileTypeExpression src pType
-        return [qq|{toAttributeName' pName}: $pTypeExpr|]
+        (arg, _) <- typeHelpers
+        return [qq|{arg (toAttributeName' pName) pTypeExpr}|]
     compileMethodMetadata :: Method -> CodeGen Code
     compileMethodMetadata Method { methodName = mName
                                  , parameters = params
@@ -674,8 +674,9 @@ class {className}_Client(client_type, $className):
         params' <- mapM compileParameter $ toList params
         rtypeExpr <- compileTypeExpression src rtype
         payloadArguments <- mapM compileClientPayload $ toList params
+        (_, ret) <- typeHelpers
         return [qq|
-    def {clientMethodName'}(self, {commaNl params'}) -> $rtypeExpr:
+    def {clientMethodName'}(self, {commaNl params'}){ ret rtypeExpr }:
         meta = self.__nirum_service_methods__['{clientMethodName'}']
         return deserialize_meta(
             meta['_return'],
@@ -736,7 +737,8 @@ compileModule :: PythonVersion
 compileModule pythonVersion' source =
     case runCodeGen code' $ emptyContext pythonVersion' of
         (Left errMsg, _) -> Left errMsg
-        (Right code, context) -> codeWithDeps context $ [qq|
+        (Right code, context) -> codeWithDeps context $
+            [qq|# -*- coding: utf-8 -*-
 {imports $ standardImports context}
 
 {fromImports $ localImports context}
