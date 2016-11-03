@@ -56,8 +56,11 @@ install:
 - travis_long stack --no-terminal setup
 - travis_long stack --no-terminal install scan
 script:
-- source "$HOME/.pyvenv/bin/activate" && stack --no-terminal test
+- source "$HOME/.pyvenv/bin/activate"
+- pip install test/python/requirements.txt
+- stack --no-terminal test
 - ./lint.sh
+- ./pythontest.sh
 before_deploy:
 - stack build --no-terminal --copy-bins
 - mkdir -p /tmp/nirum-build

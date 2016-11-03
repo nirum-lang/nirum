@@ -1,6 +1,3 @@
-.*.swp
-.cabal-sandbox
-.git
+
+__pycache__
 .stack-work
-cabal.sandbox.config
-dist

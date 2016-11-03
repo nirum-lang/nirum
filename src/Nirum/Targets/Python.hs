@@ -833,7 +833,7 @@ setup(
     version='{pVersion}',
     author=$author,
     author_email=$authorEmail,
-    pacakage_dir=\{'': SOURCE_ROOT},
+    package_dir=\{'': SOURCE_ROOT},
     packages=[$pPackages],
     provides=[$pPackages],
     requires=[$pInstallRequires],
