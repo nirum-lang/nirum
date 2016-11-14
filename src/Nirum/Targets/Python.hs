@@ -826,7 +826,7 @@ else:
 
 SOURCE_ROOT = '{python3SourceDirectory}'
 
-if sys.version_info[0] == 2:
+if sys.version_info < (3, 0):
     SOURCE_ROOT = '{python2SourceDirectory}'
 
 # TODO: description, long_description, url, license,
