@@ -238,16 +238,12 @@ quote s = [qq|'{s}'|]
 
 
 typeHelpers :: CodeGen (T.Text -> T.Text -> T.Text, T.Text -> T.Text)
-typeHelpers = getPythonVersion >>= typeHelpers'
+typeHelpers = getPythonVersion >>= return . typeHelpers'
   where
-    typeHelpers' pyVer = return (arg, ret)
-      where
-        arg name' ty = case pyVer of
-                          Python2 -> name'
-                          Python3 -> [qq|$name': $ty|]
-        ret ty = case pyVer of
-                     Python2 -> ""
-                     Python3 -> [qq| -> $ty|]
+    typeHelpers' :: PythonVersion
+                 -> (T.Text -> T.Text -> T.Text, T.Text -> T.Text)
+    typeHelpers' Python2 = (\n _ -> n, \_ -> "")
+    typeHelpers' Python3 = (\n t -> [qq|$n: $t|], \t -> [qq| -> $t|])
 
 compileUnionTag :: Source
                 -> Name

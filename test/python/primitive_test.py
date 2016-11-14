@@ -238,6 +238,6 @@ def test_service():
     with raises(NotImplementedError):
         PingService().ping(u'nonce')
     with raises(NotImplementedError):
-        PingService().ping(nounce=u'nonce')
+        PingService().ping(nonce=u'nonce')
     with raises(TypeError):
         PingService().ping(wrongkwd=u'a')
