@@ -313,6 +313,9 @@ class $className($parentClass):
             for attr in self.__slots__
         )
 
+    def __ne__(self, other){ ret "bool" }:
+        return not self.__eq__(other)
+
     def __hash__(self){ ret "int" }:
         return hash($hashTuple)
 |]
@@ -398,6 +401,9 @@ class $className(object):
     def __eq__(self, other){ ret "bool" }:
         return (isinstance(other, $className) and
                 self.value == other.value)
+
+    def __ne__(self, other){ ret "bool" }:
+        return not self.__eq__(other)
 
     def __hash__(self){ ret "int" }:
         return hash(self.value)
@@ -499,6 +505,9 @@ class $className(object):
             getattr(self, attr) == getattr(other, attr)
             for attr in self.__slots__
         )
+
+    def __ne__(self, other){ ret "bool" }:
+        return not self.__eq__(other)
 
     def __nirum_serialize__(self){ret "typing.Mapping[str, typing.Any]"}:
         return serialize_record_type(self)
