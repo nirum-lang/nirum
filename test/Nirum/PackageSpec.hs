@@ -107,21 +107,6 @@ spec = do
                 l `shouldBe` [MissingModulePathError ["import_error"] ["foo"]]
         specify "scanModules" $ do
             let path = "." </> "examples"
-            mods <- scanModules "."
-            mods `shouldBe`
-                [ (["examples", "builtins"], path </> "builtins.nrm")
-                , (["examples", "product"], path </> "product.nrm")
-                , (["examples", "shapes"], path </> "shapes.nrm")
-                , (["examples", "countries"], path </> "countries.nrm")
-                , (["examples", "address"], path </> "address.nrm")
-                , (["examples", "pdf-service"], path </> "pdf-service.nrm")
-                , ( ["test", "import_error", "import_error"]
-                  , "." </> "test" </> "import_error" </> "import_error.nrm"
-                  )
-                , ( ["test", "scan_error", "scan_error"]
-                  , "." </> "test" </> "scan_error" </> "scan_error.nrm"
-                  )
-                ]
             mods' <- scanModules path
             mods' `shouldBe` [ (["builtins"], path </> "builtins.nrm")
                              , (["product"], path </> "product.nrm")

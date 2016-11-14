@@ -15,6 +15,9 @@ module Nirum.Targets.Python ( Code
                                      , sourceModule
                                      , sourcePackage
                                      )
+                            , PythonVersion ( Python2
+                                            , Python3
+                                            )
                             , addDependency
                             , addOptionalDependency
                             , compileModule
@@ -172,7 +175,7 @@ insertEnumImport :: CodeGen ()
 insertEnumImport = insertStandardImport "enum"
 
 getPythonVersion :: CodeGen PythonVersion
-getPythonVersion = ST.get >>= return . pythonVersion
+getPythonVersion = fmap pythonVersion ST.get
 
 -- | The set of Python reserved keywords.
 -- See also: https://docs.python.org/3/reference/lexical_analysis.html#keywords
@@ -237,13 +240,23 @@ quote :: T.Text -> T.Text
 quote s = [qq|'{s}'|]
 
 
-typeHelpers :: CodeGen (T.Text -> T.Text -> T.Text, T.Text -> T.Text)
-typeHelpers = getPythonVersion >>= return . typeHelpers'
-  where
-    typeHelpers' :: PythonVersion
-                 -> (T.Text -> T.Text -> T.Text, T.Text -> T.Text)
-    typeHelpers' Python2 = (\n _ -> n, \_ -> "")
-    typeHelpers' Python3 = (\n t -> [qq|$n: $t|], \t -> [qq| -> $t|])
+type ParameterName = Code
+type ParameterType = Code
+type ReturnType = Code
+
+parameterCompiler :: CodeGen (ParameterName -> ParameterType -> Code)
+parameterCompiler = do
+    ver <- getPythonVersion
+    return $ \ n t -> case ver of
+                          Python2 -> n
+                          Python3 -> [qq|$n: $t|]
+
+returnCompiler :: CodeGen (ReturnType -> Code)
+returnCompiler = do
+    ver <- getPythonVersion
+    return $ \ r -> case ver of
+                        Python2 -> ""
+                        Python3 -> [qq| -> $r|]
 
 compileUnionTag :: Source
                 -> Name
@@ -267,8 +280,7 @@ compileUnionTag source parentname typename' fields = do
           where
             attributes :: T.Text
             attributes = toIndentedCodes (\ n -> [qq|self.{n}|]) tagNames ", "
-        initialArgs gen = toIndentedCodes
-            (\ (n, t) -> gen n t) nameNTypes ", "
+        initialArgs gen = toIndentedCodes (uncurry gen) nameNTypes ", "
         initialValues =
             toIndentedCodes (\ n -> [qq|self.{n} = {n}|]) tagNames "\n        "
         nameMaps = toIndentedCodes
@@ -280,7 +292,8 @@ compileUnionTag source parentname typename' fields = do
     insertThirdPartyImports [ ("nirum.validate", ["validate_union_type"])
                             , ("nirum.constructs", ["name_dict_type"])
                             ]
-    (arg, ret) <- typeHelpers
+    arg <- parameterCompiler
+    ret <- returnCompiler
     return [qq|
 class $className($parentClass):
     # TODO: docstring
@@ -325,7 +338,9 @@ compilePrimitiveType primitiveTypeIdentifier = do
     case (primitiveTypeIdentifier, pyVer) of
         (Bool, _) -> return "bool"
         (Bigint, _) -> return "int"
-        (Decimal, _) -> insertStandardImport "decimal" >> return "decimal.Decimal"
+        (Decimal, _) -> do
+            insertStandardImport "decimal"
+            return "decimal.Decimal"
         (Int32, _) -> return "int"
         (Int64, Python2) -> return "long"
         (Int64, Python3) -> return "int"
@@ -334,9 +349,13 @@ compilePrimitiveType primitiveTypeIdentifier = do
         (Text, Python2) -> return "unicode"
         (Text, Python3) -> return "str"
         (Binary, _) -> return "bytes"
-        (Date, _) -> insertStandardImport "datetime" >> return "datetime.date"
-        (Datetime, _) -> insertStandardImport "datetime" >> return "datetime.datetime"
-        (Uuid, _) -> insertStandardImport "uuid" >> return"uuid.UUID"
+        (Date, _) -> do
+            insertStandardImport "datetime"
+            return "datetime.date"
+        (Datetime, _) -> do
+            insertStandardImport "datetime"
+            return "datetime.datetime"
+        (Uuid, _) -> insertStandardImport "uuid" >> return "uuid.UUID"
         (Uri, Python2) -> return "unicode"
         (Uri, Python3) -> return "str"
 
@@ -387,7 +406,8 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
                             , ("nirum.serialize", ["serialize_boxed_type"])
                             , ("nirum.deserialize", ["deserialize_boxed_type"])
                             ]
-    (arg, ret) <- typeHelpers
+    arg <- parameterCompiler
+    ret <- returnCompiler
     return [qq|
 class $className(object):
     # TODO: docstring
@@ -412,7 +432,10 @@ class $className(object):
         return serialize_boxed_type(self)
 
     @classmethod
-    def __nirum_deserialize__({ arg "cls" "type" }, { arg "value" "typing.Any" }){ ret $ quote className }:
+    def __nirum_deserialize__(
+        {arg "cls" "type"},
+        {arg "value" "typing.Any"}
+    ){ ret $ quote className }:
         return deserialize_boxed_type(cls, value)
 
     def __repr__(self){ ret "str" }:
@@ -432,7 +455,8 @@ compileTypeDeclaration _ TypeDeclaration { typename = typename'
             | EnumMember memberName@(Name _ bn) _ <- toList members
             ]
     insertEnumImport
-    (arg, ret) <- typeHelpers
+    arg <- parameterCompiler
+    ret <- returnCompiler
     return [qq|
 class $className(enum.Enum):
     # TODO: docstring
@@ -443,7 +467,10 @@ class $className(enum.Enum):
         return self.value
 
     @classmethod
-    def __nirum_deserialize__({ arg "cls" "type" }, { arg "value" "str" }){ ret $ quote className }:
+    def __nirum_deserialize__(
+        {arg "cls" "type"},
+        {arg "value" "str"}
+    ){ ret $ quote className }:
         return cls(value.replace('-', '_'))  # FIXME: validate input
 |]
 compileTypeDeclaration src TypeDeclaration { typename = typename'
@@ -458,8 +485,7 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
         slotTypes = toIndentedCodes
             (\ (n, t) -> [qq|'{n}': {t}|]) nameNTypes ",\n        "
         slots = toIndentedCodes (\ n -> [qq|'{n}'|]) fieldNames ",\n        "
-        initialArgs gen = toIndentedCodes
-            (\ (n, t) -> gen n t) nameNTypes ", "
+        initialArgs gen = toIndentedCodes (uncurry gen) nameNTypes ", "
         initialValues = toIndentedCodes
             (\ n -> [qq|self.{n} = {n}|]) fieldNames "\n        "
         nameMaps = toIndentedCodes
@@ -473,7 +499,9 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
                             , ("nirum.deserialize", ["deserialize_record_type"])
                             , ("nirum.constructs", ["name_dict_type"])
                             ]
-    (arg, ret) <- typeHelpers
+    arg <- parameterCompiler
+    ret <- returnCompiler
+    let clsType = arg "cls" "type"
     return [qq|
 class $className(object):
     # TODO: docstring
@@ -513,27 +541,27 @@ class $className(object):
         return serialize_record_type(self)
 
     @classmethod
-    def __nirum_deserialize__({ arg "cls" "type" }, value){ ret $ quote className }:
+    def __nirum_deserialize__($clsType, value){ ret $ quote className }:
         return deserialize_record_type(cls, value)
 
     def __hash__(self){ret "int"}:
         return hash(($hashText,))
 |]
-
 compileTypeDeclaration src TypeDeclaration { typename = typename'
                                            , type' = UnionType tags } = do
     fieldCodes <- mapM (uncurry (compileUnionTag src typename')) tagNameNFields
     let className = toClassName' typename'
         fieldCodes' = T.intercalate "\n\n" fieldCodes
         enumMembers = toIndentedCodes
-            (\(t, b) -> [qq|$t = '{b}'|]) enumMembers' "\n        "
+            (\ (t, b) -> [qq|$t = '{b}'|]) enumMembers' "\n        "
     insertTypingImport
     insertEnumImport
     insertThirdPartyImports [ ("nirum.serialize", ["serialize_union_type"])
                             , ("nirum.deserialize", ["deserialize_union_type"])
                             , ("nirum.constructs", ["name_dict_type"])
                             ]
-    (arg, ret) <- typeHelpers
+    arg <- parameterCompiler
+    ret <- returnCompiler
     return [qq|
 class $className(object):
 
@@ -558,7 +586,9 @@ class $className(object):
         return serialize_union_type(self)
 
     @classmethod
-    def __nirum_deserialize__({ arg "cls" "type" }, value){ ret $ quote className }:
+    def __nirum_deserialize__(
+        {arg "cls" "type"}, value
+    ){ ret $ quote className }:
         return deserialize_union_type(cls, value)
 
 
@@ -624,17 +654,17 @@ class {className}_Client(client_type, $className):
     compileMethod :: Method -> CodeGen Code
     compileMethod (Method mName params rtype _etype _anno) = do
         let mName' = toAttributeName' mName
-        params' <- mapM compileParameter $ toList params
+        params' <- mapM compileMethodParameter $ toList params
         rtypeExpr <- compileTypeExpression src rtype
-        (_, ret) <- typeHelpers
+        ret <- returnCompiler
         return [qq|
     def {mName'}(self, {commaNl params'}){ ret rtypeExpr }:
         raise NotImplementedError('$className has to implement {mName'}()')
 |]
-    compileParameter :: Parameter -> CodeGen Code
-    compileParameter (Parameter pName pType _) = do
+    compileMethodParameter :: Parameter -> CodeGen Code
+    compileMethodParameter (Parameter pName pType _) = do
         pTypeExpr <- compileTypeExpression src pType
-        (arg, _) <- typeHelpers
+        arg <- parameterCompiler
         return [qq|{arg (toAttributeName' pName) pTypeExpr}|]
     compileMethodMetadata :: Method -> CodeGen Code
     compileMethodMetadata Method { methodName = mName
@@ -674,10 +704,10 @@ class {className}_Client(client_type, $className):
                                , returnType = rtype
                                } = do
         let clientMethodName' = toAttributeName' mName
-        params' <- mapM compileParameter $ toList params
+        params' <- mapM compileMethodParameter $ toList params
         rtypeExpr <- compileTypeExpression src rtype
         payloadArguments <- mapM compileClientPayload $ toList params
-        (_, ret) <- typeHelpers
+        ret <- returnCompiler
         return [qq|
     def {clientMethodName'}(self, {commaNl params'}){ ret rtypeExpr }:
         meta = self.__nirum_service_methods__['{clientMethodName'}']
@@ -895,7 +925,7 @@ compilePackage package =
                            ]
     toFilename :: T.Text -> ModulePath -> FilePath
     toFilename sourceRootDirectory mp =
-        joinPath $ [T.unpack sourceRootDirectory] ++ toPythonFilename mp
+        joinPath $ T.unpack sourceRootDirectory : toPythonFilename mp
     initFiles :: [(FilePath, Either CompileError Code)]
     initFiles = [ (toFilename sourceRootDirectory mp', Right "")
                 | mp <- MS.keys (modules package)

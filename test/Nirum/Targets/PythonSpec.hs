@@ -26,6 +26,7 @@ import Data.Either (isRight)
 import Data.List (dropWhileEnd)
 import qualified Data.Map.Strict as M
 import qualified Data.SemVer as SV
+import Data.Set (Set, union)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TI
 import System.Directory (createDirectoryIfMissing)
@@ -45,27 +46,17 @@ import Text.Megaparsec (char, digitChar, runParser, some, space, string')
 import Text.Megaparsec.String (Parser)
 
 import Nirum.Constructs.Annotation (empty)
-import Nirum.Constructs.DeclarationSet (DeclarationSet)
 import Nirum.Constructs.Identifier (Identifier)
 import Nirum.Constructs.Module (Module (Module))
 import Nirum.Constructs.ModulePath (ModulePath, fromIdentifiers)
 import Nirum.Constructs.Name (Name (Name))
-import Nirum.Constructs.Service ( Method (Method)
-                                , Parameter (Parameter)
-                                , Service (Service)
-                                )
 import Nirum.Constructs.TypeDeclaration ( Field (Field)
-                                        , EnumMember (EnumMember)
                                         , PrimitiveTypeIdentifier (..)
-                                        , Tag (Tag)
                                         , Type ( Alias
-                                               , EnumType
                                                , RecordType
                                                , UnboxedType
-                                               , UnionType
                                                )
                                         , TypeDeclaration ( Import
-                                                          , ServiceDeclaration
                                                           , TypeDeclaration
                                                           )
                                         )
@@ -93,6 +84,7 @@ import Nirum.Targets.Python ( Source (Source)
                                               , dependencies
                                               , optionalDependencies
                                               )
+                            , PythonVersion (Python2, Python3)
                             , addDependency
                             , addOptionalDependency
                             , compilePackage
@@ -308,22 +300,22 @@ makeDummySource' pathPrefix m =
 makeDummySource :: Module -> Source
 makeDummySource = makeDummySource' []
 
-run' :: CodeGen a -> (Either CompileError a, CodeGenContext)
-run' c = runCodeGen c emptyContext
-
-code :: CodeGen a -> a
-code = either (const undefined) id . fst . run'
-
-codeContext :: CodeGen a -> CodeGenContext
-codeContext = snd . run'
-
-compileError :: CodeGen a -> Maybe CompileError
-compileError cg = either Just (const Nothing) $ fst $ runCodeGen cg emptyContext
-
+versions :: [(PythonVersion, Set Code)]
+versions = [ (Python2, [])
+           , (Python3, ["typing"])
+           ]
 
 spec :: Spec
-spec = parallel $ do
-    describe "CodeGen" $ do
+spec = parallel $ forM_ versions $ \ (ver, typing) -> do
+    let empty' = emptyContext ver
+        -- run' :: CodeGen a -> (Either CompileError a, CodeGenContext)
+        run' c = runCodeGen c empty'
+        -- code :: CodeGen a -> a
+        code = either (const undefined) id . fst . run'
+        -- compileError :: CodeGen a -> Maybe CompileError
+        compileError cg = either Just (const Nothing) $ fst $
+            runCodeGen cg empty'
+    describe [qq|CodeGen ($ver)|] $ do
         specify "packages and imports" $ do
             let c = do
                     insertStandardImport "sys"
@@ -333,7 +325,7 @@ spec = parallel $ do
                     insertStandardImport "os"
                     insertThirdPartyImports [("nirum", ["serialize_enum_type"])]
                     insertLocalImport ".." "Path"
-            let (e, ctx) = runCodeGen c emptyContext
+            let (e, ctx) = runCodeGen c empty'
             e `shouldSatisfy` isRight
             standardImports ctx `shouldBe` ["os", "sys"]
             thirdPartyImports ctx `shouldBe`
@@ -341,14 +333,14 @@ spec = parallel $ do
             localImports ctx `shouldBe` [("..", ["Gender", "Path"])]
         specify "insertStandardImport" $ do
             let codeGen1 = insertStandardImport "sys"
-            let (e1, ctx1) = runCodeGen codeGen1 emptyContext
+            let (e1, ctx1) = runCodeGen codeGen1 empty'
             e1 `shouldSatisfy` isRight
             standardImports ctx1 `shouldBe` ["sys"]
             thirdPartyImports ctx1 `shouldBe` []
             localImports ctx1 `shouldBe` []
             compileError codeGen1 `shouldBe` Nothing
             let codeGen2 = codeGen1 >> insertStandardImport "os"
-            let (e2, ctx2) = runCodeGen codeGen2 emptyContext
+            let (e2, ctx2) = runCodeGen codeGen2 empty'
             e2 `shouldSatisfy` isRight
             standardImports ctx2 `shouldBe` ["os", "sys"]
             thirdPartyImports ctx2 `shouldBe` []
@@ -362,10 +354,16 @@ spec = parallel $ do
         decimalCode `shouldBe` Right "decimal.Decimal"
         standardImports decimalContext `shouldBe` ["decimal"]
         code (compilePrimitiveType Int32) `shouldBe` "int"
-        code (compilePrimitiveType Int64) `shouldBe` "int"
+        code (compilePrimitiveType Int64) `shouldBe`
+            case ver of
+                Python2 -> "long"
+                Python3 -> "int"
         code (compilePrimitiveType Float32) `shouldBe` "float"
         code (compilePrimitiveType Float64) `shouldBe` "float"
-        code (compilePrimitiveType Text) `shouldBe` "str"
+        code (compilePrimitiveType Text) `shouldBe`
+            case ver of
+                Python2 -> "unicode"
+                Python3 -> "str"
         code (compilePrimitiveType Binary) `shouldBe` "bytes"
         let (dateCode, dateContext) = run' (compilePrimitiveType Date)
         dateCode `shouldBe` Right "datetime.date"
@@ -377,7 +375,10 @@ spec = parallel $ do
         let (uuidCode, uuidContext) = run' (compilePrimitiveType Uuid)
         uuidCode `shouldBe` Right "uuid.UUID"
         standardImports uuidContext `shouldBe` ["uuid"]
-        code (compilePrimitiveType Uri) `shouldBe` "str"
+        code (compilePrimitiveType Uri) `shouldBe`
+            case ver of
+                Python2 -> "unicode"
+                Python3 -> "str"
 
     describe "compileTypeExpression" $ do
         let s = makeDummySource $ Module [] Nothing
@@ -389,28 +390,28 @@ spec = parallel $ do
             c `shouldBe` Right "int"
         specify "OptionModifier" $ do
             let (c', ctx') = run' $
-                    compileTypeExpression s (OptionModifier "text")
-            standardImports ctx' `shouldBe` ["typing"]
+                    compileTypeExpression s (OptionModifier "int32")
+            standardImports ctx' `shouldBe` typing
             localImports ctx' `shouldBe` []
-            c' `shouldBe` Right "typing.Optional[str]"
+            c' `shouldBe` Right "typing.Optional[int]"
         specify "SetModifier" $ do
             let (c'', ctx'') = run' $
-                    compileTypeExpression s (SetModifier "text")
-            standardImports ctx'' `shouldBe` ["typing"]
+                    compileTypeExpression s (SetModifier "int32")
+            standardImports ctx'' `shouldBe` typing
             localImports ctx'' `shouldBe` []
-            c'' `shouldBe` Right "typing.AbstractSet[str]"
+            c'' `shouldBe` Right "typing.AbstractSet[int]"
         specify "ListModifier" $ do
             let (c''', ctx''') = run' $
-                    compileTypeExpression s (ListModifier "text")
-            standardImports ctx''' `shouldBe` ["typing"]
+                    compileTypeExpression s (ListModifier "int32")
+            standardImports ctx''' `shouldBe` typing
             localImports ctx''' `shouldBe` []
-            c''' `shouldBe` Right "typing.Sequence[str]"
+            c''' `shouldBe` Right "typing.Sequence[int]"
         specify "MapModifier" $ do
             let (c'''', ctx'''') = run' $
-                    compileTypeExpression s (MapModifier "uuid" "text")
-            standardImports ctx'''' `shouldBe` ["uuid", "typing"]
+                    compileTypeExpression s (MapModifier "uuid" "int32")
+            standardImports ctx'''' `shouldBe` union ["uuid"] typing
             localImports ctx'''' `shouldBe` []
-            c'''' `shouldBe` Right "typing.Mapping[uuid.UUID, str]"
+            c'''' `shouldBe` Right "typing.Mapping[uuid.UUID, int]"
 
     describe "toClassName" $ do
         it "transform the facial name of the argument into PascalCase" $ do
@@ -478,33 +479,36 @@ spec = parallel $ do
             pyImportPath = toImportPath $ modulePath boundM
             defCode :: Code
             defCode = [qq|from $pyImportPath import *|]
-        tM = test testPython
-        tT' typeDecls = tM $ makeDummySource $ Module typeDecls Nothing
-        tT typeDecl = tT' [typeDecl]
-        tR source excType = test (`testRaisePython` excType) source
-        tR'' typeDecls = tR $ makeDummySource $ Module typeDecls Nothing
-        tR' typeDecl = tR'' [typeDecl]
 
     describe "compilePackage" $ do
         it "returns a Map of file paths and their contents to generate" $ do
             let (Source pkg _) = makeDummySource $ Module [] Nothing
                 files = compilePackage pkg
-            M.keysSet files `shouldBe`
-                [ "foo" </> "__init__.py"
-                , "foo" </> "bar" </> "__init__.py"
-                , "qux" </> "__init__.py"
-                , "setup.py"
-                ]
+                directoryStructure =
+                    [ "src-py2" </> "foo" </> "__init__.py"
+                    , "src-py2" </> "foo" </> "bar" </> "__init__.py"
+                    , "src-py2" </> "qux" </> "__init__.py"
+                    , "src" </> "foo" </> "__init__.py"
+                    , "src" </> "foo" </> "bar" </> "__init__.py"
+                    , "src" </> "qux" </> "__init__.py"
+                    , "setup.py"
+                    ]
+            M.keysSet files `shouldBe` directoryStructure
         it "creates an emtpy Python package directory if necessary" $ do
             let (Source pkg _) = makeDummySource' ["test"] $ Module [] Nothing
                 files = compilePackage pkg
-            M.keysSet files `shouldBe`
-                [ "test" </> "__init__.py"
-                , "test" </> "foo" </> "__init__.py"
-                , "test" </> "foo" </> "bar" </> "__init__.py"
-                , "test" </> "qux" </> "__init__.py"
-                , "setup.py"
-                ]
+                directoryStructure =
+                    [ "src-py2" </> "test" </> "__init__.py"
+                    , "src-py2" </> "test" </> "foo" </> "__init__.py"
+                    , "src-py2" </> "test" </> "foo" </> "bar" </> "__init__.py"
+                    , "src-py2" </> "test" </> "qux" </> "__init__.py"
+                    , "src" </> "test" </> "__init__.py"
+                    , "src" </> "test" </> "foo" </> "__init__.py"
+                    , "src" </> "test" </> "foo" </> "bar" </> "__init__.py"
+                    , "src" </> "test" </> "qux" </> "__init__.py"
+                    , "setup.py"
+                    ]
+            M.keysSet files `shouldBe` directoryStructure
         specify "setup.py" $ do
             let setupPyFields = [ ("--name", "TestPackage")
                                 , ("--author", "John Doe")
