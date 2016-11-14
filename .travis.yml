@@ -60,7 +60,7 @@ script:
 - pip install test/python/requirements.txt
 - stack --no-terminal test
 - ./lint.sh
-- ./pythontest.sh
+- ./test.sh
 before_deploy:
 - stack build --no-terminal --copy-bins
 - mkdir -p /tmp/nirum-build
