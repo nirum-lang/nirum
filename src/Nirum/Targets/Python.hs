@@ -234,7 +234,7 @@ toIndentedCodes f traversable concatenator =
     T.intercalate concatenator $ map f traversable
 
 quote :: T.Text -> T.Text
-quote s = '\'' `T.cons` s `T.snoc` '\''
+quote s = [qq|'{s}'|]
 
 
 typeHelpers :: CodeGen (T.Text -> T.Text -> T.Text, T.Text -> T.Text)
