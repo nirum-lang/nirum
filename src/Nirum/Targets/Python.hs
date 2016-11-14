@@ -301,7 +301,7 @@ class $className($parentClass):
         validate_union_type(self)
 
     def __repr__(self){ ret "str" }:
-        return '\{0\}(\{2\})'.format(
+        return '\{0\}(\{1\})'.format(
             typing._type_repr(self),
             ', '.join('\{\}=\{\}'.format(attr, getattr(self, attr))
                       for attr in self.__slots__)
@@ -416,8 +416,8 @@ class $className(object):
         return deserialize_boxed_type(cls, value)
 
     def __repr__(self){ ret "str" }:
-        return '\{0.__module__\}.\{0.__qualname__\}(\{1!r\})'.format(
-            type(self), self.value
+        return '\{0\}(\{1!r\})'.format(
+            typing._type_repr(self), self.value
         )
 
     def __hash__(self) -> int:
