@@ -314,7 +314,7 @@ class $className($parentClass):
         )
 
     def __ne__(self, other){ ret "bool" }:
-        return not self.__eq__(other)
+        return not self == other
 
     def __hash__(self){ ret "int" }:
         return hash($hashTuple)
@@ -403,7 +403,7 @@ class $className(object):
                 self.value == other.value)
 
     def __ne__(self, other){ ret "bool" }:
-        return not self.__eq__(other)
+        return not self == other
 
     def __hash__(self){ ret "int" }:
         return hash(self.value)
@@ -507,7 +507,7 @@ class $className(object):
         )
 
     def __ne__(self, other){ ret "bool" }:
-        return not self.__eq__(other)
+        return not self == other
 
     def __nirum_serialize__(self){ret "typing.Mapping[str, typing.Any]"}:
         return serialize_record_type(self)
