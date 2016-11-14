@@ -305,8 +305,7 @@ class $className($parentClass):
         validate_union_type(self)
 
     def __repr__(self){ ret "str" }:
-        return '\{0.__module__\}.\{1\}(\{2\})'.format(
-            type(self),
+        return '\{0\}(\{2\})'.format(
             typing._type_repr(self),
             ', '.join('\{\}=\{\}'.format(attr, getattr(self, attr))
                       for attr in self.__slots__)
@@ -493,8 +492,7 @@ class $className(object):
         validate_record_type(self)
 
     def __repr__(self){ret "bool"}:
-        return '\{0.__module__\}.\{1}(\{2\})'.format(
-            type(self),
+        return '\{0\}(\{1\})'.format(
             typing._type_repr(self),
             ', '.join('\{\}=\{\}'.format(attr, getattr(self, attr))
                       for attr in self.__slots__)
