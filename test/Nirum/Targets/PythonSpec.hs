@@ -576,7 +576,6 @@ spec = parallel $ do
             (req4 `unionInstallRequires` req5) `shouldBe` req6
             (req5 `unionInstallRequires` req4) `shouldBe` req6
 
-
 {-# ANN module ("HLint: ignore Functor law" :: String) #-}
 {-# ANN module ("HLint: ignore Monad law, left identity" :: String) #-}
 {-# ANN module ("HLint: ignore Monad law, right identity" :: String) #-}
