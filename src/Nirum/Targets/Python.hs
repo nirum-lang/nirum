@@ -51,7 +51,7 @@ import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8)
 import System.FilePath (joinPath)
 import qualified Text.Email.Validate as E
-import Text.InterpolatedString.Perl6 (qq)
+import Text.InterpolatedString.Perl6 (q, qq)
 
 import qualified Nirum.CodeGen as C
 import Nirum.CodeGen (Failure)
@@ -911,6 +911,11 @@ setup(
         | ((major, minor), deps') <- M.toList optDeps
         ]
 
+manifestIn :: Code
+manifestIn = [q|recursive-include src *.py
+recursive-include src-py2 *.py
+|]
+
 compilePackage :: Package
                -> M.Map FilePath (Either CompileError Code)
 compilePackage package =
@@ -923,7 +928,9 @@ compilePackage package =
           )
         | (f, cd) <- modules'
         ] ++
-        [("setup.py", Right $ compilePackageMetadata package installRequires)]
+        [ ("setup.py", Right $ compilePackageMetadata package installRequires)
+        , ("MANIFEST.in", Right $ manifestIn)
+        ]
   where
     toPythonFilename :: ModulePath -> [FilePath]
     toPythonFilename mp = [ T.unpack (toAttributeName i)
