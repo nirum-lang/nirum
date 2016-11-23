@@ -1,8 +1,9 @@
+# -*- coding: utf-8 -*-
 import enum
 
 from pytest import raises
 from nirum.rpc import Service
-from six import text_type
+from six import PY3, text_type
 
 from fixture.foo import (CultureAgnosticName, EastAsianName,
                          EvaChar, FloatUnbox, Gender, ImportedTypeUnbox, Irum,
@@ -32,13 +33,13 @@ def test_float_unbox():
 
 
 def test_import_type_unbox():
-    path = '/path/string'
+    path = u'/path/string'
     path_unbox = PathUnbox(path)
     imported_unbox = ImportedTypeUnbox(path_unbox)
     assert isinstance(ImportedTypeUnbox, type)
-    assert imported_unbox.value.value == '/path/string'
-    assert imported_unbox == ImportedTypeUnbox(PathUnbox('/path/string'))
-    other_path = ImportedTypeUnbox(PathUnbox('/other/path'))
+    assert imported_unbox.value.value == u'/path/string'
+    assert imported_unbox == ImportedTypeUnbox(PathUnbox(u'/path/string'))
+    other_path = ImportedTypeUnbox(PathUnbox(u'/other/path'))
     assert imported_unbox != other_path
     expected = {imported_unbox, other_path}
     assert {imported_unbox, other_path, imported_unbox} == expected
@@ -51,35 +52,35 @@ def test_import_type_unbox():
 
 
 def test_boxed_alias():
-    w = Way('.')
-    assert w.value == '.'
-    assert Way(Path('.')).value == '.'
-    assert Way.__nirum_deserialize__('.') == Way('.')
-    assert Way('.').__nirum_serialize__() == '.'
-    assert Name('khj') == Irum('khj')
-    assert Irum.__nirum_deserialize__('khj') == Irum('khj')
-    assert Irum('khj').__nirum_serialize__() == 'khj'
-    assert Irum.__nirum_deserialize__('khj') == Name('khj')
-    assert Irum.__nirum_deserialize__('khj') == Irum('khj')
+    w = Way(u'.')
+    assert w.value == u'.'
+    assert Way(Path(u'.')).value == u'.'
+    assert Way.__nirum_deserialize__(u'.') == Way(u'.')
+    assert Way(u'.').__nirum_serialize__() == u'.'
+    assert Name(u'khj') == Irum(u'khj')
+    assert Irum.__nirum_deserialize__(u'khj') == Irum(u'khj')
+    assert Irum(u'khj').__nirum_serialize__() == u'khj'
+    assert Irum.__nirum_deserialize__(u'khj') == Name(u'khj')
+    assert Irum.__nirum_deserialize__(u'khj') == Irum(u'khj')
 
 
 def test_enum():
     assert type(Gender) is enum.EnumMeta
     assert set(Gender) == {Gender.male, Gender.female}
-    assert Gender.male.value == 'male'
-    assert Gender.female.value == 'yeoseong'
-    assert Gender.__nirum_deserialize__('male') == Gender.male
-    assert Gender.__nirum_deserialize__('yeoseong') == Gender.female
+    assert Gender.male.value == u'male'
+    assert Gender.female.value == u'yeoseong'
+    assert Gender.__nirum_deserialize__(u'male') == Gender.male
+    assert Gender.__nirum_deserialize__(u'yeoseong') == Gender.female
     with raises(ValueError):
-        Gender.__nirum_deserialize__('namja')
-    assert Gender.male.__nirum_serialize__() == 'male'
-    assert Gender.female.__nirum_serialize__() == 'yeoseong'
+        Gender.__nirum_deserialize__(u'namja')
+    assert Gender.male.__nirum_serialize__() == u'male'
+    assert Gender.female.__nirum_serialize__() == u'yeoseong'
     assert type(EvaChar) is enum.EnumMeta
     assert set(EvaChar) == {EvaChar.soryu_asuka_langley,
                             EvaChar.ayanami_rei, EvaChar.ikari_shinji,
                             EvaChar.katsuragi_misato, EvaChar.nagisa_kaworu}
     soryu_asuka_langley = EvaChar.soryu_asuka_langley
-    asuka = 'soryu_asuka_langley'
+    asuka = u'soryu_asuka_langley'
     assert soryu_asuka_langley.value == asuka
     assert soryu_asuka_langley.__nirum_serialize__() == asuka
     assert EvaChar.__nirum_deserialize__(asuka) == soryu_asuka_langley
@@ -167,64 +168,66 @@ def test_union():
     assert issubclass(WesternName, MixedName)
     with raises(NotImplementedError):
         MixedName()
-    western_name = WesternName(first_name='foo', middle_name='bar',
-                               last_name='baz')
-    assert western_name.first_name == 'foo'
-    assert western_name.middle_name == 'bar'
-    assert western_name.last_name == 'baz'
+    western_name = WesternName(first_name=u'foo', middle_name=u'bar',
+                               last_name=u'baz')
+    assert western_name.first_name == u'foo'
+    assert western_name.middle_name == u'bar'
+    assert western_name.last_name == u'baz'
     with raises(TypeError):
-        WesternName(first_name=1, middle_name='bar', last_name='baz')
+        WesternName(first_name=1, middle_name=u'bar', last_name=u'baz')
     with raises(TypeError):
-        WesternName(first_name='foo', middle_name=1, last_name='baz')
+        WesternName(first_name=u'foo', middle_name=1, last_name=u'baz')
     with raises(TypeError):
-        WesternName(first_name='foo', middle_name='bar', last_name=1)
-    assert western_name == WesternName(first_name='foo', middle_name='bar',
-                                       last_name='baz')
-    assert western_name != WesternName(first_name='wrong',
-                                       middle_name='bar', last_name='baz')
-    assert western_name != WesternName(first_name='foo', middle_name='wrong',
-                                       last_name='baz')
-    assert western_name != WesternName(first_name='foo', middle_name='bar',
-                                       last_name='wrong')
-    assert western_name != WesternName(first_name='wrong', middle_name='wrong',
-                                       last_name='wrong')
-    assert hash(WesternName(first_name='foo', middle_name='bar',
-                            last_name='baz'))
+        WesternName(first_name=u'foo', middle_name=u'bar', last_name=1)
+    assert western_name == WesternName(first_name=u'foo', middle_name=u'bar',
+                                       last_name=u'baz')
+    assert western_name != WesternName(first_name=u'wrong',
+                                       middle_name=u'bar', last_name=u'baz')
+    assert western_name != WesternName(first_name=u'foo', middle_name=u'wrong',
+                                       last_name=u'baz')
+    assert western_name != WesternName(first_name=u'foo', middle_name=u'bar',
+                                       last_name=u'wrong')
+    assert western_name != WesternName(first_name=u'wrong',
+                                       middle_name=u'wrong',
+                                       last_name=u'wrong')
+    assert hash(WesternName(first_name=u'foo', middle_name=u'bar',
+                            last_name=u'baz'))
     assert isinstance(EastAsianName, type)
     assert issubclass(EastAsianName, MixedName)
-    east_asian_name = EastAsianName(family_name='foo', given_name='baz')
-    assert east_asian_name.family_name == 'foo'
-    assert east_asian_name.given_name == 'baz'
-    assert east_asian_name == EastAsianName(family_name='foo',
-                                            given_name='baz')
-    assert east_asian_name != EastAsianName(family_name='foo',
-                                            given_name='wrong')
-    assert east_asian_name != EastAsianName(family_name='wrong',
-                                            given_name='baz')
-    assert east_asian_name != EastAsianName(family_name='wrong',
-                                            given_name='wrong')
+    east_asian_name = EastAsianName(family_name=u'foo', given_name=u'baz')
+    assert east_asian_name.family_name == u'foo'
+    assert east_asian_name.given_name == u'baz'
+    assert east_asian_name == EastAsianName(family_name=u'foo',
+                                            given_name=u'baz')
+    assert east_asian_name != EastAsianName(family_name=u'foo',
+                                            given_name=u'wrong')
+    assert east_asian_name != EastAsianName(family_name=u'wrong',
+                                            given_name=u'baz')
+    assert east_asian_name != EastAsianName(family_name=u'wrong',
+                                            given_name=u'wrong')
     with raises(TypeError):
-        EastAsianName(family_name=1, given_name='baz')
+        EastAsianName(family_name=1, given_name=u'baz')
     with raises(TypeError):
-        EastAsianName(family_name='foo', given_name=2)
+        EastAsianName(family_name=u'foo', given_name=2)
     assert isinstance(CultureAgnosticName, type)
     assert issubclass(CultureAgnosticName, MixedName)
-    agnostic_name = CultureAgnosticName(fullname='foobar')
-    assert agnostic_name.fullname == 'foobar'
-    assert agnostic_name == CultureAgnosticName(fullname='foobar')
-    assert agnostic_name != CultureAgnosticName(fullname='wrong')
+    agnostic_name = CultureAgnosticName(fullname=u'foobar')
+    assert agnostic_name.fullname == u'foobar'
+    assert agnostic_name == CultureAgnosticName(fullname=u'foobar')
+    assert agnostic_name != CultureAgnosticName(fullname=u'wrong')
     with raises(TypeError):
         CultureAgnosticName(fullname=1)
 
+
 def test_union_with_special_case():
-    kr_pop = Pop(country='KR')
-    assert kr_pop.country == 'KR'
-    assert kr_pop == Pop(country='KR')
-    assert kr_pop != Pop(country='US')
+    kr_pop = Pop(country=u'KR')
+    assert kr_pop.country == u'KR'
+    assert kr_pop == Pop(country=u'KR')
+    assert kr_pop != Pop(country=u'US')
     with raises(TypeError):
         assert Pop(country=1)
-    assert Pop.__slots__ == ('country', )
-    assert Rnb(country='KR').__nirum_tag__.value == 'rhythm_and_ballad'
+    assert Pop.__slots__ == ('country',)
+    assert Rnb(country=u'KR').__nirum_tag__.value == 'rhythm_and_ballad'
     assert Run().__nirum_tag__.value == 'run'
     assert Stop().__nirum_tag__.value == 'stop'
 
@@ -232,9 +235,10 @@ def test_union_with_special_case():
 def test_service():
     assert issubclass(NullService, Service)
     assert issubclass(PingService, Service)
-    assert set(PingService.ping.__annotations__) == {'nonce', 'return'}
-    assert PingService.ping.__annotations__['nonce'] is text_type
-    assert PingService.ping.__annotations__['return'] is bool
+    if PY3:
+        assert set(PingService.ping.__annotations__) == {'nonce', 'return'}
+        assert PingService.ping.__annotations__['nonce'] is text_type
+        assert PingService.ping.__annotations__['return'] is bool
     with raises(NotImplementedError):
         PingService().ping(u'nonce')
     with raises(NotImplementedError):
