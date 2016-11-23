@@ -125,10 +125,9 @@ data CodeGenContext
                      }
     deriving (Eq, Ord, Show)
 
-python3SourceDirectory :: T.Text
-python3SourceDirectory = "src"
-python2SourceDirectory :: T.Text
-python2SourceDirectory = "src-py2"
+sourceDirectory :: PythonVersion -> T.Text
+sourceDirectory Python2 = "src-py2"
+sourceDirectory Python3 = "src"
 
 emptyContext :: PythonVersion -> CodeGenContext
 emptyContext pythonVersion' = CodeGenContext { standardImports = []
@@ -854,10 +853,10 @@ else:
     extras_require = \{}
 
 
-SOURCE_ROOT = '{python3SourceDirectory}'
+SOURCE_ROOT = '{sourceDirectory Python3}'
 
 if sys.version_info < (3, 0):
-    SOURCE_ROOT = '{python2SourceDirectory}'
+    SOURCE_ROOT = '{sourceDirectory Python2}'
 
 # TODO: description, long_description, url, license,
 #       keywords, classifiers
@@ -919,27 +918,25 @@ compilePackage package =
     toPythonFilename mp = [ T.unpack (toAttributeName i)
                           | i <- toList mp
                           ] ++ ["__init__.py"]
-    versionDirectoryList :: [(T.Text, PythonVersion)]
-    versionDirectoryList = [ (python2SourceDirectory, Python2)
-                           , (python3SourceDirectory, Python3)
-                           ]
+    versions :: [PythonVersion]
+    versions = [Python2, Python3]
     toFilename :: T.Text -> ModulePath -> FilePath
     toFilename sourceRootDirectory mp =
         joinPath $ T.unpack sourceRootDirectory : toPythonFilename mp
     initFiles :: [(FilePath, Either CompileError Code)]
-    initFiles = [ (toFilename sourceRootDirectory mp', Right "")
+    initFiles = [ (toFilename (sourceDirectory ver) mp', Right "")
                 | mp <- MS.keys (modules package)
                 , mp' <- S.elems (ancestors mp)
-                , (sourceRootDirectory, _) <- versionDirectoryList
+                , ver <- versions
                 ]
     modules' :: [(FilePath, Either CompileError (InstallRequires, Code))]
     modules' =
-        [ ( toFilename sourceRootDirectory modulePath'
-          , compileModule pythonVersion' $ Source package boundModule
+        [ ( toFilename (sourceDirectory ver) modulePath'
+          , compileModule ver $ Source package boundModule
           )
         | (modulePath', _) <- MS.toAscList (modules package)
         , Just boundModule <- [resolveBoundModule modulePath' package]
-        , (sourceRootDirectory, pythonVersion') <- versionDirectoryList
+        , ver <- versions
         ]
     installRequires :: InstallRequires
     installRequires = foldl unionInstallRequires
