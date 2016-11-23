@@ -298,9 +298,9 @@ compileUnionTag source parentname typename' fields = do
     insertThirdPartyImports [ ("nirum.validate", ["validate_union_type"])
                             , ("nirum.constructs", ["name_dict_type"])
                             ]
+    typeRepr <- typeReprCompiler
     arg <- parameterCompiler
     ret <- returnCompiler
-    typeRepr <- typeReprCompiler
     return [qq|
 class $className($parentClass):
     # TODO: docstring
@@ -416,8 +416,8 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
                             , ("nirum.deserialize", ["deserialize_boxed_type"])
                             ]
     arg <- parameterCompiler
-    ret <- returnCompiler
     typeRepr <- typeReprCompiler
+    ret <- returnCompiler
     return [qq|
 class $className(object):
     # TODO: docstring
@@ -571,9 +571,9 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
                             , ("nirum.deserialize", ["deserialize_union_type"])
                             , ("nirum.constructs", ["name_dict_type"])
                             ]
-    arg <- parameterCompiler
-    ret <- returnCompiler
     typeRepr <- typeReprCompiler
+    ret <- returnCompiler
+    arg <- parameterCompiler
     return [qq|
 class $className(object):
 
@@ -929,7 +929,7 @@ compilePackage package =
         | (f, cd) <- modules'
         ] ++
         [ ("setup.py", Right $ compilePackageMetadata package installRequires)
-        , ("MANIFEST.in", Right $ manifestIn)
+        , ("MANIFEST.in", Right manifestIn)
         ]
   where
     toPythonFilename :: ModulePath -> [FilePath]

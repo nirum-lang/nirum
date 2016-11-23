@@ -356,7 +356,7 @@ spec = parallel $ forM_ versions $ \ (ver, typing) -> do
         code (compilePrimitiveType Int32) `shouldBe` "int"
         code (compilePrimitiveType Int64) `shouldBe`
             case ver of
-                Python2 -> "long"
+                Python2 -> "numbers.Integral"
                 Python3 -> "int"
         code (compilePrimitiveType Float32) `shouldBe` "float"
         code (compilePrimitiveType Float64) `shouldBe` "float"
@@ -492,6 +492,7 @@ spec = parallel $ forM_ versions $ \ (ver, typing) -> do
                     , "src" </> "foo" </> "bar" </> "__init__.py"
                     , "src" </> "qux" </> "__init__.py"
                     , "setup.py"
+                    , "MANIFEST.in"
                     ]
             M.keysSet files `shouldBe` directoryStructure
         it "creates an emtpy Python package directory if necessary" $ do
@@ -507,6 +508,7 @@ spec = parallel $ forM_ versions $ \ (ver, typing) -> do
                     , "src" </> "test" </> "foo" </> "bar" </> "__init__.py"
                     , "src" </> "test" </> "qux" </> "__init__.py"
                     , "setup.py"
+                    , "MANIFEST.in"
                     ]
             M.keysSet files `shouldBe` directoryStructure
         specify "setup.py" $ do
