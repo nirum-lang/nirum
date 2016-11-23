@@ -17,33 +17,17 @@ run this unit test in the virtualenv (pyvenv).  E.g.:
 -}
 module Nirum.Targets.PythonSpec where
 
-import Control.Monad (forM_, void, unless)
-import Data.Char (isSpace)
-import Data.Maybe (fromJust, isJust)
-import System.IO.Error (catchIOError)
-
+import Control.Monad (forM_)
 import Data.Either (isRight)
-import Data.List (dropWhileEnd)
+import Data.Maybe (fromJust)
+
 import qualified Data.Map.Strict as M
 import qualified Data.SemVer as SV
 import Data.Set (Set, union)
-import qualified Data.Text as T
-import qualified Data.Text.IO as TI
-import System.Directory (createDirectoryIfMissing)
-import System.Exit (ExitCode (ExitSuccess))
-import System.FilePath (isValid, takeDirectory, (</>))
-import System.Info (os)
-import System.IO.Temp (withSystemTempDirectory)
-import System.Process ( CreateProcess (cwd)
-                      , proc
-                      , readCreateProcess
-                      , readCreateProcessWithExitCode
-                      )
+import System.FilePath ((</>))
 import Test.Hspec.Meta
 import Text.Email.Validate (emailAddress)
 import Text.InterpolatedString.Perl6 (q, qq)
-import Text.Megaparsec (char, digitChar, runParser, some, space, string')
-import Text.Megaparsec.String (Parser)
 
 import Nirum.Constructs.Annotation (empty)
 import Nirum.Constructs.Identifier (Identifier)
@@ -67,7 +51,7 @@ import Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
                                                         , TypeIdentifier
                                                         )
                                        )
-import Nirum.Package (BoundModule (modulePath), Package, resolveBoundModule)
+import Nirum.Package (Package, resolveBoundModule)
 import Nirum.Package.Metadata ( Author (Author, email, name, uri)
                               , Metadata (Metadata, authors, version)
                               )
@@ -80,7 +64,6 @@ import Nirum.Targets.Python ( Source (Source)
                                              , standardImports
                                              , thirdPartyImports
                                              )
-                            , CompileError
                             , InstallRequires ( InstallRequires
                                               , dependencies
                                               , optionalDependencies
@@ -94,7 +77,6 @@ import Nirum.Targets.Python ( Source (Source)
                             , stringLiteral
                             , toAttributeName
                             , toClassName
-                            , toImportPath
                             , toNamePair
                             , unionInstallRequires
                             , insertLocalImport
@@ -105,155 +87,6 @@ import Nirum.Targets.Python ( Source (Source)
 
 codeGen :: a -> CodeGen a
 codeGen = return
-
-windows :: Bool
-windows = os `elem` (["mingw32", "cygwin32", "win32"] :: [String])
-
-data PyVersion = PyVersion Int Int Int deriving (Eq, Ord, Show)
-
-installedPythonPaths :: Maybe FilePath -> IO [FilePath]
-installedPythonPaths cwd' = do
-    (exitCode, stdOut, _) <- readCreateProcessWithExitCode proc' ""
-    return $ case exitCode of
-        ExitSuccess -> filter isValid $ lines' stdOut
-        _ -> []
-  where
-    proc' :: CreateProcess
-    proc' = (if windows
-             then proc "where.exe" ["python"]
-             else proc "which" ["python3"]) { cwd = cwd' }
-    lines' :: String -> [String]
-    lines' = map T.unpack . filter (not . T.null)
-                          . map T.strip
-                          . T.lines
-                          . T.pack
-
-getPythonVersion :: Maybe FilePath -> FilePath -> IO (Maybe PyVersion)
-getPythonVersion cwd' path' = do
-    let proc' = (proc path' ["-V"]) { cwd = cwd' }
-    pyVersionStr <- readCreateProcess proc' ""
-    return $ case runParser pyVersionParser "<python3>" pyVersionStr of
-            Left _ -> Nothing
-            Right v -> Just v
-  where
-    pyVersionParser :: Parser PyVersion
-    pyVersionParser = do
-        void $ string' "python"
-        space
-        major <- integer
-        void $ char '.'
-        minor <- integer
-        void $ char '.'
-        micro <- integer
-        return $ PyVersion major minor micro
-    integer :: Parser Int
-    integer = do
-        digits <- some digitChar
-        return (read digits :: Int)
-
-findPython :: Maybe FilePath -> IO (Maybe FilePath)
-findPython cwd' = installedPythonPaths cwd' >>= findPython'
-  where
-    findPython' :: [FilePath] -> IO (Maybe FilePath)
-    findPython' (x : xs) = do
-        pyVerM <- getPythonVersion cwd' x
-        case pyVerM of
-            Nothing -> findPython' xs
-            Just version' -> if version' >= PyVersion 3 3 0
-                             then return $ Just x
-                             else findPython' xs
-    findPython' [] = return Nothing
-
-runPython' :: Maybe FilePath -> [String] -> String -> IO (Maybe String)
-runPython' cwd' args stdinStr = do
-    pyPathM <- findPython cwd'
-    case pyPathM of
-        Nothing -> do
-            putStrLn "Python 3 seems not installed; skipping..."
-            return Nothing
-        Just path -> execute cwd' path args stdinStr
-  where
-    execute :: Maybe FilePath
-            -> FilePath
-            -> [String]
-            -> String
-            -> IO (Maybe String)
-    execute cwdPath pyPath args' stdinStr' = do
-        let proc' = (proc pyPath args') { cwd = cwdPath }
-        result <- readCreateProcess proc' stdinStr'
-        return $ Just result
-
-runPython :: Maybe FilePath -> String -> IO (Maybe String)
-runPython cwd' code' =
-    catchIOError (runPython' cwd' [] code') $ \ e -> do
-        putStrLn "\nThe following IO error was raised:\n"
-        putStrLn $ indent "  " $ show e
-        putStrLn "\n... while the following code was executed:\n"
-        putStrLn $ indent "  " code'
-        ioError e
-  where
-    indent :: String -> String -> String
-    indent spaces content = unlines [spaces ++ l | l <- lines content]
-
-testPythonSuit :: Maybe FilePath -> String -> T.Text -> IO ()
-testPythonSuit cwd' suitCode testCode = do
-    nirumPackageInstalledM <-
-        runPython cwd' [q|
-try: import nirum
-except ImportError: print('F')
-else: print('T')
-            |]
-    case nirumPackageInstalledM of
-        Just nirumPackageInstalled ->
-            case strip nirumPackageInstalled of
-                "T" -> do
-                    resultM <- runPython cwd' suitCode
-                    case resultM of
-                        Just result ->
-                            unless (strip result == "True") $
-                                expectationFailure $
-                                T.unpack ("Test failed: " `T.append` testCode)
-                        Nothing -> return ()
-                _ -> putStrLn ("The nirum Python package cannot be " ++
-                               "imported; skipped...")
-        Nothing -> return ()
-  where
-    strip :: String -> String
-    strip = dropWhile isSpace . dropWhileEnd isSpace
-
-testPython :: Maybe FilePath -> T.Text -> T.Text -> IO ()
-testPython cwd' defCode testCode = testPythonSuit cwd' code' testCode'
-  where
-    -- to workaround hlint's "Eta reduce" warning
-    -- hlint seems unable to look inside qq string literal...
-    testCode' :: T.Text
-    testCode' = testCode
-    code' :: String
-    code' = [qq|$defCode
-
-if __name__ == '__main__':
-    print(bool($testCode'))
-|]
-
-testRaisePython :: Maybe FilePath -> T.Text -> T.Text -> T.Text -> IO ()
-testRaisePython cwd' errorClassName defCode testCode =
-    testPythonSuit cwd' code' testCode''
-  where
-    -- to workaround hlint's "Eta reduce" warning
-    -- hlint seems unable to look inside qq string literal...
-    testCode'' :: T.Text
-    testCode'' = testCode
-    code' :: String
-    code' = [qq|$defCode
-
-if __name__ == '__main__':
-    try:
-        $testCode''
-    except $errorClassName:
-        print(True)
-    else:
-        print(False)
-|]
 
 makeDummySource' :: [Identifier] -> Module -> Source
 makeDummySource' pathPrefix m =
@@ -454,32 +287,6 @@ spec = parallel $ forM_ versions $ \ (ver, typing) -> do
         stringLiteral "Say '\xc548\xb155'"
             `shouldBe` [q|u"Say '\uc548\ub155'"|]
 
-    let test testRunner (Source pkg boundM) testCode =
-            case errors of
-                error' : _ -> fail $ T.unpack error'
-                [] -> withSystemTempDirectory "nirumpy." $ \ dir -> do
-                    forM_ codes $ \ (filePath, code') -> do
-                        let filePath' = dir </> filePath
-                            dirName = takeDirectory filePath'
-                        createDirectoryIfMissing True dirName
-                        TI.writeFile filePath' code'
-                        {-- <- Remove '{' to print debug log
-                        TI.putStrLn $ T.pack filePath'
-                        TI.putStrLn code'
-                        -- -}
-                    testRunner (Just dir) defCode testCode
-          where
-            files :: M.Map FilePath (Either CompileError Code)
-            files = compilePackage pkg
-            errors :: [CompileError]
-            errors = [error' | (_, Left error') <- M.toList files]
-            codes :: [(FilePath, Code)]
-            codes = [(path, code') | (path, Right code') <- M.toList files]
-            pyImportPath :: T.Text
-            pyImportPath = toImportPath $ modulePath boundM
-            defCode :: Code
-            defCode = [qq|from $pyImportPath import *|]
-
     describe "compilePackage" $ do
         it "returns a Map of file paths and their contents to generate" $ do
             let (Source pkg _) = makeDummySource $ Module [] Nothing
@@ -511,32 +318,6 @@ spec = parallel $ forM_ versions $ \ (ver, typing) -> do
                     , "MANIFEST.in"
                     ]
             M.keysSet files `shouldBe` directoryStructure
-        specify "setup.py" $ do
-            let setupPyFields = [ ("--name", "TestPackage")
-                                , ("--author", "John Doe")
-                                , ("--author-email", "john@example.com")
-                                , ("--version", "1.2.3")
-                                , ("--provides", "foo\nfoo.bar\nqux")
-                                , ("--requires", "nirum")
-                                ] :: [(String, T.Text)]
-                source = makeDummySource $ Module [] Nothing
-                testRunner cwd' _ _ =
-                    {-- -- <- remove '{' to print debug log
-                    do
-                        let spath = case cwd' of
-                                        Just c -> c </> "setup.py"
-                                        Nothing -> "setup.py"
-                        contents <- TI.readFile spath
-                        TI.putStrLn "=========== setup.py ==========="
-                        TI.putStrLn contents
-                        TI.putStrLn "=========== /setup.py =========="
-                    -- -}
-                        forM_ setupPyFields $ \ (option, expected) -> do
-                            out <- runPython' cwd' ["setup.py", option] ""
-                            out `shouldSatisfy` isJust
-                            let Just result = out
-                            T.strip (T.pack result) `shouldBe` expected
-            test testRunner source T.empty
 
     describe "InstallRequires" $ do
         let req = InstallRequires [] []
