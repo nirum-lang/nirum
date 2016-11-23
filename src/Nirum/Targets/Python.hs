@@ -238,6 +238,13 @@ toIndentedCodes f traversable concatenator =
 quote :: T.Text -> T.Text
 quote s = [qq|'{s}'|]
 
+typeReprCompiler :: CodeGen (Code -> Code)
+typeReprCompiler = do
+    insertTypingImport
+    ver <- getPythonVersion
+    return $ case ver of
+        Python2 -> \ t -> [qq|($t.__module__ + '.' + $t.__name__)|]
+        Python3 -> \ t -> [qq|typing._type_repr($t)|]
 
 type ParameterName = Code
 type ParameterType = Code
@@ -293,6 +300,7 @@ compileUnionTag source parentname typename' fields = do
                             ]
     arg <- parameterCompiler
     ret <- returnCompiler
+    typeRepr <- typeReprCompiler
     return [qq|
 class $className($parentClass):
     # TODO: docstring
@@ -314,7 +322,7 @@ class $className($parentClass):
 
     def __repr__(self){ ret "str" }:
         return '\{0\}(\{1\})'.format(
-            typing._type_repr(self),
+            {typeRepr "type(self)"},
             ', '.join('\{\}=\{\}'.format(attr, getattr(self, attr))
                       for attr in self.__slots__)
         )
@@ -341,7 +349,9 @@ compilePrimitiveType primitiveTypeIdentifier = do
             insertStandardImport "decimal"
             return "decimal.Decimal"
         (Int32, _) -> return "int"
-        (Int64, Python2) -> return "long"
+        (Int64, Python2) -> do
+            insertStandardImport "numbers"
+            return "numbers.Integral"
         (Int64, Python3) -> return "int"
         (Float32, _) -> return "float"
         (Float64, _) -> return "float"
@@ -407,6 +417,7 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
                             ]
     arg <- parameterCompiler
     ret <- returnCompiler
+    typeRepr <- typeReprCompiler
     return [qq|
 class $className(object):
     # TODO: docstring
@@ -439,7 +450,7 @@ class $className(object):
 
     def __repr__(self){ ret "str" }:
         return '\{0\}(\{1!r\})'.format(
-            typing._type_repr(self), self.value
+            {typeRepr "type(self)"}, self.value
         )
 
     def __hash__(self) -> int:
@@ -500,6 +511,7 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
                             ]
     arg <- parameterCompiler
     ret <- returnCompiler
+    typeRepr <- typeReprCompiler
     let clsType = arg "cls" "type"
     return [qq|
 class $className(object):
@@ -522,7 +534,7 @@ class $className(object):
 
     def __repr__(self){ret "bool"}:
         return '\{0\}(\{1\})'.format(
-            typing._type_repr(self),
+            {typeRepr "type(self)"},
             ', '.join('\{\}=\{\}'.format(attr, getattr(self, attr))
                       for attr in self.__slots__)
         )
@@ -561,6 +573,7 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
                             ]
     arg <- parameterCompiler
     ret <- returnCompiler
+    typeRepr <- typeReprCompiler
     return [qq|
 class $className(object):
 
@@ -574,11 +587,9 @@ class $className(object):
 
     def __init__(self, *args, **kwargs):
         raise NotImplementedError(
-            "\{0.__module__\}.\{0.__qualname__\} cannot be instantiated "
+            "\{0\} cannot be instantiated "
             "since it is an abstract class.  Instantiate a concrete subtype "
-            "of it instead.".format(
-                type(self)
-            )
+            "of it instead.".format({typeRepr "type(self)"})
         )
 
     def __nirum_serialize__(self){ ret "typing.Mapping[str, typing.Any]" }:
