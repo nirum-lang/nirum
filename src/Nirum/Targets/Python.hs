@@ -38,7 +38,7 @@ module Nirum.Targets.Python ( Code
                             , unionInstallRequires
                             ) where
 
-import Control.Monad.State as ST (get, modify)
+import qualified Control.Monad.State as ST
 import qualified Data.List as L
 import Data.Maybe (fromMaybe)
 import GHC.Exts (IsList (toList))
@@ -145,13 +145,13 @@ runCodeGen :: CodeGen a
 runCodeGen = C.runCodeGen
 
 insertStandardImport :: T.Text -> CodeGen ()
-insertStandardImport module' = modify insert'
+insertStandardImport module' = ST.modify insert'
   where
     insert' c@CodeGenContext { standardImports = si } =
         c { standardImports = S.insert module' si }
 
 insertThirdPartyImports :: [(T.Text, S.Set T.Text)] -> CodeGen ()
-insertThirdPartyImports imports = modify insert'
+insertThirdPartyImports imports = ST.modify insert'
   where
     insert' c@CodeGenContext { thirdPartyImports = ti } =
         c { thirdPartyImports = L.foldl (M.unionWith S.union) ti importList }
@@ -159,7 +159,7 @@ insertThirdPartyImports imports = modify insert'
     importList = map (uncurry M.singleton) imports
 
 insertLocalImport :: T.Text -> T.Text -> CodeGen ()
-insertLocalImport module' object = modify insert'
+insertLocalImport module' object = ST.modify insert'
   where
     insert' c@CodeGenContext { localImports = li } =
         c { localImports = M.insertWith S.union module' [object] li }
