@@ -42,7 +42,8 @@ after_build:
 - ps: ls
 - ps: upx.exe -9 nirum-win-${env:PLATFORM}.exe
 test_script:
-- C:\pyvenv\Scripts\Activate.bat & stack test
+- stack test
+- C:\mingw-w64\i686-5.3.0-posix-dwarf-rt_v4-rev0\mingw32\bin\bash test.sh
 artifacts:
 - path: nirum-win-x86.exe
 - path: nirum-win-x64.exe

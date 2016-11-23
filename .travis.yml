@@ -17,7 +17,6 @@ matrix:
 cache:
   directories:
   - "$HOME/.stack"
-  - "$HOME/.pyvenv"
   - "$HOME/.ghc"
 before_install:
 - mkdir -p "$HOME/.local/bin"
@@ -40,24 +39,16 @@ before_install:
 - chmod +x "$HOME/.local/bin/travis_long"
 install:
 - | 
-  if [[ "$TRAVIS_OS_NAME" = "osx" ]]
-  then
-    pip3 install --user virtualenv
-    if [[ ! -f "$HOME/.pyvenv/bin/activate" ]]; then pyvenv "$HOME/.pyvenv"; fi
+  if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then
+    pip3 install --user --upgrade tox pip setuptools
   else
-    pip install --user virtualenv
-    if [[ ! -f "$HOME/.pyvenv/bin/activate" ]]; then virtualenv -p "$(which python$PY)" "$HOME/.pyvenv"; fi
+    pip install --user --upgrade tox pip setuptools
   fi
-- '"$HOME/.pyvenv/bin/pip" install --upgrade pip setuptools'
-- '"$HOME/.pyvenv/bin/pip" install --upgrade git+git://github.com/spoqa/nirum-python.git'
-- if [[ "$PY" = "3.4" ]]; then "$HOME/.pyvenv/bin/pip" install --upgrade typing; fi  # FIXME
 - 'sed -E "s/resolver\s*:\s*.*/resolver: $RESOLVER/" stack.yaml > stack-new.yaml'
 - mv stack-new.yaml stack.yaml
 - travis_long stack --no-terminal setup
 - travis_long stack --no-terminal install scan
 script:
-- source "$HOME/.pyvenv/bin/activate"
-- pip install test/python/requirements.txt
 - stack --no-terminal test
 - ./lint.sh
 - ./test.sh
