@@ -72,6 +72,7 @@ import Nirum.Package.Metadata ( Author (Author, email, name, uri)
                               , Metadata (Metadata, authors, version)
                               )
 import Nirum.PackageSpec (createPackage)
+import qualified Nirum.Targets.Python as PY
 import Nirum.Targets.Python ( Source (Source)
                             , Code
                             , CodeGen
@@ -90,7 +91,6 @@ import Nirum.Targets.Python ( Source (Source)
                             , compilePackage
                             , compilePrimitiveType
                             , compileTypeExpression
-                            , emptyContext
                             , stringLiteral
                             , toAttributeName
                             , toClassName
@@ -307,7 +307,7 @@ versions = [ (Python2, [])
 
 spec :: Spec
 spec = parallel $ forM_ versions $ \ (ver, typing) -> do
-    let empty' = emptyContext ver
+    let empty' = PY.empty ver
         -- run' :: CodeGen a -> (Either CompileError a, CodeGenContext)
         run' c = runCodeGen c empty'
         -- code :: CodeGen a -> a

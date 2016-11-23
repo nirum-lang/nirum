@@ -25,7 +25,7 @@ module Nirum.Targets.Python ( Code
                             , compilePrimitiveType
                             , compileTypeDeclaration
                             , compileTypeExpression
-                            , emptyContext
+                            , empty
                             , insertLocalImport
                             , insertStandardImport
                             , insertThirdPartyImports
@@ -129,12 +129,12 @@ sourceDirectory :: PythonVersion -> T.Text
 sourceDirectory Python2 = "src-py2"
 sourceDirectory Python3 = "src"
 
-emptyContext :: PythonVersion -> CodeGenContext
-emptyContext pythonVersion' = CodeGenContext { standardImports = []
-                                             , thirdPartyImports = []
-                                             , localImports = []
-                                             , pythonVersion = pythonVersion'
-                                             }
+empty :: PythonVersion -> CodeGenContext
+empty pythonVersion' = CodeGenContext { standardImports = []
+                                      , thirdPartyImports = []
+                                      , localImports = []
+                                      , pythonVersion = pythonVersion'
+                                      }
 
 type CodeGen = C.CodeGen CodeGenContext CompileError
 
@@ -767,7 +767,7 @@ compileModule :: PythonVersion
               -> Source
               -> Either CompileError (InstallRequires, Code)
 compileModule pythonVersion' source =
-    case runCodeGen code' $ emptyContext pythonVersion' of
+    case runCodeGen code' $ empty pythonVersion' of
         (Left errMsg, _) -> Left errMsg
         (Right code, context) -> codeWithDeps context $
             [qq|# -*- coding: utf-8 -*-
