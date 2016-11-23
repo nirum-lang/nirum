@@ -453,7 +453,7 @@ class $className(object):
             {typeRepr "type(self)"}, self.value
         )
 
-    def __hash__(self) -> int:
+    def __hash__(self){ ret "int" }:
         return hash(self.value)
 |]
 compileTypeDeclaration _ TypeDeclaration { typename = typename'
