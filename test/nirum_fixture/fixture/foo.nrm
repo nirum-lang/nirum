@@ -1,0 +1,56 @@
+import fixture.foo.bar (path-unbox, point, int-unbox);
+import fixture.qux (path, name);
+
+unboxed float-unbox (float64);
+unboxed imported-type-unbox (path-unbox);
+unboxed way (path);
+
+type irum = name;
+
+enum gender = female/yeoseong
+            | male 
+            ;
+enum eva-char = soryu-asuka-langley
+              | ayanami-rei
+              | ikari-shinji
+              | katsuragi-misato
+              | nagisa-kaworu
+              ;
+
+record point1 (
+    bigint left/x,
+    bigint top,
+);
+record point2 (
+    int-unbox left,
+    int-unbox top,
+);
+record point3d (
+    point xy,
+    int64 z,
+);
+record line (
+    bigint length,
+);
+
+union mixed-name = western-name ( text first-name
+                                , text middle-name
+                                , text last-name
+                                )
+                 | east-asian-name ( text family-name
+                                   , text given-name
+                                   )
+                 | culture-agnostic-name (text fullname)
+                 ;
+union music = pop (text country)
+            | rnb/rhythm-and-ballad (text country)
+            ;
+union status = run
+             | stop
+             ;
+
+service null-service ();
+
+service ping-service (
+    bool ping (text nonce),
+);

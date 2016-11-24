@@ -1,0 +1,4 @@
+pytest
+nirum
+six
+tox

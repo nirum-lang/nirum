@@ -1,0 +1,9 @@
+import fixture.qux (path);
+
+unboxed path-unbox (path);
+unboxed int-unbox (bigint);
+
+record point (
+    int64 x,
+    int64 y,
+);
