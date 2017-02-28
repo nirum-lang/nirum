@@ -7,6 +7,7 @@ module Nirum.Constructs.ModulePath ( ModulePath ( ModuleName
                                    , ancestors
                                    , fromFilePath
                                    , fromIdentifiers
+                                   , hierarchy
                                    ) where
 
 import Data.Char (toLower)
@@ -66,3 +67,10 @@ instance IsList ModulePath where
                   (fromIdentifiers identifiers)
     toList (ModuleName identifier) = [identifier]
     toList (ModulePath path' identifier) = toList path' ++ [identifier]
+
+hierarchy :: ModulePath -> S.Set [Identifier]
+hierarchy modulePath' = S.fromList $ toPathList modulePath'
+  where
+    toPathList :: ModulePath -> [[Identifier]]
+    toPathList m@(ModulePath path' _) = toList m : toPathList path'
+    toPathList (ModuleName identifier) = [[identifier]]

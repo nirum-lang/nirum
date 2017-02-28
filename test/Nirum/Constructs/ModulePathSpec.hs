@@ -3,8 +3,10 @@ module Nirum.Constructs.ModulePathSpec where
 
 import Control.Exception (evaluate)
 import Data.List (sort)
+import Data.Maybe (fromJust)
 import GHC.Exts (IsList (fromList, toList))
 
+import qualified Data.Set as S
 import System.FilePath ((</>))
 import Test.Hspec.Meta
 
@@ -13,6 +15,7 @@ import Nirum.Constructs.ModulePath ( ModulePath (ModuleName, ModulePath)
                                    , ancestors
                                    , fromFilePath
                                    , fromIdentifiers
+                                   , hierarchy
                                    )
 
 spec :: Spec
@@ -82,3 +85,9 @@ spec =
                 fooBarBaz2 `shouldNotSatisfy` (<= fooBarBaz)
                 sort [["abc"], foo, fooBar, fooBarBaz, fooBarBaz2]
                     `shouldBe` [["abc"], foo, fooBar, fooBarBaz, fooBarBaz2]
+        specify "hierarchy" $ do
+            let foo' = fromJust $ fromIdentifiers ["foo", "bar", "baz"]
+            hierarchy foo' `shouldBe` S.fromList [ ["foo", "bar", "baz"]
+                                                 , ["foo", "bar"]
+                                                 , ["foo"]
+                                                 ]
