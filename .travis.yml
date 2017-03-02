@@ -1,11 +1,9 @@
 language: c
 matrix:
   include:
-  - env: GHCVER=8.0.1 RESOLVER=nightly-2016-10-10
-    os: osx
+  - os: osx
     osx_image: xcode7.3
-  - env: GHCVER=8.0.1 RESOLVER=nightly-2016-10-10
-    addons:
+  - addons:
       apt:
         sources: [hvr-ghc, deadsnakes]
         packages:
@@ -44,8 +42,6 @@ install:
   else
     pip install --user --upgrade tox pip setuptools
   fi
-- 'sed -E "s/resolver\s*:\s*.*/resolver: $RESOLVER/" stack.yaml > stack-new.yaml'
-- mv stack-new.yaml stack.yaml
 - travis_long stack --no-terminal setup
 - travis_long stack --no-terminal install scan
 script:
