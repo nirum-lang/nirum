@@ -33,8 +33,9 @@ fi
 # Haskell style scanner doesn't provide proper exit code ---
 # it always exists with zero even if it found errors.
 scanout="$(mktemp)"
-find src test -name '*.hs' -print0 | \
-    xargs -0 "${scan[@]}" -j false -c false > "$scanout"
+find src test -name '*.hs' -and -not -exec grep -q TemplateHaskell {} \; \
+    -print0 | \
+        xargs -0 "${scan[@]}" -t -j false -c false > "$scanout"
 cat "$scanout"
 if [[ "$(cat "$scanout")" != "" ]]; then
   exit 1
