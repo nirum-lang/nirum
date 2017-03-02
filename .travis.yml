@@ -1,14 +1,18 @@
 language: c
 matrix:
   include:
-  - env: GHCVER=8.0.1 RESOLVER=nightly-2016-10-10
-    os: osx
+  - os: osx
     osx_image: xcode7.3
-  - env: GHCVER=8.0.1 RESOLVER=nightly-2016-10-10
-    addons:
+  - addons:
       apt:
         sources: [hvr-ghc, deadsnakes]
-        packages: [ghc-8.0.1, python2.7, python3.4, python3.5, libgmp10, upx-ucl]
+        packages:
+        - ghc-8.0.1
+        - python2.7
+        - python3.4
+        - python3.5
+        - libgmp10
+        - upx-ucl
 cache:
   directories:
   - "$HOME/.stack"
@@ -27,7 +31,7 @@ before_install:
   if [[ "$TRAVIS_OS_NAME" = "osx" ]]
   then 
     brew tap drolando/deadsnakes
-    brew install python34 python3 || brew upgrade python34 python35 || true
+    brew install python34 python35 python3 || brew upgrade python34 python35 python3 || true
   fi
 - curl -o "$HOME/.local/bin/travis_long" -L https://raw.githubusercontent.com/futurice/fum2github/master/travis_long
 - chmod +x "$HOME/.local/bin/travis_long"
@@ -38,8 +42,6 @@ install:
   else
     pip install --user --upgrade tox pip setuptools
   fi
-- 'sed -E "s/resolver\s*:\s*.*/resolver: $RESOLVER/" stack.yaml > stack-new.yaml'
-- mv stack-new.yaml stack.yaml
 - travis_long stack --no-terminal setup
 - travis_long stack --no-terminal install scan
 script:
