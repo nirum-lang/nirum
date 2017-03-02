@@ -12,7 +12,7 @@ def parse_pkg_info(pkg_name):
 
 
 def test_setup_metadata():
-    pkg = parse_pkg_info('TestPackage')
+    pkg = parse_pkg_info('nirum_fixture')
     assert ['nirum'] == pkg['Author']
     assert ['dev@nirum.org'] == pkg['Author-email']
     assert ['nirum'] == pkg['Requires']

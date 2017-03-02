@@ -3,10 +3,9 @@ module Nirum.CliSpec where
 
 import Control.Monad (forM_)
 
+import qualified Data.ByteString as B
 import qualified Data.Map.Strict as M
 import Data.List (sort)
-import Data.Text (Text)
-import qualified Data.Text.IO as TI
 import System.Directory (listDirectory)
 import System.FilePath ((</>))
 import System.IO.Temp (withSystemTempDirectory)
@@ -14,11 +13,11 @@ import Test.Hspec.Meta
 
 import Nirum.Cli (writeFiles)
 
-expectWriteFiles :: FilePath -> [(FilePath, Text)] -> IO [FilePath]
+expectWriteFiles :: FilePath -> [(FilePath, B.ByteString)] -> IO [FilePath]
 expectWriteFiles tmpDir files = do
-    writeFiles tmpDir $ M.fromList [(f, Right c) | (f, c) <- files]
+    writeFiles tmpDir $ M.fromList files
     forM_ files $ \ (f, expectedContent) -> do
-        content <- TI.readFile (tmpDir </> f)
+        content <- B.readFile (tmpDir </> f)
         content `shouldBe` expectedContent
     fileList <- listDirectory tmpDir
     return $ sort fileList

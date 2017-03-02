@@ -1,3 +1,4 @@
+{-# LANGUAGE RankNTypes, StandaloneDeriving #-}
 module Nirum.Package ( BoundModule (boundPackage, modulePath)
                      , Package (Package, metadata, modules)
                      , PackageError ( ImportError
@@ -13,6 +14,7 @@ module Nirum.Package ( BoundModule (boundPackage, modulePath)
                      , resolveModule
                      , scanModules
                      , scanPackage
+                     , target
                      , types
                      ) where
 
@@ -40,23 +42,23 @@ import Nirum.Constructs.TypeDeclaration ( Type
                                                           , type'
                                                           )
                                         )
-import Nirum.Package.Metadata ( Metadata
-                              , MetadataError
+import Nirum.Package.Metadata ( MetadataError
+                              , Package (Package, metadata, modules)
+                              , Target
                               , metadataPath
+                              , packageTarget
                               , readFromPackage
                               )
 import qualified Nirum.Package.ModuleSet as MS
 import Nirum.Parser (ParseError, parseFile)
 
--- | Represents a package which consists of modules.
-data Package = Package { metadata :: Metadata
-                       , modules :: MS.ModuleSet
-                       } deriving (Eq, Ord, Show)
+target :: Target t => Package t -> t
+target = packageTarget
 
-resolveModule :: ModulePath -> Package -> Maybe Mod.Module
+resolveModule :: ModulePath -> Package t -> Maybe Mod.Module
 resolveModule path Package { modules = ms } = MS.lookup path ms
 
-resolveBoundModule :: ModulePath -> Package -> Maybe BoundModule
+resolveBoundModule :: ModulePath -> Package t -> Maybe (BoundModule t)
 resolveBoundModule path package =
     case resolveModule path package of
         Just _ -> Just $ BoundModule package path
@@ -69,7 +71,7 @@ data PackageError = ScanError FilePath IOError
                   deriving (Eq, Show)
 
 -- | Scan the given package path, and then return the read package.
-scanPackage :: FilePath -> IO (Either PackageError Package)
+scanPackage :: Target t => FilePath -> IO (Either PackageError (Package t))
 scanPackage packagePath = runExceptT $ do
     metadataE <- catch (readFromPackage packagePath)
                        (ScanError $ metadataPath packagePath)
@@ -127,11 +129,15 @@ scanModules packagePath = do
                        [] -> packagePath
                        p -> packagePath </> p
 
-data BoundModule = BoundModule { boundPackage :: Package
-                               , modulePath :: ModulePath
-                               } deriving (Eq, Ord, Show)
+data BoundModule t = BoundModule { boundPackage :: Target t => Package t
+                                 , modulePath :: ModulePath
+                                 }
 
-findInBoundModule :: (Mod.Module -> a) -> a -> BoundModule -> a
+deriving instance (Eq t, Target t) => Eq (BoundModule t)
+deriving instance (Ord t, Target t) => Ord (BoundModule t)
+deriving instance (Show t, Target t) => Show (BoundModule t)
+
+findInBoundModule :: Target t => (Mod.Module -> a) -> a -> BoundModule t -> a
 findInBoundModule valueWhenExist valueWhenNotExist
                   BoundModule { boundPackage = Package { modules = ms }
                               , modulePath = path
@@ -140,10 +146,10 @@ findInBoundModule valueWhenExist valueWhenNotExist
         Nothing -> valueWhenNotExist
         Just mod' -> valueWhenExist mod'
 
-types :: BoundModule -> DS.DeclarationSet TypeDeclaration
+types :: Target t => BoundModule t -> DS.DeclarationSet TypeDeclaration
 types = findInBoundModule Mod.types DS.empty
 
-docs :: BoundModule -> Maybe Docs
+docs :: Target t => BoundModule t -> Maybe Docs
 docs = findInBoundModule Mod.docs Nothing
 
 data TypeLookup = Missing
@@ -151,7 +157,7 @@ data TypeLookup = Missing
                 | Imported ModulePath Type
                 deriving (Eq, Ord, Show)
 
-lookupType :: Identifier -> BoundModule -> TypeLookup
+lookupType :: Target t => Identifier -> BoundModule t -> TypeLookup
 lookupType identifier boundModule =
     case DS.lookup identifier (types boundModule) of
         Nothing -> toType Mod.coreModulePath

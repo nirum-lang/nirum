@@ -5,10 +5,10 @@ import Control.Monad (forM_)
 import GHC.Exts (IsList (toList))
 import System.IO.Error (catchIOError, ioeGetErrorString)
 
+import qualified Data.ByteString as B
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
-import qualified Data.Text.IO as TI
 import System.Console.CmdArgs.Implicit ( Data
                                        , Typeable
                                        , argPos
@@ -41,14 +41,16 @@ import Nirum.Package ( PackageError ( ImportError
                                     , ScanError
                                     )
                      , scanModules
-                     , scanPackage
                      )
 import Nirum.Package.ModuleSet ( ImportError ( CircularImportError
                                              , MissingImportError
                                              , MissingModulePathError
                                              )
                                )
-import Nirum.Targets.Python (compilePackage)
+import Nirum.Targets ( BuildError (CompileError, PackageError, TargetNameError)
+                     , BuildResult
+                     , buildPackage
+                     )
 import Nirum.Version (versionString)
 
 data NirumCli = NirumCli { sourcePath :: FilePath
@@ -132,10 +134,12 @@ nirumCli = NirumCli { objectPath = def &= explicit
 
 main' :: IO ()
 main' = do
-    NirumCli src obj <- cmdArgs nirumCli
-    scanResult <- scanPackage src
-    case scanResult of
-        Left (ParseError modulePath error') -> do
+    NirumCli src outDir <- cmdArgs nirumCli
+    result <- buildPackage "python" src
+    case result of
+        Left (TargetNameError targetName) ->
+            putStrLn [qq|Couldn't find "$targetName" target.|]
+        Left (PackageError (ParseError modulePath error')) -> do
             {- FIXME: find more efficient way to determine filename from
                       the given module path -}
             filePaths <- scanModules src
@@ -144,26 +148,26 @@ main' = do
                     m <- parseErrortoPrettyMessage error' filePath'
                     putStrLn m
                 Nothing -> putStrLn [qq|$modulePath not found|]
-        Left (ImportError importErrors) ->
+        Left (PackageError (ImportError importErrors)) ->
             putStrLn [qq|Import error:
 {importErrorsToPrettyMessage importErrors}
 |]
-        Left (ScanError _ error') -> putStrLn [qq|Scan error: $error'|]
-        Left (MetadataError error') -> putStrLn [qq|Metadata error: $error'|]
-        Right pkg -> writeFiles obj $ compilePackage pkg
+        Left (PackageError (ScanError _ error')) ->
+            putStrLn [qq|Scan error: $error'|]
+        Left (PackageError (MetadataError error')) ->
+            putStrLn [qq|Metadata error: $error'|]
+        Left (CompileError errors) ->
+            forM_ (M.toList errors) $ \ (filePath, compileError) ->
+                putStrLn [qq|error: $filePath: $compileError|]
+        Right buildResult -> writeFiles outDir buildResult
 
-writeFiles :: FilePath -> M.Map FilePath (Either T.Text T.Text) -> IO ()
-writeFiles obj m =
-    forM_ files $ \ (filePath, result) ->
-        case result of
-            Left compileError -> putStrLn [qq|error: $filePath: $compileError|]
-            Right code -> do
-                createDirectoryIfMissing True $ takeDirectory filePath
-                putStrLn filePath
-                TI.writeFile filePath code
-  where
-    files :: [(FilePath, Either T.Text T.Text)]
-    files = [(obj </> f, r) | (f, r) <- M.toList m]
+writeFiles :: FilePath -> BuildResult -> IO ()
+writeFiles outDir files =
+    forM_ (M.toAscList files) $ \ (filePath, code) -> do
+        let outPath = outDir </> filePath
+        createDirectoryIfMissing True $ takeDirectory outPath
+        putStrLn outPath
+        B.writeFile outPath code
 
 main :: IO ()
 main = catchIOError main' $ putStrLn . ioeGetErrorString

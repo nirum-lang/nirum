@@ -43,9 +43,12 @@ library
                  ,     Nirum.Package.Metadata
                  ,     Nirum.Package.ModuleSet
                  ,     Nirum.Parser
+                 ,     Nirum.Targets
+                 ,     Nirum.Targets.List
                  ,     Nirum.Targets.Python
                  ,     Nirum.Version
   build-depends:       base                     >=4.7     && <5
+               ,       bytestring
                ,       containers               >=0.5.6.2 && <0.6
                ,       cmdargs                  >=0.10.14 && <0.11
                ,       directory                >=1.2.5   && <1.3
@@ -58,6 +61,7 @@ library
                ,       parsec
                        -- only for dealing with htoml's ParserError
                ,       semver                   >=0.3.0   && <1.0
+               ,       template-haskell         >=2.11    && <3
                ,       text                     >=0.9.1.0 && <1.3
                ,       unordered-containers
                        -- only for dealing with htoml's data structures
@@ -72,6 +76,7 @@ executable nirum
                ,       nirum
   main-is:             Main.hs
   default-language:    Haskell2010
+  default-extensions:  OverloadedStrings
   ghc-options:         -Wall -Werror -fwarn-incomplete-uni-patterns
                        -threaded -with-rtsopts=-N
 
@@ -80,6 +85,7 @@ executable nirum-static
                ,       nirum
   main-is:             Main.hs
   default-language:    Haskell2010
+  default-extensions:  OverloadedStrings
   ghc-options:         -Wall -Werror -fwarn-incomplete-uni-patterns
                        -threaded -with-rtsopts=-N
                        -static
@@ -100,15 +106,18 @@ test-suite spec
                ,       Nirum.Constructs.ServiceSpec
                ,       Nirum.Constructs.TypeDeclarationSpec
                ,       Nirum.Constructs.TypeExpressionSpec
+               ,       Nirum.Package.MetadataSpec
                ,       Nirum.Package.ModuleSetSpec
                ,       Nirum.PackageSpec
                ,       Nirum.ParserSpec
                ,       Nirum.Targets.PythonSpec
+               ,       Nirum.TargetsSpec
                ,       Nirum.VersionSpec
                ,       Util
   default-language:    Haskell2010
   default-extensions:  OverloadedStrings
   build-depends:       base                     >=4.7     && <5
+               ,       bytestring
                ,       containers               >=0.5.6.2 && <0.6
                ,       directory
                ,       email-validate           >=2.0.0   && <3.0.0
@@ -116,6 +125,7 @@ test-suite spec
                ,       hspec
                ,       hspec-core
                ,       hspec-meta
+               ,       htoml                    >=1.0.0.0 && <1.1.0.0
                ,       interpolatedstring-perl6 >=1.0.0   && <1.1.0
                ,       megaparsec               >=5       && <5.2
                ,       mtl                      >=2.2.1   && <3

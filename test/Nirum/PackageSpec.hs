@@ -1,12 +1,15 @@
-{-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE OverloadedLists, OverloadedStrings, QuasiQuotes,
+             ScopedTypeVariables #-}
 module Nirum.PackageSpec where
 
-import Data.Either (isRight)
+import Data.Either (isLeft, isRight)
+import Data.Proxy (Proxy (Proxy))
 import System.IO.Error (isDoesNotExistError)
 
 import qualified Data.SemVer as SV
 import System.FilePath ((</>))
 import Test.Hspec.Meta
+import Text.InterpolatedString.Perl6 (qq)
 import qualified Text.Parsec.Error as PE
 import Text.Parsec.Pos (sourceColumn, sourceLine)
 
@@ -21,7 +24,7 @@ import Nirum.Constructs.TypeDeclaration ( JsonType (String)
                                                           )
                                         )
 import Nirum.Package ( BoundModule (boundPackage, modulePath)
-                     , Package (Package)
+                     , Package (Package, metadata)
                      , PackageError (ImportError, MetadataError, ScanError)
                      , TypeLookup (Imported, Local, Missing)
                      , docs
@@ -32,29 +35,40 @@ import Nirum.Package ( BoundModule (boundPackage, modulePath)
                      , scanPackage
                      , types
                      )
-import Nirum.Package.Metadata ( Metadata (Metadata, authors, version)
+import Nirum.Package.Metadata ( Metadata (Metadata, authors, target, version)
                               , MetadataError (FormatError)
+                              , Target (targetName)
                               )
+import Nirum.Package.MetadataSpec (DummyTarget (DummyTarget))
 import Nirum.Package.ModuleSet ( ImportError (MissingModulePathError)
                                , fromList
                                )
 import Nirum.Package.ModuleSetSpec (validModules)
 import Nirum.Parser (parseFile)
+import Nirum.Targets.Python (Python (Python))
 
-createPackage :: Metadata -> [(ModulePath, Module)] -> Package
+createPackage :: Metadata t -> [(ModulePath, Module)] -> Package t
 createPackage metadata' modules' =
     case fromList modules' of
         Right ms -> Package metadata' ms
         Left e -> error $ "errored: " ++ show e
 
-validPackage :: Package
-validPackage = createPackage Metadata { version = SV.initial
-                                      , authors = []
-                                      } validModules
+createValidPackage :: t -> Package t
+createValidPackage t = createPackage Metadata { version = SV.initial
+                                              , authors = []
+                                              , target = t
+                                              } validModules
 
 spec :: Spec
 spec = do
-    describe "Package" $ do
+    testPackage (Python "nirum-examples")
+    testPackage DummyTarget
+
+testPackage :: forall t . Target t => t -> Spec
+testPackage target' = do
+    let targetName' = targetName (Proxy :: Proxy t)
+        validPackage = createValidPackage target'
+    describe [qq|Package (target: $targetName')|] $ do
         specify "resolveModule" $ do
             resolveModule ["foo"] validPackage `shouldBe`
                 Just (Module [] $ Just "foo")
@@ -71,7 +85,7 @@ spec = do
         describe "scanPackage" $ do
             it "returns Package value when all is well" $ do
                 let path = "." </> "examples"
-                package' <- scanPackage path
+                package' <- scanPackage' path
                 package' `shouldSatisfy` isRight
                 let Right package = package'
                 Right builtinsM <- parseFile (path </> "builtins.nrm")
@@ -87,23 +101,29 @@ spec = do
                               , (["address"], addressM)
                               , (["pdf-service"], pdfServiceM)
                               ] :: [(ModulePath, Module)]
-                package `shouldBe`
-                    createPackage Metadata { version = SV.version 0 3 0 [] []
-                                           , authors = []
-                                           } modules
+                    metadata' = Metadata { version = SV.version 0 3 0 [] []
+                                         , authors = []
+                                         , target = target'
+                                         }
+                metadata package `shouldBe` metadata'
+                package `shouldBe` createPackage metadata' modules
             let testDir = "." </> "test"
             it "returns ScanError if the directory lacks package.toml" $ do
-                Left (ScanError filePath ioError') <-
-                    scanPackage $ testDir </> "scan_error"
+                scanResult <- scanPackage' $ testDir </> "scan_error"
+                scanResult `shouldSatisfy` isLeft
+                let Left (ScanError filePath ioError') = scanResult
                 filePath `shouldBe` testDir </> "scan_error" </> "package.toml"
                 ioError' `shouldSatisfy` isDoesNotExistError
             it "returns MetadataError if the package.toml is invalid" $ do
-                Left (MetadataError (FormatError e)) <-
-                    scanPackage $ testDir </> "metadata_error"
+                scanResult <- scanPackage' $ testDir </> "metadata_error"
+                scanResult `shouldSatisfy` isLeft
+                let Left (MetadataError (FormatError e)) = scanResult
                 sourceLine (PE.errorPos e) `shouldBe` 3
                 sourceColumn (PE.errorPos e) `shouldBe` 14
             it "returns ImportError if a module imports an absent module" $ do
-                Left (ImportError l) <- scanPackage $ testDir </> "import_error"
+                scanResult <- scanPackage' $ testDir </> "import_error"
+                scanResult `shouldSatisfy` isLeft
+                let Left (ImportError l) = scanResult
                 l `shouldBe` [MissingModulePathError ["import_error"] ["foo"]]
         specify "scanModules" $ do
             let path = "." </> "examples"
@@ -115,7 +135,7 @@ spec = do
                              , (["address"], path </> "address.nrm")
                              , (["pdf-service"], path </> "pdf-service.nrm")
                              ]
-    describe "BoundModule" $ do
+    describe [qq|BoundModule (target: $targetName')|] $ do
         let Just bm = resolveBoundModule ["foo", "bar"] validPackage
             Just abc = resolveBoundModule ["abc"] validPackage
             Just xyz = resolveBoundModule ["xyz"] validPackage
@@ -140,3 +160,6 @@ spec = do
                 Imported coreModulePath (PrimitiveType Text String)
             lookupType "text" abc `shouldBe` lookupType "text" bm
             lookupType "text" xyz `shouldBe` lookupType "text" bm
+  where
+    scanPackage' :: FilePath -> IO (Either PackageError (Package t))
+    scanPackage' = scanPackage
