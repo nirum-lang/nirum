@@ -8,7 +8,13 @@ matrix:
     addons:
       apt:
         sources: [hvr-ghc, deadsnakes]
-        packages: [ghc-8.0.1, python2.7, python3.4, python3.5, libgmp10, upx-ucl]
+        packages:
+        - ghc-8.0.1
+        - python2.7
+        - python3.4
+        - python3.5
+        - libgmp10
+        - upx-ucl
 cache:
   directories:
   - "$HOME/.stack"
@@ -27,7 +33,7 @@ before_install:
   if [[ "$TRAVIS_OS_NAME" = "osx" ]]
   then 
     brew tap drolando/deadsnakes
-    brew install python34 python3 || brew upgrade python34 python35 || true
+    brew install python34 python35 python3 || brew upgrade python34 python35 python3 || true
   fi
 - curl -o "$HOME/.local/bin/travis_long" -L https://raw.githubusercontent.com/futurice/fum2github/master/travis_long
 - chmod +x "$HOME/.local/bin/travis_long"
