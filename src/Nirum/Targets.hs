@@ -34,7 +34,8 @@ import Nirum.Package.Metadata ( Metadata (Metadata, target)
                                        )
                               , TargetName
                               )
-import Nirum.Targets.List (proxyTypeMapQ)
+import Nirum.Targets.List (targetProxyMapQ)
+import Nirum.Targets.Python ()
 
 data BuildError = TargetNameError TargetName
                 | CompileError (M.Map FilePath Text)
@@ -44,7 +45,7 @@ type BuildResult = M.Map FilePath ByteString
 
 packageBuilders :: M.Map TargetName
                          (FilePath -> IO (Either BuildError BuildResult))
-packageBuilders = M.fromList $(proxyTypeMapQ [e|buildPackage'|])
+packageBuilders = M.fromList $(targetProxyMapQ [e|buildPackage'|])
 
 buildPackage :: TargetName -> FilePath -> IO (Either BuildError BuildResult)
 buildPackage targetName' =

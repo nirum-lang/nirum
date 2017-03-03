@@ -1,29 +1,34 @@
 {-# LANGUAGE QuasiQuotes, TemplateHaskell #-}
-module Nirum.Targets.List ( proxyTypeMapQ
-                          , proxyTypeQs
+module Nirum.Targets.List ( targetProxiesQ
+                          , targetProxyMapQ
                           , targetTypesQ
-                          , targetTypeQs
                           ) where
 
 import Data.Proxy (Proxy (Proxy))
-import Language.Haskell.TH (Exp, Q, Type)
+import Language.Haskell.TH ( Dec (InstanceD)
+                           , Exp
+                           , Info (ClassI)
+                           , Q
+                           , Type (AppT)
+                           )
 import Language.Haskell.TH.Lib (listE)
-import Language.Haskell.TH.Syntax (sequenceQ)
+import Language.Haskell.TH.Syntax (reify, sequenceQ)
 
-import Nirum.Targets.Python (Python)
-
-targetTypeQs :: [Q Type]
-targetTypeQs = [ [t|Python|]
-               ] -- add target types here
+import Nirum.Package.Metadata (Target)
 
 targetTypesQ :: Q [Type]
-targetTypesQ = sequenceQ targetTypeQs
+targetTypesQ = do
+    ClassI _ instances <- reify ''Target
+    return [t | InstanceD _ _ (AppT _ t) _ <- instances]
 
-proxyTypeQs :: [Q Exp]
-proxyTypeQs = [[e|(Proxy :: Proxy $tQ)|] | tQ <- targetTypeQs]
+targetProxiesQ :: Q [Exp]
+targetProxiesQ = do
+    targetTypes <- targetTypesQ
+    sequenceQ [[e|(Proxy :: Proxy $(return t))|] | t <- targetTypes]
 
-proxyTypeMapQ :: Q Exp -> Q Exp
-proxyTypeMapQ funcQ =
-    listE [ [e|(targetName $(pQ), $funcQ $(pQ))|]
-                         | pQ <- proxyTypeQs
-                         ]
+targetProxyMapQ :: Q Exp -> Q Exp
+targetProxyMapQ funcQ = do
+    targetProxies <- targetProxiesQ
+    listE [ [e|(targetName $(return p), $funcQ $(return p))|]
+          | p <- targetProxies
+          ]
