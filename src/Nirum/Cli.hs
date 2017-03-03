@@ -48,7 +48,8 @@ import Nirum.Package.ModuleSet ( ImportError ( CircularImportError
                                              , MissingModulePathError
                                              )
                                )
-import Nirum.Targets.Python (compilePackage)
+-- import Nirum.Targets.Python (compilePackage)
+import qualified Nirum.Targets.JavaScript as JS
 import Nirum.Version (versionString)
 
 data NirumCli = NirumCli { sourcePath :: FilePath
@@ -150,7 +151,7 @@ main' = do
 |]
         Left (ScanError _ error') -> putStrLn [qq|Scan error: $error'|]
         Left (MetadataError error') -> putStrLn [qq|Metadata error: $error'|]
-        Right pkg -> writeFiles obj $ compilePackage pkg
+        Right pkg -> writeFiles obj $ JS.compilePackage pkg
 
 writeFiles :: FilePath -> M.Map FilePath (Either T.Text T.Text) -> IO ()
 writeFiles obj m =

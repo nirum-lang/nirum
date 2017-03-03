@@ -44,6 +44,7 @@ library
                  ,     Nirum.Package.ModuleSet
                  ,     Nirum.Parser
                  ,     Nirum.Targets.Python
+                 ,     Nirum.Targets.JavaScript
                  ,     Nirum.Version
   build-depends:       base                     >=4.7     && <5
                ,       containers               >=0.5.6.2 && <0.6
