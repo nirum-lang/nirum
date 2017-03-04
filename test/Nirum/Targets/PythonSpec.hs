@@ -1,20 +1,5 @@
-{-# LANGUAGE OverloadedLists, QuasiQuotes, ScopedTypeVariables #-}
-{- |
-This unit test module optionally depends on Python interpreter.
-It internally tries to popen python3 executable, and import nirum Python
-package.  If any of these prerequisites are not satisfied, tests depending
-on Python interpreter are skipped instead of marked failed.
-
-To make Python interpreter possible to import nirum package, you need to
-install the nirum package to your Python site-packages using pip command.
-We recommend to install the package inside a virtualenv (pyvenv) and
-run this unit test in the virtualenv (pyvenv).  E.g.:
-
-> $ pyvenv env
-> $ . env/bin/activate
-> (env)$ pip install git+git://github.com/spoqa/nirum-python.git
-> (env)$ cabal test  # or: stack test
--}
+{-# LANGUAGE OverloadedLists, OverloadedStrings, QuasiQuotes,
+             ScopedTypeVariables #-}
 module Nirum.Targets.PythonSpec where
 
 import Control.Monad (forM_)
@@ -53,7 +38,8 @@ import Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
                                        )
 import Nirum.Package (Package, resolveBoundModule)
 import Nirum.Package.Metadata ( Author (Author, email, name, uri)
-                              , Metadata (Metadata, authors, version)
+                              , Metadata (Metadata, authors, target, version)
+                              , Target (compilePackage)
                               )
 import Nirum.PackageSpec (createPackage)
 import qualified Nirum.Targets.Python as PY
@@ -68,10 +54,10 @@ import Nirum.Targets.Python ( Source (Source)
                                               , dependencies
                                               , optionalDependencies
                                               )
+                            , Python (Python)
                             , PythonVersion (Python2, Python3)
                             , addDependency
                             , addOptionalDependency
-                            , compilePackage
                             , compilePrimitiveType
                             , compileTypeExpression
                             , stringLiteral
@@ -94,7 +80,7 @@ makeDummySource' pathPrefix m =
   where
     mp :: [Identifier] -> ModulePath
     mp identifiers = fromJust $ fromIdentifiers (pathPrefix ++ identifiers)
-    metadata' :: Metadata
+    metadata' :: Metadata Python
     metadata' = Metadata
         { version = SV.version 1 2 3 [] []
         , authors =
@@ -104,8 +90,9 @@ makeDummySource' pathPrefix m =
                     , uri = Nothing
                     }
               ]
+        , target = Python "sample-package"
         }
-    pkg :: Package
+    pkg :: Package Python
     pkg = createPackage
             metadata'
             [ (mp ["foo"], m)

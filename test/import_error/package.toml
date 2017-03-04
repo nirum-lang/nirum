@@ -1,1 +1,7 @@
 version = "0.3.0"
+
+[targets.python]
+name = "import_error"
+
+[targets.dummy]
+# for unit test

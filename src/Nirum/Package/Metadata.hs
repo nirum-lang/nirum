@@ -1,6 +1,7 @@
-{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE GADTs, QuasiQuotes, RankNTypes, ScopedTypeVariables,
+             StandaloneDeriving, TypeFamilies #-}
 module Nirum.Package.Metadata ( Author (Author, email, name, uri)
-                              , Metadata (Metadata, authors, version)
+                              , Metadata (Metadata, authors, target, version)
                               , MetadataError ( FieldError
                                               , FieldTypeError
                                               , FieldValueError
@@ -8,18 +9,47 @@ module Nirum.Package.Metadata ( Author (Author, email, name, uri)
                                               )
                               , MetadataField
                               , MetadataFieldType
+                              , Node ( VArray
+                                     , VBoolean
+                                     , VDatetime
+                                     , VFloat
+                                     , VInteger
+                                     , VString
+                                     , VTable
+                                     , VTArray
+                                     )
+                              , Package (Package, metadata, modules)
+                              , Table
+                              , Target ( CompileError
+                                       , CompileResult
+                                       , compilePackage
+                                       , parseTarget
+                                       , showCompileError
+                                       , targetName
+                                       , toByteString
+                                       )
+                              , TargetName
+                              , VTArray
                               , metadataFilename
                               , metadataPath
                               , parseMetadata
+                              , packageTarget
+                              , prependMetadataErrorField
                               , readFromPackage
                               , readMetadata
+                              , stringField
+                              , tableField
                               ) where
 
+import Data.Proxy (Proxy (Proxy))
+import Data.Typeable (Typeable)
 import GHC.Exts (IsList (fromList, toList))
 
+import Data.ByteString (ByteString)
 import qualified Data.HashMap.Strict as HM
+import Data.Map.Strict (Map)
 import qualified Data.SemVer as SV
-import Data.Text (Text, unpack)
+import Data.Text (Text, append, snoc, unpack)
 import Data.Text.Encoding (encodeUtf8)
 import qualified Data.Text.IO as TIO
 import System.FilePath ((</>))
@@ -42,19 +72,62 @@ import Text.Toml.Types (Node ( VArray
                        )
 import Text.URI (URI, parseURI)
 
+import Nirum.Package.ModuleSet (ModuleSet)
+
 -- | The filename of Nirum package metadata.
 metadataFilename :: FilePath
 metadataFilename = "package.toml"
 
-data Metadata = Metadata { version :: SV.Version
-                         , authors :: [Author]
-                         } deriving (Eq, Ord, Show)
+-- | Represents a package which consists of modules.
+data Package t =
+    Package { metadata :: (Eq t, Ord t, Show t, Target t) => Metadata t
+            , modules :: ModuleSet
+            }
+
+deriving instance (Eq t, Target t) => Eq (Package t)
+deriving instance (Ord t, Target t) => Ord (Package t)
+deriving instance (Show t, Target t) => Show (Package t)
+
+packageTarget :: Target t => Package t -> t
+packageTarget Package { metadata = Metadata _ _ t } = t
+
+data Metadata t =
+    Metadata { version :: SV.Version
+             , authors :: [Author]
+             , target :: (Eq t, Ord t, Show t, Target t) => t
+             }
 -- TODO: uri, dependencies
+
+deriving instance (Eq t, Target t) => Eq (Metadata t)
+deriving instance (Ord t, Target t) => Ord (Metadata t)
+deriving instance (Show t, Target t) => Show (Metadata t)
 
 data Author = Author { name :: Text
                      , email :: Maybe EmailAddress
                      , uri :: Maybe URI
                      } deriving (Eq, Ord, Show)
+
+type TargetName = Text
+
+class (Eq t, Ord t, Show t, Typeable t) => Target t where
+    type family CompileResult t :: *
+    type family CompileError t :: *
+
+    -- | The name of the given target e.g. @"python"@.
+    targetName :: Proxy t -> TargetName
+
+    -- | Parse the target metadata.
+    parseTarget :: Table -> Either MetadataError t
+
+    -- | Compile the package to a source tree of the target.
+    compilePackage :: Package t
+                   -> Map FilePath (Either (CompileError t) (CompileResult t))
+
+    -- | Show a human-readable message from the given 'CompileError'.
+    showCompileError :: t -> CompileError t -> Text
+
+    -- | Encode the given 'CompileResult' to a 'ByteString'
+    toByteString :: t -> CompileResult t -> ByteString
 
 -- | Name of package.toml field.
 type MetadataField = Text
@@ -75,16 +148,45 @@ data MetadataError
     | FormatError ParseError
     deriving (Eq, Show)
 
-parseMetadata :: FilePath -> Text -> Either MetadataError Metadata
+-- | Prepend the given prefix to a 'MetadataError' value's field information.
+-- Note that a period is automatically inserted right after the given prefix.
+-- It's useful for handling of accessing nested tables.
+prependMetadataErrorField :: MetadataField -> MetadataError -> MetadataError
+prependMetadataErrorField prefix e =
+    case e of
+        FieldError f -> FieldError $ prepend f
+        FieldTypeError f e' a -> FieldTypeError (prepend f) e' a
+        FieldValueError f m -> FieldValueError (prepend f) m
+        e'@(FormatError _) -> e'
+  where
+    prepend :: MetadataField -> MetadataField
+    prepend = (prefix `snoc` '.' `append`)
+
+parseMetadata :: forall t . Target t
+              => FilePath -> Text -> Either MetadataError (Metadata t)
 parseMetadata metadataPath' tomlText = do
     table <- case parseTomlDoc metadataPath' tomlText of
         Left e -> Left $ FormatError e
         Right t -> Right t
     version' <- versionField "version" table
     authors' <- authorsField "authors" table
-    return Metadata { version = version', authors = authors' }
+    targets <- tableField "targets" table
+    targetTable <- case tableField targetName' targets of
+        Left e -> Left $ prependMetadataErrorField "targets" e
+        otherwise' -> otherwise'
+    target' <- case parseTarget targetTable of
+        Left e -> Left $ prependMetadataErrorField "targets"
+                       $ prependMetadataErrorField targetName' e
+        otherwise' -> otherwise'
+    return Metadata { version = version'
+                    , authors = authors'
+                    , target = target'
+                    }
+  where
+    targetName' :: Text
+    targetName' = targetName (Proxy :: Proxy t)
 
-readMetadata :: FilePath -> IO (Either MetadataError Metadata)
+readMetadata :: Target t => FilePath -> IO (Either MetadataError (Metadata t))
 readMetadata metadataPath' = do
     tomlText <- TIO.readFile metadataPath'
     return $ parseMetadata metadataPath' tomlText
@@ -92,7 +194,8 @@ readMetadata metadataPath' = do
 metadataPath :: FilePath -> FilePath
 metadataPath = (</> metadataFilename)
 
-readFromPackage :: FilePath -> IO (Either MetadataError Metadata)
+readFromPackage :: Target t
+                => FilePath -> IO (Either MetadataError (Metadata t))
 readFromPackage = readMetadata . metadataPath
 
 printNode :: Node -> MetadataFieldType
@@ -129,6 +232,11 @@ optional :: Either MetadataError a -> Either MetadataError (Maybe a)
 optional (Right value) = Right $ Just value
 optional (Left (FieldError _)) = Right Nothing
 optional (Left error') = Left error'
+
+tableField :: MetadataField -> Table -> Either MetadataError Table
+tableField = typedField "table" $ \ n -> case n of
+                                              VTable t -> Just t
+                                              _ -> Nothing
 
 stringField :: MetadataField -> Table -> Either MetadataError Text
 stringField = typedField "string" $ \ n -> case n of

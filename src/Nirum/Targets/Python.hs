@@ -1,5 +1,6 @@
-{-# LANGUAGE ExtendedDefaultRules, OverloadedLists, QuasiQuotes,
-  TypeSynonymInstances, MultiParamTypeClasses #-}
+{-# LANGUAGE DeriveDataTypeable, ExtendedDefaultRules, OverloadedLists,
+             QuasiQuotes, TypeFamilies, TypeSynonymInstances,
+             MultiParamTypeClasses #-}
 module Nirum.Targets.Python ( Code
                             , CodeGen
                             , CodeGenContext ( localImports
@@ -15,13 +16,13 @@ module Nirum.Targets.Python ( Code
                                      , sourceModule
                                      , sourcePackage
                                      )
+                            , Python (Python)
                             , PythonVersion ( Python2
                                             , Python3
                                             )
                             , addDependency
                             , addOptionalDependency
                             , compileModule
-                            , compilePackage
                             , compilePrimitiveType
                             , compileTypeDeclaration
                             , compileTypeExpression
@@ -41,6 +42,7 @@ module Nirum.Targets.Python ( Code
 import qualified Control.Monad.State as ST
 import qualified Data.List as L
 import Data.Maybe (fromMaybe)
+import Data.Typeable (Typeable)
 import GHC.Exts (IsList (toList))
 import Text.Printf (printf)
 
@@ -48,7 +50,7 @@ import qualified Data.Map.Strict as M
 import qualified Data.SemVer as SV
 import qualified Data.Set as S
 import qualified Data.Text as T
-import Data.Text.Encoding (decodeUtf8)
+import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import System.FilePath (joinPath)
 import qualified Text.Email.Validate as E
 import Text.InterpolatedString.Perl6 (q, qq)
@@ -100,21 +102,36 @@ import Nirum.Package ( BoundModule
                      , types
                      )
 import Nirum.Package.Metadata ( Author (Author, name, email)
-                              , Metadata (authors, version)
+                              , Metadata (authors, target, version)
+                              , Target ( CompileError
+                                       , CompileResult
+                                       , compilePackage
+                                       , parseTarget
+                                       , showCompileError
+                                       , targetName
+                                       , toByteString
+                                       )
+                              , stringField
                               )
 import qualified Nirum.Package.ModuleSet as MS
+
+data Python = Python { packageName :: T.Text
+                     } deriving (Eq, Ord, Show, Typeable)
+
+type Package' = Package Python
+type CompileError' = T.Text
 
 data PythonVersion = Python2
                    | Python3
                    deriving (Eq, Ord, Show)
-data Source = Source { sourcePackage :: Package
-                     , sourceModule :: BoundModule
+
+data Source = Source { sourcePackage :: Package'
+                     , sourceModule :: BoundModule Python
                      } deriving (Eq, Ord, Show)
 
 type Code = T.Text
-type CompileError = T.Text
 
-instance Failure CodeGenContext CompileError where
+instance Failure CodeGenContext CompileError' where
     fromString = return . T.pack
 
 data CodeGenContext
@@ -136,11 +153,11 @@ empty pythonVersion' = CodeGenContext { standardImports = []
                                       , pythonVersion = pythonVersion'
                                       }
 
-type CodeGen = C.CodeGen CodeGenContext CompileError
+type CodeGen = C.CodeGen CodeGenContext CompileError'
 
 runCodeGen :: CodeGen a
            -> CodeGenContext
-           -> (Either CompileError a, CodeGenContext)
+           -> (Either CompileError' a, CodeGenContext)
 runCodeGen = C.runCodeGen
 
 insertStandardImport :: T.Text -> CodeGen ()
@@ -776,7 +793,7 @@ unionInstallRequires a b =
 
 compileModule :: PythonVersion
               -> Source
-              -> Either CompileError (InstallRequires, Code)
+              -> Either CompileError' (InstallRequires, Code)
 compileModule pythonVersion' source =
     case runCodeGen code' $ empty pythonVersion' of
         (Left errMsg, _) -> Left errMsg
@@ -812,7 +829,7 @@ compileModule pythonVersion' source =
         if set `has` module' then S.singleton pkg else S.empty
     codeWithDeps :: CodeGenContext
                  -> Code
-                 -> Either CompileError (InstallRequires, Code)
+                 -> Either CompileError' (InstallRequires, Code)
     codeWithDeps context c = Right (InstallRequires deps optDeps, c)
       where
         deps :: S.Set T.Text
@@ -823,7 +840,7 @@ compileModule pythonVersion' source =
             , ((3, 5), require "typing" "typing" $ standardImports context)
             ]
 
-compilePackageMetadata :: Package -> InstallRequires -> Code
+compilePackageMetadata :: Package' -> InstallRequires -> Code
 compilePackageMetadata package@Package { metadata = metadata' }
                        (InstallRequires deps optDeps) =
     [qq|# -*- coding: utf-8 -*-
@@ -890,7 +907,7 @@ setup(
     csStrings [] = "None"
     csStrings s = stringLiteral $ T.intercalate ", " s
     pName :: Code
-    pName = "TestPackage"  -- FIXME
+    pName = packageName $ target metadata'
     pVersion :: Code
     pVersion = SV.toText $ version metadata'
     strings :: [Code] -> Code
@@ -916,9 +933,9 @@ manifestIn = [q|recursive-include src *.py
 recursive-include src-py2 *.py
 |]
 
-compilePackage :: Package
-               -> M.Map FilePath (Either CompileError Code)
-compilePackage package =
+compilePackage' :: Package'
+                -> M.Map FilePath (Either CompileError' Code)
+compilePackage' package =
     M.fromList $
         initFiles ++
         [ ( f
@@ -941,13 +958,13 @@ compilePackage package =
     toFilename :: T.Text -> ModulePath -> FilePath
     toFilename sourceRootDirectory mp =
         joinPath $ T.unpack sourceRootDirectory : toPythonFilename mp
-    initFiles :: [(FilePath, Either CompileError Code)]
+    initFiles :: [(FilePath, Either CompileError' Code)]
     initFiles = [ (toFilename (sourceDirectory ver) mp', Right "")
                 | mp <- MS.keys (modules package)
                 , mp' <- S.elems (ancestors mp)
                 , ver <- versions
                 ]
-    modules' :: [(FilePath, Either CompileError (InstallRequires, Code))]
+    modules' :: [(FilePath, Either CompileError' (InstallRequires, Code))]
     modules' =
         [ ( toFilename (sourceDirectory ver) modulePath'
           , compileModule ver $ Source package boundModule
@@ -960,3 +977,14 @@ compilePackage package =
     installRequires = foldl unionInstallRequires
                             (InstallRequires [] [])
                             [deps | (_, Right (deps, _)) <- modules']
+
+instance Target Python where
+    type CompileResult Python = Code
+    type CompileError Python = CompileError'
+    targetName _ = "python"
+    parseTarget table = do
+        name' <- stringField "name" table
+        return Python { packageName = name' }
+    compilePackage = compilePackage'
+    showCompileError _ e = e
+    toByteString _ = encodeUtf8
