@@ -42,7 +42,7 @@ instance Construct Annotation where
 fromTuple :: (Identifier, Maybe Metadata) -> Annotation
 fromTuple (name', meta') = Annotation { name = name', metadata = meta' }
 
-data AnnotationSet
+newtype AnnotationSet
   -- | The set of 'Annotation' values.
   -- Every annotation name has to be unique in the set.
   = AnnotationSet { annotations :: M.Map Identifier (Maybe Metadata) }

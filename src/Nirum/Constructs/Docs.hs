@@ -17,7 +17,7 @@ annotationDocsName :: Identifier
 annotationDocsName = "docs"
 
 -- | Docstring for constructs.
-data Docs = Docs T.Text deriving (Eq, Ord, Show)
+newtype Docs = Docs T.Text deriving (Eq, Ord, Show)
 
 -- | Convert the docs to text.
 toText :: Docs -> T.Text

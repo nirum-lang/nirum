@@ -91,5 +91,5 @@ instance Declaration Method where
     annotations = methodAnnotations
 
 -- | RPC service.
-data Service =
+newtype Service =
     Service { methods :: DeclarationSet Method } deriving (Eq, Ord, Show)
