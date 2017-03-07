@@ -6,6 +6,7 @@ import Data.Maybe (isNothing)
 import Prelude hiding (length, lookup, null)
 
 import qualified Data.Map.Strict as M
+import qualified Data.Set as S
 import Test.Hspec.Meta
 
 import Nirum.Constructs.Annotation (empty)
@@ -111,7 +112,8 @@ spec =
             sort (keys validModuleSet) `shouldBe`
                 sort [path | (path, _) <- validModules]
         specify "keysSet" $
-            keysSet validModuleSet `shouldBe` [p | (p, _) <- validModules]
+            keysSet validModuleSet `shouldBe`
+                S.fromList [p | (p, _) <- validModules]
         specify "lookup" $ do
             let Just mod' = lookup ["foo", "bar"] validModuleSet
             mod' `shouldBe` fooBarModule

@@ -31,11 +31,11 @@ module Nirum.Targets.Python ( Code
                             , insertStandardImport
                             , insertThirdPartyImports
                             , runCodeGen
-                            , spreadModulePaths
                             , stringLiteral
                             , toAttributeName
                             , toClassName
                             , toImportPath
+                            , toImportPaths
                             , toNamePair
                             , unionInstallRequires
                             ) where
@@ -64,7 +64,7 @@ import Nirum.Constructs.Identifier ( Identifier
                                    , toSnakeCaseText
                                    , toString
                                    )
-import Nirum.Constructs.ModulePath (ModulePath, hierarchy)
+import Nirum.Constructs.ModulePath (ModulePath, hierarchy, hierarchies)
 import Nirum.Constructs.Name (Name (Name))
 import qualified Nirum.Constructs.Name as N
 import Nirum.Constructs.Service ( Method ( Method
@@ -227,6 +227,9 @@ toAttributeName' = toAttributeName . N.facialName
 
 toImportPath :: ModulePath -> T.Text
 toImportPath = T.intercalate "." . map toAttributeName . toList
+
+toImportPaths :: S.Set ModulePath -> [T.Text]
+toImportPaths paths = S.toAscList $ S.map toImportPath $ hierarchies paths
 
 toNamePair :: Name -> T.Text
 toNamePair (Name f b) = [qq|('{toAttributeName f}', '{toSnakeCaseText b}')|]
@@ -841,13 +844,6 @@ compileModule pythonVersion' source =
             , ((3, 5), require "typing" "typing" $ standardImports context)
             ]
 
-spreadModulePaths :: [ModulePath] -> [Code]
-spreadModulePaths modulePaths = pathsToPackageNames $ map ancestors modulePaths
-  where
-    pathsToPackageNames :: [S.Set ModulePath] -> [Code]
-    pathsToPackageNames modulePaths' = S.toAscList $ S.map toImportPath $
-        S.unions modulePaths'
-
 compilePackageMetadata :: Package' -> InstallRequires -> Code
 compilePackageMetadata package@Package { metadata = metadata' }
                        (InstallRequires deps optDeps) =
@@ -927,7 +923,7 @@ setup(
                             | Author { email = Just e } <- authors metadata'
                             ]
     pPackages :: Code
-    pPackages = strings $ spreadModulePaths $ MS.keys $ modules package
+    pPackages = strings $ toImportPaths $ MS.keysSet $ modules package
     pInstallRequires :: Code
     pInstallRequires = strings $ S.toList deps
     pPolyfillRequires :: Code

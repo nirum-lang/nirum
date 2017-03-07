@@ -352,12 +352,12 @@ spec = parallel $ forM_ versions $ \ (ver, typing) -> do
             (req5 `unionInstallRequires` req4) `shouldBe` req6
     describe "Add ancestors of packages" $ do
         let (Source pkg _) = makeDummySource $ Module [] Nothing
-            modulePaths = MS.keys $ modules pkg
-        specify "spreadModulePaths" $
-            PY.spreadModulePaths modulePaths `shouldBe` [ "foo"
-                                                        , "foo.bar"
-                                                        , "qux"
-                                                        ]
+            modulePaths = MS.keysSet $ modules pkg
+        specify "toImportPaths" $
+            PY.toImportPaths modulePaths `shouldBe` [ "foo"
+                                                    , "foo.bar"
+                                                    , "qux"
+                                                    ]
 
 
 {-# ANN module ("HLint: ignore Functor law" :: String) #-}
