@@ -350,6 +350,8 @@ spec = parallel $ forM_ versions $ \ (ver, typing) -> do
                                              (3, 4) "ipaddress"
             (req4 `unionInstallRequires` req5) `shouldBe` req6
             (req5 `unionInstallRequires` req4) `shouldBe` req6
+    specify "toImportPath" $
+        PY.toImportPath ["foo", "bar"] `shouldBe` "foo.bar"
     describe "Add ancestors of packages" $ do
         let (Source pkg _) = makeDummySource $ Module [] Nothing
             modulePaths = MS.keysSet $ modules pkg
