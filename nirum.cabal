@@ -39,6 +39,7 @@ library
                  ,     Nirum.Constructs.Service
                  ,     Nirum.Constructs.TypeDeclaration
                  ,     Nirum.Constructs.TypeExpression
+                 ,     Nirum.Docs
                  ,     Nirum.Package
                  ,     Nirum.Package.Metadata
                  ,     Nirum.Package.ModuleSet
@@ -49,6 +50,7 @@ library
                  ,     Nirum.Version
   build-depends:       base                     >=4.7     && <5
                ,       bytestring
+               ,       cmark                    >=0.5     && <0.6
                ,       containers               >=0.5.6.2 && <0.6
                ,       cmdargs                  >=0.10.14 && <0.11
                ,       directory                >=1.2.5   && <1.4
@@ -109,6 +111,7 @@ test-suite spec
                ,       Nirum.Constructs.ServiceSpec
                ,       Nirum.Constructs.TypeDeclarationSpec
                ,       Nirum.Constructs.TypeExpressionSpec
+               ,       Nirum.DocsSpec
                ,       Nirum.Package.MetadataSpec
                ,       Nirum.Package.ModuleSetSpec
                ,       Nirum.PackageSpec
