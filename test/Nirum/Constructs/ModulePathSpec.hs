@@ -11,6 +11,7 @@ import Test.Hspec.Meta
 import Nirum.Constructs (Construct (toCode))
 import Nirum.Constructs.ModulePath ( ModulePath (ModuleName, ModulePath)
                                    , hierarchy
+                                   , hierarchies
                                    , fromFilePath
                                    , fromIdentifiers
                                    )
@@ -52,6 +53,14 @@ spec =
                 , ["foo", "bar", "baz"]
                 ]
             hierarchy ["foo"] `shouldBe` [["foo"]]
+        specify "hierarchies" $
+            hierarchies [ ["foo", "bar", "baz"], ["tar", "gz"] ] `shouldBe`
+                [ ["foo"]
+                , ["foo", "bar"]
+                , ["foo", "bar", "baz"]
+                , ["tar"]
+                , ["tar", "gz"]
+                ]
         context "Construct" $
             specify "toCode" $ do
                 toCode foo `shouldBe` "foo"
