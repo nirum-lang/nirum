@@ -115,8 +115,8 @@ import Nirum.Package.Metadata ( Author (Author, name, email)
                               )
 import qualified Nirum.Package.ModuleSet as MS
 
-data Python = Python { packageName :: T.Text
-                     } deriving (Eq, Ord, Show, Typeable)
+newtype Python = Python { packageName :: T.Text
+                        } deriving (Eq, Ord, Show, Typeable)
 
 type Package' = Package Python
 type CompileError' = T.Text

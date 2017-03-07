@@ -34,7 +34,7 @@ data ImportError = CircularImportError [ModulePath]
                  deriving (Eq, Ord, Show)
 
 -- | The set of 'Module' values.  It can be looked up by its 'ModulePath'.
-data ModuleSet = ModuleSet (M.Map ModulePath Module) deriving (Eq, Ord, Show)
+newtype ModuleSet = ModuleSet (M.Map ModulePath Module) deriving (Eq, Ord, Show)
 
 fromMap :: M.Map ModulePath Module -> Either (S.Set ImportError) ModuleSet
 fromMap ms

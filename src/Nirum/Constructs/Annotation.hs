@@ -29,8 +29,8 @@ import Nirum.Constructs.Identifier (Identifier)
 docs :: Docs -> Annotation
 docs (Docs d) = Annotation { name = annotationDocsName, metadata = Just d }
 
-data NameDuplication = AnnotationNameDuplication Identifier
-                     deriving (Eq, Ord, Show)
+newtype NameDuplication = AnnotationNameDuplication Identifier
+                          deriving (Eq, Ord, Show)
 
 empty :: AnnotationSet
 empty = AnnotationSet { annotations = M.empty }

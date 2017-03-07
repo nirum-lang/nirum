@@ -51,7 +51,7 @@ to @book-category@, and it can be translated to:
 [PascalCase] @BookCategory@
 [lisp-case] @book-category@
 -}
-data Identifier = Identifier T.Text deriving (Show)
+newtype Identifier = Identifier T.Text deriving (Show)
 
 reservedKeywords :: S.Set Identifier
 reservedKeywords = [ "enum"

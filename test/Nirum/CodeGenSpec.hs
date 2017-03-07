@@ -11,8 +11,7 @@ import Test.Hspec.Meta
 import Nirum.CodeGen (CodeGen, Failure, fromString, runCodeGen)
 
 
-data SampleError = SampleError Text
-    deriving (Eq, Ord, Show)
+newtype SampleError = SampleError Text deriving (Eq, Ord, Show)
 
 instance forall s . Failure s SampleError where
     fromString = return . SampleError . T.pack
