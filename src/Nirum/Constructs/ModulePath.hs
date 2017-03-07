@@ -13,7 +13,7 @@ import Data.Char (toLower)
 import Data.Maybe (fromMaybe, mapMaybe)
 import GHC.Exts (IsList (Item, fromList, toList))
 
-import Data.Set (Set, insert, singleton)
+import qualified Data.Set as S
 import Data.Text (intercalate, pack)
 import System.FilePath (splitDirectories, stripExtension)
 
@@ -55,9 +55,9 @@ fromFilePath filePath =
     fileIdentifiers :: [Identifier]
     fileIdentifiers = mapMaybe (fromText . pack) paths
 
-ancestors :: ModulePath -> Set ModulePath
-ancestors m@ModuleName {} = singleton m
-ancestors m@(ModulePath parent _) = m `insert` ancestors parent
+ancestors :: ModulePath -> S.Set ModulePath
+ancestors m@ModuleName {} = S.singleton m
+ancestors m@(ModulePath parent _) = m `S.insert` ancestors parent
 
 instance IsList ModulePath where
     type Item ModulePath = Identifier
