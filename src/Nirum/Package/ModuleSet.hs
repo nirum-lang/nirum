@@ -6,6 +6,7 @@ module Nirum.Package.ModuleSet ( ImportError ( CircularImportError
                                , fromList
                                , fromMap
                                , keys
+                               , keysSet
                                , length
                                , lookup
                                , null
@@ -66,6 +67,9 @@ null = M.null . toMap
 
 keys :: ModuleSet -> [ModulePath]
 keys = M.keys . toMap
+
+keysSet :: ModuleSet -> S.Set ModulePath
+keysSet = M.keysSet . toMap
 
 lookup :: ModulePath -> ModuleSet -> Maybe Module
 lookup path = M.lookup path . toMap
