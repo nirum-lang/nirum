@@ -10,7 +10,7 @@ import Test.Hspec.Meta
 
 import Nirum.Constructs (Construct (toCode))
 import Nirum.Constructs.ModulePath ( ModulePath (ModuleName, ModulePath)
-                                   , ancestors
+                                   , hierarchy
                                    , fromFilePath
                                    , fromIdentifiers
                                    )
@@ -45,13 +45,13 @@ spec =
                 Just fooBarBaz
             fromFilePath ("foo" </> "bar-baz2.nrm") `shouldBe` Just fooBarBaz2
             fromFilePath ("foo" </> "bar_baz2.NRM") `shouldBe` Just fooBarBaz2
-        specify "ancestors" $ do
-            ancestors ["foo", "bar", "baz"] `shouldBe`
+        specify "hierarchy" $ do
+            hierarchy ["foo", "bar", "baz"] `shouldBe`
                 [ ["foo"]
                 , ["foo", "bar"]
                 , ["foo", "bar", "baz"]
                 ]
-            ancestors ["foo"] `shouldBe` [["foo"]]
+            hierarchy ["foo"] `shouldBe` [["foo"]]
         context "Construct" $
             specify "toCode" $ do
                 toCode foo `shouldBe` "foo"

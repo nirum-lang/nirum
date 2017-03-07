@@ -4,9 +4,9 @@ module Nirum.Constructs.ModulePath ( ModulePath ( ModuleName
                                                 , moduleName
                                                 , path
                                                 )
-                                   , ancestors
                                    , fromFilePath
                                    , fromIdentifiers
+                                   , hierarchy
                                    ) where
 
 import Data.Char (toLower)
@@ -55,9 +55,9 @@ fromFilePath filePath =
     fileIdentifiers :: [Identifier]
     fileIdentifiers = mapMaybe (fromText . pack) paths
 
-ancestors :: ModulePath -> S.Set ModulePath
-ancestors m@ModuleName {} = S.singleton m
-ancestors m@(ModulePath parent _) = m `S.insert` ancestors parent
+hierarchy :: ModulePath -> S.Set ModulePath
+hierarchy m@ModuleName {} = S.singleton m
+hierarchy m@(ModulePath parent _) = m `S.insert` hierarchy parent
 
 instance IsList ModulePath where
     type Item ModulePath = Identifier

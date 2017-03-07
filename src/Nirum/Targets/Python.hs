@@ -64,7 +64,7 @@ import Nirum.Constructs.Identifier ( Identifier
                                    , toSnakeCaseText
                                    , toString
                                    )
-import Nirum.Constructs.ModulePath (ModulePath, ancestors)
+import Nirum.Constructs.ModulePath (ModulePath, hierarchy)
 import Nirum.Constructs.Name (Name (Name))
 import qualified Nirum.Constructs.Name as N
 import Nirum.Constructs.Service ( Method ( Method
@@ -969,7 +969,7 @@ compilePackage' package =
     initFiles :: [(FilePath, Either CompileError' Code)]
     initFiles = [ (toFilename (sourceDirectory ver) mp', Right "")
                 | mp <- MS.keys (modules package)
-                , mp' <- S.elems (ancestors mp)
+                , mp' <- S.elems (hierarchy mp)
                 , ver <- versions
                 ]
     modules' :: [(FilePath, Either CompileError' (InstallRequires, Code))]
