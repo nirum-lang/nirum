@@ -18,6 +18,7 @@ import System.Console.CmdArgs.Implicit ( Data
                                        , name
                                        , program
                                        , summary
+                                       , typ
                                        , typDir
                                        , (&=)
                                        )
@@ -42,6 +43,7 @@ import Nirum.Package ( PackageError ( ImportError
                                     )
                      , scanModules
                      )
+import Nirum.Package.Metadata (TargetName)
 import Nirum.Package.ModuleSet ( ImportError ( CircularImportError
                                              , MissingImportError
                                              , MissingModulePathError
@@ -50,11 +52,13 @@ import Nirum.Package.ModuleSet ( ImportError ( CircularImportError
 import Nirum.Targets ( BuildError (CompileError, PackageError, TargetNameError)
                      , BuildResult
                      , buildPackage
+                     , targetNames
                      )
 import Nirum.Version (versionString)
 
 data NirumCli = NirumCli { sourcePath :: FilePath
                          , objectPath :: FilePath
+                         , targetName :: TargetName
                          } deriving (Show, Data, Typeable)
 
 parseErrortoPrettyMessage :: ParseError (Token T.Text) Dec
@@ -124,21 +128,28 @@ importErrorsToPrettyMessage importErrors =
         map (T.append "- ") (importErrorsToMessageList importErrors)
 
 nirumCli :: NirumCli
-nirumCli = NirumCli { objectPath = def &= explicit
-                          &= name "o" &= name "output-dir" &= typDir
-                          &= help "The directory to place object files"
-                    , sourcePath = def &= argPos 1 &= typDir
-                    }
-         &= program "nirum"
-         &= summary ("Nirum Compiler " ++ versionString)
+nirumCli = NirumCli
+    { objectPath = def &= explicit
+          &= name "o" &= name "output-dir" &= typDir
+          &= help "The directory to place object files"
+    , targetName = "python" &= explicit
+          &= name "t" &= name "target" &= typ "TARGET"
+          &= help ("The target language.  Available targets: " ++
+                   T.unpack targetNamesText)
+    , sourcePath = def &= argPos 1 &= typDir
+    } &= program "nirum" &= summary ("Nirum Compiler " ++ versionString)
+
+targetNamesText :: T.Text
+targetNamesText = T.intercalate ", " $ S.toAscList targetNames
 
 main' :: IO ()
 main' = do
-    NirumCli src outDir <- cmdArgs nirumCli
-    result <- buildPackage "python" src
+    NirumCli src outDir target <- cmdArgs nirumCli
+    result <- buildPackage target src
     case result of
-        Left (TargetNameError targetName) ->
-            putStrLn [qq|Couldn't find "$targetName" target.|]
+        Left (TargetNameError targetName') ->
+            putStrLn [qq|$targetName': No such target.
+Available targets: $targetNamesText|]
         Left (PackageError (ParseError modulePath error')) -> do
             {- FIXME: find more efficient way to determine filename from
                       the given module path -}

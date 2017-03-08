@@ -61,6 +61,7 @@ For more infomration, use `--help` option:
 
     Common flags:
       -o --output-dir=DIR   The directory to place object files
+      -t --target=TARGET    The target language.  Available targets: python
       -? --help             Display help message
       -V --version          Print version information
          --numeric-version  Print just the version number

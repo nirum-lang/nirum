@@ -11,6 +11,7 @@ module Nirum.Targets ( BuildError (CompileError, PackageError, TargetNameError)
                               )
                      , TargetName
                      , buildPackage
+                     , targetNames
                      ) where
 
 import Data.Either (partitionEithers)
@@ -18,6 +19,7 @@ import Data.Maybe (fromMaybe)
 import Data.Proxy (Proxy)
 
 import Data.ByteString (ByteString)
+import Data.Set (Set)
 import qualified Data.Map.Strict as M
 import Data.Text (Text)
 
@@ -46,6 +48,9 @@ type BuildResult = M.Map FilePath ByteString
 packageBuilders :: M.Map TargetName
                          (FilePath -> IO (Either BuildError BuildResult))
 packageBuilders = M.fromList $(targetProxyMapQ [e|buildPackage'|])
+
+targetNames :: Set TargetName
+targetNames = M.keysSet packageBuilders
 
 buildPackage :: TargetName -> FilePath -> IO (Either BuildError BuildResult)
 buildPackage targetName' =
