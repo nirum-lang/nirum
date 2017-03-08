@@ -35,6 +35,7 @@ module Nirum.Targets.Python ( Code
                             , toAttributeName
                             , toClassName
                             , toImportPath
+                            , toImportPaths
                             , toNamePair
                             , unionInstallRequires
                             ) where
@@ -63,7 +64,7 @@ import Nirum.Constructs.Identifier ( Identifier
                                    , toSnakeCaseText
                                    , toString
                                    )
-import Nirum.Constructs.ModulePath (ModulePath, ancestors)
+import Nirum.Constructs.ModulePath (ModulePath, hierarchy, hierarchies)
 import Nirum.Constructs.Name (Name (Name))
 import qualified Nirum.Constructs.Name as N
 import Nirum.Constructs.Service ( Method ( Method
@@ -226,6 +227,9 @@ toAttributeName' = toAttributeName . N.facialName
 
 toImportPath :: ModulePath -> T.Text
 toImportPath = T.intercalate "." . map toAttributeName . toList
+
+toImportPaths :: S.Set ModulePath -> [T.Text]
+toImportPaths paths = S.toAscList $ S.map toImportPath $ hierarchies paths
 
 toNamePair :: Name -> T.Text
 toNamePair (Name f b) = [qq|('{toAttributeName f}', '{toSnakeCaseText b}')|]
@@ -919,7 +923,7 @@ setup(
                             | Author { email = Just e } <- authors metadata'
                             ]
     pPackages :: Code
-    pPackages = strings $ map toImportPath $ MS.keys $ modules package
+    pPackages = strings $ toImportPaths $ MS.keysSet $ modules package
     pInstallRequires :: Code
     pInstallRequires = strings $ S.toList deps
     pPolyfillRequires :: Code
@@ -961,7 +965,7 @@ compilePackage' package =
     initFiles :: [(FilePath, Either CompileError' Code)]
     initFiles = [ (toFilename (sourceDirectory ver) mp', Right "")
                 | mp <- MS.keys (modules package)
-                , mp' <- S.elems (ancestors mp)
+                , mp' <- S.elems (hierarchy mp)
                 , ver <- versions
                 ]
     modules' :: [(FilePath, Either CompileError' (InstallRequires, Code))]

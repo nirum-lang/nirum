@@ -17,6 +17,6 @@ def test_setup_metadata():
     assert ['dev@nirum.org'] == pkg['Author-email']
     assert ['nirum'] == pkg['Requires']
     assert set(pkg['Provides']) == {
-        'fixture.foo', 'fixture.foo.bar', 'fixture.qux',
+        'fixture', 'fixture.foo', 'fixture.foo.bar', 'fixture.qux',
     }
     assert ['0.3.0'] == pkg['Version']

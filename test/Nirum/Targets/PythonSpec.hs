@@ -36,11 +36,12 @@ import Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
                                                         , TypeIdentifier
                                                         )
                                        )
-import Nirum.Package (Package, resolveBoundModule)
+import Nirum.Package (Package (modules), resolveBoundModule)
 import Nirum.Package.Metadata ( Author (Author, email, name, uri)
                               , Metadata (Metadata, authors, target, version)
                               , Target (compilePackage)
                               )
+import qualified Nirum.Package.ModuleSet as MS
 import Nirum.PackageSpec (createPackage)
 import qualified Nirum.Targets.Python as PY
 import Nirum.Targets.Python ( Source (Source)
@@ -349,6 +350,17 @@ spec = parallel $ forM_ versions $ \ (ver, typing) -> do
                                              (3, 4) "ipaddress"
             (req4 `unionInstallRequires` req5) `shouldBe` req6
             (req5 `unionInstallRequires` req4) `shouldBe` req6
+    specify "toImportPath" $
+        PY.toImportPath ["foo", "bar"] `shouldBe` "foo.bar"
+    describe "Add ancestors of packages" $ do
+        let (Source pkg _) = makeDummySource $ Module [] Nothing
+            modulePaths = MS.keysSet $ modules pkg
+        specify "toImportPaths" $
+            PY.toImportPaths modulePaths `shouldBe` [ "foo"
+                                                    , "foo.bar"
+                                                    , "qux"
+                                                    ]
+
 
 {-# ANN module ("HLint: ignore Functor law" :: String) #-}
 {-# ANN module ("HLint: ignore Monad law, left identity" :: String) #-}

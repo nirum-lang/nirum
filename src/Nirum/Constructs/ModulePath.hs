@@ -4,16 +4,17 @@ module Nirum.Constructs.ModulePath ( ModulePath ( ModuleName
                                                 , moduleName
                                                 , path
                                                 )
-                                   , ancestors
                                    , fromFilePath
                                    , fromIdentifiers
+                                   , hierarchy
+                                   , hierarchies
                                    ) where
 
 import Data.Char (toLower)
 import Data.Maybe (fromMaybe, mapMaybe)
 import GHC.Exts (IsList (Item, fromList, toList))
 
-import Data.Set (Set, insert, singleton)
+import qualified Data.Set as S
 import Data.Text (intercalate, pack)
 import System.FilePath (splitDirectories, stripExtension)
 
@@ -55,9 +56,9 @@ fromFilePath filePath =
     fileIdentifiers :: [Identifier]
     fileIdentifiers = mapMaybe (fromText . pack) paths
 
-ancestors :: ModulePath -> Set ModulePath
-ancestors m@ModuleName {} = singleton m
-ancestors m@(ModulePath parent _) = m `insert` ancestors parent
+hierarchy :: ModulePath -> S.Set ModulePath
+hierarchy m@ModuleName {} = S.singleton m
+hierarchy m@(ModulePath parent _) = m `S.insert` hierarchy parent
 
 instance IsList ModulePath where
     type Item ModulePath = Identifier
@@ -66,3 +67,6 @@ instance IsList ModulePath where
                   (fromIdentifiers identifiers)
     toList (ModuleName identifier) = [identifier]
     toList (ModulePath path' identifier) = toList path' ++ [identifier]
+
+hierarchies :: S.Set ModulePath -> S.Set ModulePath
+hierarchies modulePaths = S.unions $ toList $ S.map hierarchy modulePaths
