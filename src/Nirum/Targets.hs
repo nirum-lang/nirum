@@ -37,6 +37,7 @@ import Nirum.Package.Metadata ( Metadata (Metadata, target)
                               , TargetName
                               )
 import Nirum.Targets.List (targetProxyMapQ)
+import Nirum.Targets.Docs ()
 import Nirum.Targets.Python ()
 
 data BuildError = TargetNameError TargetName
