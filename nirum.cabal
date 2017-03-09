@@ -40,6 +40,7 @@ library
                  ,     Nirum.Constructs.TypeDeclaration
                  ,     Nirum.Constructs.TypeExpression
                  ,     Nirum.Docs
+                 ,     Nirum.Docs.Html
                  ,     Nirum.Package
                  ,     Nirum.Package.Metadata
                  ,     Nirum.Package.ModuleSet
@@ -116,6 +117,7 @@ test-suite spec
                ,       Nirum.Constructs.TypeDeclarationSpec
                ,       Nirum.Constructs.TypeExpressionSpec
                ,       Nirum.DocsSpec
+               ,       Nirum.Docs.HtmlSpec
                ,       Nirum.Package.MetadataSpec
                ,       Nirum.Package.ModuleSetSpec
                ,       Nirum.PackageSpec

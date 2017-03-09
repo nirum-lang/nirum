@@ -34,6 +34,7 @@ module Nirum.Docs ( Block ( BlockQuote
                   , Title
                   , Url
                   , headingLevelFromInt
+                  , headingLevelInt
                   , parse
                   ) where
 
@@ -56,6 +57,14 @@ headingLevelFromInt 3 = H3
 headingLevelFromInt 4 = H4
 headingLevelFromInt 5 = H5
 headingLevelFromInt i = if i > 5 then H6 else H1
+
+headingLevelInt :: HeadingLevel -> Int
+headingLevelInt H1 = 1
+headingLevelInt H2 = 2
+headingLevelInt H3 = 3
+headingLevelInt H4 = 4
+headingLevelInt H5 = 5
+headingLevelInt H6 = 6
 
 -- | Whether a list is a bullet list or an ordered list.
 -- See also: http://spec.commonmark.org/0.25/#of-the-same-type
