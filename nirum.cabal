@@ -44,6 +44,7 @@ library
                  ,     Nirum.Package.ModuleSet
                  ,     Nirum.Parser
                  ,     Nirum.Targets
+                 ,     Nirum.Targets.JavaScript
                  ,     Nirum.Targets.List
                  ,     Nirum.Targets.Python
                  ,     Nirum.Version
@@ -112,6 +113,7 @@ test-suite spec
                ,       Nirum.Package.ModuleSetSpec
                ,       Nirum.PackageSpec
                ,       Nirum.ParserSpec
+               ,       Nirum.Targets.JavaScriptSpec
                ,       Nirum.Targets.PythonSpec
                ,       Nirum.TargetsSpec
                ,       Nirum.VersionSpec

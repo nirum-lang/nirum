@@ -1,5 +1,8 @@
 version = "0.3.0"
 
+[targets.javascript]
+name = "nirum-examples"
+
 [targets.python]
 name = "nirum-examples"
 
