@@ -134,7 +134,6 @@ test-suite spec
                ,       megaparsec
                ,       mtl
                ,       nirum
-               ,       optparse-applicative     >=0.13.1  && <0.14
                ,       parsec
                        -- only for dealing with htoml's ParserError
                ,       process                  >=1.1     && <2
