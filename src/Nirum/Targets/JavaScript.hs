@@ -61,9 +61,17 @@ compilePackage' package =
         [("package.json", Right $ compilePackageMetadata package)]
   where
     toJavaScriptFilename :: ModulePath -> [FilePath]
-    toJavaScriptFilename mp = [ T.unpack (toSnakeCaseText i) ++ ".js"
-                              | i <- toList mp
-                              ]
+    toJavaScriptFilename mp =
+      case mp of
+        ModulePath { .. } ->
+          [ T.unpack (toSnakeCaseText i)
+          | i <- toList path
+          ]
+          ++ [ f moduleName ]
+        ModuleName { .. } ->
+          [ f moduleName ]
+      where
+        f moduleName = T.unpack (toSnakeCaseText moduleName) ++ ".js"
     toFilename :: T.Text -> ModulePath -> FilePath
     toFilename sourceRootDirectory mp =
         joinPath $ T.unpack sourceRootDirectory : toJavaScriptFilename mp
