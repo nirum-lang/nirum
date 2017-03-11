@@ -15,10 +15,17 @@ import Text.Blaze.Html.Renderer.Utf8 (renderHtml)
 import Text.Hamlet (Html, shamlet)
 
 import Nirum.Constructs (Construct (toCode))
+import qualified Nirum.Constructs.Declaration as DE
+import qualified Nirum.Constructs.DeclarationSet as DES
 import qualified Nirum.Constructs.Docs as D
-import Nirum.Constructs.Identifier (toNormalizedString)
+import Nirum.Constructs.Identifier ( Identifier
+                                   , toNormalizedString
+                                   , toNormalizedText
+                                   )
 import Nirum.Constructs.Module (Module (Module, docs))
 import Nirum.Constructs.ModulePath (ModulePath)
+import Nirum.Constructs.Name (Name (facialName))
+import qualified Nirum.Constructs.TypeDeclaration as TD
 import Nirum.Docs ( Block (Heading)
                   , filterReferences
                   )
@@ -26,6 +33,7 @@ import Nirum.Docs.Html (renderInlines)
 import Nirum.Package ( BoundModule (boundPackage, modulePath)
                      , Package (Package, metadata, modules)
                      , resolveBoundModule
+                     , types
                      )
 import Nirum.Package.Metadata ( Author (Author, email, name, uri)
                               , Metadata (authors)
@@ -68,12 +76,31 @@ $doctype 5
     <body>
         <h1>
             <code>#{path}
+        $forall (ident, decl) <- types'
+            <h2>#{showKind decl} <code>#{toNormalizedText ident}</code>
 |]
   where
     md :: Metadata Docs
     md = metadata $ boundPackage docsModule
     path :: T.Text
     path = toCode $ modulePath docsModule
+    showKind :: TD.TypeDeclaration -> T.Text
+    showKind TD.ServiceDeclaration {} = "service"
+    showKind TD.TypeDeclaration { TD.type' = type'' } = case type'' of
+        TD.Alias {} -> "alias"
+        TD.UnboxedType {} -> "unboxed"
+        TD.EnumType {} -> "enum"
+        TD.RecordType {} -> "record"
+        TD.UnionType {} -> "union"
+        TD.PrimitiveType {} -> "primitive"
+    showKind TD.Import {} = "import"
+    types' :: [(Identifier, TD.TypeDeclaration)]
+    types' = [ (facialName $ DE.name decl, decl)
+             | decl <- DES.toList $ types docsModule
+             , case decl of
+                    TD.Import {} -> False
+                    _ -> True
+             ]
 
 contents :: Package Docs -> Html
 contents Package { metadata = md, modules = ms } = [shamlet|
