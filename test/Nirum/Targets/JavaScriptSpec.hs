@@ -2,6 +2,8 @@
 module Nirum.Targets.JavaScriptSpec ( spec
                                     ) where
 
+import qualified Data.Aeson.Types as A
+import Data.Aeson.Types ( (.=), object, toJSON )
 import qualified Data.Map.Strict as M
 import qualified Data.SemVer as SV
 import Text.Toml.Types (emptyTable)
@@ -35,6 +37,11 @@ spec = do
                                                 }
                           , modules = modules'
                           }
+    describe "JavaScript type" $
+        it "should be converted to a JSON that holds the NPM package metadata" $
+            toJSON package `shouldBe` object [ "name" .= A.String "dummy"
+                                             , "version" .= A.String "0.0.1"
+                                             ]
     describe "compilePackage'" $
         it "should produce JavaScript files per corresponding module" $ do
             let m = compilePackage' package

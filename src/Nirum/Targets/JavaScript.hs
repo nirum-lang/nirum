@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards, TypeFamilies #-}
+{-# LANGUAGE FlexibleInstances, RecordWildCards, TypeFamilies #-}
 module Nirum.Targets.JavaScript ( JavaScript (..)
                                 , CompileError' (..)
                                 , compilePackage'
@@ -10,6 +10,7 @@ import Data.Aeson.Types (ToJSON, (.=), object, toJSON)
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Map.Strict as M
 import Data.Map.Strict (Map)
+import qualified Data.SemVer as SV
 import qualified Data.Text as T
 import qualified Data.Text.Lazy.Builder as LB
 import Data.Text.Lazy.Builder (Builder, toLazyText)
@@ -28,7 +29,8 @@ import Nirum.Constructs.ModulePath (ModulePath (..))
 import qualified Nirum.Constructs.Name as N
 import Nirum.Constructs.TypeDeclaration (Field (..), Type (..), TypeDeclaration (..))
 
-import Nirum.Package.Metadata ( Package (..)
+import Nirum.Package.Metadata ( Metadata (..)
+                              , Package (..)
                               , Target ( CompileError
                                        , CompileResult
                                        , compilePackage
@@ -46,9 +48,13 @@ import qualified Nirum.Package.ModuleSet as MS
 newtype JavaScript = JavaScript { packageName :: T.Text }
     deriving (Eq, Ord, Show)
 
-instance ToJSON JavaScript where
-    toJSON JavaScript { .. } =
-        object [ "name" .= packageName ]
+instance ToJSON (Package JavaScript) where
+    toJSON package = object [ "name" .= packageName
+                            , "version" .= SV.toText version
+                            ]
+      where
+        Metadata {..} = metadata package
+        JavaScript {..} = packageTarget package
 
 newtype Code = Code { builder :: Builder }
 data CompileError' = CompileError'
@@ -93,7 +99,7 @@ compilePackage' package =
     compile = Right . Code . snd . runBuilder . compileModule
 
 compilePackageMetadata :: Package JavaScript -> Code
-compilePackageMetadata = Code . (`mappend` LB.singleton '\n') . encodePrettyToTextBuilder . packageTarget
+compilePackageMetadata = Code . (`mappend` LB.singleton '\n') . encodePrettyToTextBuilder
 
 
 compileModule :: Module -> CodeBuilder ()
