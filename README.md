@@ -55,10 +55,10 @@ In order to compile a Nirum package (`examples/`) to a Python package:
 For more infomration, use `--help` option:
 
     $ nirum --help
-    nirum - The IDL compiler and RPC/distributed object framework
+    Nirum: The IDL compiler and RPC/distributed object framework
 
     Usage: nirum [-v|--version] (-o|--output-dir DIR) (-t|--target TARGET) DIR
-      Nirum compiler0.3.0
+      Nirum compiler 0.3.0
 
     Available options:
       -h,--help                Show this help text

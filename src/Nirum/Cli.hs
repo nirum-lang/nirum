@@ -168,10 +168,10 @@ main = do
         OPT.info
             (OPT.helper <*> versionOption <*> programOptions)
             (OPT.fullDesc <>
-             OPT.progDesc ("Nirum compiler" ++ versionString) <>
+             OPT.progDesc ("Nirum compiler " ++ versionString) <>
              OPT.header header)
     header :: String
-    header = "nirum - The IDL compiler and RPC/distributed object framework"
+    header = "Nirum: The IDL compiler and RPC/distributed object framework"
     versionOption :: OPT.Parser (Opts -> Opts)
     versionOption = OPT.infoOption
         versionString (OPT.long "version" <>
