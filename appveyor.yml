@@ -40,7 +40,7 @@ after_build:
 test_script:
 - stack test
 # FIXME: duplicate code with test.sh
-- stack exec -- nirum -o nirum_fixture test/nirum_fixture
+- stack exec -- nirum -o nirum_fixture -t python test/nirum_fixture
 - C:\Python35\Scripts\tox
 artifacts:
 - path: nirum-win-x86.exe
