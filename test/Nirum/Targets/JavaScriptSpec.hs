@@ -23,21 +23,24 @@ emptyModule = Module { types = DS.empty, docs = Nothing }
 
 spec :: Spec
 spec = do
+    let target = JavaScript { packageName = "dummy" }
+    let Right modules' = MS.fromList [ (["fruits"], emptyModule)
+                                     , (["imported-commons"], emptyModule)
+                                     , (["transports", "truck"], emptyModule)
+                                     , (["transports", "container"], emptyModule)
+                                     ]
+    let package = Package { metadata = Metadata { version = SV.version 0 0 1 [] []
+                                                , authors = []
+                                                , target = target
+                                                }
+                          , modules = modules'
+                          }
     describe "compilePackage'" $
         it "should produce JavaScript files per corresponding module" $ do
-            let Right modules' = MS.fromList [ (["fruits"], emptyModule)
-                                             , (["transports", "truck"], emptyModule)
-                                             , (["transports", "container"], emptyModule)
-                                             ]
-            let package = Package { metadata = Metadata { version = SV.version 0 0 1 [] []
-                                                        , authors = []
-                                                        , target = JavaScript { packageName = "dummy" }
-                                                        }
-                                  , modules = modules'
-                                  }
             let m = compilePackage' package
             M.keysSet m `shouldBe` [ "package.json"
                                    , "src/fruits.js"
+                                   , "src/imported_commons.js"
                                    , "src/transports/truck.js"
                                    , "src/transports/container.js"
                                    ]
