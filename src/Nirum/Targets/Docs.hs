@@ -49,8 +49,11 @@ makeFilePath :: ModulePath -> FilePath
 makeFilePath modulePath' = foldl (</>) "" $
     map toNormalizedString (toList modulePath') ++ ["index.html"]
 
-makeUri :: ModulePath -> String
-makeUri modulePath' = "./" ++ makeFilePath modulePath'
+-- FIXME: remove trailing index.html on production
+makeUri :: ModulePath -> T.Text
+makeUri modulePath' =
+    T.intercalate "/" $
+                  map toNormalizedText (toList modulePath') ++ ["index.html"]
 
 module' :: BoundModule Docs -> Html
 module' docsModule = [shamlet|

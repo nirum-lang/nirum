@@ -12,5 +12,5 @@ spec = do
         D.makeFilePath ["foo", "bar", "baz"] `shouldBe`
             "foo" </> "bar" </> "baz" </> "index.html"
     specify "makeUri" $
-        D.makeUri ["foo", "bar", "baz"] `shouldBe`
-            "./" ++ ("foo" </> "bar" </> "baz" </> "index.html")
+        D.makeUri ["foo", "bar", "baz"] `shouldBe` "foo/bar/baz/index.html"
+    -- FIXME: more functional tests
