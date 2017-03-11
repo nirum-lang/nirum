@@ -3,17 +3,23 @@ module Nirum.Targets.JavaScript ( JavaScript (..)
                                 , compilePackage'
                                 ) where
 
-import Data.Aeson.Encode.Pretty ( encodePrettyToTextBuilder )
-import Data.Aeson.Types ( ToJSON, (.=), object, toJSON )
+import Data.Aeson.Encode.Pretty (encodePrettyToTextBuilder)
+import Data.Aeson.Types (ToJSON, (.=), object, toJSON)
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Map.Strict as M
-import Data.Map.Strict ( Map )
+import Data.Map.Strict (Map)
 import qualified Data.Text as T
 import qualified Data.Text.Lazy.Builder as LB
-import Data.Text.Lazy.Builder ( Builder, toLazyText )
-import Data.Text.Lazy.Encoding ( encodeUtf8 )
+import Data.Text.Lazy.Builder (Builder, toLazyText)
+import Data.Text.Lazy.Encoding (encodeUtf8)
+import qualified Data.Set as S
+import GHC.Exts (IsList (toList))
+import System.FilePath (joinPath)
 
-import Nirum.Package.Metadata ( Package
+import Nirum.Constructs.Identifier (toSnakeCaseText)
+import Nirum.Constructs.ModulePath (ModulePath (..), hierarchy)
+
+import Nirum.Package.Metadata ( Package (..)
                               , Target ( CompileError
                                        , CompileResult
                                        , compilePackage
@@ -25,6 +31,7 @@ import Nirum.Package.Metadata ( Package
                               , packageTarget
                               , stringField
                               )
+import qualified Nirum.Package.ModuleSet as MS
 
 
 data JavaScript = JavaScript { packageName :: T.Text }
@@ -49,9 +56,23 @@ instance Target JavaScript where
 
 compilePackage' :: Package JavaScript -> Map FilePath (Either () CodeBuilder)
 compilePackage' package =
-    M.fromList [
-        ("package.json", Right $ compilePackageMetadata package)
-    ]
+    M.fromList $
+        files ++
+        [("package.json", Right $ compilePackageMetadata package)]
+  where
+    toJavaScriptFilename :: ModulePath -> [FilePath]
+    toJavaScriptFilename mp = [ T.unpack (toSnakeCaseText i) ++ ".js"
+                              | i <- toList mp
+                              ]
+    toFilename :: T.Text -> ModulePath -> FilePath
+    toFilename sourceRootDirectory mp =
+        joinPath $ T.unpack sourceRootDirectory : toJavaScriptFilename mp
+    files :: [(FilePath, Either () CodeBuilder)]
+    files = [ (toFilename "src" mp', Right $ CodeBuilder "")
+            | mp <- MS.keys (modules package)
+            , mp' <- S.elems (hierarchy mp)
+            ]
+
 
 compilePackageMetadata :: Package JavaScript -> CodeBuilder
 compilePackageMetadata = CodeBuilder . (`mappend` LB.singleton '\n') . encodePrettyToTextBuilder . packageTarget
