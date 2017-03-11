@@ -1,11 +1,12 @@
 {-# LANGUAGE OverloadedLists, QuasiQuotes, TypeFamilies #-}
-module Nirum.Targets.Docs (Docs) where
+module Nirum.Targets.Docs (Docs, makeFilePath, makeUri) where
 
-import GHC.Exts (IsList (toList))
+import Data.Maybe (mapMaybe)
+import GHC.Exts (IsList (fromList, toList))
 
 import Data.ByteString.Lazy (toStrict)
 import qualified Text.Email.Parser as E
-import Data.Map.Strict (Map)
+import Data.Map.Strict (Map, union)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8)
 import System.FilePath ((</>))
@@ -22,7 +23,10 @@ import Nirum.Docs ( Block (Heading)
                   , filterReferences
                   )
 import Nirum.Docs.Html (renderInlines)
-import Nirum.Package (Package (Package, metadata, modules))
+import Nirum.Package ( BoundModule (boundPackage, modulePath)
+                     , Package (Package, metadata, modules)
+                     , resolveBoundModule
+                     )
 import Nirum.Package.Metadata ( Author (Author, email, name, uri)
                               , Metadata (authors)
                               , Target ( CompileError
@@ -42,11 +46,31 @@ data Docs = Docs deriving (Eq, Ord, Show)
 type Error = T.Text
 
 makeFilePath :: ModulePath -> FilePath
-makeFilePath modulePath = foldl (</>) "" $
-    map toNormalizedString (toList modulePath) ++ ["index.html"]
+makeFilePath modulePath' = foldl (</>) "" $
+    map toNormalizedString (toList modulePath') ++ ["index.html"]
 
 makeUri :: ModulePath -> String
 makeUri modulePath' = "./" ++ (makeFilePath modulePath')
+
+module' :: BoundModule Docs -> Html
+module' docsModule = [shamlet|
+$doctype 5
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>#{path}
+        <meta name="generator" content="Nirum #{versionText}">
+        $forall Author { name = name' } <- authors md
+            <meta name="author" content="#{name'}">
+    <body>
+        <h1>
+            <code>#{path}
+|]
+  where
+    md :: Metadata Docs
+    md = metadata $ boundPackage docsModule
+    path :: T.Text
+    path = toCode $ modulePath docsModule
 
 contents :: Package Docs -> Html
 contents Package { metadata = md, modules = ms } = [shamlet|
@@ -61,11 +85,12 @@ $doctype 5
     <body>
         <h1>Modules
         <ul>
-            $forall (modulePath, mod) <- MS.toAscList ms
+            $forall (modulePath', mod) <- MS.toAscList ms
                 <li>
-                    <code>#{toCode modulePath}
-                    $maybe tit <- moduleTitle mod
-                        &mdash; #{tit}
+                    <a href="#{makeUri modulePath'}">
+                        <code>#{toCode modulePath'} </code>
+                            $maybe tit <- moduleTitle mod
+                                &mdash; #{tit}
         <hr>
         <dl>
             <dt.author>
@@ -97,7 +122,15 @@ $doctype 5
 
 compilePackage' :: Package Docs -> Map FilePath (Either Error Html)
 compilePackage' pkg =
-    [("index.html", Right $ contents pkg)]
+    [("index.html", Right $ contents pkg)] `union`
+          (fromList [ (makeFilePath $ modulePath m, Right $ module' m)
+                    | m <- modules'
+                    ] :: Map FilePath (Either Error Html))
+  where
+    paths' :: [ModulePath]
+    paths' = MS.keys $ modules pkg
+    modules' :: [BoundModule Docs]
+    modules' = mapMaybe (`resolveBoundModule` pkg) paths'
 
 instance Target Docs where
     type CompileResult Docs = Html
