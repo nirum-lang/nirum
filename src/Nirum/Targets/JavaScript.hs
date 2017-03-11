@@ -12,12 +12,11 @@ import qualified Data.Text as T
 import qualified Data.Text.Lazy.Builder as LB
 import Data.Text.Lazy.Builder (Builder, toLazyText)
 import Data.Text.Lazy.Encoding (encodeUtf8)
-import qualified Data.Set as S
 import GHC.Exts (IsList (toList))
 import System.FilePath (joinPath)
 
 import Nirum.Constructs.Identifier (toSnakeCaseText)
-import Nirum.Constructs.ModulePath (ModulePath (..), hierarchy)
+import Nirum.Constructs.ModulePath (ModulePath (..))
 
 import Nirum.Package.Metadata ( Package (..)
                               , Target ( CompileError
@@ -76,9 +75,8 @@ compilePackage' package =
     toFilename sourceRootDirectory mp =
         joinPath $ T.unpack sourceRootDirectory : toJavaScriptFilename mp
     files :: [(FilePath, Either () CodeBuilder)]
-    files = [ (toFilename "src" mp', Right $ CodeBuilder "")
+    files = [ (toFilename "src" mp, Right $ CodeBuilder "")
             | mp <- MS.keys (modules package)
-            , mp' <- S.elems (hierarchy mp)
             ]
 
 
