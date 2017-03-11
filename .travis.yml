@@ -46,9 +46,9 @@ install:
     pip install --user --upgrade tox pip setuptools
   fi
 - travis_long stack --no-terminal setup
-- travis_long stack --no-terminal install scan
+- travis_long stack --no-terminal install scan -j4
 script:
-- stack --no-terminal test
+- stack --no-terminal test -j4
 - ./lint.sh
 - ./test.sh
 before_deploy:
