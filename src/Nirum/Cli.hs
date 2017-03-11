@@ -3,26 +3,13 @@ module Nirum.Cli (main, writeFiles) where
 
 import Control.Monad (forM_)
 import GHC.Exts (IsList (toList))
-import System.IO.Error (catchIOError, ioeGetErrorString)
 
 import qualified Data.ByteString as B
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
-import System.Console.CmdArgs.Implicit ( Data
-                                       , Typeable
-                                       , argPos
-                                       , cmdArgs
-                                       , explicit
-                                       , help
-                                       , name
-                                       , program
-                                       , summary
-                                       , typ
-                                       , typDir
-                                       , (&=)
-                                       )
-import System.Console.CmdArgs.Default (def)
+import Data.Monoid
+import qualified Options.Applicative as OPT
 import System.Directory (createDirectoryIfMissing)
 import System.Exit (die)
 import System.FilePath (takeDirectory, (</>))
@@ -56,11 +43,6 @@ import Nirum.Targets ( BuildError (CompileError, PackageError, TargetNameError)
                      , targetNames
                      )
 import Nirum.Version (versionString)
-
-data NirumCli = NirumCli { sourcePath :: FilePath
-                         , objectPath :: FilePath
-                         , targetName :: TargetName
-                         } deriving (Show, Data, Typeable)
 
 parseErrortoPrettyMessage :: ParseError (Token T.Text) Dec
                           -> FilePath
@@ -128,24 +110,11 @@ importErrorsToPrettyMessage importErrors =
     withListStyleText =
         map (T.append "- ") (importErrorsToMessageList importErrors)
 
-nirumCli :: NirumCli
-nirumCli = NirumCli
-    { objectPath = def &= explicit
-          &= name "o" &= name "output-dir" &= typDir
-          &= help "The directory to place object files"
-    , targetName = "python" &= explicit
-          &= name "t" &= name "target" &= typ "TARGET"
-          &= help ("The target language.  Available targets: " ++
-                   T.unpack targetNamesText)
-    , sourcePath = def &= argPos 1 &= typDir
-    } &= program "nirum" &= summary ("Nirum Compiler " ++ versionString)
-
 targetNamesText :: T.Text
 targetNamesText = T.intercalate ", " $ S.toAscList targetNames
 
-main' :: IO ()
-main' = do
-    NirumCli src outDir target <- cmdArgs nirumCli
+runCli :: FilePath -> FilePath -> TargetName -> IO ()
+runCli src outDir target = do
     result <- buildPackage target src
     case result of
         Left (TargetNameError targetName') ->
@@ -181,5 +150,38 @@ writeFiles outDir files =
         putStrLn outPath
         B.writeFile outPath code
 
+data Opts = Opts { outDirectory :: !String
+                 , targetOption :: !String
+                 , packageDirectory :: !String
+                 }
+
 main :: IO ()
-main = catchIOError main' $ die . ioeGetErrorString
+main = do
+    opts <- OPT.execParser optsParser
+    let packageDirectoryPath = packageDirectory opts
+        outDirectoryPath = outDirectory opts
+        targetName = T.pack $ targetOption opts
+    runCli packageDirectoryPath outDirectoryPath targetName
+  where
+    optsParser :: OPT.ParserInfo Opts
+    optsParser =
+        OPT.info
+            (OPT.helper <*> versionOption <*> programOptions)
+            (OPT.fullDesc <> OPT.progDesc "Nirum compiler." <>
+             OPT.header header)
+    header :: String
+    header = "nirum - The IDL compiler and RPC/distributed object framework"
+    versionOption :: OPT.Parser (Opts -> Opts)
+    versionOption = OPT.infoOption
+        versionString (OPT.long "version" <>
+                       OPT.short 'v' <> OPT.help "Show version")
+    programOptions :: OPT.Parser Opts
+    programOptions =
+        Opts <$> OPT.strOption
+            (OPT.long "outdir" <> OPT.short 'o' <> OPT.metavar "OUTDIR" <>
+             OPT.help "out directory") <*>
+        OPT.strOption
+            (OPT.long "target" <> OPT.short 't' <> OPT.metavar "TARGET" <>
+             OPT.help "Target name") <*>
+        OPT.strArgument
+            (OPT.metavar "PACKAGE" <> OPT.help "Package directory")
