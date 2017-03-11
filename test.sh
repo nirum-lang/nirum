@@ -2,6 +2,6 @@
 set -e
 
 stack build
-stack exec -- nirum -o nirum_fixture test/nirum_fixture
+stack exec -- nirum -o nirum_fixture -t python test/nirum_fixture
 
 tox --skip-missing-interpreters
