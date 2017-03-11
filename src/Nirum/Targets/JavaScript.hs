@@ -1,5 +1,7 @@
 {-# LANGUAGE RecordWildCards, TypeFamilies #-}
-module Nirum.Targets.JavaScript ( JavaScript ) where
+module Nirum.Targets.JavaScript ( JavaScript (..)
+                                , compilePackage'
+                                ) where
 
 import Data.Aeson.Encode.Pretty ( encodePrettyToTextBuilder )
 import Data.Aeson.Types ( ToJSON, (.=), object, toJSON )
