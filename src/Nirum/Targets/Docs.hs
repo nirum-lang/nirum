@@ -50,7 +50,7 @@ makeFilePath modulePath' = foldl (</>) "" $
     map toNormalizedString (toList modulePath') ++ ["index.html"]
 
 makeUri :: ModulePath -> String
-makeUri modulePath' = "./" ++ (makeFilePath modulePath')
+makeUri modulePath' = "./" ++ makeFilePath modulePath'
 
 module' :: BoundModule Docs -> Html
 module' docsModule = [shamlet|
