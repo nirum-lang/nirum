@@ -48,7 +48,9 @@ library
                  ,     Nirum.Targets.List
                  ,     Nirum.Targets.Python
                  ,     Nirum.Version
-  build-depends:       base                     >=4.7     && <5
+  build-depends:       aeson                    >=1.0.2   && <2
+               ,       aeson-pretty             >=0.8     && <0.9
+               ,       base                     >=4.7     && <5
                ,       bytestring
                ,       containers               >=0.5.6.2 && <0.6
                ,       cmdargs                  >=0.10.14 && <0.11
@@ -121,7 +123,9 @@ test-suite spec
   default-language:    Haskell2010
   default-extensions:  OverloadedStrings
   -- omit version specifiers for shared dependencies to library
-  build-depends:       base
+  build-depends:       aeson                    >=1.0.2   && <2
+               ,       aeson-pretty             >=0.8     && <0.9
+               ,       base
                ,       bytestring
                ,       containers
                ,       directory
