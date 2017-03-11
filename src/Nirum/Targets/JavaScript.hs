@@ -1,8 +1,10 @@
 {-# LANGUAGE RecordWildCards, TypeFamilies #-}
 module Nirum.Targets.JavaScript ( JavaScript (..)
+                                , CompileError' (..)
                                 , compilePackage'
                                 ) where
 
+import Control.Monad (forM_)
 import Data.Aeson.Encode.Pretty (encodePrettyToTextBuilder)
 import Data.Aeson.Types (ToJSON, (.=), object, toJSON)
 import qualified Data.ByteString.Lazy as BSL
@@ -14,9 +16,17 @@ import Data.Text.Lazy.Builder (Builder, toLazyText)
 import Data.Text.Lazy.Encoding (encodeUtf8)
 import GHC.Exts (IsList (toList))
 import System.FilePath (joinPath)
+import qualified Text.PrettyPrint as P
+import Text.PrettyPrint (Doc, (<>), (<+>))
 
-import Nirum.Constructs.Identifier (toSnakeCaseText)
+import Nirum.CodeBuilder (CodeBuilder, nest, runBuilder, writeLine)
+import qualified Nirum.Constructs.Declaration as D
+import qualified Nirum.Constructs.DeclarationSet as DS
+import Nirum.Constructs.Identifier (toCamelCaseText, toPascalCaseText, toSnakeCaseText)
+import Nirum.Constructs.Module (Module (..))
 import Nirum.Constructs.ModulePath (ModulePath (..))
+import qualified Nirum.Constructs.Name as N
+import Nirum.Constructs.TypeDeclaration (Field (..), Type (..), TypeDeclaration (..))
 
 import Nirum.Package.Metadata ( Package (..)
                               , Target ( CompileError
@@ -40,11 +50,12 @@ instance ToJSON JavaScript where
     toJSON JavaScript { .. } =
         object [ "name" .= packageName ]
 
-newtype CodeBuilder = CodeBuilder { builder :: Builder }
+newtype Code = Code { builder :: Builder }
+data CompileError' = CompileError'
 
 instance Target JavaScript where
-    type CompileResult JavaScript = CodeBuilder
-    type CompileError JavaScript = ()
+    type CompileResult JavaScript = Code
+    type CompileError JavaScript = CompileError'
     targetName _ = "javascript"
     parseTarget table = do
         name' <- stringField "name" table
@@ -53,7 +64,7 @@ instance Target JavaScript where
     showCompileError _ _e = ""
     toByteString _ = BSL.toStrict . encodeUtf8 . toLazyText . builder
 
-compilePackage' :: Package JavaScript -> Map FilePath (Either () CodeBuilder)
+compilePackage' :: Package JavaScript -> Map FilePath (Either CompileError' Code)
 compilePackage' package =
     M.fromList $
         files ++
@@ -74,11 +85,45 @@ compilePackage' package =
     toFilename :: T.Text -> ModulePath -> FilePath
     toFilename sourceRootDirectory mp =
         joinPath $ T.unpack sourceRootDirectory : toJavaScriptFilename mp
-    files :: [(FilePath, Either () CodeBuilder)]
-    files = [ (toFilename "src" mp, Right $ CodeBuilder "")
-            | mp <- MS.keys (modules package)
+    files :: [(FilePath, Either CompileError' Code)]
+    files = [ (toFilename "src" mp, compile m)
+            | (mp, m) <- MS.toList (modules package)
             ]
+    compile :: Module -> Either CompileError' Code
+    compile = Right . Code . snd . runBuilder . compileModule
+
+compilePackageMetadata :: Package JavaScript -> Code
+compilePackageMetadata = Code . (`mappend` LB.singleton '\n') . encodePrettyToTextBuilder . packageTarget
 
 
-compilePackageMetadata :: Package JavaScript -> CodeBuilder
-compilePackageMetadata = CodeBuilder . (`mappend` LB.singleton '\n') . encodePrettyToTextBuilder . packageTarget
+compileModule :: Module -> CodeBuilder ()
+compileModule Module {..} = sequence_ $ map compileTypeDeclaration $ DS.toList types
+
+compileTypeDeclaration :: TypeDeclaration -> CodeBuilder ()
+compileTypeDeclaration td@TypeDeclaration {..} =
+  case type' of
+    RecordType {..} -> do
+        writeLine $ "class" <+> (toClassName $ D.name td) <+> "{"
+        nest 4 $ compileRecordBody fields
+        writeLine "}"
+    _ -> return ()
+compileTypeDeclaration _ = return ()
+
+compileRecordBody :: DS.DeclarationSet Field -> CodeBuilder ()
+compileRecordBody fields = do
+    writeLine $ "constructor(values)" <+> "{"
+    nest 4 $ do
+        forM_ (DS.toList fields) $ \field -> do
+            writeLine $ "this" <> dot <> (toFieldName field) <+> "=" <+> "values" <> dot <> (toFieldName field) <> ";"
+        writeLine "Object.freeze(this);"
+    writeLine "}"
+
+
+toFieldName :: Field -> Doc
+toFieldName = P.text . T.unpack . toCamelCaseText . N.facialName . fieldName
+
+toClassName :: N.Name -> Doc
+toClassName = P.text . T.unpack . toPascalCaseText . N.facialName
+
+dot :: P.Doc
+dot = P.char '.'
