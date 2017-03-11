@@ -167,7 +167,8 @@ main = do
     optsParser =
         OPT.info
             (OPT.helper <*> versionOption <*> programOptions)
-            (OPT.fullDesc <> OPT.progDesc "Nirum compiler." <>
+            (OPT.fullDesc <>
+             OPT.progDesc ("Nirum compiler" ++ versionString) <>
              OPT.header header)
     header :: String
     header = "nirum - The IDL compiler and RPC/distributed object framework"
@@ -178,10 +179,10 @@ main = do
     programOptions :: OPT.Parser Opts
     programOptions =
         Opts <$> OPT.strOption
-            (OPT.long "outdir" <> OPT.short 'o' <> OPT.metavar "OUTDIR" <>
-             OPT.help "out directory") <*>
+            (OPT.long "output-dir" <> OPT.short 'o' <> OPT.metavar "DIR" <>
+             OPT.help "Output directory") <*>
         OPT.strOption
             (OPT.long "target" <> OPT.short 't' <> OPT.metavar "TARGET" <>
-             OPT.help "Target name") <*>
+             OPT.help "Target language name") <*>
         OPT.strArgument
-            (OPT.metavar "PACKAGE" <> OPT.help "Package directory")
+            (OPT.metavar "DIR" <> OPT.help "Package directory")
