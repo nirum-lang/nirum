@@ -23,7 +23,7 @@ emptyModule = Module { types = DS.empty, docs = Nothing }
 
 spec :: Spec
 spec = do
-    let target = JavaScript { packageName = "dummy" }
+    let js = JavaScript { packageName = "dummy" }
     let Right modules' = MS.fromList [ (["fruits"], emptyModule)
                                      , (["imported-commons"], emptyModule)
                                      , (["transports", "truck"], emptyModule)
@@ -31,7 +31,7 @@ spec = do
                                      ]
     let package = Package { metadata = Metadata { version = SV.version 0 0 1 [] []
                                                 , authors = []
-                                                , target = target
+                                                , target = js
                                                 }
                           , modules = modules'
                           }
