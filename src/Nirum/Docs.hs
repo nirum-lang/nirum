@@ -33,6 +33,7 @@ module Nirum.Docs ( Block ( BlockQuote
                   , TightItem
                   , Title
                   , Url
+                  , filterReferences
                   , headingLevelFromInt
                   , headingLevelInt
                   , parse
@@ -173,3 +174,11 @@ instance IsString Block where
 
 instance IsString Inline where
     fromString = Text . T.pack
+
+-- | Replace all 'Link' and 'Image' nodes with normal 'Text' nodes.
+filterReferences :: [Inline] -> [Inline]
+filterReferences [] = []
+filterReferences (Image { imageTitle = t } : ix) = Text t : filterReferences ix
+filterReferences (Link { linkContents = children } : ix) =
+    children ++ filterReferences ix
+filterReferences (i : ix) = i : filterReferences ix

@@ -11,6 +11,7 @@ import Nirum.Docs ( Block (..)
                   , ItemList (..)
                   , ListDelimiter (..)
                   , ListType (..)
+                  , filterReferences
                   , headingLevelFromInt
                   , parse
                   )
@@ -74,3 +75,19 @@ spec = do
             headingLevelFromInt 99 `shouldBe` H6
     specify "parse" $
         parse sampleSource `shouldBe` sampleDocument
+    specify "filterReferences" $
+        filterReferences [ "A paragraph that consists of a "
+                         , Link "http://nirum.org/" ""
+                                [ Emphasis ["hyper"], " link" ]
+                         , " and an "
+                         , Image "./img.png" "image"
+                         , "."
+                         ]
+            `shouldBe`
+                [ "A paragraph that consists of a "
+                , Emphasis ["hyper"]
+                , " link"
+                , " and an "
+                , "image"
+                , "."
+                ]
