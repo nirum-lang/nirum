@@ -1,4 +1,5 @@
-# Module consists zero or more type declarations.
+# Module consists zero or more type declarations
+# ==============================================
 
 unboxed offset (float64);
 # The key difference between unboxed type and reocrd type consisting of a single

@@ -1,15 +1,24 @@
-{-# LANGUAGE OverloadedLists, OverloadedStrings, QuasiQuotes, TypeFamilies #-}
+{-# LANGUAGE OverloadedLists, QuasiQuotes, TypeFamilies #-}
 module Nirum.Targets.Docs (Docs) where
 
 import Data.ByteString.Lazy (toStrict)
+import qualified Text.Email.Parser as E
 import Data.Map.Strict (Map)
-import Data.Text (Text)
+import qualified Data.Text as T
+import Data.Text.Encoding (decodeUtf8)
+import Text.Blaze (preEscapedToMarkup)
 import Text.Blaze.Html.Renderer.Utf8 (renderHtml)
 import Text.Hamlet (Html, shamlet)
 
 import Nirum.Constructs (Construct (toCode))
+import qualified Nirum.Constructs.Docs as D
+import Nirum.Constructs.Module (Module (Module, docs))
+import Nirum.Docs ( Block (Heading)
+                  , filterReferences
+                  )
+import Nirum.Docs.Html (renderInlines)
 import Nirum.Package (Package (Package, metadata, modules))
-import Nirum.Package.Metadata ( Author (Author, name)
+import Nirum.Package.Metadata ( Author (Author, email, name, uri)
                               , Metadata (authors)
                               , Target ( CompileError
                                        , CompileResult
@@ -25,7 +34,7 @@ import Nirum.Version (versionText)
 
 data Docs = Docs deriving (Eq, Ord, Show)
 
-type Error = Text
+type Error = T.Text
 
 index :: Package Docs -> Html
 index Package { metadata = md, modules = ms } = [shamlet|
@@ -40,9 +49,39 @@ $doctype 5
     <body>
         <h1>Modules
         <ul>
-            $forall (modulePath, _) <- MS.toAscList ms
-                <li><code>#{toCode modulePath}</code>
+            $forall (modulePath, mod) <- MS.toAscList ms
+                <li>
+                    <code>#{toCode modulePath}
+                    $maybe tit <- moduleTitle mod
+                        &mdash; #{tit}
+        <hr>
+        <dl>
+            <dt.author>
+                $if 1 < length (authors md)
+                    Authors
+                $else
+                    Author
+            $forall Author { name = n, uri = u, email = e } <- authors md
+                $maybe uri' <- u
+                    <dd.author><a href="#{show uri'}">#{n}</a>
+                $nothing
+                    $maybe email' <- e
+                        <dd.author><a href="mailto:#{emailText email'}">#{n}</a>
+                    $nothing
+                        <dd.author>#{n}
 |]
+  where
+    moduleTitle :: Module -> Maybe Html
+    moduleTitle Module { docs = docs' } = do
+        d <- docs'
+        t <- D.title d
+        nodes <- case t of
+                     Heading _ inlines ->
+                        Just $ filterReferences inlines
+                     _ -> Nothing
+        return $ preEscapedToMarkup $ renderInlines nodes
+    emailText :: E.EmailAddress -> T.Text
+    emailText = decodeUtf8 . E.toByteString
 
 compilePackage' :: Package Docs -> Map FilePath (Either Error Html)
 compilePackage' pkg =
