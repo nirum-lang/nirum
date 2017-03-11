@@ -24,6 +24,7 @@ import System.Console.CmdArgs.Implicit ( Data
                                        )
 import System.Console.CmdArgs.Default (def)
 import System.Directory (createDirectoryIfMissing)
+import System.Exit (die)
 import System.FilePath (takeDirectory, (</>))
 import Text.InterpolatedString.Perl6 (qq)
 import Text.Megaparsec (Token)
@@ -148,7 +149,7 @@ main' = do
     result <- buildPackage target src
     case result of
         Left (TargetNameError targetName') ->
-            putStrLn [qq|$targetName': No such target.
+            die [qq|Couldn't find "$targetName'" target.
 Available targets: $targetNamesText|]
         Left (PackageError (ParseError modulePath error')) -> do
             {- FIXME: find more efficient way to determine filename from
@@ -157,19 +158,19 @@ Available targets: $targetNamesText|]
             case M.lookup modulePath filePaths of
                 Just filePath' -> do
                     m <- parseErrortoPrettyMessage error' filePath'
-                    putStrLn m
-                Nothing -> putStrLn [qq|$modulePath not found|]
+                    die m
+                Nothing -> die [qq|$modulePath not found|]
         Left (PackageError (ImportError importErrors)) ->
-            putStrLn [qq|Import error:
+            die [qq|Import error:
 {importErrorsToPrettyMessage importErrors}
 |]
         Left (PackageError (ScanError _ error')) ->
-            putStrLn [qq|Scan error: $error'|]
+            die [qq|Scan error: $error'|]
         Left (PackageError (MetadataError error')) ->
-            putStrLn [qq|Metadata error: $error'|]
+            die [qq|Metadata error: $error'|]
         Left (CompileError errors) ->
             forM_ (M.toList errors) $ \ (filePath, compileError) ->
-                putStrLn [qq|error: $filePath: $compileError|]
+                die [qq|error: $filePath: $compileError|]
         Right buildResult -> writeFiles outDir buildResult
 
 writeFiles :: FilePath -> BuildResult -> IO ()
@@ -181,4 +182,4 @@ writeFiles outDir files =
         B.writeFile outPath code
 
 main :: IO ()
-main = catchIOError main' $ putStrLn . ioeGetErrorString
+main = catchIOError main' $ die . ioeGetErrorString
