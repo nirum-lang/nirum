@@ -7,7 +7,10 @@ import Test.Hspec.Meta
 import qualified Nirum.Targets.Docs as D
 
 spec :: Spec
-spec =
+spec = do
     specify "makeFilePath" $
         D.makeFilePath ["foo", "bar", "baz"] `shouldBe`
             "foo" </> "bar" </> "baz" </> "index.html"
+    specify "makeUri" $
+        D.makeUri ["foo", "bar", "baz"] `shouldBe`
+            "./" ++ ("foo" </> "bar" </> "baz" </> "index.html")

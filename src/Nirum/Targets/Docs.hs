@@ -45,6 +45,9 @@ makeFilePath :: ModulePath -> FilePath
 makeFilePath modulePath = foldl (</>) "" $
     map toNormalizedString (toList modulePath) ++ ["index.html"]
 
+makeUri :: ModulePath -> String
+makeUri modulePath' = "./" ++ (makeFilePath modulePath')
+
 contents :: Package Docs -> Html
 contents Package { metadata = md, modules = ms } = [shamlet|
 $doctype 5
