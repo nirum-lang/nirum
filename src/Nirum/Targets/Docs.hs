@@ -1,18 +1,23 @@
 {-# LANGUAGE OverloadedLists, QuasiQuotes, TypeFamilies #-}
 module Nirum.Targets.Docs (Docs) where
 
+import GHC.Exts (IsList (toList))
+
 import Data.ByteString.Lazy (toStrict)
 import qualified Text.Email.Parser as E
 import Data.Map.Strict (Map)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8)
+import System.FilePath ((</>))
 import Text.Blaze (preEscapedToMarkup)
 import Text.Blaze.Html.Renderer.Utf8 (renderHtml)
 import Text.Hamlet (Html, shamlet)
 
 import Nirum.Constructs (Construct (toCode))
 import qualified Nirum.Constructs.Docs as D
+import Nirum.Constructs.Identifier (toNormalizedString)
 import Nirum.Constructs.Module (Module (Module, docs))
+import Nirum.Constructs.ModulePath (ModulePath)
 import Nirum.Docs ( Block (Heading)
                   , filterReferences
                   )
@@ -35,6 +40,10 @@ import Nirum.Version (versionText)
 data Docs = Docs deriving (Eq, Ord, Show)
 
 type Error = T.Text
+
+makeFilePath :: ModulePath -> FilePath
+makeFilePath modulePath = foldl (</>) "" $
+    map toNormalizedString (toList modulePath) ++ ["index.html"]
 
 contents :: Package Docs -> Html
 contents Package { metadata = md, modules = ms } = [shamlet|
