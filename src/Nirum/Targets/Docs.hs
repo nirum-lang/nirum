@@ -36,8 +36,8 @@ data Docs = Docs deriving (Eq, Ord, Show)
 
 type Error = T.Text
 
-index :: Package Docs -> Html
-index Package { metadata = md, modules = ms } = [shamlet|
+contents :: Package Docs -> Html
+contents Package { metadata = md, modules = ms } = [shamlet|
 $doctype 5
 <html>
     <head>
@@ -85,7 +85,7 @@ $doctype 5
 
 compilePackage' :: Package Docs -> Map FilePath (Either Error Html)
 compilePackage' pkg =
-    [("index.html", Right $ index pkg)]
+    [("index.html", Right $ contents pkg)]
 
 instance Target Docs where
     type CompileResult Docs = Html
