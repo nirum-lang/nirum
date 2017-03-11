@@ -8,7 +8,7 @@ import qualified Data.ByteString as B
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
-import Data.Monoid
+import Data.Monoid ((<>))
 import qualified Options.Applicative as OPT
 import System.Directory (createDirectoryIfMissing)
 import System.Exit (die)
