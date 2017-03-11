@@ -103,13 +103,13 @@ compilePackageMetadata = Code . (`mappend` LB.singleton '\n') . encodePrettyToTe
 
 
 compileModule :: Module -> CodeBuilder ()
-compileModule Module {..} = sequence_ $ map compileTypeDeclaration $ DS.toList types
+compileModule Module {..} = mapM_ compileTypeDeclaration $ DS.toList types
 
 compileTypeDeclaration :: TypeDeclaration -> CodeBuilder ()
 compileTypeDeclaration td@TypeDeclaration {..} =
   case type' of
     RecordType {..} -> do
-        writeLine $ "class" <+> (toClassName $ D.name td) <+> "{"
+        writeLine $ "class" <+> toClassName (D.name td) <+> "{"
         nest 4 $ compileRecordBody fields
         writeLine "}"
     _ -> return ()
@@ -119,8 +119,8 @@ compileRecordBody :: DS.DeclarationSet Field -> CodeBuilder ()
 compileRecordBody fields = do
     writeLine $ "constructor(values)" <+> "{"
     nest 4 $ do
-        forM_ (DS.toList fields) $ \field -> do
-            writeLine $ "this" <> dot <> (toFieldName field) <+> "=" <+> "values" <> dot <> (toFieldName field) <> ";"
+        forM_ (DS.toList fields) $ \field ->
+            writeLine $ "this" <> dot <> toFieldName field <+> "=" <+> "values" <> dot <> toFieldName field <> ";"
         writeLine "Object.freeze(this);"
     writeLine "}"
 
