@@ -33,7 +33,7 @@ import Nirum.Package.Metadata ( Package (..)
 import qualified Nirum.Package.ModuleSet as MS
 
 
-data JavaScript = JavaScript { packageName :: T.Text }
+newtype JavaScript = JavaScript { packageName :: T.Text }
     deriving (Eq, Ord, Show)
 
 instance ToJSON JavaScript where

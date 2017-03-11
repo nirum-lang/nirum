@@ -1,6 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving, MultiParamTypeClasses, TypeOperators #-}
 module Nirum.CodeBuilder ( CodeBuilder
-                         , IsCode
                          , nest
                          , runBuilder
                          , writeLine
@@ -8,44 +7,36 @@ module Nirum.CodeBuilder ( CodeBuilder
 
 import Control.Applicative (Applicative)
 import Control.Monad (Monad)
-import Control.Monad.Reader (MonadReader, ReaderT, ask, local, runReaderT)
-import Control.Monad.Writer (MonadWriter, Writer, runWriter, tell)
+import Control.Monad.State (MonadState, State, runState, modify)
 import Data.Functor (Functor)
-import qualified Data.Text as T
+import Data.Monoid ((<>))
 import qualified Data.Text.Lazy.Builder as B
+import qualified Text.PrettyPrint as P
+import Text.PrettyPrint (($+$))
 
 
-newtype CodeBuilder a = CodeBuilder (ReaderT BuildContext (Writer B.Builder) a)
+newtype CodeBuilder a = CodeBuilder (State P.Doc a)
     deriving ( Applicative
              , Functor
              , Monad
-             , MonadReader BuildContext
-             , MonadWriter B.Builder
+             , MonadState P.Doc
              )
 
-data BuildContext = BuildContext { indentSize :: Integer }
-
-defaultContext :: BuildContext
-defaultContext = BuildContext { indentSize = 0 }
-
-class IsCode a where
-    toCode :: a -> B.Builder
-
-instance IsCode B.Builder where
-    toCode = id
-
-instance IsCode T.Text where
-    toCode = B.fromText
-
-writeLine :: (IsCode a) => a -> CodeBuilder ()
-writeLine code = do
-    BuildContext { indentSize = i } <- ask
-    tell $ toCode $ T.replicate (fromIntegral i) " "
-    tell $ toCode code
-    tell "\n"
+writeLine :: P.Doc -> CodeBuilder ()
+writeLine code = modify $ \s -> s $+$ code
 
 nest :: Integer -> CodeBuilder a -> CodeBuilder a
-nest n = local (\BuildContext { indentSize = i } -> BuildContext { indentSize = i + n })
+nest n code = do
+    let CodeBuilder a = code
+    let (ret , inner) = runState a P.empty
+    writeLine $ P.nest (fromIntegral n) inner
+    return ret
 
 runBuilder :: CodeBuilder a -> (a, B.Builder)
-runBuilder (CodeBuilder a) = runWriter (runReaderT a defaultContext)
+runBuilder (CodeBuilder a) = (ret, rendered)
+  where
+    (ret, finalState) = runState a P.empty
+    rendered = P.fullRender P.PageMode 80 1.5 concat' (B.singleton '\n') finalState
+    concat' (P.Chr c) rest = B.singleton c <> rest
+    concat' (P.Str s) rest = B.fromString s <> rest
+    concat' (P.PStr s) rest = concat' (P.Str s) rest

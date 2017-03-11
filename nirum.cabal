@@ -64,6 +64,7 @@ library
                ,       mtl                      >=2.2.1   && <3
                ,       parsec
                        -- only for dealing with htoml's ParserError
+               ,       pretty                   >=1.1.3   && <2
                ,       semver                   >=0.3.0   && <1.0
                ,       template-haskell         >=2.11    && <3
                ,       text                     >=0.9.1.0 && <1.3
@@ -143,6 +144,7 @@ test-suite spec
                ,       nirum
                ,       parsec
                        -- only for dealing with htoml's ParserError
+               ,       pretty                   >=1.1.3   && <2
                ,       process                  >=1.1     && <2
                ,       semigroups
                ,       semver
