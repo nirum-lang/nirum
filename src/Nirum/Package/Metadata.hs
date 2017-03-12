@@ -170,8 +170,11 @@ parseMetadata metadataPath' tomlText = do
         Right t -> Right t
     version' <- versionField "version" table
     authors' <- authorsField "authors" table
-    targets <- tableField "targets" table
+    targets <- case tableField "targets" table of
+        Left (FieldError _) -> Right HM.empty
+        otherwise' -> otherwise'
     targetTable <- case tableField targetName' targets of
+        Left (FieldError _) -> Right HM.empty
         Left e -> Left $ prependMetadataErrorField "targets" e
         otherwise' -> otherwise'
     target' <- case parseTarget targetTable of

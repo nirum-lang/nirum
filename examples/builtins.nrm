@@ -1,4 +1,5 @@
-# Introducing built-in types.
+# Introducing built-in types
+# ==========================
 
 record number-types (
     bigint a,
