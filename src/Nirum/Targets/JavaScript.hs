@@ -92,20 +92,20 @@ compilePackage' package =
     toFilename sourceRootDirectory mp =
         joinPath $ T.unpack sourceRootDirectory : toJavaScriptFilename mp
     files :: [(FilePath, Either CompileError' Code)]
-    files = [ (toFilename "src" mp, compile m)
+    files = [ (toFilename "src" mp, compile (mp, m))
             | (mp, m) <- MS.toList (modules package)
             ]
-    compile :: Module -> Either CompileError' Code
-    compile = Right . Code . snd . runBuilder . compileModule
+    compile :: (ModulePath, Module) -> Either CompileError' Code
+    compile (mp, m) = Right $ Code $ snd $ runBuilder package mp (compileModule m)
 
 compilePackageMetadata :: Package JavaScript -> Code
 compilePackageMetadata = Code . (`mappend` LB.singleton '\n') . encodePrettyToTextBuilder
 
 
-compileModule :: Module -> CodeBuilder ()
+compileModule :: Target t => Module -> CodeBuilder t ()
 compileModule Module {..} = mapM_ compileTypeDeclaration $ DS.toList types
 
-compileTypeDeclaration :: TypeDeclaration -> CodeBuilder ()
+compileTypeDeclaration :: Target t => TypeDeclaration -> CodeBuilder t ()
 compileTypeDeclaration td@TypeDeclaration {..} =
   case type' of
     RecordType {..} -> do
@@ -115,7 +115,7 @@ compileTypeDeclaration td@TypeDeclaration {..} =
     _ -> return ()
 compileTypeDeclaration _ = return ()
 
-compileRecordBody :: DS.DeclarationSet Field -> CodeBuilder ()
+compileRecordBody :: Target t => DS.DeclarationSet Field -> CodeBuilder t ()
 compileRecordBody fields = do
     writeLine $ "constructor(values)" <+> "{"
     nest 4 $ do

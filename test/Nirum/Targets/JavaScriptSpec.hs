@@ -6,11 +6,16 @@ import qualified Data.Aeson.Types as A
 import Data.Aeson.Types ( (.=), object, toJSON )
 import qualified Data.Map.Strict as M
 import qualified Data.SemVer as SV
+import qualified Data.Text.Lazy as L
+import qualified Data.Text.Lazy.Builder as B
 import Text.Toml.Types (emptyTable)
 import Test.Hspec.Meta
 
+import Nirum.CodeBuilder (CodeBuilder, runBuilder)
+import Nirum.Constructs.Annotation as AS (empty)
 import qualified Nirum.Constructs.DeclarationSet as DS
 import Nirum.Constructs.Module (Module (..))
+import Nirum.Constructs.TypeDeclaration (Field (..))
 import Nirum.Targets.JavaScript
 import Nirum.Package.Metadata ( Metadata (..)
                               , MetadataError ( FieldError )
@@ -21,6 +26,31 @@ import qualified Nirum.Package.ModuleSet as MS
 
 emptyModule :: Module
 emptyModule = Module { types = DS.empty, docs = Nothing }
+
+js :: JavaScript
+js = JavaScript { packageName = "dummy" }
+
+modules' :: MS.ModuleSet
+modules' = case m of
+    Right m' -> m'
+    _ -> error "unreachable"
+  where
+    m = MS.fromList [ (["fruits"], emptyModule)
+                    , (["imported-commons"], emptyModule)
+                    , (["transports", "truck"], emptyModule)
+                    , (["transports", "container"], emptyModule)
+                    ]
+
+package :: Package JavaScript
+package = Package { metadata = Metadata { version = SV.version 0 0 1 [] []
+                                        , authors = []
+                                        , target = js
+                                        }
+                  , modules = modules'
+                  }
+
+run :: CodeBuilder JavaScript a -> L.Text
+run = B.toLazyText . snd . runBuilder package ["fruits"]
 
 
 spec :: Spec
