@@ -39,16 +39,22 @@ library
                  ,     Nirum.Constructs.Service
                  ,     Nirum.Constructs.TypeDeclaration
                  ,     Nirum.Constructs.TypeExpression
+                 ,     Nirum.Docs
+                 ,     Nirum.Docs.Html
                  ,     Nirum.Package
                  ,     Nirum.Package.Metadata
                  ,     Nirum.Package.ModuleSet
                  ,     Nirum.Parser
                  ,     Nirum.Targets
+                 ,     Nirum.Targets.Docs
                  ,     Nirum.Targets.List
                  ,     Nirum.Targets.Python
                  ,     Nirum.Version
   build-depends:       base                     >=4.7     && <5
+               ,       blaze-html               >=0.8.1.3 && <0.9
+               ,       blaze-markup             >=0.7.1.1 && <0.8
                ,       bytestring
+               ,       cmark                    >=0.5     && <0.6
                ,       containers               >=0.5.6.2 && <0.6
                ,       cmdargs                  >=0.10.14 && <0.11
                ,       directory                >=1.2.5   && <1.4
@@ -62,6 +68,7 @@ library
                ,       parsec
                        -- only for dealing with htoml's ParserError
                ,       semver                   >=0.3.0   && <1.0
+               ,       shakespeare              >=2.0.12  && <2.1
                ,       template-haskell         >=2.11    && <3
                ,       text                     >=0.9.1.0 && <1.3
                ,       unordered-containers
@@ -109,6 +116,8 @@ test-suite spec
                ,       Nirum.Constructs.ServiceSpec
                ,       Nirum.Constructs.TypeDeclarationSpec
                ,       Nirum.Constructs.TypeExpressionSpec
+               ,       Nirum.DocsSpec
+               ,       Nirum.Docs.HtmlSpec
                ,       Nirum.Package.MetadataSpec
                ,       Nirum.Package.ModuleSetSpec
                ,       Nirum.PackageSpec

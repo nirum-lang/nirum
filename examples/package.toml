@@ -2,6 +2,3 @@ version = "0.3.0"
 
 [targets.python]
 name = "nirum-examples"
-
-[targets.dummy]
-# for unit test
