@@ -50,7 +50,7 @@ Getting started
 In order to compile a Nirum package (`examples/`) to a Python package:
 
     $ mkdir out/  # directory to place generated Python files
-    $ nirum -o out/ examples/
+    $ nirum -t python -o out/ examples/
 
 For more infomration, use `--help` option:
 
