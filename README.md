@@ -64,7 +64,7 @@ For more infomration, use `--help` option:
       -h,--help                Show this help text
       -v,--version             Show version
       -o,--output-dir DIR      Output directory
-      -t,--target TARGET       Target language name
+      -t,--target TARGET       Target language name. Available: docs, python
       DIR                      Package directory
 
 Building
