@@ -25,6 +25,7 @@ import Nirum.Constructs.Identifier ( Identifier
 import Nirum.Constructs.Module (Module (Module, docs))
 import Nirum.Constructs.ModulePath (ModulePath)
 import Nirum.Constructs.Name (Name (facialName))
+import qualified Nirum.Constructs.Service as S
 import qualified Nirum.Constructs.TypeDeclaration as TD
 import qualified Nirum.Constructs.TypeExpression as TE
 import Nirum.Docs ( Block (Heading)
@@ -157,9 +158,24 @@ typeDecl _ ident
          TD.TypeDeclaration { TD.type' = TD.PrimitiveType {} } = [shamlet|
     <h2>primitive <code>#{toNormalizedText ident}</code>
 |]
-typeDecl _ ident decl = [shamlet|
-    <h2>#{showKind decl} <code>#{toNormalizedText ident}</code>
+typeDecl mod' ident
+         TD.ServiceDeclaration { TD.service = S.Service methods } = [shamlet|
+    <h2>service <code>#{toNormalizedText ident}</code>
+    $forall methodDecl@(S.Method _ params ret err _) <- DES.toList methods
+        <h3 class="method">
+            <code>#{nameText $ DE.name methodDecl}
+        <p class="return-type">#{typeExpression mod' ret}
+        $maybe errType <- err
+            <p class="error-type">#{typeExpression mod' errType}
+        <dl class="parameters">
+            $forall paramDecl@(S.Parameter _ paramType _) <- DES.toList params
+                <dt class="parameter-name">
+                    <code>#{nameText $ DE.name paramDecl}
+                <dd class="parameter-type">#{typeExpression mod' paramType}
 |]
+typeDecl _ _ TD.Import {} =
+    error ("It shouldn't happen; please report it to Nirum's bug tracker:\n" ++
+           "https://github.com/spoqa/nirum/issues")
 
 nameText :: Name -> T.Text
 nameText = toNormalizedText . facialName
