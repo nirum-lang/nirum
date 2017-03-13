@@ -77,7 +77,13 @@ $doctype 5
         <h1>
             <code>#{path}
         $forall (ident, decl) <- types'
-            <h2>#{showKind decl} <code>#{toNormalizedText ident}</code>
+            $with ident' <- toNormalizedText ident
+                <div class="#{showKind decl}" id="#{ident'}">
+                    $case decl
+                        $of TD.TypeDeclaration _ TD.Alias {} _
+                            <h2>type <code>#{ident'}</code>
+                        $of _
+                            <h2>#{showKind decl} <code>#{ident'}</code>
 |]
   where
     md :: Metadata Docs

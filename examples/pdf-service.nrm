@@ -1,4 +1,6 @@
 
+type html = text;
+
 service pdf-service (
     # A microservice which renders a PDF from the given URI or HTML.
 
@@ -9,6 +11,6 @@ service pdf-service (
 
     binary render-html (
         # Renders a PDF from the given HTML text.
-        text html,
+        html html,
     ),
 );
