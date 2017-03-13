@@ -26,6 +26,7 @@ import Nirum.Constructs.Module (Module (Module, docs))
 import Nirum.Constructs.ModulePath (ModulePath)
 import Nirum.Constructs.Name (Name (facialName))
 import qualified Nirum.Constructs.TypeDeclaration as TD
+import qualified Nirum.Constructs.TypeExpression as TE
 import Nirum.Docs ( Block (Heading)
                   , filterReferences
                   )
@@ -76,34 +77,36 @@ $doctype 5
     <body>#{body}
 |]
 
+typeExpression :: BoundModule Docs -> TE.TypeExpression -> Html
+typeExpression _ expr = [shamlet|<code>#{typeExpr expr}|]
+  where
+    typeExpr :: TE.TypeExpression -> Html
+    typeExpr expr' = [shamlet|
+$case expr'
+    $of TE.TypeIdentifier ident
+        #{toCode ident}
+    $of TE.OptionModifier type'
+        #{typeExpr type'}?
+    $of TE.SetModifier elementType
+        {#{typeExpr elementType}}
+    $of TE.ListModifier elementType
+        [#{typeExpr elementType}]
+    $of TE.MapModifier keyType valueType
+        {#{typeExpr keyType}: #{typeExpr valueType}}
+|]
+
 module' :: BoundModule Docs -> Html
 module' docsModule = layout pkg path $ [shamlet|
-<div>
     <h1><code>#{path}</code>
     $forall (ident, decl) <- types'
-        $with ident' <- toNormalizedText ident
-            <div class="#{showKind decl}" id="#{ident'}">
-                $case decl
-                    $of TD.TypeDeclaration _ TD.Alias {} _
-                        <h2>type <code>#{ident'}</code>
-                    $of _
-                        <h2>#{showKind decl} <code>#{ident'}</code>
+        <div class="#{showKind decl}" id="#{toNormalizedText ident}">
+            #{typeDecl docsModule ident decl}
 |]
   where
     pkg :: Package Docs
     pkg = boundPackage docsModule
     path :: T.Text
     path = toCode $ modulePath docsModule
-    showKind :: TD.TypeDeclaration -> T.Text
-    showKind TD.ServiceDeclaration {} = "service"
-    showKind TD.TypeDeclaration { TD.type' = type'' } = case type'' of
-        TD.Alias {} -> "alias"
-        TD.UnboxedType {} -> "unboxed"
-        TD.EnumType {} -> "enum"
-        TD.RecordType {} -> "record"
-        TD.UnionType {} -> "union"
-        TD.PrimitiveType {} -> "primitive"
-    showKind TD.Import {} = "import"
     types' :: [(Identifier, TD.TypeDeclaration)]
     types' = [ (facialName $ DE.name decl, decl)
              | decl <- DES.toList $ types docsModule
@@ -111,6 +114,27 @@ module' docsModule = layout pkg path $ [shamlet|
                     TD.Import {} -> False
                     _ -> True
              ]
+
+typeDecl :: BoundModule Docs -> Identifier -> TD.TypeDeclaration -> Html
+typeDecl mod' ident
+         TD.TypeDeclaration { TD.type' = TD.Alias cname } = [shamlet|
+    <h2>type <code>#{toNormalizedText ident}</code>
+    <p>= <span class="canonical-type">#{typeExpression mod' cname}</span>
+|]
+typeDecl _ ident decl = [shamlet|
+    <h2>#{showKind decl} <code>#{toNormalizedText ident}</code>
+|]
+
+showKind :: TD.TypeDeclaration -> T.Text
+showKind TD.ServiceDeclaration {} = "service"
+showKind TD.TypeDeclaration { TD.type' = type'' } = case type'' of
+    TD.Alias {} -> "alias"
+    TD.UnboxedType {} -> "unboxed"
+    TD.EnumType {} -> "enum"
+    TD.RecordType {} -> "record"
+    TD.UnionType {} -> "union"
+    TD.PrimitiveType {} -> "primitive"
+showKind TD.Import {} = "import"
 
 contents :: Package Docs -> Html
 contents pkg@Package { metadata = md
