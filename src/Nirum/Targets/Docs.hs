@@ -10,7 +10,7 @@ import Data.Map.Strict (Map, union)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8)
 import System.FilePath ((</>))
-import Text.Blaze (preEscapedToMarkup)
+import Text.Blaze (ToMarkup (preEscapedToMarkup))
 import Text.Blaze.Html.Renderer.Utf8 (renderHtml)
 import Text.Hamlet (Html, shamlet)
 
@@ -63,31 +63,35 @@ makeUri modulePath' =
     T.intercalate "/" $
                   map toNormalizedText (toList modulePath') ++ ["index.html"]
 
-module' :: BoundModule Docs -> Html
-module' docsModule = [shamlet|
+layout :: ToMarkup m => Package Docs -> m -> Html -> Html
+layout Package { metadata = md } title body = [shamlet|
 $doctype 5
 <html>
     <head>
         <meta charset="utf-8">
-        <title>#{path}
+        <title>#{title}
         <meta name="generator" content="Nirum #{versionText}">
         $forall Author { name = name' } <- authors md
             <meta name="author" content="#{name'}">
-    <body>
-        <h1>
-            <code>#{path}
-        $forall (ident, decl) <- types'
-            $with ident' <- toNormalizedText ident
-                <div class="#{showKind decl}" id="#{ident'}">
-                    $case decl
-                        $of TD.TypeDeclaration _ TD.Alias {} _
-                            <h2>type <code>#{ident'}</code>
-                        $of _
-                            <h2>#{showKind decl} <code>#{ident'}</code>
+    <body>#{body}
+|]
+
+module' :: BoundModule Docs -> Html
+module' docsModule = layout pkg path $ [shamlet|
+<div>
+    <h1><code>#{path}</code>
+    $forall (ident, decl) <- types'
+        $with ident' <- toNormalizedText ident
+            <div class="#{showKind decl}" id="#{ident'}">
+                $case decl
+                    $of TD.TypeDeclaration _ TD.Alias {} _
+                        <h2>type <code>#{ident'}</code>
+                    $of _
+                        <h2>#{showKind decl} <code>#{ident'}</code>
 |]
   where
-    md :: Metadata Docs
-    md = metadata $ boundPackage docsModule
+    pkg :: Package Docs
+    pkg = boundPackage docsModule
     path :: T.Text
     path = toCode $ modulePath docsModule
     showKind :: TD.TypeDeclaration -> T.Text
@@ -109,39 +113,32 @@ $doctype 5
              ]
 
 contents :: Package Docs -> Html
-contents Package { metadata = md, modules = ms } = [shamlet|
-$doctype 5
-<html>
-    <head>
-        <meta charset="utf-8">
-        <title>Package docs
-        <meta name="generator" content="Nirum #{versionText}">
-        $forall Author { name = name' } <- authors md
-            <meta name="author" content="#{name'}">
-    <body>
-        <h1>Modules
-        <ul>
-            $forall (modulePath', mod) <- MS.toAscList ms
-                <li>
-                    <a href="#{makeUri modulePath'}">
-                        <code>#{toCode modulePath'} </code>
-                            $maybe tit <- moduleTitle mod
-                                &mdash; #{tit}
-        <hr>
-        <dl>
-            <dt.author>
-                $if 1 < length (authors md)
-                    Authors
-                $else
-                    Author
-            $forall Author { name = n, uri = u, email = e } <- authors md
-                $maybe uri' <- u
-                    <dd.author><a href="#{show uri'}">#{n}</a>
-                $nothing
-                    $maybe email' <- e
-                        <dd.author><a href="mailto:#{emailText email'}">#{n}</a>
-                    $nothing
-                        <dd.author>#{n}
+contents pkg@Package { metadata = md
+                     , modules = ms
+                     } = layout pkg ("Package docs" :: T.Text) [shamlet|
+<h1>Modules
+<ul>
+    $forall (modulePath', mod) <- MS.toAscList ms
+        <li>
+            <a href="#{makeUri modulePath'}">
+                <code>#{toCode modulePath'} </code>
+                    $maybe tit <- moduleTitle mod
+                        &mdash; #{tit}
+<hr>
+<dl>
+    <dt.author>
+        $if 1 < length (authors md)
+            Authors
+        $else
+            Author
+    $forall Author { name = n, uri = u, email = e } <- authors md
+        $maybe uri' <- u
+            <dd.author><a href="#{show uri'}">#{n}</a>
+        $nothing
+            $maybe email' <- e
+                <dd.author><a href="mailto:#{emailText email'}">#{n}</a>
+            $nothing
+                <dd.author>#{n}
 |]
   where
     moduleTitle :: Module -> Maybe Html
