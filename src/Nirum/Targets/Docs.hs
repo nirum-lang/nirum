@@ -133,12 +133,20 @@ typeDecl _ ident
         $forall decl <- DES.toList members
             <li class="member"><code>#{nameText $ DE.name decl}</code>
 |]
-  where
-    nameText :: Name -> T.Text
-    nameText = toNormalizedText . facialName
+typeDecl mod' ident
+         TD.TypeDeclaration { TD.type' = TD.RecordType fields } = [shamlet|
+    <h2>record <code>#{toNormalizedText ident}</code>
+    <dl class="fields">
+        $forall fieldDecl@(TD.Field _ fieldType _) <- DES.toList fields
+            <dt class="field-name"><code>#{nameText $ DE.name fieldDecl}</code>
+            <dd class="field-type">#{typeExpression mod' fieldType}
+|]
 typeDecl _ ident decl = [shamlet|
     <h2>#{showKind decl} <code>#{toNormalizedText ident}</code>
 |]
+
+nameText :: Name -> T.Text
+nameText = toNormalizedText . facialName
 
 showKind :: TD.TypeDeclaration -> T.Text
 showKind TD.ServiceDeclaration {} = "service"
