@@ -56,7 +56,6 @@ library
                ,       bytestring
                ,       cmark                    >=0.5     && <0.6
                ,       containers               >=0.5.6.2 && <0.6
-               ,       cmdargs                  >=0.10.14 && <0.11
                ,       directory                >=1.2.5   && <1.4
                ,       email-validate           >=2.0.0   && <3.0.0
                ,       filepath                 >=1.4     && <1.5

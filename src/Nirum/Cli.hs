@@ -183,6 +183,7 @@ main = do
              OPT.help "Output directory") <*>
         OPT.strOption
             (OPT.long "target" <> OPT.short 't' <> OPT.metavar "TARGET" <>
-             OPT.help "Target language name") <*>
+             OPT.help [qq|Target language name.
+                          Available: $targetNamesText|]) <*>
         OPT.strArgument
             (OPT.metavar "DIR" <> OPT.help "Package directory")
