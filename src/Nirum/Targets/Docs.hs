@@ -141,6 +141,18 @@ typeDecl mod' ident
             <dt class="field-name"><code>#{nameText $ DE.name fieldDecl}</code>
             <dd class="field-type">#{typeExpression mod' fieldType}
 |]
+typeDecl mod' ident
+         TD.TypeDeclaration { TD.type' = TD.UnionType tags } = [shamlet|
+    <h2>union <code>#{toNormalizedText ident}</code>
+    $forall tagDecl@(TD.Tag _ fields _) <- DES.toList tags
+        <h3 class="tag">
+            <code>#{nameText $ DE.name tagDecl}
+        <dl class="fields">
+            $forall fieldDecl@(TD.Field _ fieldType _) <- DES.toList fields
+                <dt class="field-name">
+                    <code>#{nameText $ DE.name fieldDecl}
+                <dd class="field-type">#{typeExpression mod' fieldType}
+|]
 typeDecl _ ident decl = [shamlet|
     <h2>#{showKind decl} <code>#{toNormalizedText ident}</code>
 |]
