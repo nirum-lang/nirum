@@ -153,6 +153,10 @@ typeDecl mod' ident
                     <code>#{nameText $ DE.name fieldDecl}
                 <dd class="field-type">#{typeExpression mod' fieldType}
 |]
+typeDecl _ ident
+         TD.TypeDeclaration { TD.type' = TD.PrimitiveType {} } = [shamlet|
+    <h2>primitive <code>#{toNormalizedText ident}</code>
+|]
 typeDecl _ ident decl = [shamlet|
     <h2>#{showKind decl} <code>#{toNormalizedText ident}</code>
 |]
