@@ -121,6 +121,11 @@ typeDecl mod' ident
     <h2>type <code>#{toNormalizedText ident}</code>
     <p>= <span class="canonical-type">#{typeExpression mod' cname}</span>
 |]
+typeDecl mod' ident
+         TD.TypeDeclaration { TD.type' = TD.UnboxedType innerType } = [shamlet|
+    <h2>unboxed <code>#{toNormalizedText ident}</code>
+    <p>(<span class="inner-type">#{typeExpression mod' innerType}</span>)
+|]
 typeDecl _ ident decl = [shamlet|
     <h2>#{showKind decl} <code>#{toNormalizedText ident}</code>
 |]
