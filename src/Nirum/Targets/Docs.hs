@@ -126,6 +126,16 @@ typeDecl mod' ident
     <h2>unboxed <code>#{toNormalizedText ident}</code>
     <p>(<span class="inner-type">#{typeExpression mod' innerType}</span>)
 |]
+typeDecl _ ident
+         TD.TypeDeclaration { TD.type' = TD.EnumType members } = [shamlet|
+    <h2>enum <code>#{toNormalizedText ident}</code>
+    <ul class="members">
+        $forall decl <- DES.toList members
+            <li class="member"><code>#{nameText $ DE.name decl}</code>
+|]
+  where
+    nameText :: Name -> T.Text
+    nameText = toNormalizedText . facialName
 typeDecl _ ident decl = [shamlet|
     <h2>#{showKind decl} <code>#{toNormalizedText ident}</code>
 |]
