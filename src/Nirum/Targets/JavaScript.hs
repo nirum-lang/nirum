@@ -114,7 +114,11 @@ compilePackageMetadata = Code . (`mappend` LB.singleton '\n') . encodePrettyToTe
 
 
 compileModule :: Module -> CodeBuilder ()
-compileModule Module {..} = mapM_ compileTypeDeclaration $ DS.toList types
+compileModule Module {..} = do
+    writeLine $ P.doubleQuotes "use strict" <> P.semi
+    mapM_ compileTypeDecl $ DS.toList types
+  where
+    compileTypeDecl tds = writeLine "" >> compileTypeDeclaration tds
 
 compileTypeDeclaration :: TypeDeclaration -> CodeBuilder ()
 compileTypeDeclaration td@TypeDeclaration { type' = RecordType fields } = do
