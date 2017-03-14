@@ -39,6 +39,7 @@ module Nirum.Package.Metadata ( Author (Author, email, name, uri)
                               , readMetadata
                               , stringField
                               , tableField
+                              , versionField
                               ) where
 
 import Data.Proxy (Proxy (Proxy))
