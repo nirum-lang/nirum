@@ -8,7 +8,6 @@ import Data.Maybe (fromJust)
 
 import qualified Data.Map.Strict as M
 import qualified Data.SemVer as SV
-import Data.Set (Set, union)
 import System.FilePath ((</>))
 import Test.Hspec.Meta
 import Text.Email.Validate (emailAddress)
@@ -45,7 +44,6 @@ import qualified Nirum.Package.ModuleSet as MS
 import Nirum.PackageSpec (createPackage)
 import qualified Nirum.Targets.Python as PY
 import Nirum.Targets.Python ( Source (Source)
-                            , Code
                             , CodeGen
                             , CodeGenContext ( localImports
                                              , standardImports
@@ -121,13 +119,8 @@ makeDummySource' pathPrefix m =
 makeDummySource :: Module -> Source
 makeDummySource = makeDummySource' []
 
-versions :: [(PythonVersion, Set Code)]
-versions = [ (Python2, [])
-           , (Python3, ["typing"])
-           ]
-
 spec :: Spec
-spec = parallel $ forM_ versions $ \ (ver, typing) -> do
+spec = parallel $ forM_ ([Python2, Python3] :: [PythonVersion]) $ \ ver -> do
     let empty' = PY.empty ver
         -- run' :: CodeGen a -> (Either CompileError a, CodeGenContext)
         run' c = runCodeGen c empty'
@@ -168,7 +161,7 @@ spec = parallel $ forM_ versions $ \ (ver, typing) -> do
             localImports ctx2 `shouldBe` []
             compileError codeGen2 `shouldBe` Nothing
 
-    specify "compilePrimitiveType" $ do
+    specify [qq|compilePrimitiveType ($ver)|] $ do
         code (compilePrimitiveType Bool) `shouldBe` "bool"
         code (compilePrimitiveType Bigint) `shouldBe` "int"
         let (decimalCode, decimalContext) = run' (compilePrimitiveType Decimal)
@@ -201,7 +194,7 @@ spec = parallel $ forM_ versions $ \ (ver, typing) -> do
                 Python2 -> "unicode"
                 Python3 -> "str"
 
-    describe "compileTypeExpression" $ do
+    describe [qq|compileTypeExpression ($ver)|] $ do
         let s = makeDummySource $ Module [] Nothing
         specify "TypeIdentifier" $ do
             let (c, ctx) = run' $
@@ -212,29 +205,29 @@ spec = parallel $ forM_ versions $ \ (ver, typing) -> do
         specify "OptionModifier" $ do
             let (c', ctx') = run' $
                     compileTypeExpression s (OptionModifier "int32")
-            standardImports ctx' `shouldBe` typing
+            standardImports ctx' `shouldBe` ["typing"]
             localImports ctx' `shouldBe` []
             c' `shouldBe` Right "typing.Optional[int]"
         specify "SetModifier" $ do
             let (c'', ctx'') = run' $
                     compileTypeExpression s (SetModifier "int32")
-            standardImports ctx'' `shouldBe` typing
+            standardImports ctx'' `shouldBe` ["typing"]
             localImports ctx'' `shouldBe` []
             c'' `shouldBe` Right "typing.AbstractSet[int]"
         specify "ListModifier" $ do
             let (c''', ctx''') = run' $
                     compileTypeExpression s (ListModifier "int32")
-            standardImports ctx''' `shouldBe` typing
+            standardImports ctx''' `shouldBe` ["typing"]
             localImports ctx''' `shouldBe` []
             c''' `shouldBe` Right "typing.Sequence[int]"
         specify "MapModifier" $ do
             let (c'''', ctx'''') = run' $
                     compileTypeExpression s (MapModifier "uuid" "int32")
-            standardImports ctx'''' `shouldBe` union ["uuid"] typing
+            standardImports ctx'''' `shouldBe` ["typing", "uuid"]
             localImports ctx'''' `shouldBe` []
             c'''' `shouldBe` Right "typing.Mapping[uuid.UUID, int]"
 
-    describe "toClassName" $ do
+    describe [qq|toClassName ($ver)|] $ do
         it "transform the facial name of the argument into PascalCase" $ do
             toClassName "test" `shouldBe` "Test"
             toClassName "hello-world" `shouldBe` "HelloWorld"
@@ -243,7 +236,7 @@ spec = parallel $ forM_ versions $ \ (ver, typing) -> do
             toClassName "false" `shouldBe` "False_"
             toClassName "none" `shouldBe` "None_"
 
-    describe "toAttributeName" $ do
+    describe [qq|toAttributeName ($ver)|] $ do
         it "transform the facial name of the argument into snake_case" $ do
             toAttributeName "test" `shouldBe` "test"
             toAttributeName "hello-world" `shouldBe` "hello_world"
@@ -252,7 +245,7 @@ spec = parallel $ forM_ versions $ \ (ver, typing) -> do
             toAttributeName "lambda" `shouldBe` "lambda_"
             toAttributeName "nonlocal" `shouldBe` "nonlocal_"
 
-    describe "toNamePair" $ do
+    describe [qq|toNamePair ($ver)|] $ do
         it "transforms the name to a Python code string of facial/behind pair" $
             do toNamePair "text" `shouldBe` "('text', 'text')"
                toNamePair (Name "test" "hello") `shouldBe` "('test', 'hello')"
@@ -266,7 +259,7 @@ spec = parallel $ forM_ versions $ \ (ver, typing) -> do
             toNamePair (Name "abc" "lambda") `shouldBe` "('abc', 'lambda')"
             toNamePair (Name "lambda" "abc") `shouldBe` "('lambda_', 'abc')"
 
-    specify "stringLiteral" $ do
+    specify [qq|stringLiteral ($ver)|] $ do
         stringLiteral "asdf" `shouldBe` [q|"asdf"|]
         stringLiteral [q|Say 'hello world'|]
             `shouldBe` [q|"Say 'hello world'"|]
@@ -275,7 +268,7 @@ spec = parallel $ forM_ versions $ \ (ver, typing) -> do
         stringLiteral "Say '\xc548\xb155'"
             `shouldBe` [q|u"Say '\uc548\ub155'"|]
 
-    describe "compilePackage" $ do
+    describe [qq|compilePackage ($ver)|] $ do
         it "returns a Map of file paths and their contents to generate" $ do
             let (Source pkg _) = makeDummySource $ Module [] Nothing
                 files = compilePackage pkg
@@ -307,7 +300,7 @@ spec = parallel $ forM_ versions $ \ (ver, typing) -> do
                     ]
             M.keysSet files `shouldBe` directoryStructure
 
-    describe "InstallRequires" $ do
+    describe [qq|InstallRequires ($ver)|] $ do
         let req = InstallRequires [] []
             req2 = req { dependencies = ["six"] }
             req3 = req { optionalDependencies = [((3, 4), ["enum34"])] }
@@ -350,9 +343,9 @@ spec = parallel $ forM_ versions $ \ (ver, typing) -> do
                                              (3, 4) "ipaddress"
             (req4 `unionInstallRequires` req5) `shouldBe` req6
             (req5 `unionInstallRequires` req4) `shouldBe` req6
-    specify "toImportPath" $
+    specify [qq|toImportPath ($ver)|] $
         PY.toImportPath ["foo", "bar"] `shouldBe` "foo.bar"
-    describe "Add ancestors of packages" $ do
+    describe [qq|add ancestors of packages ($ver)|] $ do
         let (Source pkg _) = makeDummySource $ Module [] Nothing
             modulePaths = MS.keysSet $ modules pkg
         specify "toImportPaths" $

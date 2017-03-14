@@ -181,8 +181,9 @@ insertLocalImport module' object = ST.modify insert'
     insert' c@CodeGenContext { localImports = li } =
         c { localImports = M.insertWith S.union module' [object] li }
 
-insertTypingImport :: CodeGen ()
-insertTypingImport = do
+
+importTypingForPython3 :: CodeGen ()
+importTypingForPython3 = do
     pyVer <- getPythonVersion
     case pyVer of
         Python2 -> return ()
@@ -261,11 +262,12 @@ quote s = [qq|'{s}'|]
 
 typeReprCompiler :: CodeGen (Code -> Code)
 typeReprCompiler = do
-    insertTypingImport
     ver <- getPythonVersion
-    return $ case ver of
-        Python2 -> \ t -> [qq|($t.__module__ + '.' + $t.__name__)|]
-        Python3 -> \ t -> [qq|typing._type_repr($t)|]
+    case ver of
+        Python2 -> return $ \ t -> [qq|($t.__module__ + '.' + $t.__name__)|]
+        Python3 -> do
+            insertStandardImport "typing"
+            return $ \ t -> [qq|typing._type_repr($t)|]
 
 type ParameterName = Code
 type ParameterType = Code
@@ -315,7 +317,6 @@ compileUnionTag source parentname typename' fields = do
             (map fieldName $ toList fields)
             ",\n        "
         parentClass = toClassName' parentname
-    insertTypingImport
     insertThirdPartyImports [ ("nirum.validate", ["validate_union_type"])
                             , ("nirum.constructs", ["name_dict_type"])
                             ]
@@ -401,11 +402,11 @@ compileTypeExpression Source { sourceModule = boundModule } (TypeIdentifier i) =
 compileTypeExpression source (MapModifier k v) = do
     kExpr <- compileTypeExpression source k
     vExpr <- compileTypeExpression source v
-    insertTypingImport
+    insertStandardImport "typing"
     return [qq|typing.Mapping[$kExpr, $vExpr]|]
 compileTypeExpression source modifier = do
     expr <- compileTypeExpression source typeExpr
-    insertTypingImport
+    insertStandardImport "typing"
     return [qq|typing.$className[$expr]|]
   where
     typeExpr :: TypeExpression
@@ -431,7 +432,6 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
                                            , type' = UnboxedType itype } = do
     let className = toClassName' typename'
     itypeExpr <- compileTypeExpression src itype
-    insertTypingImport
     insertThirdPartyImports [ ("nirum.validate", ["validate_boxed_type"])
                             , ("nirum.serialize", ["serialize_boxed_type"])
                             , ("nirum.deserialize", ["deserialize_boxed_type"])
@@ -524,7 +524,7 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
             (map fieldName $ toList fields)
             ",\n        "
         hashText = toIndentedCodes (\ n -> [qq|self.{n}|]) fieldNames ", "
-    insertTypingImport
+    importTypingForPython3
     insertThirdPartyImports [ ("nirum.validate", ["validate_record_type"])
                             , ("nirum.serialize", ["serialize_record_type"])
                             , ("nirum.deserialize", ["deserialize_record_type"])
@@ -586,7 +586,7 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
         fieldCodes' = T.intercalate "\n\n" fieldCodes
         enumMembers = toIndentedCodes
             (\ (t, b) -> [qq|$t = '{b}'|]) enumMembers' "\n        "
-    insertTypingImport
+    importTypingForPython3
     insertEnumImport
     insertThirdPartyImports [ ("nirum.serialize", ["serialize_union_type"])
                             , ("nirum.deserialize", ["deserialize_union_type"])
