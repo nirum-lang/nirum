@@ -8,7 +8,6 @@ import Data.Maybe (fromJust)
 
 import qualified Data.Map.Strict as M
 import qualified Data.SemVer as SV
-import Data.Set (Set, union)
 import System.FilePath ((</>))
 import Test.Hspec.Meta
 import Text.Email.Validate (emailAddress)
@@ -45,7 +44,6 @@ import qualified Nirum.Package.ModuleSet as MS
 import Nirum.PackageSpec (createPackage)
 import qualified Nirum.Targets.Python as PY
 import Nirum.Targets.Python ( Source (Source)
-                            , Code
                             , CodeGen
                             , CodeGenContext ( localImports
                                              , standardImports
@@ -121,13 +119,8 @@ makeDummySource' pathPrefix m =
 makeDummySource :: Module -> Source
 makeDummySource = makeDummySource' []
 
-versions :: [(PythonVersion, Set Code)]
-versions = [ (Python2, [])
-           , (Python3, ["typing"])
-           ]
-
 spec :: Spec
-spec = parallel $ forM_ versions $ \ (ver, typing) -> do
+spec = parallel $ forM_ ([Python2, Python3] :: [PythonVersion]) $ \ ver -> do
     let empty' = PY.empty ver
         -- run' :: CodeGen a -> (Either CompileError a, CodeGenContext)
         run' c = runCodeGen c empty'
@@ -212,25 +205,25 @@ spec = parallel $ forM_ versions $ \ (ver, typing) -> do
         specify "OptionModifier" $ do
             let (c', ctx') = run' $
                     compileTypeExpression s (OptionModifier "int32")
-            standardImports ctx' `shouldBe` typing
+            standardImports ctx' `shouldBe` ["typing"]
             localImports ctx' `shouldBe` []
             c' `shouldBe` Right "typing.Optional[int]"
         specify "SetModifier" $ do
             let (c'', ctx'') = run' $
                     compileTypeExpression s (SetModifier "int32")
-            standardImports ctx'' `shouldBe` typing
+            standardImports ctx'' `shouldBe` ["typing"]
             localImports ctx'' `shouldBe` []
             c'' `shouldBe` Right "typing.AbstractSet[int]"
         specify "ListModifier" $ do
             let (c''', ctx''') = run' $
                     compileTypeExpression s (ListModifier "int32")
-            standardImports ctx''' `shouldBe` typing
+            standardImports ctx''' `shouldBe` ["typing"]
             localImports ctx''' `shouldBe` []
             c''' `shouldBe` Right "typing.Sequence[int]"
         specify "MapModifier" $ do
             let (c'''', ctx'''') = run' $
                     compileTypeExpression s (MapModifier "uuid" "int32")
-            standardImports ctx'''' `shouldBe` union ["uuid"] typing
+            standardImports ctx'''' `shouldBe` ["typing", "uuid"]
             localImports ctx'''' `shouldBe` []
             c'''' `shouldBe` Right "typing.Mapping[uuid.UUID, int]"
 

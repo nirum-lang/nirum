@@ -33,6 +33,11 @@ record line (
     bigint length,
 );
 
+record import-typing (
+    // see also: https://github.com/spoqa/nirum/issues/93
+    bigint? an-optional-field,
+);
+
 union mixed-name = western-name ( text first-name
                                 , text middle-name
                                 , text last-name
