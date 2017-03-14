@@ -1,8 +1,9 @@
-{-# LANGUAGE FlexibleInstances, RecordWildCards, TypeFamilies #-}
+{-# LANGUAGE FlexibleInstances, OverloadedLists, RecordWildCards, TypeFamilies #-}
 module Nirum.Targets.JavaScript ( CodeBuilder
                                 , CompileError' (..)
                                 , JavaScript (..)
                                 , compilePackage'
+                                , keywords
                                 , methodDefinition
                                 ) where
 
@@ -12,6 +13,7 @@ import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Map.Strict as M
 import Data.Map.Strict (Map)
 import qualified Data.SemVer as SV
+import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.Lazy.Builder as LB
 import Data.Text.Lazy.Builder (Builder, toLazyText)
@@ -223,3 +225,14 @@ toDoc = P.text . T.unpack
 
 dot :: P.Doc -> P.Doc -> P.Doc
 a `dot` b = a <> P.char '.' <> b
+
+-- | The set of JavaScript reserved keywords.
+-- See also: https://www.ecma-international.org/ecma-262/5.1/#sec-7.6.1.1
+keywords :: S.Set T.Text
+keywords = [ "break", "do", "instanceof", "typeof", "case", "else", "new"
+           , "var", "catch", "finally", "return", "void", "continue", "for"
+           , "switch", "while", "debugger", "function", "this", "with"
+           , "default", "if", "throw", "delete", "in", "try"
+           -- Future reserved words
+           , "class", "enum", "extends", "super", "const", "export", "import"
+           ]
