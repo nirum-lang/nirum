@@ -14,6 +14,8 @@ import qualified Text.PrettyPrint as P
 import Nirum.CodeBuilder
 import qualified Nirum.Constructs.DeclarationSet as DS
 import Nirum.Constructs.Module (Module (..))
+import qualified Nirum.Constructs.TypeDeclaration as TD
+import Nirum.Package (TypeLookup (..))
 import Nirum.Package.Metadata (Metadata (..), Package (..), Target (..))
 import qualified Nirum.Package.ModuleSet as MS
 
@@ -40,8 +42,8 @@ package = Package { metadata = Metadata { version = SV.version 0 0 1 [] []
                   , modules = modules'
                   }
 
-run :: CodeBuilder DummyTarget a -> L.Text
-run = B.toLazyText . snd . runBuilder package ["fruits"]
+run :: CodeBuilder DummyTarget () a -> L.Text
+run = B.toLazyText . snd . runBuilder package ["fruits"] ()
 
 
 spec = do
@@ -67,6 +69,11 @@ spec = do
                         writeLine "cd"
                     writeLine "eee"
             run w `shouldBe` "a\n    b\n    cd\neee\n"
+    describe "lookupType" $
+        specify "primitives" $ do
+            let run' = fst . runBuilder package ["fruits"] ()
+            (run' $ lookupType "text") `shouldBe` Local (TD.PrimitiveType TD.Text TD.String)
+            (run' $ lookupType "int32") `shouldBe` Local (TD.PrimitiveType TD.Int32 TD.String)
 
 
 data DummyTarget = DummyTarget deriving (Eq, Ord, Show)

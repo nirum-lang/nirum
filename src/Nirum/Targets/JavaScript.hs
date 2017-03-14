@@ -1,10 +1,11 @@
 {-# LANGUAGE FlexibleInstances, RecordWildCards, TypeFamilies #-}
-module Nirum.Targets.JavaScript ( JavaScript (..)
+module Nirum.Targets.JavaScript ( CodeBuilder
                                 , CompileError' (..)
+                                , JavaScript (..)
                                 , compilePackage'
+                                , methodDefinition
                                 ) where
 
-import Control.Monad (forM_)
 import Data.Aeson.Encode.Pretty (encodePrettyToTextBuilder)
 import Data.Aeson.Types (ToJSON, (.=), object, toJSON)
 import qualified Data.ByteString.Lazy as BSL
@@ -20,14 +21,22 @@ import System.FilePath (joinPath)
 import qualified Text.PrettyPrint as P
 import Text.PrettyPrint (Doc, (<>), (<+>))
 
-import Nirum.CodeBuilder (CodeBuilder, nest, runBuilder, writeLine)
+import qualified Nirum.CodeBuilder as CB
+import Nirum.CodeBuilder (nest, runBuilder, writeLine)
 import qualified Nirum.Constructs.Declaration as D
 import qualified Nirum.Constructs.DeclarationSet as DS
-import Nirum.Constructs.Identifier (toCamelCaseText, toPascalCaseText, toSnakeCaseText)
+import Nirum.Constructs.Identifier ( Identifier
+                                   , toCamelCaseText
+                                   , toPascalCaseText
+                                   , toSnakeCaseText
+                                   )
 import Nirum.Constructs.Module (Module (..))
 import Nirum.Constructs.ModulePath (ModulePath (..))
 import qualified Nirum.Constructs.Name as N
-import Nirum.Constructs.TypeDeclaration (Field (..), Type (..), TypeDeclaration (..))
+import Nirum.Constructs.TypeDeclaration ( Field (..)
+                                        , Type (..)
+                                        , TypeDeclaration (..)
+                                        )
 
 import Nirum.Package.Metadata ( Metadata (..)
                               , Package (..)
@@ -58,6 +67,8 @@ instance ToJSON (Package JavaScript) where
 
 newtype Code = Code { builder :: Builder }
 data CompileError' = CompileError'
+
+type CodeBuilder = CB.CodeBuilder JavaScript ()
 
 instance Target JavaScript where
     type CompileResult JavaScript = Code
@@ -96,40 +107,115 @@ compilePackage' package =
             | (mp, m) <- MS.toList (modules package)
             ]
     compile :: (ModulePath, Module) -> Either CompileError' Code
-    compile (mp, m) = Right $ Code $ snd $ runBuilder package mp (compileModule m)
+    compile (mp, m) = Right $ Code $ snd $ runBuilder package mp () (compileModule m)
 
 compilePackageMetadata :: Package JavaScript -> Code
 compilePackageMetadata = Code . (`mappend` LB.singleton '\n') . encodePrettyToTextBuilder
 
 
-compileModule :: Target t => Module -> CodeBuilder t ()
+compileModule :: Module -> CodeBuilder ()
 compileModule Module {..} = mapM_ compileTypeDeclaration $ DS.toList types
 
-compileTypeDeclaration :: Target t => TypeDeclaration -> CodeBuilder t ()
-compileTypeDeclaration td@TypeDeclaration {..} =
-  case type' of
-    RecordType {..} -> do
-        writeLine $ "class" <+> toClassName (D.name td) <+> "{"
-        nest 4 $ compileRecordBody fields
-        writeLine "}"
-    _ -> return ()
+compileTypeDeclaration :: TypeDeclaration -> CodeBuilder ()
+compileTypeDeclaration td@TypeDeclaration { type' = RecordType fields } = do
+    let name' = D.name td
+    compileRecordConstructor name' fields
+    writeLine ""
+    compileRecordSerialize name' fields
+    writeLine ""
+    compileRecordDeserialize name' fields
 compileTypeDeclaration _ = return ()
 
-compileRecordBody :: Target t => DS.DeclarationSet Field -> CodeBuilder t ()
-compileRecordBody fields = do
-    writeLine $ "constructor(values)" <+> "{"
-    nest 4 $ do
-        forM_ (DS.toList fields) $ \field ->
-            writeLine $ "this" <> dot <> toFieldName field <+> "=" <+> "values" <> dot <> toFieldName field <> ";"
-        writeLine "Object.freeze(this);"
-    writeLine "}"
+compileRecordConstructor :: N.Name -> DS.DeclarationSet Field -> CodeBuilder ()
+compileRecordConstructor name fields = functionDefinition (toClassName name) [param] $ do
+    let fields' = DS.toList fields
+    writeLine "var errors = [];"
+    mapM_ compileRecordTypeCheck fields'
+    writeLine $ "if (errors.length > 0)" <+> P.lbrace
+    nest 4 $ writeLine "throw new NirumError(errors);"
+    writeLine P.rbrace
+    mapM_ compileRecordInit fields'
+    writeLine "Object.freeze(this);"
+  where
+    param = "values"
+    values_ :: Field -> P.Doc
+    values_ = dot (P.text $ T.unpack $ toCamelCaseText param) . toAttributeName . N.facialName . fieldName
+    compileRecordTypeCheck :: Field -> CodeBuilder ()
+    compileRecordTypeCheck field = do
+        -- ty <- lookupType $ fieldType field
+        writeLine $ "if" <+> P.parens (values_ field) <+> P.lbrace
+        nest 4 $ writeLine $ "errors.push" <> P.parens P.empty <> P.semi
+        writeLine P.rbrace
+    compileRecordInit :: Field -> CodeBuilder ()
+    compileRecordInit field = do
+        writeLine $ "this" `dot` (toAttributeName $ N.facialName $ fieldName field) <+> P.equals <+> values_ field <> P.semi
 
+compileRecordSerialize :: N.Name -> DS.DeclarationSet Field -> CodeBuilder ()
+compileRecordSerialize name fields = methodDefinition name "serialize" [] $ do
+    writeLine $ "return" <+> P.lbrace
+    nest 4 $ do
+        writeLine $ "_type" <> P.colon <+> P.quotes (toDoc $ toSnakeCaseText $ N.behindName name)
+        mapM_ field $ DS.toList fields
+    writeLine $ P.rbrace <> P.semi
+  where
+    field :: Field -> CodeBuilder ()
+    field f = writeLine $ P.quotes (toFieldName f) <> P.colon <+> "this" `dot` toFieldName f <> P.comma
+
+compileRecordDeserialize :: N.Name -> DS.DeclarationSet Field -> CodeBuilder ()
+compileRecordDeserialize name _fields = staticMethodDefinition name "deserialize" [] $ do
+    writeLine $ "return" <+> "new" <+> toClassName name <> P.parens P.empty <> P.semi
+
+functionDefinition'
+    :: P.Doc  -- prefix
+    -> P.Doc  -- end
+    -> P.Doc  -- function name
+    -> [Identifier]  -- parameters
+    -> CodeBuilder ()  -- function body
+    -> CodeBuilder ()
+functionDefinition' prefix end name params body = do
+    writeLine $ prefix <+> name <> P.parens params' <+> P.lbrace
+    nest 4 body
+    writeLine $ P.rbrace <> end
+  where
+    toParamName :: Identifier -> Doc
+    toParamName = toAttributeName
+    params' :: Doc
+    params' = P.sep $ P.punctuate P.comma $ map toParamName params
+
+functionDefinition :: P.Doc -> [Identifier] -> CodeBuilder () -> CodeBuilder ()
+functionDefinition = functionDefinition' "function" P.empty
+
+methodDefinition
+    :: N.Name  -- class name
+    -> Identifier  -- method name
+    -> [Identifier]  -- parameters
+    -> CodeBuilder ()  -- method body
+    -> CodeBuilder ()
+methodDefinition className name = functionDefinition' prefix P.semi (P.text "")
+  where
+    prefix = toClassName className `dot` "prototype" `dot` toAttributeName name <+> P.equals <+> "function"
+
+staticMethodDefinition
+    :: N.Name  -- class name
+    -> Identifier  -- method name
+    -> [Identifier]  -- parameters
+    -> CodeBuilder ()  -- method body
+    -> CodeBuilder ()
+staticMethodDefinition className name = functionDefinition' prefix P.semi (P.text "")
+  where
+    prefix = toClassName className `dot` toAttributeName name <+> P.equals <+> "function"
+
+toAttributeName :: Identifier -> Doc
+toAttributeName = toDoc . toCamelCaseText
 
 toFieldName :: Field -> Doc
-toFieldName = P.text . T.unpack . toCamelCaseText . N.facialName . fieldName
+toFieldName = toAttributeName . N.facialName . fieldName
 
 toClassName :: N.Name -> Doc
-toClassName = P.text . T.unpack . toPascalCaseText . N.facialName
+toClassName = toDoc . toPascalCaseText . N.facialName
 
-dot :: P.Doc
-dot = P.char '.'
+toDoc :: T.Text -> Doc
+toDoc = P.text . T.unpack
+
+dot :: P.Doc -> P.Doc -> P.Doc
+a `dot` b = a <> P.char '.' <> b

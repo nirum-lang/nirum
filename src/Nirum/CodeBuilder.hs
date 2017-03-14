@@ -1,5 +1,6 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, MultiParamTypeClasses, TypeOperators #-}
+{-# LANGUAGE FlexibleInstances, GeneralizedNewtypeDeriving, MultiParamTypeClasses, TypeOperators #-}
 module Nirum.CodeBuilder ( CodeBuilder
+                         , lookupType
                          , nest
                          , runBuilder
                          , writeLine
@@ -8,7 +9,7 @@ module Nirum.CodeBuilder ( CodeBuilder
 import Control.Applicative (Applicative)
 import Control.Monad (Monad)
 import qualified Control.Monad.State as ST
-import Control.Monad.State (State, runState)
+import Control.Monad.State (MonadState, State, state, runState)
 import Data.Functor (Functor)
 import Data.Maybe (fromMaybe)
 import Data.Monoid ((<>))
@@ -16,49 +17,65 @@ import qualified Data.Text.Lazy.Builder as B
 import qualified Text.PrettyPrint as P
 import Text.PrettyPrint (($+$))
 
+import Nirum.Constructs.Identifier (Identifier)
 import Nirum.Constructs.ModulePath (ModulePath)
+import qualified Nirum.Package as PK
 import Nirum.Package (BoundModule (..), resolveBoundModule)
 import Nirum.Package.Metadata (Package (..), Target (..))
 
 
-newtype Target t => CodeBuilder t a = CodeBuilder (State (BuildState t) a)
+newtype Target t => CodeBuilder t s a = CodeBuilder (State (BuildState t s) a)
     deriving ( Applicative
              , Functor
              , Monad
              )
 
-data Target t => BuildState t =
+data Target t => BuildState t s =
     BuildState { output :: P.Doc
                , boundModule :: BoundModule t
+               , innerState :: s
                }
 
-get :: Target t => CodeBuilder t (BuildState t)
-get = CodeBuilder ST.get
+instance Target t => MonadState s (CodeBuilder t s) where
+    state f = do
+        st <- get'
+        let (a, s) = f (innerState st)
+        put' $ st { innerState = s }
+        return a
 
-put :: Target t => BuildState t -> CodeBuilder t ()
-put = CodeBuilder . ST.put
+get' :: Target t => CodeBuilder t s (BuildState t s)
+get' = CodeBuilder ST.get
 
-modify :: Target t => (BuildState t -> BuildState t) -> CodeBuilder t ()
-modify = CodeBuilder . ST.modify
+put' :: Target t => BuildState t s -> CodeBuilder t s ()
+put' = CodeBuilder . ST.put
 
-writeLine :: Target t => P.Doc -> CodeBuilder t ()
-writeLine code = modify $ \s -> s { output = output s $+$ code }
+modify' :: Target t => (BuildState t s -> BuildState t s) -> CodeBuilder t s ()
+modify' = CodeBuilder . ST.modify
 
-nest :: Target t => Integer -> CodeBuilder t a -> CodeBuilder t a
+writeLine :: Target t => P.Doc -> CodeBuilder t s ()
+writeLine code = modify' $ \s -> s { output = output s $+$ code }
+
+nest :: Target t => Integer -> CodeBuilder t s a -> CodeBuilder t s a
 nest n code = do
-    st <- get
+    st <- get'
     let st' = st { output = P.empty }
-    put st'
+    put' st'
     ret <- code
-    after <- get
-    modify $ \s -> s { output = output st $+$ P.nest (fromIntegral n) (output after) }
+    after <- get'
+    modify' $ \s -> s { output = output st $+$ P.nest (fromIntegral n) (output after) }
     return ret
 
-runBuilder :: Target t => Package t -> ModulePath -> CodeBuilder t a -> (a, B.Builder)
-runBuilder package modPath (CodeBuilder a) = (ret, rendered)
+lookupType :: Target t => Identifier -> CodeBuilder t s PK.TypeLookup
+lookupType identifier = do
+    m <- fmap boundModule get'
+    return $ PK.lookupType identifier m
+
+runBuilder :: Target t => Package t -> ModulePath -> s -> CodeBuilder t s a -> (a, B.Builder)
+runBuilder package modPath st (CodeBuilder a) = (ret, rendered)
   where
     initialState = BuildState { output = P.empty
                               , boundModule = fromMaybe (error "asdf") (resolveBoundModule modPath package)
+                              , innerState = st
                               }
     (ret, finalState) = runState a initialState
     rendered = P.fullRender P.PageMode 80 1.5 concat' (B.singleton '\n') (output finalState)
