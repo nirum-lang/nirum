@@ -59,6 +59,7 @@ import Nirum.Targets.Python ( Source (Source)
                             , addOptionalDependency
                             , compilePrimitiveType
                             , compileTypeExpression
+                            , minimumRuntime
                             , stringLiteral
                             , toAttributeName
                             , toClassName
@@ -89,7 +90,7 @@ makeDummySource' pathPrefix m =
                     , uri = Nothing
                     }
               ]
-        , target = Python "sample-package"
+        , target = Python "sample-package" minimumRuntime
         }
     pkg :: Package Python
     pkg = createPackage
