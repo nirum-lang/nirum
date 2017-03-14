@@ -72,8 +72,8 @@ spec = do
     describe "lookupType" $
         specify "primitives" $ do
             let run' = fst . runBuilder package ["fruits"] ()
-            (run' $ lookupType "text") `shouldBe` Local (TD.PrimitiveType TD.Text TD.String)
-            (run' $ lookupType "int32") `shouldBe` Local (TD.PrimitiveType TD.Int32 TD.String)
+            run' (lookupType "text") `shouldBe` Local (TD.PrimitiveType TD.Text TD.String)
+            run' (lookupType "int32") `shouldBe` Local (TD.PrimitiveType TD.Int32 TD.String)
 
 
 data DummyTarget = DummyTarget deriving (Eq, Ord, Show)

@@ -81,7 +81,7 @@ javaScriptTargetSpec = describe "JavaScript target" $ do
 
 compilationSpec :: Spec
 compilationSpec =
-    specify "methodDefinition" $ do
+    specify "methodDefinition" $
         run (methodDefinition "customer" "get-name" [] (writeLine "return this.name;")) `shouldBe`
             "Customer.prototype.getName = function () {\n\
             \    return this.name;\n\

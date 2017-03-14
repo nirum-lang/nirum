@@ -147,8 +147,8 @@ compileRecordConstructor name fields = functionDefinition (toClassName name) [pa
         nest 4 $ writeLine $ "errors.push" <> P.parens P.empty <> P.semi
         writeLine P.rbrace
     compileRecordInit :: Field -> CodeBuilder ()
-    compileRecordInit field = do
-        writeLine $ "this" `dot` (toAttributeName $ N.facialName $ fieldName field) <+> P.equals <+> values_ field <> P.semi
+    compileRecordInit field =
+        writeLine $ "this" `dot` toAttributeName (N.facialName $ fieldName field) <+> P.equals <+> values_ field <> P.semi
 
 compileRecordSerialize :: N.Name -> DS.DeclarationSet Field -> CodeBuilder ()
 compileRecordSerialize name fields = methodDefinition name "serialize" [] $ do
@@ -162,7 +162,7 @@ compileRecordSerialize name fields = methodDefinition name "serialize" [] $ do
     field f = writeLine $ P.quotes (toFieldName f) <> P.colon <+> "this" `dot` toFieldName f <> P.comma
 
 compileRecordDeserialize :: N.Name -> DS.DeclarationSet Field -> CodeBuilder ()
-compileRecordDeserialize name _fields = staticMethodDefinition name "deserialize" [] $ do
+compileRecordDeserialize name _fields = staticMethodDefinition name "deserialize" [] $
     writeLine $ "return" <+> "new" <+> toClassName name <> P.parens P.empty <> P.semi
 
 functionDefinition'
