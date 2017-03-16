@@ -51,6 +51,7 @@ import Data.Typeable (Typeable)
 import GHC.Exts (IsList (toList))
 import Text.Printf (printf)
 
+import qualified Data.HashMap.Strict as HM
 import qualified Data.Map.Strict as M
 import qualified Data.SemVer as SV
 import qualified Data.Set as S
@@ -68,6 +69,7 @@ import Nirum.Constructs.ModulePath ( ModulePath
                                    , fromIdentifiers
                                    , hierarchy
                                    , hierarchies
+                                   , replacePrefix
                                    )
 import Nirum.Constructs.Name (Name (Name))
 import qualified Nirum.Constructs.Name as N
@@ -107,8 +109,12 @@ import Nirum.Package ( BoundModule
                      , types
                      )
 import Nirum.Package.Metadata ( Author (Author, name, email)
-                              , Metadata (authors, target, version)
-                              , MetadataError (FieldError)
+                              , Metadata (Metadata, authors, target, version)
+                              , MetadataError ( FieldError
+                                              , FieldTypeError
+                                              , FieldValueError
+                                              )
+                              , Node (VString)
                               , Target ( CompileError
                                        , CompileResult
                                        , compilePackage
@@ -117,7 +123,9 @@ import Nirum.Package.Metadata ( Author (Author, name, email)
                                        , targetName
                                        , toByteString
                                        )
+                              , fieldType
                               , stringField
+                              , tableField
                               , versionField
                               )
 import qualified Nirum.Package.ModuleSet as MS
@@ -127,6 +135,7 @@ minimumRuntime = SV.version 0 3 9 [] []
 
 data Python = Python { packageName :: T.Text
                      , minimumRuntimeVersion :: SV.Version
+                     , renames :: RenameMap
                      } deriving (Eq, Ord, Show, Typeable)
 
 type RenameMap = M.Map ModulePath ModulePath
@@ -218,6 +227,9 @@ renameModulePath renameMap path' =
                                   else r
     rename [] = path'
 
+renameMP :: Python -> ModulePath -> ModulePath
+renameMP Python { renames = table } = renameModulePath table
+
 -- | The set of Python reserved keywords.
 -- See also: https://docs.python.org/3/reference/lexical_analysis.html#keywords
 keywords :: S.Set T.Text
@@ -249,11 +261,18 @@ toAttributeName identifier =
 toAttributeName' :: Name -> T.Text
 toAttributeName' = toAttributeName . N.facialName
 
-toImportPath :: ModulePath -> T.Text
-toImportPath = T.intercalate "." . map toAttributeName . toList
+toImportPath' :: ModulePath -> T.Text
+toImportPath' = T.intercalate "." . map toAttributeName . toList
 
-toImportPaths :: S.Set ModulePath -> [T.Text]
-toImportPaths paths = S.toAscList $ S.map toImportPath $ hierarchies paths
+toImportPath :: Python -> ModulePath -> T.Text
+toImportPath target' = toImportPath' . renameMP target'
+
+toImportPaths :: Python -> S.Set ModulePath -> [T.Text]
+toImportPaths target' paths =
+    S.toAscList $ S.map toImportPath' $ hierarchies renamedPaths
+  where
+    renamedPaths :: S.Set ModulePath
+    renamedPaths = S.map (renameMP target') paths
 
 toNamePair :: Name -> T.Text
 toNamePair (Name f b) = [qq|('{toAttributeName f}', '{I.toSnakeCaseText b}')|]
@@ -414,14 +433,20 @@ compilePrimitiveType primitiveTypeIdentifier = do
         (Uri, Python3) -> return "str"
 
 compileTypeExpression :: Source -> TypeExpression -> CodeGen Code
-compileTypeExpression Source { sourceModule = boundModule } (TypeIdentifier i) =
+compileTypeExpression Source { sourcePackage = Package { metadata = meta }
+                             , sourceModule = boundModule
+                             }
+                      (TypeIdentifier i) =
     case lookupType i boundModule of
         Missing -> fail $ "undefined identifier: " ++ I.toString i
         Imported _ (PrimitiveType p _) -> compilePrimitiveType p
         Imported m _ -> do
-            insertThirdPartyImports [(toImportPath m, [toClassName i])]
+            insertThirdPartyImports [(toImportPath target' m, [toClassName i])]
             return $ toClassName i
         Local _ -> return $ toClassName i
+  where
+    target' :: Python
+    target' = target meta
 compileTypeExpression source (MapModifier k v) = do
     kExpr <- compileTypeExpression source k
     vExpr <- compileTypeExpression source v
@@ -932,6 +957,8 @@ setup(
 )
 |]
   where
+    target' :: Python
+    target' = target metadata'
     csStrings :: [T.Text] -> T.Text
     csStrings [] = "None"
     csStrings s = stringLiteral $ T.intercalate ", " s
@@ -948,7 +975,7 @@ setup(
                             | Author { email = Just e } <- authors metadata'
                             ]
     pPackages :: Code
-    pPackages = strings $ toImportPaths $ MS.keysSet $ modules package
+    pPackages = strings $ toImportPaths target' $ MS.keysSet $ modules package
     runtimeVer :: SV.Version
     runtimeVer = minimumRuntimeVersion $ target metadata'
     pRequires :: Code
@@ -973,7 +1000,7 @@ recursive-include src-py2 *.py
 
 compilePackage' :: Package'
                 -> M.Map FilePath (Either CompileError' Code)
-compilePackage' package =
+compilePackage' package@Package { metadata = Metadata { target = target' } } =
     M.fromList $
         initFiles ++
         [ ( f
@@ -989,7 +1016,7 @@ compilePackage' package =
   where
     toPythonFilename :: ModulePath -> [FilePath]
     toPythonFilename mp = [ T.unpack (toAttributeName i)
-                          | i <- toList mp
+                          | i <- toList $ renameMP target' mp
                           ] ++ ["__init__.py"]
     versions :: [PythonVersion]
     versions = [Python2, Python3]
@@ -1032,8 +1059,25 @@ instance Target Python where
         minRuntime <- case versionField "minimum_runtime" table of
             Left (FieldError _) -> Right minimumRuntime
             otherwise' -> otherwise'
+        renameTable <- case tableField "renames" table of
+            Right t -> Right t
+            Left (FieldError _) -> Right HM.empty
+            otherwise' -> otherwise'
+        renamePairs <- sequence
+            [ case (parseModulePath k, v) of
+                  (Just modulePath', VString v') -> case parseModulePath v' of
+                      Just altPath -> Right (modulePath', altPath)
+                      Nothing -> Left $ FieldValueError [qq|renames.$k|]
+                          [qq|expected a module path, not "$v'"|]
+                  (Nothing, _) -> Left $ FieldValueError [qq|renams.$k|]
+                      [qq|expected a module path as a key, not "$k"|]
+                  _ -> Left $ FieldTypeError [qq|renames.$k|] "string" $
+                                             fieldType v
+            | (k, v) <- HM.toList renameTable
+            ]
         return Python { packageName = name'
                       , minimumRuntimeVersion = max minRuntime minimumRuntime
+                      , renames = M.fromList renamePairs
                       }
     compilePackage = compilePackage'
     showCompileError _ e = e

@@ -48,3 +48,44 @@ script.
 
 [nirum]: https://pypi.python.org/pypi/nirum
 [semver]: http://semver.org/
+
+
+### `renames`: Rename module paths
+
+Sometimes you may need to use other name in Python than package names defined
+by Nirum IDL.  For example, you may choose a general term `statistics` for
+a module name, but need to use an other name in Python since it's reserved
+by Python standard library.  In case, `renames` configuration replace package
+names when it's compiled to Python.
+
+It's a table of strings where keys are module paths to be replaced and
+values are module paths to replace with.  Note that keys and values are
+not Python import paths but Nirum IDL module paths.  That means you can't use
+names like `__foo__` because Nirum IDL doesn't allow more than twice continued
+underscores/hyphens.
+
+The following example replaces `statistics` to `rpc.statistics`:
+
+~~~~~~~~ toml
+[targets.python.renames]
+statistics = "rpc.statistics"
+~~~~~~~~
+
+The `renames` table is recursively applied to submodules.  If you have 4 modules
+and submodules like `statistics`, `statistics.products`, `statistics.users`, and
+`statistics.users.friends`, they are renamed to `rpc.statistics.products`,
+`rpc.statistics`, `rpc.statistics.products`, `rpc.statistics.users`, and
+`rpc.statistics.users.friends`.
+
+Though it's applied only from root modules to submodules.  Even if there're
+some matched module paths in the middle they aren't renamed.  For example,
+whereas `statistics.foo` is renamed to `rpc.statistics.foo`, `foo.statistics`
+is remained without renaming.
+
+Names to be replaced can contain periods.  For example, the following example
+renames `foo.bar.baz` to `new-name.baz`:
+
+~~~~~~~~ toml
+[targets.python.renames]
+"foo.bar" = "new-name"  # Note that the key is quoted.
+~~~~~~~~

@@ -1,0 +1,3 @@
+import renames.test.foo.bar (bar-test);
+
+record foo-test (bar-test a);

@@ -35,7 +35,7 @@ import Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
                                                         , TypeIdentifier
                                                         )
                                        )
-import Nirum.Package (Package (modules), resolveBoundModule)
+import Nirum.Package (Package (metadata, modules), resolveBoundModule)
 import Nirum.Package.Metadata ( Author (Author, email, name, uri)
                               , Metadata (Metadata, authors, target, version)
                               , Target (compilePackage)
@@ -77,8 +77,8 @@ import Nirum.Targets.Python ( Source (Source)
 codeGen :: a -> CodeGen a
 codeGen = return
 
-makeDummySource' :: [Identifier] -> Module -> Source
-makeDummySource' pathPrefix m =
+makeDummySource' :: [Identifier] -> Module -> RenameMap -> Source
+makeDummySource' pathPrefix m renames =
     Source pkg $ fromJust $ resolveBoundModule ["foo"] pkg
   where
     mp :: [Identifier] -> ModulePath
@@ -93,7 +93,7 @@ makeDummySource' pathPrefix m =
                     , uri = Nothing
                     }
               ]
-        , target = Python "sample-package" minimumRuntime
+        , target = Python "sample-package" minimumRuntime renames
         }
     pkg :: Package Python
     pkg = createPackage
@@ -121,7 +121,7 @@ makeDummySource' pathPrefix m =
             ]
 
 makeDummySource :: Module -> Source
-makeDummySource = makeDummySource' []
+makeDummySource m = makeDummySource' [] m []
 
 spec :: Spec
 spec = parallel $ forM_ ([Python2, Python3] :: [PythonVersion]) $ \ ver -> do
@@ -288,7 +288,8 @@ spec = parallel $ forM_ ([Python2, Python3] :: [PythonVersion]) $ \ ver -> do
                     ]
             M.keysSet files `shouldBe` directoryStructure
         it "creates an emtpy Python package directory if necessary" $ do
-            let (Source pkg _) = makeDummySource' ["test"] $ Module [] Nothing
+            let (Source pkg _) = makeDummySource' ["test"] (Module [] Nothing)
+                                                  []
                 files = compilePackage pkg
                 directoryStructure =
                     [ "src-py2" </> "test" </> "__init__.py"
@@ -303,6 +304,35 @@ spec = parallel $ forM_ ([Python2, Python3] :: [PythonVersion]) $ \ ver -> do
                     , "MANIFEST.in"
                     ]
             M.keysSet files `shouldBe` directoryStructure
+        it "generates renamed package dirs if renames are configured" $ do
+            let (Source pkg _) = makeDummySource' [] (Module [] Nothing)
+                                                  [(["foo"], ["quz"])]
+                files = compilePackage pkg
+                directoryStructure =
+                    [ "src-py2" </> "quz" </> "__init__.py"
+                    , "src-py2" </> "quz" </> "bar" </> "__init__.py"
+                    , "src-py2" </> "qux" </> "__init__.py"
+                    , "src" </> "quz" </> "__init__.py"
+                    , "src" </> "quz" </> "bar" </> "__init__.py"
+                    , "src" </> "qux" </> "__init__.py"
+                    , "setup.py"
+                    , "MANIFEST.in"
+                    ]
+            M.keysSet files `shouldBe` directoryStructure
+            let (Source pkg' _) = makeDummySource' [] (Module [] Nothing)
+                                                   [(["foo", "bar"], ["bar"])]
+                files' = compilePackage pkg'
+                directoryStructure' =
+                    [ "src-py2" </> "foo" </> "__init__.py"
+                    , "src-py2" </> "bar" </> "__init__.py"
+                    , "src-py2" </> "qux" </> "__init__.py"
+                    , "src" </> "foo" </> "__init__.py"
+                    , "src" </> "bar" </> "__init__.py"
+                    , "src" </> "qux" </> "__init__.py"
+                    , "setup.py"
+                    , "MANIFEST.in"
+                    ]
+            M.keysSet files' `shouldBe` directoryStructure'
 
     describe [qq|InstallRequires ($ver)|] $ do
         let req = InstallRequires [] []
@@ -347,16 +377,31 @@ spec = parallel $ forM_ ([Python2, Python3] :: [PythonVersion]) $ \ ver -> do
                                              (3, 4) "ipaddress"
             (req4 `unionInstallRequires` req5) `shouldBe` req6
             (req5 `unionInstallRequires` req4) `shouldBe` req6
-    specify [qq|toImportPath ($ver)|] $
-        PY.toImportPath ["foo", "bar"] `shouldBe` "foo.bar"
-    describe [qq|add ancestors of packages ($ver)|] $ do
+    specify [qq|toImportPath ($ver)|] $ do
         let (Source pkg _) = makeDummySource $ Module [] Nothing
-            modulePaths = MS.keysSet $ modules pkg
-        specify "toImportPaths" $
-            PY.toImportPaths modulePaths `shouldBe` [ "foo"
-                                                    , "foo.bar"
-                                                    , "qux"
-                                                    ]
+            target' = target $ metadata pkg
+        PY.toImportPath target' ["foo", "bar"] `shouldBe` "foo.bar"
+    describe [qq|toImportPath ($ver)|] $ do
+        it "adds ancestors of packages" $ do
+            let (Source pkg _) = makeDummySource $ Module [] Nothing
+                modulePaths = MS.keysSet $ modules pkg
+                target' = target $ metadata pkg
+            PY.toImportPaths target' modulePaths `shouldBe`
+                [ "foo"
+                , "foo.bar"
+                , "qux"
+                ]
+        it "applies renames before add ancestors of packages" $ do
+            let (Source pkg _) = makeDummySource' [] (Module [] Nothing)
+                                                  [(["foo"], ["f", "oo"])]
+                modulePaths = MS.keysSet $ modules pkg
+                target' = target $ metadata pkg
+            PY.toImportPaths target' modulePaths `shouldBe`
+                [ "f"  -- > "f" should be added
+                , "f.oo"
+                , "f.oo.bar"
+                , "qux"
+                ]
     specify "parseModulePath" $ do
         parseModulePath "" `shouldBe` Nothing
         parseModulePath "foo" `shouldBe` Just ["foo"]
