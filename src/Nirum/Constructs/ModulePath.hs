@@ -8,6 +8,7 @@ module Nirum.Constructs.ModulePath ( ModulePath ( ModuleName
                                    , fromIdentifiers
                                    , hierarchy
                                    , hierarchies
+                                   , replacePrefix
                                    ) where
 
 import Data.Char (toLower)
@@ -59,6 +60,14 @@ fromFilePath filePath =
 hierarchy :: ModulePath -> S.Set ModulePath
 hierarchy m@ModuleName {} = S.singleton m
 hierarchy m@(ModulePath parent _) = m `S.insert` hierarchy parent
+
+replacePrefix :: ModulePath -> ModulePath -> ModulePath -> ModulePath
+replacePrefix from to path'
+ | path' == from = to
+ | otherwise = case path' of
+                   ModuleName {} -> path'
+                   ModulePath p n -> ModulePath (replacePrefix from to p) n
+
 
 instance IsList ModulePath where
     type Item ModulePath = Identifier
