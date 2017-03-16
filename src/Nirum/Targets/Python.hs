@@ -60,11 +60,7 @@ import Text.InterpolatedString.Perl6 (q, qq)
 import qualified Nirum.CodeGen as C
 import Nirum.CodeGen (Failure)
 import qualified Nirum.Constructs.DeclarationSet as DS
-import Nirum.Constructs.Identifier ( Identifier
-                                   , toPascalCaseText
-                                   , toSnakeCaseText
-                                   , toString
-                                   )
+import qualified Nirum.Constructs.Identifier as I
 import Nirum.Constructs.ModulePath (ModulePath, hierarchy, hierarchies)
 import Nirum.Constructs.Name (Name (Name))
 import qualified Nirum.Constructs.Name as N
@@ -213,22 +209,22 @@ keywords = [ "False", "None", "True"
            , "return", "try", "while", "with", "yield"
            ]
 
-toClassName :: Identifier -> T.Text
+toClassName :: I.Identifier -> T.Text
 toClassName identifier =
     if className `S.member` keywords then className `T.snoc` '_' else className
   where
     className :: T.Text
-    className = toPascalCaseText identifier
+    className = I.toPascalCaseText identifier
 
 toClassName' :: Name -> T.Text
 toClassName' = toClassName . N.facialName
 
-toAttributeName :: Identifier -> T.Text
+toAttributeName :: I.Identifier -> T.Text
 toAttributeName identifier =
     if attrName `S.member` keywords then attrName `T.snoc` '_' else attrName
   where
     attrName :: T.Text
-    attrName = toSnakeCaseText identifier
+    attrName = I.toSnakeCaseText identifier
 
 toAttributeName' :: Name -> T.Text
 toAttributeName' = toAttributeName . N.facialName
@@ -240,7 +236,7 @@ toImportPaths :: S.Set ModulePath -> [T.Text]
 toImportPaths paths = S.toAscList $ S.map toImportPath $ hierarchies paths
 
 toNamePair :: Name -> T.Text
-toNamePair (Name f b) = [qq|('{toAttributeName f}', '{toSnakeCaseText b}')|]
+toNamePair (Name f b) = [qq|('{toAttributeName f}', '{I.toSnakeCaseText b}')|]
 
 stringLiteral :: T.Text -> T.Text
 stringLiteral string =
@@ -400,7 +396,7 @@ compilePrimitiveType primitiveTypeIdentifier = do
 compileTypeExpression :: Source -> TypeExpression -> CodeGen Code
 compileTypeExpression Source { sourceModule = boundModule } (TypeIdentifier i) =
     case lookupType i boundModule of
-        Missing -> fail $ "undefined identifier: " ++ toString i
+        Missing -> fail $ "undefined identifier: " ++ I.toString i
         Imported _ (PrimitiveType p _) -> compilePrimitiveType p
         Imported m _ -> do
             insertThirdPartyImports [(toImportPath m, [toClassName i])]
@@ -489,7 +485,7 @@ compileTypeDeclaration _ TypeDeclaration { typename = typename'
     let className = toClassName' typename'
         memberNames = T.intercalate
             "\n    "
-            [ [qq|{toAttributeName' memberName} = '{toSnakeCaseText bn}'|]
+            [ [qq|{toAttributeName' memberName} = '{I.toSnakeCaseText bn}'|]
             | EnumMember memberName@(Name _ bn) _ <- toList members
             ]
     insertEnumImport
@@ -548,7 +544,9 @@ class $className(object):
     __slots__ = (
         $slots,
     )
-    __nirum_record_behind_name__ = '{toSnakeCaseText $ N.behindName typename'}'
+    __nirum_record_behind_name__ = (
+        '{I.toSnakeCaseText $ N.behindName typename'}'
+    )
     __nirum_field_types__ = \{
         $slotTypes
     \}
@@ -605,7 +603,7 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
     return [qq|
 class $className(object):
 
-    __nirum_union_behind_name__ = '{toSnakeCaseText $ N.behindName typename'}'
+    __nirum_union_behind_name__ = '{I.toSnakeCaseText $ N.behindName typename'}'
     __nirum_field_names__ = name_dict_type([
         $nameMaps
     ])
@@ -639,7 +637,7 @@ $fieldCodes'
                      ]
     enumMembers' :: [(T.Text, T.Text)]
     enumMembers' = [ ( toAttributeName' tagName
-                     , toSnakeCaseText $ N.behindName tagName
+                     , I.toSnakeCaseText $ N.behindName tagName
                      )
                    | (Tag tagName _ _) <- toList tags
                    ]
