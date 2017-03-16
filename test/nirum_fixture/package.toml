@@ -7,3 +7,5 @@ email = "dev@nirum.org"
 [targets]
 [targets.python]
 name = "nirum_fixture"
+[targets.python.renames]
+"renames.test" = "renamed"

@@ -4,7 +4,9 @@ module Nirum.Package.MetadataSpec where
 import Control.Monad (forM_)
 import Data.Char (isSpace)
 import Data.Either (isRight)
+import Data.Maybe (fromJust)
 
+import qualified Data.HashMap.Strict as HM
 import qualified Data.Map.Strict as M
 import qualified Data.SemVer as SV
 import Data.Text (Text)
@@ -30,6 +32,7 @@ import Nirum.Package.Metadata ( Metadata (Metadata, version)
                                        , targetName
                                        , toByteString
                                        )
+                              , fieldType
                               , metadataFilename
                               , metadataPath
                               , parseMetadata
@@ -190,6 +193,42 @@ spec =
                 Left (FieldTypeError "d" "string" "float (1.0)")
             versionField "e" table `shouldBe` Left (FieldValueError "e"
                 "expected a semver string (e.g. \"1.2.3\"), not \"1.2.3.4\"")
+        specify "fieldType" $ do
+            let Right table = parseTomlDoc "<string>"
+                    [q|s = "foobar"
+                       i = 123
+                       f = 3.14
+                       bt = true
+                       bf = false
+                       d = 2017-03-16T10:56:30Z
+                       a0 = []
+                       a1 = ["foobar"]
+                       a3 = ["foo", "bar", "baz"]
+                       t0 = {}
+                       t1 = { a = 1 }
+                       [t2]
+                       a = 1
+                       b = 2
+                       [[ta]]
+                       a = 1
+                       b = 2
+                       [[ta]]
+                       c = 3
+                       d = 4|]
+                get = fromJust . (`HM.lookup` table)
+            fieldType (get "s") `shouldBe` "string (foobar)"
+            fieldType (get "i") `shouldBe` "integer (123)"
+            fieldType (get "f") `shouldBe` "float (3.14)"
+            fieldType (get "bt") `shouldBe` "boolean (true)"
+            fieldType (get "bf") `shouldBe` "boolean (false)"
+            fieldType (get "d") `shouldBe` "datetime (2017-03-16 10:56:30 UTC)"
+            fieldType (get "a0") `shouldBe` "array of 0 values"
+            fieldType (get "a1") `shouldBe` "array of a value"
+            fieldType (get "a3") `shouldBe` "array of 3 values"
+            fieldType (get "t0") `shouldBe` "table of 0 items"
+            fieldType (get "t1") `shouldBe` "table of an item"
+            fieldType (get "t2") `shouldBe` "table of 2 items"
+            fieldType (get "ta") `shouldBe` "array of 2 tables"
   where
     parse :: Text -> Either MetadataError (Metadata DummyTarget)
     parse = parseMetadata "<string>"
