@@ -367,9 +367,3 @@ spec = parallel $ forM_ ([Python2, Python3] :: [PythonVersion]) $ \ ver -> do
         parseModulePath "foo..bar" `shouldBe` Nothing
         parseModulePath "foo.bar>" `shouldBe` Nothing
         parseModulePath "foo.bar-" `shouldBe` Nothing
-
-
-{-# ANN module ("HLint: ignore Functor law" :: String) #-}
-{-# ANN module ("HLint: ignore Monad law, left identity" :: String) #-}
-{-# ANN module ("HLint: ignore Monad law, right identity" :: String) #-}
-{-# ANN module ("HLint: ignore Use >=>" :: String) #-}
