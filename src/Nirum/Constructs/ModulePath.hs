@@ -61,6 +61,9 @@ hierarchy :: ModulePath -> S.Set ModulePath
 hierarchy m@ModuleName {} = S.singleton m
 hierarchy m@(ModulePath parent _) = m `S.insert` hierarchy parent
 
+hierarchies :: S.Set ModulePath -> S.Set ModulePath
+hierarchies modulePaths = S.unions $ toList $ S.map hierarchy modulePaths
+
 replacePrefix :: ModulePath -> ModulePath -> ModulePath -> ModulePath
 replacePrefix from to path'
  | path' == from = to
@@ -76,6 +79,3 @@ instance IsList ModulePath where
                   (fromIdentifiers identifiers)
     toList (ModuleName identifier) = [identifier]
     toList (ModulePath path' identifier) = toList path' ++ [identifier]
-
-hierarchies :: S.Set ModulePath -> S.Set ModulePath
-hierarchies modulePaths = S.unions $ toList $ S.map hierarchy modulePaths
