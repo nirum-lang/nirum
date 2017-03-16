@@ -55,6 +55,7 @@ import Nirum.Targets.Python ( Source (Source)
                                               )
                             , Python (Python)
                             , PythonVersion (Python2, Python3)
+                            , RenameMap
                             , addDependency
                             , addOptionalDependency
                             , compilePrimitiveType
@@ -64,6 +65,7 @@ import Nirum.Targets.Python ( Source (Source)
                             , insertThirdPartyImports
                             , minimumRuntime
                             , parseModulePath
+                            , renameModulePath
                             , runCodeGen
                             , stringLiteral
                             , toAttributeName
@@ -367,3 +369,15 @@ spec = parallel $ forM_ ([Python2, Python3] :: [PythonVersion]) $ \ ver -> do
         parseModulePath "foo..bar" `shouldBe` Nothing
         parseModulePath "foo.bar>" `shouldBe` Nothing
         parseModulePath "foo.bar-" `shouldBe` Nothing
+    specify "renameModulePath" $ do
+        let renames = [ (["foo"], ["poo"])
+                      , (["foo", "bar"], ["foo"])
+                      , (["baz"], ["p", "az"])
+                      ] :: RenameMap
+        renameModulePath renames ["foo"] `shouldBe` ["poo"]
+        renameModulePath renames ["foo", "baz"] `shouldBe` ["poo", "baz"]
+        renameModulePath renames ["foo", "bar"] `shouldBe` ["foo"]
+        renameModulePath renames ["foo", "bar", "qux"] `shouldBe` ["foo", "qux"]
+        renameModulePath renames ["baz"] `shouldBe` ["p", "az"]
+        renameModulePath renames ["baz", "qux"] `shouldBe` ["p", "az", "qux"]
+        renameModulePath renames ["qux", "foo"] `shouldBe` ["qux", "foo"]

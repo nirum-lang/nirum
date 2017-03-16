@@ -20,6 +20,7 @@ module Nirum.Targets.Python ( Code
                             , PythonVersion ( Python2
                                             , Python3
                                             )
+                            , RenameMap
                             , addDependency
                             , addOptionalDependency
                             , compileModule
@@ -32,6 +33,7 @@ module Nirum.Targets.Python ( Code
                             , insertThirdPartyImports
                             , minimumRuntime
                             , parseModulePath
+                            , renameModulePath
                             , runCodeGen
                             , stringLiteral
                             , toAttributeName
@@ -127,6 +129,7 @@ data Python = Python { packageName :: T.Text
                      , minimumRuntimeVersion :: SV.Version
                      } deriving (Eq, Ord, Show, Typeable)
 
+type RenameMap = M.Map ModulePath ModulePath
 type Package' = Package Python
 type CompileError' = T.Text
 
@@ -202,6 +205,18 @@ insertEnumImport = insertStandardImport "enum"
 
 getPythonVersion :: CodeGen PythonVersion
 getPythonVersion = fmap pythonVersion ST.get
+
+renameModulePath :: RenameMap -> ModulePath -> ModulePath
+renameModulePath renameMap path' =
+    rename (M.toDescList renameMap)
+    -- longest paths should be processed first
+  where
+    rename :: [(ModulePath, ModulePath)] -> ModulePath
+    rename ((from, to) : xs) = let r = replacePrefix from to path'
+                               in if r == path'
+                                  then rename xs
+                                  else r
+    rename [] = path'
 
 -- | The set of Python reserved keywords.
 -- See also: https://docs.python.org/3/reference/lexical_analysis.html#keywords
