@@ -30,6 +30,7 @@ module Nirum.Targets.Python ( Code
                             , insertLocalImport
                             , insertStandardImport
                             , insertThirdPartyImports
+                            , minimumRuntime
                             , runCodeGen
                             , stringLiteral
                             , toAttributeName
@@ -104,6 +105,7 @@ import Nirum.Package ( BoundModule
                      )
 import Nirum.Package.Metadata ( Author (Author, name, email)
                               , Metadata (authors, target, version)
+                              , MetadataError (FieldError)
                               , Target ( CompileError
                                        , CompileResult
                                        , compilePackage
@@ -113,11 +115,16 @@ import Nirum.Package.Metadata ( Author (Author, name, email)
                                        , toByteString
                                        )
                               , stringField
+                              , versionField
                               )
 import qualified Nirum.Package.ModuleSet as MS
 
-newtype Python = Python { packageName :: T.Text
-                        } deriving (Eq, Ord, Show, Typeable)
+minimumRuntime :: SV.Version
+minimumRuntime = SV.version 0 3 9 [] []
+
+data Python = Python { packageName :: T.Text
+                     , minimumRuntimeVersion :: SV.Version
+                     } deriving (Eq, Ord, Show, Typeable)
 
 type Package' = Package Python
 type CompileError' = T.Text
@@ -900,7 +907,7 @@ setup(
     package_dir=\{'': SOURCE_ROOT},
     packages=[$pPackages],
     provides=[$pPackages],
-    requires=[$pInstallRequires],
+    requires=[$pRequires],
     setup_requires=setup_requires,
     install_requires=install_requires,
     extras_require=extras_require,
@@ -924,8 +931,17 @@ setup(
                             ]
     pPackages :: Code
     pPackages = strings $ toImportPaths $ MS.keysSet $ modules package
+    runtimeVer :: SV.Version
+    runtimeVer = minimumRuntimeVersion $ target metadata'
+    pRequires :: Code
+    pRequires = strings $ S.toList deps
     pInstallRequires :: Code
-    pInstallRequires = strings $ S.toList deps
+    pInstallRequires = strings
+        [ case p of
+              "nirum" -> [qq|nirum >= {SV.toText runtimeVer}|]
+              p' -> p'
+        | p <- S.toList deps
+        ]
     pPolyfillRequires :: Code
     pPolyfillRequires = T.intercalate ", "
         [ [qq|($major, $minor): [{strings $ S.toList deps'}]|]
@@ -988,7 +1004,12 @@ instance Target Python where
     targetName _ = "python"
     parseTarget table = do
         name' <- stringField "name" table
-        return Python { packageName = name' }
+        minRuntime <- case versionField "minimum_runtime" table of
+            Left (FieldError _) -> Right minimumRuntime
+            otherwise' -> otherwise'
+        return Python { packageName = name'
+                      , minimumRuntimeVersion = max minRuntime minimumRuntime
+                      }
     compilePackage = compilePackage'
     showCompileError _ e = e
     toByteString _ = encodeUtf8

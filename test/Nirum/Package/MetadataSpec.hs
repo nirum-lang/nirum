@@ -37,6 +37,7 @@ import Nirum.Package.Metadata ( Metadata (Metadata, version)
                               , readFromPackage
                               , readMetadata
                               , stringField
+                              , versionField
                               )
 
 stripPrefix :: String -> String
@@ -174,6 +175,21 @@ spec =
             stringField "bar" table `shouldBe`
                 Left (FieldTypeError "bar" "string" "integer (1)")
             stringField "qux" table `shouldBe` Left (FieldError "qux")
+        specify "versionField" $ do
+            let Right table = parseTomlDoc "<string>"
+                                           [q|a = "1.0.0"
+                                              b = "1.2.3"
+                                              c = "1.0"
+                                              d = 1.0
+                                              e = "1.2.3.4"|]
+            versionField "a" table `shouldBe` Right (SV.version 1 0 0 [] [])
+            versionField "b" table `shouldBe` Right (SV.version 1 2 3 [] [])
+            versionField "c" table `shouldBe` Left (FieldValueError "c"
+                "expected a semver string (e.g. \"1.2.3\"), not \"1.0\"")
+            versionField "d" table `shouldBe`
+                Left (FieldTypeError "d" "string" "float (1.0)")
+            versionField "e" table `shouldBe` Left (FieldValueError "e"
+                "expected a semver string (e.g. \"1.2.3\"), not \"1.2.3.4\"")
   where
     parse :: Text -> Either MetadataError (Metadata DummyTarget)
     parse = parseMetadata "<string>"

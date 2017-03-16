@@ -59,15 +59,16 @@ import Nirum.Targets.Python ( Source (Source)
                             , addOptionalDependency
                             , compilePrimitiveType
                             , compileTypeExpression
+                            , insertLocalImport
+                            , insertStandardImport
+                            , insertThirdPartyImports
+                            , minimumRuntime
+                            , runCodeGen
                             , stringLiteral
                             , toAttributeName
                             , toClassName
                             , toNamePair
                             , unionInstallRequires
-                            , insertLocalImport
-                            , insertStandardImport
-                            , insertThirdPartyImports
-                            , runCodeGen
                             )
 
 codeGen :: a -> CodeGen a
@@ -89,7 +90,7 @@ makeDummySource' pathPrefix m =
                     , uri = Nothing
                     }
               ]
-        , target = Python "sample-package"
+        , target = Python "sample-package" minimumRuntime
         }
     pkg :: Package Python
     pkg = createPackage
