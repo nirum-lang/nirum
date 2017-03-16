@@ -31,6 +31,7 @@ module Nirum.Targets.Python ( Code
                             , insertStandardImport
                             , insertThirdPartyImports
                             , minimumRuntime
+                            , parseModulePath
                             , runCodeGen
                             , stringLiteral
                             , toAttributeName
@@ -61,7 +62,11 @@ import qualified Nirum.CodeGen as C
 import Nirum.CodeGen (Failure)
 import qualified Nirum.Constructs.DeclarationSet as DS
 import qualified Nirum.Constructs.Identifier as I
-import Nirum.Constructs.ModulePath (ModulePath, hierarchy, hierarchies)
+import Nirum.Constructs.ModulePath ( ModulePath
+                                   , fromIdentifiers
+                                   , hierarchy
+                                   , hierarchies
+                                   )
 import Nirum.Constructs.Name (Name (Name))
 import qualified Nirum.Constructs.Name as N
 import Nirum.Constructs.Service ( Method ( Method
@@ -995,6 +1000,13 @@ compilePackage' package =
     installRequires = foldl unionInstallRequires
                             (InstallRequires [] [])
                             [deps | (_, Right (deps, _)) <- modules']
+
+parseModulePath :: T.Text -> Maybe ModulePath
+parseModulePath string =
+    mapM I.fromText identTexts >>= fromIdentifiers
+  where
+    identTexts :: [T.Text]
+    identTexts = T.split (== '.') string
 
 instance Target Python where
     type CompileResult Python = Code

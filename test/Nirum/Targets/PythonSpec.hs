@@ -63,6 +63,7 @@ import Nirum.Targets.Python ( Source (Source)
                             , insertStandardImport
                             , insertThirdPartyImports
                             , minimumRuntime
+                            , parseModulePath
                             , runCodeGen
                             , stringLiteral
                             , toAttributeName
@@ -354,6 +355,18 @@ spec = parallel $ forM_ ([Python2, Python3] :: [PythonVersion]) $ \ ver -> do
                                                     , "foo.bar"
                                                     , "qux"
                                                     ]
+    specify "parseModulePath" $ do
+        parseModulePath "" `shouldBe` Nothing
+        parseModulePath "foo" `shouldBe` Just ["foo"]
+        parseModulePath "foo.bar" `shouldBe` Just ["foo", "bar"]
+        parseModulePath "foo.bar-baz" `shouldBe` Just ["foo", "bar-baz"]
+        parseModulePath "foo." `shouldBe` Nothing
+        parseModulePath "foo.bar." `shouldBe` Nothing
+        parseModulePath ".foo" `shouldBe` Nothing
+        parseModulePath ".foo.bar" `shouldBe` Nothing
+        parseModulePath "foo..bar" `shouldBe` Nothing
+        parseModulePath "foo.bar>" `shouldBe` Nothing
+        parseModulePath "foo.bar-" `shouldBe` Nothing
 
 
 {-# ANN module ("HLint: ignore Functor law" :: String) #-}
