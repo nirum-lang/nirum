@@ -202,6 +202,7 @@ spec =
                        bf = false
                        d = 2017-03-16T10:56:30Z
                        a0 = []
+                       a1 = ["foobar"]
                        a3 = ["foo", "bar", "baz"]
                        t0 = {}
                        t1 = { a = 1 }
@@ -222,6 +223,7 @@ spec =
             fieldType (get "bf") `shouldBe` "boolean (false)"
             fieldType (get "d") `shouldBe` "datetime (2017-03-16 10:56:30 UTC)"
             fieldType (get "a0") `shouldBe` "array of 0 values"
+            fieldType (get "a1") `shouldBe` "array of a value"
             fieldType (get "a3") `shouldBe` "array of 3 values"
             fieldType (get "t0") `shouldBe` "table of 0 items"
             fieldType (get "t1") `shouldBe` "table of an item"

@@ -215,7 +215,9 @@ fieldType (VFloat f) = [qq|float ($f)|]
 fieldType (VBoolean True) = "boolean (true)"
 fieldType (VBoolean False) = "boolean (false)"
 fieldType (VDatetime d) = [qq|datetime ($d)|]
-fieldType (VArray a) = [qq|array of {length a} values|]
+fieldType (VArray a) = if length a == 1
+                       then "array of a value"
+                       else [qq|array of {length a} values|]
 
 field :: MetadataField -> Table -> Either MetadataError Node
 field field' table =
