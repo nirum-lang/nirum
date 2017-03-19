@@ -302,6 +302,15 @@ toIndentedCodes :: (a -> T.Text) -> [a] -> T.Text -> T.Text
 toIndentedCodes f traversable concatenator =
     T.intercalate concatenator $ map f traversable
 
+toArgumentCode :: (ParameterName -> ParameterType -> Code)
+               -> [(T.Text, Code)]
+               -> Code
+toArgumentCode gen nameNTypes = toIndentedCodes (uncurry gen) nameNTypes ", "
+
+toInitialValueCode :: DS.DeclarationSet Field -> Code
+toInitialValueCode fields =
+    T.intercalate "\n        " $ toClassInitialValues $ toList fields
+
 quote :: T.Text -> T.Text
 quote s = [qq|'{s}'|]
 
@@ -424,9 +433,6 @@ compileUnionTag source parentname d@(Tag typename' fields _) = do
           where
             attributes :: T.Text
             attributes = toIndentedCodes (\ n -> [qq|self.{n}|]) tagNames ", "
-        initialArgs gen = toIndentedCodes (uncurry gen) nameNTypes ", "
-        initialValues =
-            toIndentedCodes (\ n -> [qq|self.{n} = {n}|]) tagNames "\n        "
         nameMaps = toIndentedCodes
             toNamePair
             (map fieldName $ toList fields)
@@ -452,8 +458,8 @@ class $className($parentClass):
         $nameMaps
     ])
 
-    def __init__(self, {initialArgs arg}){ ret "None" }:
-        $initialValues
+    def __init__(self, {toArgumentCode arg nameNTypes}){ ret "None" }:
+        {toInitialValueCode fields}
         validate_union_type(self)
 
     def __repr__(self){ ret "str" }:
@@ -652,9 +658,6 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
         slotTypes = toIndentedCodes
             (\ (n, t) -> [qq|'{n}': {t}|]) nameTypePairs ",\n        "
         slots = toIndentedCodes (\ n -> [qq|'{n}'|]) fieldNames ",\n        "
-        initialArgs gen = toIndentedCodes (uncurry gen) nameTypePairs ", "
-        initialValues = toIndentedCodes
-            (\ n -> [qq|self.{n} = {n}|]) fieldNames "\n        "
         nameMaps = toIndentedCodes
             toNamePair
             (map fieldName $ toList fields)
@@ -686,8 +689,8 @@ class $className(object):
         $nameMaps
     ])
 
-    def __init__(self, {initialArgs arg}){ret "None"}:
-        $initialValues
+    def __init__(self, {toArgumentCode arg nameNTypes}){ret "None"}:
+        {toInitialValueCode fields}
         validate_record_type(self)
 
     def __repr__(self){ret "bool"}:
