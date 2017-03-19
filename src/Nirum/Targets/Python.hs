@@ -82,6 +82,7 @@ import Nirum.Constructs.Service ( Method ( Method
                                 , Parameter (Parameter)
                                 , Service (Service)
                                 )
+import qualified Nirum.Constructs.TypeDeclaration as TD
 import Nirum.Constructs.TypeDeclaration ( EnumMember (EnumMember)
                                         , Field (Field, fieldName)
                                         , PrimitiveTypeIdentifier (..)
@@ -382,6 +383,28 @@ returnCompiler = do
     return $ \ r -> case ver of
                         Python2 -> ""
                         Python3 -> [qq| -> $r|]
+
+convertFieldToImmutable :: Field -> Code
+convertFieldToImmutable field =
+    [qq|self.{attributeName} = $attributeValue|]
+  where
+    fieldName' :: Name
+    fieldName' = fieldName field
+    fieldType' :: TypeExpression
+    fieldType' = TD.fieldType field
+    attributeName :: T.Text
+    attributeName = toAttributeName' fieldName'
+    attributeValue :: T.Text
+    attributeValue = case fieldType' of
+                         SetModifier _ -> [qq|frozenset($attributeName)|]
+                         ListModifier _ -> [qq|tuple($attributeName)|]
+                         _ -> attributeName
+
+toClassInitialValues :: [Field] -> [Code]
+toClassInitialValues fields =
+    [ [qq|self.{toAttributeName' n} = {convertFieldToImmutable field}|]
+    | field@Field {fieldName = n} <- fields
+    ]
 
 compileUnionTag :: Source -> Name -> Tag -> CodeGen Code
 compileUnionTag source parentname d@(Tag typename' fields _) = do

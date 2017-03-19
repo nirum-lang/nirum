@@ -67,6 +67,15 @@ union status = run
              | stop
              ;
 
+record song (
+  text name,
+);
+
+record album (
+  text name,
+  [song] tracks,
+);
+
 service null-service ();
 
 service ping-service (
@@ -76,4 +85,13 @@ service ping-service (
         text nonce,
         # Parameter docs.
     ),
+);
+
+record person (
+  irum first-name,
+  irum last-name,
+);
+
+record people (
+  {person} people
 );
