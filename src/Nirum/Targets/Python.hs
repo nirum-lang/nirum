@@ -302,10 +302,10 @@ toIndentedCodes :: (a -> T.Text) -> [a] -> T.Text -> T.Text
 toIndentedCodes f traversable concatenator =
     T.intercalate concatenator $ map f traversable
 
-toArgumentCode :: (ParameterName -> ParameterType -> Code)
+compileParameters :: (ParameterName -> ParameterType -> Code)
                -> [(T.Text, Code)]
                -> Code
-toArgumentCode gen nameNTypes = toIndentedCodes (uncurry gen) nameNTypes ", "
+compileParameters gen nameNTypes = toIndentedCodes (uncurry gen) nameNTypes ", "
 
 toInitialValueCode :: DS.DeclarationSet Field -> Code
 toInitialValueCode fields =
@@ -458,7 +458,7 @@ class $className($parentClass):
         $nameMaps
     ])
 
-    def __init__(self, {toArgumentCode arg nameNTypes}){ ret "None" }:
+    def __init__(self, {compileParameters arg nameNTypes}){ ret "None" }:
         {toInitialValueCode fields}
         validate_union_type(self)
 
@@ -689,7 +689,7 @@ class $className(object):
         $nameMaps
     ])
 
-    def __init__(self, {toArgumentCode arg nameNTypes}){ret "None"}:
+    def __init__(self, {compileParameters arg nameNTypes}){ret "None"}:
         {toInitialValueCode fields}
         validate_record_type(self)
 
