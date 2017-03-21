@@ -2,14 +2,19 @@ import fixture.foo.bar (path-unbox, point, int-unbox);
 import fixture.qux (path, name);
 
 unboxed float-unbox (float64);
+# Unboxed type docs.
+
 unboxed imported-type-unbox (path-unbox);
 unboxed way (path);
 
 type irum = name;
+# Type alias docs.
 
-enum gender = female/yeoseong
-            | male 
-            ;
+enum gender
+    # Enum docs.
+    = female/yeoseong
+    | male 
+    ;
 enum eva-char = soryu-asuka-langley
               | ayanami-rei
               | ikari-shinji
@@ -18,11 +23,14 @@ enum eva-char = soryu-asuka-langley
               ;
 
 record point1 (
+    # Record docs.
     bigint left/x,
+    # Record field docs.
     bigint top,
 );
 record point2 (
     int-unbox left,
+    # Record field docs.
     int-unbox top,
 );
 record point3d (
@@ -47,9 +55,14 @@ union mixed-name = western-name ( text first-name
                                    )
                  | culture-agnostic-name (text fullname)
                  ;
-union music = pop (text country)
-            | rnb/rhythm-and-ballad (text country)
-            ;
+union music
+    # Union docs.
+    = pop ( text country
+          # Tag field docs.
+          )
+    # Tag docs.
+    | rnb/rhythm-and-ballad (text country)
+    ;
 union status = run
              | stop
              ;
@@ -57,5 +70,10 @@ union status = run
 service null-service ();
 
 service ping-service (
-    bool ping (text nonce),
+    # Service docs.
+    bool ping (
+        # Method docs.
+        text nonce,
+        # Parameter docs.
+    ),
 );
