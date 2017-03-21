@@ -13,7 +13,9 @@ import qualified Data.Text as T
 
 import Nirum.Constructs (Construct (toCode))
 import Nirum.Constructs.Annotation (AnnotationSet, empty, lookupDocs)
-import Nirum.Constructs.Declaration (Declaration (annotations, name), docs)
+import Nirum.Constructs.Declaration ( Declaration (annotations, name)
+                                    , Documented (docs)
+                                    )
 import Nirum.Constructs.Docs (Docs, toCodeWithPrefix)
 import Nirum.Constructs.DeclarationSet (DeclarationSet, toList)
 import Nirum.Constructs.Name (Name)
@@ -31,6 +33,8 @@ instance Construct Parameter where
                  , ","
                  , toCodeWithPrefix "\n" (docs p)
                  ]
+
+instance Documented Parameter
 
 instance Declaration Parameter where
     name (Parameter name' _ _) = name'
@@ -85,6 +89,8 @@ instance Construct Method where
                         , T.intercalate "\n" $ map indentedCode p
                         , "\n"
                         ]
+
+instance Documented Method
 
 instance Declaration Method where
     name = methodName

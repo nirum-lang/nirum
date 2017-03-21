@@ -9,7 +9,7 @@ import Test.Hspec.Meta
 import Nirum.Constructs (Construct (..))
 import qualified Nirum.Constructs.Annotation as A
 import Nirum.Constructs.Annotation (AnnotationSet)
-import Nirum.Constructs.Declaration (Declaration (..))
+import Nirum.Constructs.Declaration (Declaration (..), Documented)
 import Nirum.Constructs.DeclarationSet ( DeclarationSet
                                        , NameDuplication (..)
                                        , empty
@@ -27,6 +27,8 @@ data SampleDecl = SampleDecl Name AnnotationSet deriving (Eq, Ord, Show)
 
 instance Construct SampleDecl where
     toCode _ = "(do not impl)"
+
+instance Documented SampleDecl
 
 instance Declaration SampleDecl where
     name (SampleDecl name' _) = name'
