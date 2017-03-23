@@ -20,6 +20,7 @@ module Nirum.Targets.Python ( Code
                             , PythonVersion ( Python2
                                             , Python3
                                             )
+                            , RenameMap
                             , addDependency
                             , addOptionalDependency
                             , compileModule
@@ -30,6 +31,9 @@ module Nirum.Targets.Python ( Code
                             , insertLocalImport
                             , insertStandardImport
                             , insertThirdPartyImports
+                            , minimumRuntime
+                            , parseModulePath
+                            , renameModulePath
                             , runCodeGen
                             , stringLiteral
                             , toAttributeName
@@ -47,6 +51,7 @@ import Data.Typeable (Typeable)
 import GHC.Exts (IsList (toList))
 import Text.Printf (printf)
 
+import qualified Data.HashMap.Strict as HM
 import qualified Data.Map.Strict as M
 import qualified Data.SemVer as SV
 import qualified Data.Set as S
@@ -59,12 +64,13 @@ import Text.InterpolatedString.Perl6 (q, qq)
 import qualified Nirum.CodeGen as C
 import Nirum.CodeGen (Failure)
 import qualified Nirum.Constructs.DeclarationSet as DS
-import Nirum.Constructs.Identifier ( Identifier
-                                   , toPascalCaseText
-                                   , toSnakeCaseText
-                                   , toString
+import qualified Nirum.Constructs.Identifier as I
+import Nirum.Constructs.ModulePath ( ModulePath
+                                   , fromIdentifiers
+                                   , hierarchy
+                                   , hierarchies
+                                   , replacePrefix
                                    )
-import Nirum.Constructs.ModulePath (ModulePath, hierarchy, hierarchies)
 import Nirum.Constructs.Name (Name (Name))
 import qualified Nirum.Constructs.Name as N
 import Nirum.Constructs.Service ( Method ( Method
@@ -103,7 +109,12 @@ import Nirum.Package ( BoundModule
                      , types
                      )
 import Nirum.Package.Metadata ( Author (Author, name, email)
-                              , Metadata (authors, target, version)
+                              , Metadata (Metadata, authors, target, version)
+                              , MetadataError ( FieldError
+                                              , FieldTypeError
+                                              , FieldValueError
+                                              )
+                              , Node (VString)
                               , Target ( CompileError
                                        , CompileResult
                                        , compilePackage
@@ -112,13 +123,22 @@ import Nirum.Package.Metadata ( Author (Author, name, email)
                                        , targetName
                                        , toByteString
                                        )
+                              , fieldType
                               , stringField
+                              , tableField
+                              , versionField
                               )
 import qualified Nirum.Package.ModuleSet as MS
 
-newtype Python = Python { packageName :: T.Text
-                        } deriving (Eq, Ord, Show, Typeable)
+minimumRuntime :: SV.Version
+minimumRuntime = SV.version 0 3 9 [] []
 
+data Python = Python { packageName :: T.Text
+                     , minimumRuntimeVersion :: SV.Version
+                     , renames :: RenameMap
+                     } deriving (Eq, Ord, Show, Typeable)
+
+type RenameMap = M.Map ModulePath ModulePath
 type Package' = Package Python
 type CompileError' = T.Text
 
@@ -181,8 +201,9 @@ insertLocalImport module' object = ST.modify insert'
     insert' c@CodeGenContext { localImports = li } =
         c { localImports = M.insertWith S.union module' [object] li }
 
-insertTypingImport :: CodeGen ()
-insertTypingImport = do
+
+importTypingForPython3 :: CodeGen ()
+importTypingForPython3 = do
     pyVer <- getPythonVersion
     case pyVer of
         Python2 -> return ()
@@ -193,6 +214,21 @@ insertEnumImport = insertStandardImport "enum"
 
 getPythonVersion :: CodeGen PythonVersion
 getPythonVersion = fmap pythonVersion ST.get
+
+renameModulePath :: RenameMap -> ModulePath -> ModulePath
+renameModulePath renameMap path' =
+    rename (M.toDescList renameMap)
+    -- longest paths should be processed first
+  where
+    rename :: [(ModulePath, ModulePath)] -> ModulePath
+    rename ((from, to) : xs) = let r = replacePrefix from to path'
+                               in if r == path'
+                                  then rename xs
+                                  else r
+    rename [] = path'
+
+renameMP :: Python -> ModulePath -> ModulePath
+renameMP Python { renames = table } = renameModulePath table
 
 -- | The set of Python reserved keywords.
 -- See also: https://docs.python.org/3/reference/lexical_analysis.html#keywords
@@ -205,34 +241,41 @@ keywords = [ "False", "None", "True"
            , "return", "try", "while", "with", "yield"
            ]
 
-toClassName :: Identifier -> T.Text
+toClassName :: I.Identifier -> T.Text
 toClassName identifier =
     if className `S.member` keywords then className `T.snoc` '_' else className
   where
     className :: T.Text
-    className = toPascalCaseText identifier
+    className = I.toPascalCaseText identifier
 
 toClassName' :: Name -> T.Text
 toClassName' = toClassName . N.facialName
 
-toAttributeName :: Identifier -> T.Text
+toAttributeName :: I.Identifier -> T.Text
 toAttributeName identifier =
     if attrName `S.member` keywords then attrName `T.snoc` '_' else attrName
   where
     attrName :: T.Text
-    attrName = toSnakeCaseText identifier
+    attrName = I.toSnakeCaseText identifier
 
 toAttributeName' :: Name -> T.Text
 toAttributeName' = toAttributeName . N.facialName
 
-toImportPath :: ModulePath -> T.Text
-toImportPath = T.intercalate "." . map toAttributeName . toList
+toImportPath' :: ModulePath -> T.Text
+toImportPath' = T.intercalate "." . map toAttributeName . toList
 
-toImportPaths :: S.Set ModulePath -> [T.Text]
-toImportPaths paths = S.toAscList $ S.map toImportPath $ hierarchies paths
+toImportPath :: Python -> ModulePath -> T.Text
+toImportPath target' = toImportPath' . renameMP target'
+
+toImportPaths :: Python -> S.Set ModulePath -> [T.Text]
+toImportPaths target' paths =
+    S.toAscList $ S.map toImportPath' $ hierarchies renamedPaths
+  where
+    renamedPaths :: S.Set ModulePath
+    renamedPaths = S.map (renameMP target') paths
 
 toNamePair :: Name -> T.Text
-toNamePair (Name f b) = [qq|('{toAttributeName f}', '{toSnakeCaseText b}')|]
+toNamePair (Name f b) = [qq|('{toAttributeName f}', '{I.toSnakeCaseText b}')|]
 
 stringLiteral :: T.Text -> T.Text
 stringLiteral string =
@@ -261,11 +304,12 @@ quote s = [qq|'{s}'|]
 
 typeReprCompiler :: CodeGen (Code -> Code)
 typeReprCompiler = do
-    insertTypingImport
     ver <- getPythonVersion
-    return $ case ver of
-        Python2 -> \ t -> [qq|($t.__module__ + '.' + $t.__name__)|]
-        Python3 -> \ t -> [qq|typing._type_repr($t)|]
+    case ver of
+        Python2 -> return $ \ t -> [qq|($t.__module__ + '.' + $t.__name__)|]
+        Python3 -> do
+            insertStandardImport "typing"
+            return $ \ t -> [qq|typing._type_repr($t)|]
 
 type ParameterName = Code
 type ParameterType = Code
@@ -315,7 +359,6 @@ compileUnionTag source parentname typename' fields = do
             (map fieldName $ toList fields)
             ",\n        "
         parentClass = toClassName' parentname
-    insertTypingImport
     insertThirdPartyImports [ ("nirum.validate", ["validate_union_type"])
                             , ("nirum.constructs", ["name_dict_type"])
                             ]
@@ -390,22 +433,28 @@ compilePrimitiveType primitiveTypeIdentifier = do
         (Uri, Python3) -> return "str"
 
 compileTypeExpression :: Source -> TypeExpression -> CodeGen Code
-compileTypeExpression Source { sourceModule = boundModule } (TypeIdentifier i) =
+compileTypeExpression Source { sourcePackage = Package { metadata = meta }
+                             , sourceModule = boundModule
+                             }
+                      (TypeIdentifier i) =
     case lookupType i boundModule of
-        Missing -> fail $ "undefined identifier: " ++ toString i
+        Missing -> fail $ "undefined identifier: " ++ I.toString i
         Imported _ (PrimitiveType p _) -> compilePrimitiveType p
         Imported m _ -> do
-            insertThirdPartyImports [(toImportPath m, [toClassName i])]
+            insertThirdPartyImports [(toImportPath target' m, [toClassName i])]
             return $ toClassName i
         Local _ -> return $ toClassName i
+  where
+    target' :: Python
+    target' = target meta
 compileTypeExpression source (MapModifier k v) = do
     kExpr <- compileTypeExpression source k
     vExpr <- compileTypeExpression source v
-    insertTypingImport
+    insertStandardImport "typing"
     return [qq|typing.Mapping[$kExpr, $vExpr]|]
 compileTypeExpression source modifier = do
     expr <- compileTypeExpression source typeExpr
-    insertTypingImport
+    insertStandardImport "typing"
     return [qq|typing.$className[$expr]|]
   where
     typeExpr :: TypeExpression
@@ -431,7 +480,6 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
                                            , type' = UnboxedType itype } = do
     let className = toClassName' typename'
     itypeExpr <- compileTypeExpression src itype
-    insertTypingImport
     insertThirdPartyImports [ ("nirum.validate", ["validate_boxed_type"])
                             , ("nirum.serialize", ["serialize_boxed_type"])
                             , ("nirum.deserialize", ["deserialize_boxed_type"])
@@ -482,7 +530,7 @@ compileTypeDeclaration _ TypeDeclaration { typename = typename'
     let className = toClassName' typename'
         memberNames = T.intercalate
             "\n    "
-            [ [qq|{toAttributeName' memberName} = '{toSnakeCaseText bn}'|]
+            [ [qq|{toAttributeName' memberName} = '{I.toSnakeCaseText bn}'|]
             | EnumMember memberName@(Name _ bn) _ <- toList members
             ]
     insertEnumImport
@@ -524,7 +572,7 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
             (map fieldName $ toList fields)
             ",\n        "
         hashText = toIndentedCodes (\ n -> [qq|self.{n}|]) fieldNames ", "
-    insertTypingImport
+    importTypingForPython3
     insertThirdPartyImports [ ("nirum.validate", ["validate_record_type"])
                             , ("nirum.serialize", ["serialize_record_type"])
                             , ("nirum.deserialize", ["deserialize_record_type"])
@@ -541,7 +589,9 @@ class $className(object):
     __slots__ = (
         $slots,
     )
-    __nirum_record_behind_name__ = '{toSnakeCaseText $ N.behindName typename'}'
+    __nirum_record_behind_name__ = (
+        '{I.toSnakeCaseText $ N.behindName typename'}'
+    )
     __nirum_field_types__ = \{
         $slotTypes
     \}
@@ -586,7 +636,7 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
         fieldCodes' = T.intercalate "\n\n" fieldCodes
         enumMembers = toIndentedCodes
             (\ (t, b) -> [qq|$t = '{b}'|]) enumMembers' "\n        "
-    insertTypingImport
+    importTypingForPython3
     insertEnumImport
     insertThirdPartyImports [ ("nirum.serialize", ["serialize_union_type"])
                             , ("nirum.deserialize", ["deserialize_union_type"])
@@ -598,7 +648,7 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
     return [qq|
 class $className(object):
 
-    __nirum_union_behind_name__ = '{toSnakeCaseText $ N.behindName typename'}'
+    __nirum_union_behind_name__ = '{I.toSnakeCaseText $ N.behindName typename'}'
     __nirum_field_names__ = name_dict_type([
         $nameMaps
     ])
@@ -632,7 +682,7 @@ $fieldCodes'
                      ]
     enumMembers' :: [(T.Text, T.Text)]
     enumMembers' = [ ( toAttributeName' tagName
-                     , toSnakeCaseText $ N.behindName tagName
+                     , I.toSnakeCaseText $ N.behindName tagName
                      )
                    | (Tag tagName _ _) <- toList tags
                    ]
@@ -900,13 +950,15 @@ setup(
     package_dir=\{'': SOURCE_ROOT},
     packages=[$pPackages],
     provides=[$pPackages],
-    requires=[$pInstallRequires],
+    requires=[$pRequires],
     setup_requires=setup_requires,
     install_requires=install_requires,
     extras_require=extras_require,
 )
 |]
   where
+    target' :: Python
+    target' = target metadata'
     csStrings :: [T.Text] -> T.Text
     csStrings [] = "None"
     csStrings s = stringLiteral $ T.intercalate ", " s
@@ -923,9 +975,18 @@ setup(
                             | Author { email = Just e } <- authors metadata'
                             ]
     pPackages :: Code
-    pPackages = strings $ toImportPaths $ MS.keysSet $ modules package
+    pPackages = strings $ toImportPaths target' $ MS.keysSet $ modules package
+    runtimeVer :: SV.Version
+    runtimeVer = minimumRuntimeVersion $ target metadata'
+    pRequires :: Code
+    pRequires = strings $ S.toList deps
     pInstallRequires :: Code
-    pInstallRequires = strings $ S.toList deps
+    pInstallRequires = strings
+        [ case p of
+              "nirum" -> [qq|nirum >= {SV.toText runtimeVer}|]
+              p' -> p'
+        | p <- S.toList deps
+        ]
     pPolyfillRequires :: Code
     pPolyfillRequires = T.intercalate ", "
         [ [qq|($major, $minor): [{strings $ S.toList deps'}]|]
@@ -939,7 +1000,7 @@ recursive-include src-py2 *.py
 
 compilePackage' :: Package'
                 -> M.Map FilePath (Either CompileError' Code)
-compilePackage' package =
+compilePackage' package@Package { metadata = Metadata { target = target' } } =
     M.fromList $
         initFiles ++
         [ ( f
@@ -955,7 +1016,7 @@ compilePackage' package =
   where
     toPythonFilename :: ModulePath -> [FilePath]
     toPythonFilename mp = [ T.unpack (toAttributeName i)
-                          | i <- toList mp
+                          | i <- toList $ renameMP target' mp
                           ] ++ ["__init__.py"]
     versions :: [PythonVersion]
     versions = [Python2, Python3]
@@ -982,13 +1043,42 @@ compilePackage' package =
                             (InstallRequires [] [])
                             [deps | (_, Right (deps, _)) <- modules']
 
+parseModulePath :: T.Text -> Maybe ModulePath
+parseModulePath string =
+    mapM I.fromText identTexts >>= fromIdentifiers
+  where
+    identTexts :: [T.Text]
+    identTexts = T.split (== '.') string
+
 instance Target Python where
     type CompileResult Python = Code
     type CompileError Python = CompileError'
     targetName _ = "python"
     parseTarget table = do
         name' <- stringField "name" table
-        return Python { packageName = name' }
+        minRuntime <- case versionField "minimum_runtime" table of
+            Left (FieldError _) -> Right minimumRuntime
+            otherwise' -> otherwise'
+        renameTable <- case tableField "renames" table of
+            Right t -> Right t
+            Left (FieldError _) -> Right HM.empty
+            otherwise' -> otherwise'
+        renamePairs <- sequence
+            [ case (parseModulePath k, v) of
+                  (Just modulePath', VString v') -> case parseModulePath v' of
+                      Just altPath -> Right (modulePath', altPath)
+                      Nothing -> Left $ FieldValueError [qq|renames.$k|]
+                          [qq|expected a module path, not "$v'"|]
+                  (Nothing, _) -> Left $ FieldValueError [qq|renams.$k|]
+                      [qq|expected a module path as a key, not "$k"|]
+                  _ -> Left $ FieldTypeError [qq|renames.$k|] "string" $
+                                             fieldType v
+            | (k, v) <- HM.toList renameTable
+            ]
+        return Python { packageName = name'
+                      , minimumRuntimeVersion = max minRuntime minimumRuntime
+                      , renames = M.fromList renamePairs
+                      }
     compilePackage = compilePackage'
     showCompileError _ e = e
     toByteString _ = encodeUtf8

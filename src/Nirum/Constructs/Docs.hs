@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Nirum.Constructs.Docs ( Docs (Docs)
                              , annotationDocsName
+                             , title
+                             , toBlock
                              , toCode
                              , toCodeWithPrefix
                              , toText
@@ -12,12 +14,24 @@ import qualified Data.Text as T
 
 import Nirum.Constructs (Construct (toCode))
 import Nirum.Constructs.Identifier (Identifier)
+import Nirum.Docs (Block (Document, Heading), parse)
 
 annotationDocsName :: Identifier
 annotationDocsName = "docs"
 
 -- | Docstring for constructs.
 newtype Docs = Docs T.Text deriving (Eq, Ord, Show)
+
+-- | Convert the docs to a tree.
+toBlock :: Docs -> Block
+toBlock (Docs docs') = parse docs'
+
+-- | Gets the heading title of the module if it has any title.
+title :: Docs -> Maybe Block
+title docs =
+    case toBlock docs of
+        Document (firstBlock@Heading {} : _) -> Just firstBlock
+        _ -> Nothing
 
 -- | Convert the docs to text.
 toText :: Docs -> T.Text

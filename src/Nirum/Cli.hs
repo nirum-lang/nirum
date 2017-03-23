@@ -1,29 +1,17 @@
-{-# LANGUAGE ExtendedDefaultRules, QuasiQuotes, DeriveDataTypeable #-}
+{-# LANGUAGE ExtendedDefaultRules, QuasiQuotes #-}
 module Nirum.Cli (main, writeFiles) where
 
 import Control.Monad (forM_)
 import GHC.Exts (IsList (toList))
-import System.IO.Error (catchIOError, ioeGetErrorString)
 
 import qualified Data.ByteString as B
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
-import System.Console.CmdArgs.Implicit ( Data
-                                       , Typeable
-                                       , argPos
-                                       , cmdArgs
-                                       , explicit
-                                       , help
-                                       , name
-                                       , program
-                                       , summary
-                                       , typ
-                                       , typDir
-                                       , (&=)
-                                       )
-import System.Console.CmdArgs.Default (def)
+import Data.Monoid ((<>))
+import qualified Options.Applicative as OPT
 import System.Directory (createDirectoryIfMissing)
+import System.Exit (die)
 import System.FilePath (takeDirectory, (</>))
 import Text.InterpolatedString.Perl6 (qq)
 import Text.Megaparsec (Token)
@@ -55,11 +43,6 @@ import Nirum.Targets ( BuildError (CompileError, PackageError, TargetNameError)
                      , targetNames
                      )
 import Nirum.Version (versionString)
-
-data NirumCli = NirumCli { sourcePath :: FilePath
-                         , objectPath :: FilePath
-                         , targetName :: TargetName
-                         } deriving (Show, Data, Typeable)
 
 parseErrortoPrettyMessage :: ParseError (Token T.Text) Dec
                           -> FilePath
@@ -127,28 +110,15 @@ importErrorsToPrettyMessage importErrors =
     withListStyleText =
         map (T.append "- ") (importErrorsToMessageList importErrors)
 
-nirumCli :: NirumCli
-nirumCli = NirumCli
-    { objectPath = def &= explicit
-          &= name "o" &= name "output-dir" &= typDir
-          &= help "The directory to place object files"
-    , targetName = "python" &= explicit
-          &= name "t" &= name "target" &= typ "TARGET"
-          &= help ("The target language.  Available targets: " ++
-                   T.unpack targetNamesText)
-    , sourcePath = def &= argPos 1 &= typDir
-    } &= program "nirum" &= summary ("Nirum Compiler " ++ versionString)
-
 targetNamesText :: T.Text
 targetNamesText = T.intercalate ", " $ S.toAscList targetNames
 
-main' :: IO ()
-main' = do
-    NirumCli src outDir target <- cmdArgs nirumCli
+runCli :: FilePath -> FilePath -> TargetName -> IO ()
+runCli src outDir target = do
     result <- buildPackage target src
     case result of
         Left (TargetNameError targetName') ->
-            putStrLn [qq|$targetName': No such target.
+            die [qq|Couldn't find "$targetName'" target.
 Available targets: $targetNamesText|]
         Left (PackageError (ParseError modulePath error')) -> do
             {- FIXME: find more efficient way to determine filename from
@@ -157,19 +127,19 @@ Available targets: $targetNamesText|]
             case M.lookup modulePath filePaths of
                 Just filePath' -> do
                     m <- parseErrortoPrettyMessage error' filePath'
-                    putStrLn m
-                Nothing -> putStrLn [qq|$modulePath not found|]
+                    die m
+                Nothing -> die [qq|$modulePath not found|]
         Left (PackageError (ImportError importErrors)) ->
-            putStrLn [qq|Import error:
+            die [qq|Import error:
 {importErrorsToPrettyMessage importErrors}
 |]
         Left (PackageError (ScanError _ error')) ->
-            putStrLn [qq|Scan error: $error'|]
+            die [qq|Scan error: $error'|]
         Left (PackageError (MetadataError error')) ->
-            putStrLn [qq|Metadata error: $error'|]
+            die [qq|Metadata error: $error'|]
         Left (CompileError errors) ->
             forM_ (M.toList errors) $ \ (filePath, compileError) ->
-                putStrLn [qq|error: $filePath: $compileError|]
+                die [qq|error: $filePath: $compileError|]
         Right buildResult -> writeFiles outDir buildResult
 
 writeFiles :: FilePath -> BuildResult -> IO ()
@@ -180,5 +150,40 @@ writeFiles outDir files =
         putStrLn outPath
         B.writeFile outPath code
 
+data Opts = Opts { outDirectory :: !String
+                 , targetOption :: !String
+                 , packageDirectory :: !String
+                 }
+
 main :: IO ()
-main = catchIOError main' $ putStrLn . ioeGetErrorString
+main = do
+    opts <- OPT.execParser optsParser
+    let packageDirectoryPath = packageDirectory opts
+        outDirectoryPath = outDirectory opts
+        targetName = T.pack $ targetOption opts
+    runCli packageDirectoryPath outDirectoryPath targetName
+  where
+    optsParser :: OPT.ParserInfo Opts
+    optsParser =
+        OPT.info
+            (OPT.helper <*> versionOption <*> programOptions)
+            (OPT.fullDesc <>
+             OPT.progDesc ("Nirum compiler " ++ versionString) <>
+             OPT.header header)
+    header :: String
+    header = "Nirum: The IDL compiler and RPC/distributed object framework"
+    versionOption :: OPT.Parser (Opts -> Opts)
+    versionOption = OPT.infoOption
+        versionString (OPT.long "version" <>
+                       OPT.short 'v' <> OPT.help "Show version")
+    programOptions :: OPT.Parser Opts
+    programOptions =
+        Opts <$> OPT.strOption
+            (OPT.long "output-dir" <> OPT.short 'o' <> OPT.metavar "DIR" <>
+             OPT.help "Output directory") <*>
+        OPT.strOption
+            (OPT.long "target" <> OPT.short 't' <> OPT.metavar "TARGET" <>
+             OPT.help [qq|Target language name.
+                          Available: $targetNamesText|]) <*>
+        OPT.strArgument
+            (OPT.metavar "DIR" <> OPT.help "Package directory")

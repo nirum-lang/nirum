@@ -40,11 +40,14 @@ library
                  ,     Nirum.Constructs.Service
                  ,     Nirum.Constructs.TypeDeclaration
                  ,     Nirum.Constructs.TypeExpression
+                 ,     Nirum.Docs
+                 ,     Nirum.Docs.Html
                  ,     Nirum.Package
                  ,     Nirum.Package.Metadata
                  ,     Nirum.Package.ModuleSet
                  ,     Nirum.Parser
                  ,     Nirum.Targets
+                 ,     Nirum.Targets.Docs
                  ,     Nirum.Targets.JavaScript
                  ,     Nirum.Targets.List
                  ,     Nirum.Targets.Python
@@ -52,9 +55,11 @@ library
   build-depends:       aeson                    >=1.0.2   && <2
                ,       aeson-pretty             >=0.8     && <0.9
                ,       base                     >=4.7     && <5
+               ,       blaze-html               >=0.8.1.3 && <0.9
+               ,       blaze-markup             >=0.7.1.1 && <0.8
                ,       bytestring
+               ,       cmark                    >=0.5     && <0.6
                ,       containers               >=0.5.6.2 && <0.6
-               ,       cmdargs                  >=0.10.14 && <0.11
                ,       directory                >=1.2.5   && <1.4
                ,       email-validate           >=2.0.0   && <3.0.0
                ,       filepath                 >=1.4     && <1.5
@@ -62,10 +67,12 @@ library
                ,       interpolatedstring-perl6 >=1.0.0   && <1.1.0
                ,       megaparsec               >=5       && <5.3
                ,       mtl                      >=2.2.1   && <3
+               ,       optparse-applicative     >=0.13.1  && <0.14
                ,       parsec
                        -- only for dealing with htoml's ParserError
                ,       pretty                   >=1.1.3   && <2
                ,       semver                   >=0.3.0   && <1.0
+               ,       shakespeare              >=2.0.12  && <2.1
                ,       template-haskell         >=2.11    && <3
                ,       text                     >=0.9.1.0 && <1.3
                ,       unordered-containers
@@ -114,12 +121,15 @@ test-suite spec
                ,       Nirum.Constructs.ServiceSpec
                ,       Nirum.Constructs.TypeDeclarationSpec
                ,       Nirum.Constructs.TypeExpressionSpec
+               ,       Nirum.DocsSpec
+               ,       Nirum.Docs.HtmlSpec
                ,       Nirum.Package.MetadataSpec
                ,       Nirum.Package.ModuleSetSpec
                ,       Nirum.PackageSpec
                ,       Nirum.ParserSpec
                ,       Nirum.Targets.JavaScriptSpec
                ,       Nirum.Targets.PythonSpec
+               ,       Nirum.Targets.DocsSpec
                ,       Nirum.TargetsSpec
                ,       Nirum.VersionSpec
                ,       Util
@@ -151,6 +161,7 @@ test-suite spec
                ,       string-qq                >=0.0.2   && <0.1.0
                ,       temporary                >=1.2     && <1.3
                ,       text
+               ,       unordered-containers
   ghc-options:         -Wall -Werror
                        -fno-warn-incomplete-uni-patterns
                        -fno-warn-missing-signatures

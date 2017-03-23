@@ -14,6 +14,7 @@ import Nirum.Constructs.ModulePath ( ModulePath (ModuleName, ModulePath)
                                    , hierarchies
                                    , fromFilePath
                                    , fromIdentifiers
+                                   , replacePrefix
                                    )
 
 spec :: Spec
@@ -61,6 +62,25 @@ spec =
                 , ["tar"]
                 , ["tar", "gz"]
                 ]
+        specify "replacePrefix" $ do
+            replacePrefix ["foo"] ["qux"] ["foo"] `shouldBe` ["qux"]
+            replacePrefix ["foo"] ["qux"] ["foo", "bar"] `shouldBe`
+                ["qux", "bar"]
+            replacePrefix ["foo"] ["qux"] ["bar", "foo"] `shouldBe`
+                ["bar", "foo"]
+            replacePrefix ["foo"] ["qux", "quz"] ["foo"] `shouldBe`
+                ["qux", "quz"]
+            replacePrefix ["foo"] ["qux", "quz"] ["foo", "bar"] `shouldBe`
+                ["qux", "quz", "bar"]
+            replacePrefix ["foo"] ["qux", "quz"] ["bar", "foo"] `shouldBe`
+                ["bar", "foo"]
+            replacePrefix ["foo", "bar"] ["qux"] ["foo"] `shouldBe` ["foo"]
+            replacePrefix ["foo", "bar"] ["qux"] ["foo", "bar"] `shouldBe`
+                ["qux"]
+            replacePrefix ["foo", "bar"] ["qux"] ["foo", "bar", "baz"]
+                `shouldBe` ["qux", "baz"]
+            replacePrefix ["foo", "bar"] ["qux"] ["bar", "foo"] `shouldBe`
+                ["bar", "foo"]
         context "Construct" $
             specify "toCode" $ do
                 toCode foo `shouldBe` "foo"

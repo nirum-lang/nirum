@@ -30,6 +30,7 @@ module Nirum.Package.Metadata ( Author (Author, email, name, uri)
                                        )
                               , TargetName
                               , VTArray
+                              , fieldType
                               , metadataFilename
                               , metadataPath
                               , parseMetadata
@@ -39,6 +40,7 @@ module Nirum.Package.Metadata ( Author (Author, email, name, uri)
                               , readMetadata
                               , stringField
                               , tableField
+                              , versionField
                               ) where
 
 import Data.Proxy (Proxy (Proxy))
@@ -170,8 +172,11 @@ parseMetadata metadataPath' tomlText = do
         Right t -> Right t
     version' <- versionField "version" table
     authors' <- authorsField "authors" table
-    targets <- tableField "targets" table
+    targets <- case tableField "targets" table of
+        Left (FieldError _) -> Right HM.empty
+        otherwise' -> otherwise'
     targetTable <- case tableField targetName' targets of
+        Left (FieldError _) -> Right HM.empty
         Left e -> Left $ prependMetadataErrorField "targets" e
         otherwise' -> otherwise'
     target' <- case parseTarget targetTable of
@@ -198,18 +203,21 @@ readFromPackage :: Target t
                 => FilePath -> IO (Either MetadataError (Metadata t))
 readFromPackage = readMetadata . metadataPath
 
-printNode :: Node -> MetadataFieldType
-printNode (VTable t) = if length t == 1
+-- | Show the typename of the given 'Node'.
+fieldType :: Node -> MetadataFieldType
+fieldType (VTable t) = if length t == 1
                        then "table of an item"
                        else [qq|table of {length t} items|]
-printNode (VTArray a) = [qq|array of {length a} tables|]
-printNode (VString s) = [qq|string ($s)|]
-printNode (VInteger i) = [qq|integer ($i)|]
-printNode (VFloat f) = [qq|float ($f)|]
-printNode (VBoolean True) = "boolean (true)"
-printNode (VBoolean False) = "boolean (false)"
-printNode (VDatetime d) = [qq|datetime ($d)|]
-printNode (VArray a) = [qq|array of {length a} values|]
+fieldType (VTArray a) = [qq|array of {length a} tables|]
+fieldType (VString s) = [qq|string ($s)|]
+fieldType (VInteger i) = [qq|integer ($i)|]
+fieldType (VFloat f) = [qq|float ($f)|]
+fieldType (VBoolean True) = "boolean (true)"
+fieldType (VBoolean False) = "boolean (false)"
+fieldType (VDatetime d) = [qq|datetime ($d)|]
+fieldType (VArray a) = if length a == 1
+                       then "array of a value"
+                       else [qq|array of {length a} values|]
 
 field :: MetadataField -> Table -> Either MetadataError Node
 field field' table =
@@ -226,7 +234,7 @@ typedField typename match field' table = do
     node <- field field' table
     case match node of
         Just value -> return value
-        Nothing -> Left $ FieldTypeError field' typename $ printNode node
+        Nothing -> Left $ FieldTypeError field' typename $ fieldType node
 
 optional :: Either MetadataError a -> Either MetadataError (Maybe a)
 optional (Right value) = Right $ Just value

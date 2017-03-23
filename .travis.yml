@@ -1,3 +1,5 @@
+dist: trusty
+sudo: false
 language: c
 matrix:
   include:
@@ -11,6 +13,7 @@ matrix:
         - python2.7
         - python3.4
         - python3.5
+        - python3.6
         - libgmp10
         - upx-ucl
 cache:
@@ -43,9 +46,9 @@ install:
     pip install --user --upgrade tox pip setuptools
   fi
 - travis_long stack --no-terminal setup
-- travis_long stack --no-terminal install scan
+- travis_long stack --no-terminal install scan -j4
 script:
-- stack --no-terminal test
+- stack --no-terminal test -j4
 - ./lint.sh
 - ./test.sh
 before_deploy:

@@ -8,7 +8,6 @@ import Data.Maybe (fromJust)
 
 import qualified Data.Map.Strict as M
 import qualified Data.SemVer as SV
-import Data.Set (Set, union)
 import System.FilePath ((</>))
 import Test.Hspec.Meta
 import Text.Email.Validate (emailAddress)
@@ -36,7 +35,7 @@ import Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
                                                         , TypeIdentifier
                                                         )
                                        )
-import Nirum.Package (Package (modules), resolveBoundModule)
+import Nirum.Package (Package (metadata, modules), resolveBoundModule)
 import Nirum.Package.Metadata ( Author (Author, email, name, uri)
                               , Metadata (Metadata, authors, target, version)
                               , Target (compilePackage)
@@ -45,7 +44,6 @@ import qualified Nirum.Package.ModuleSet as MS
 import Nirum.PackageSpec (createPackage)
 import qualified Nirum.Targets.Python as PY
 import Nirum.Targets.Python ( Source (Source)
-                            , Code
                             , CodeGen
                             , CodeGenContext ( localImports
                                              , standardImports
@@ -57,26 +55,30 @@ import Nirum.Targets.Python ( Source (Source)
                                               )
                             , Python (Python)
                             , PythonVersion (Python2, Python3)
+                            , RenameMap
                             , addDependency
                             , addOptionalDependency
                             , compilePrimitiveType
                             , compileTypeExpression
+                            , insertLocalImport
+                            , insertStandardImport
+                            , insertThirdPartyImports
+                            , minimumRuntime
+                            , parseModulePath
+                            , renameModulePath
+                            , runCodeGen
                             , stringLiteral
                             , toAttributeName
                             , toClassName
                             , toNamePair
                             , unionInstallRequires
-                            , insertLocalImport
-                            , insertStandardImport
-                            , insertThirdPartyImports
-                            , runCodeGen
                             )
 
 codeGen :: a -> CodeGen a
 codeGen = return
 
-makeDummySource' :: [Identifier] -> Module -> Source
-makeDummySource' pathPrefix m =
+makeDummySource' :: [Identifier] -> Module -> RenameMap -> Source
+makeDummySource' pathPrefix m renames =
     Source pkg $ fromJust $ resolveBoundModule ["foo"] pkg
   where
     mp :: [Identifier] -> ModulePath
@@ -91,7 +93,7 @@ makeDummySource' pathPrefix m =
                     , uri = Nothing
                     }
               ]
-        , target = Python "sample-package"
+        , target = Python "sample-package" minimumRuntime renames
         }
     pkg :: Package Python
     pkg = createPackage
@@ -119,15 +121,10 @@ makeDummySource' pathPrefix m =
             ]
 
 makeDummySource :: Module -> Source
-makeDummySource = makeDummySource' []
-
-versions :: [(PythonVersion, Set Code)]
-versions = [ (Python2, [])
-           , (Python3, ["typing"])
-           ]
+makeDummySource m = makeDummySource' [] m []
 
 spec :: Spec
-spec = parallel $ forM_ versions $ \ (ver, typing) -> do
+spec = parallel $ forM_ ([Python2, Python3] :: [PythonVersion]) $ \ ver -> do
     let empty' = PY.empty ver
         -- run' :: CodeGen a -> (Either CompileError a, CodeGenContext)
         run' c = runCodeGen c empty'
@@ -168,7 +165,7 @@ spec = parallel $ forM_ versions $ \ (ver, typing) -> do
             localImports ctx2 `shouldBe` []
             compileError codeGen2 `shouldBe` Nothing
 
-    specify "compilePrimitiveType" $ do
+    specify [qq|compilePrimitiveType ($ver)|] $ do
         code (compilePrimitiveType Bool) `shouldBe` "bool"
         code (compilePrimitiveType Bigint) `shouldBe` "int"
         let (decimalCode, decimalContext) = run' (compilePrimitiveType Decimal)
@@ -201,7 +198,7 @@ spec = parallel $ forM_ versions $ \ (ver, typing) -> do
                 Python2 -> "unicode"
                 Python3 -> "str"
 
-    describe "compileTypeExpression" $ do
+    describe [qq|compileTypeExpression ($ver)|] $ do
         let s = makeDummySource $ Module [] Nothing
         specify "TypeIdentifier" $ do
             let (c, ctx) = run' $
@@ -212,29 +209,29 @@ spec = parallel $ forM_ versions $ \ (ver, typing) -> do
         specify "OptionModifier" $ do
             let (c', ctx') = run' $
                     compileTypeExpression s (OptionModifier "int32")
-            standardImports ctx' `shouldBe` typing
+            standardImports ctx' `shouldBe` ["typing"]
             localImports ctx' `shouldBe` []
             c' `shouldBe` Right "typing.Optional[int]"
         specify "SetModifier" $ do
             let (c'', ctx'') = run' $
                     compileTypeExpression s (SetModifier "int32")
-            standardImports ctx'' `shouldBe` typing
+            standardImports ctx'' `shouldBe` ["typing"]
             localImports ctx'' `shouldBe` []
             c'' `shouldBe` Right "typing.AbstractSet[int]"
         specify "ListModifier" $ do
             let (c''', ctx''') = run' $
                     compileTypeExpression s (ListModifier "int32")
-            standardImports ctx''' `shouldBe` typing
+            standardImports ctx''' `shouldBe` ["typing"]
             localImports ctx''' `shouldBe` []
             c''' `shouldBe` Right "typing.Sequence[int]"
         specify "MapModifier" $ do
             let (c'''', ctx'''') = run' $
                     compileTypeExpression s (MapModifier "uuid" "int32")
-            standardImports ctx'''' `shouldBe` union ["uuid"] typing
+            standardImports ctx'''' `shouldBe` ["typing", "uuid"]
             localImports ctx'''' `shouldBe` []
             c'''' `shouldBe` Right "typing.Mapping[uuid.UUID, int]"
 
-    describe "toClassName" $ do
+    describe [qq|toClassName ($ver)|] $ do
         it "transform the facial name of the argument into PascalCase" $ do
             toClassName "test" `shouldBe` "Test"
             toClassName "hello-world" `shouldBe` "HelloWorld"
@@ -243,7 +240,7 @@ spec = parallel $ forM_ versions $ \ (ver, typing) -> do
             toClassName "false" `shouldBe` "False_"
             toClassName "none" `shouldBe` "None_"
 
-    describe "toAttributeName" $ do
+    describe [qq|toAttributeName ($ver)|] $ do
         it "transform the facial name of the argument into snake_case" $ do
             toAttributeName "test" `shouldBe` "test"
             toAttributeName "hello-world" `shouldBe` "hello_world"
@@ -252,7 +249,7 @@ spec = parallel $ forM_ versions $ \ (ver, typing) -> do
             toAttributeName "lambda" `shouldBe` "lambda_"
             toAttributeName "nonlocal" `shouldBe` "nonlocal_"
 
-    describe "toNamePair" $ do
+    describe [qq|toNamePair ($ver)|] $ do
         it "transforms the name to a Python code string of facial/behind pair" $
             do toNamePair "text" `shouldBe` "('text', 'text')"
                toNamePair (Name "test" "hello") `shouldBe` "('test', 'hello')"
@@ -266,7 +263,7 @@ spec = parallel $ forM_ versions $ \ (ver, typing) -> do
             toNamePair (Name "abc" "lambda") `shouldBe` "('abc', 'lambda')"
             toNamePair (Name "lambda" "abc") `shouldBe` "('lambda_', 'abc')"
 
-    specify "stringLiteral" $ do
+    specify [qq|stringLiteral ($ver)|] $ do
         stringLiteral "asdf" `shouldBe` [q|"asdf"|]
         stringLiteral [q|Say 'hello world'|]
             `shouldBe` [q|"Say 'hello world'"|]
@@ -275,7 +272,7 @@ spec = parallel $ forM_ versions $ \ (ver, typing) -> do
         stringLiteral "Say '\xc548\xb155'"
             `shouldBe` [q|u"Say '\uc548\ub155'"|]
 
-    describe "compilePackage" $ do
+    describe [qq|compilePackage ($ver)|] $ do
         it "returns a Map of file paths and their contents to generate" $ do
             let (Source pkg _) = makeDummySource $ Module [] Nothing
                 files = compilePackage pkg
@@ -291,7 +288,8 @@ spec = parallel $ forM_ versions $ \ (ver, typing) -> do
                     ]
             M.keysSet files `shouldBe` directoryStructure
         it "creates an emtpy Python package directory if necessary" $ do
-            let (Source pkg _) = makeDummySource' ["test"] $ Module [] Nothing
+            let (Source pkg _) = makeDummySource' ["test"] (Module [] Nothing)
+                                                  []
                 files = compilePackage pkg
                 directoryStructure =
                     [ "src-py2" </> "test" </> "__init__.py"
@@ -306,8 +304,37 @@ spec = parallel $ forM_ versions $ \ (ver, typing) -> do
                     , "MANIFEST.in"
                     ]
             M.keysSet files `shouldBe` directoryStructure
+        it "generates renamed package dirs if renames are configured" $ do
+            let (Source pkg _) = makeDummySource' [] (Module [] Nothing)
+                                                  [(["foo"], ["quz"])]
+                files = compilePackage pkg
+                directoryStructure =
+                    [ "src-py2" </> "quz" </> "__init__.py"
+                    , "src-py2" </> "quz" </> "bar" </> "__init__.py"
+                    , "src-py2" </> "qux" </> "__init__.py"
+                    , "src" </> "quz" </> "__init__.py"
+                    , "src" </> "quz" </> "bar" </> "__init__.py"
+                    , "src" </> "qux" </> "__init__.py"
+                    , "setup.py"
+                    , "MANIFEST.in"
+                    ]
+            M.keysSet files `shouldBe` directoryStructure
+            let (Source pkg' _) = makeDummySource' [] (Module [] Nothing)
+                                                   [(["foo", "bar"], ["bar"])]
+                files' = compilePackage pkg'
+                directoryStructure' =
+                    [ "src-py2" </> "foo" </> "__init__.py"
+                    , "src-py2" </> "bar" </> "__init__.py"
+                    , "src-py2" </> "qux" </> "__init__.py"
+                    , "src" </> "foo" </> "__init__.py"
+                    , "src" </> "bar" </> "__init__.py"
+                    , "src" </> "qux" </> "__init__.py"
+                    , "setup.py"
+                    , "MANIFEST.in"
+                    ]
+            M.keysSet files' `shouldBe` directoryStructure'
 
-    describe "InstallRequires" $ do
+    describe [qq|InstallRequires ($ver)|] $ do
         let req = InstallRequires [] []
             req2 = req { dependencies = ["six"] }
             req3 = req { optionalDependencies = [((3, 4), ["enum34"])] }
@@ -350,19 +377,52 @@ spec = parallel $ forM_ versions $ \ (ver, typing) -> do
                                              (3, 4) "ipaddress"
             (req4 `unionInstallRequires` req5) `shouldBe` req6
             (req5 `unionInstallRequires` req4) `shouldBe` req6
-    specify "toImportPath" $
-        PY.toImportPath ["foo", "bar"] `shouldBe` "foo.bar"
-    describe "Add ancestors of packages" $ do
+    specify [qq|toImportPath ($ver)|] $ do
         let (Source pkg _) = makeDummySource $ Module [] Nothing
-            modulePaths = MS.keysSet $ modules pkg
-        specify "toImportPaths" $
-            PY.toImportPaths modulePaths `shouldBe` [ "foo"
-                                                    , "foo.bar"
-                                                    , "qux"
-                                                    ]
-
-
-{-# ANN module ("HLint: ignore Functor law" :: String) #-}
-{-# ANN module ("HLint: ignore Monad law, left identity" :: String) #-}
-{-# ANN module ("HLint: ignore Monad law, right identity" :: String) #-}
-{-# ANN module ("HLint: ignore Use >=>" :: String) #-}
+            target' = target $ metadata pkg
+        PY.toImportPath target' ["foo", "bar"] `shouldBe` "foo.bar"
+    describe [qq|toImportPath ($ver)|] $ do
+        it "adds ancestors of packages" $ do
+            let (Source pkg _) = makeDummySource $ Module [] Nothing
+                modulePaths = MS.keysSet $ modules pkg
+                target' = target $ metadata pkg
+            PY.toImportPaths target' modulePaths `shouldBe`
+                [ "foo"
+                , "foo.bar"
+                , "qux"
+                ]
+        it "applies renames before add ancestors of packages" $ do
+            let (Source pkg _) = makeDummySource' [] (Module [] Nothing)
+                                                  [(["foo"], ["f", "oo"])]
+                modulePaths = MS.keysSet $ modules pkg
+                target' = target $ metadata pkg
+            PY.toImportPaths target' modulePaths `shouldBe`
+                [ "f"  -- > "f" should be added
+                , "f.oo"
+                , "f.oo.bar"
+                , "qux"
+                ]
+    specify "parseModulePath" $ do
+        parseModulePath "" `shouldBe` Nothing
+        parseModulePath "foo" `shouldBe` Just ["foo"]
+        parseModulePath "foo.bar" `shouldBe` Just ["foo", "bar"]
+        parseModulePath "foo.bar-baz" `shouldBe` Just ["foo", "bar-baz"]
+        parseModulePath "foo." `shouldBe` Nothing
+        parseModulePath "foo.bar." `shouldBe` Nothing
+        parseModulePath ".foo" `shouldBe` Nothing
+        parseModulePath ".foo.bar" `shouldBe` Nothing
+        parseModulePath "foo..bar" `shouldBe` Nothing
+        parseModulePath "foo.bar>" `shouldBe` Nothing
+        parseModulePath "foo.bar-" `shouldBe` Nothing
+    specify "renameModulePath" $ do
+        let renames = [ (["foo"], ["poo"])
+                      , (["foo", "bar"], ["foo"])
+                      , (["baz"], ["p", "az"])
+                      ] :: RenameMap
+        renameModulePath renames ["foo"] `shouldBe` ["poo"]
+        renameModulePath renames ["foo", "baz"] `shouldBe` ["poo", "baz"]
+        renameModulePath renames ["foo", "bar"] `shouldBe` ["foo"]
+        renameModulePath renames ["foo", "bar", "qux"] `shouldBe` ["foo", "qux"]
+        renameModulePath renames ["baz"] `shouldBe` ["p", "az"]
+        renameModulePath renames ["baz", "qux"] `shouldBe` ["p", "az", "qux"]
+        renameModulePath renames ["qux", "foo"] `shouldBe` ["qux", "foo"]

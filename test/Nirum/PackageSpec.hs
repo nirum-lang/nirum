@@ -45,7 +45,7 @@ import Nirum.Package.ModuleSet ( ImportError (MissingModulePathError)
                                )
 import Nirum.Package.ModuleSetSpec (validModules)
 import Nirum.Parser (parseFile)
-import Nirum.Targets.Python (Python (Python))
+import Nirum.Targets.Python (Python (Python), minimumRuntime)
 
 createPackage :: Metadata t -> [(ModulePath, Module)] -> Package t
 createPackage metadata' modules' =
@@ -61,7 +61,7 @@ createValidPackage t = createPackage Metadata { version = SV.initial
 
 spec :: Spec
 spec = do
-    testPackage (Python "nirum-examples")
+    testPackage (Python "nirum-examples" minimumRuntime [])
     testPackage DummyTarget
 
 testPackage :: forall t . Target t => t -> Spec

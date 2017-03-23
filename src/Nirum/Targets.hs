@@ -39,6 +39,7 @@ import Nirum.Package.Metadata ( Metadata (Metadata, target)
 import Nirum.Targets.List (targetProxyMapQ)
 
 -- these targets adds automatically
+import Nirum.Targets.Docs ()
 import Nirum.Targets.JavaScript ()
 import Nirum.Targets.Python ()
 

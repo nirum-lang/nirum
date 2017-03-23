@@ -5,6 +5,4 @@ name = "nirum-examples"
 
 [targets.python]
 name = "nirum-examples"
-
-[targets.dummy]
-# for unit test
+minimum_runtime = "0.3.9"

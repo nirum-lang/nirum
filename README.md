@@ -50,22 +50,22 @@ Getting started
 In order to compile a Nirum package (`examples/`) to a Python package:
 
     $ mkdir out/  # directory to place generated Python files
-    $ nirum -o out/ examples/
+    $ nirum -t python -o out/ examples/
 
 For more infomration, use `--help` option:
 
     $ nirum --help
-    Nirum Compiler 0.3.0
+    Nirum: The IDL compiler and RPC/distributed object framework
 
-    nirum [OPTIONS] DIR
+    Usage: nirum [-v|--version] (-o|--output-dir DIR) (-t|--target TARGET) DIR
+      Nirum compiler 0.3.0
 
-    Common flags:
-      -o --output-dir=DIR   The directory to place object files
-      -t --target=TARGET    The target language.  Available targets: python
-      -? --help             Display help message
-      -V --version          Print version information
-         --numeric-version  Print just the version number
-
+    Available options:
+      -h,--help                Show this help text
+      -v,--version             Show version
+      -o,--output-dir DIR      Output directory
+      -t,--target TARGET       Target language name. Available: docs, python
+      DIR                      Package directory
 
 Building
 --------

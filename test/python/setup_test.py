@@ -18,5 +18,6 @@ def test_setup_metadata():
     assert ['nirum'] == pkg['Requires']
     assert set(pkg['Provides']) == {
         'fixture', 'fixture.foo', 'fixture.foo.bar', 'fixture.qux',
+        'renamed', 'renamed.foo', 'renamed.foo.bar',
     }
     assert ['0.3.0'] == pkg['Version']
