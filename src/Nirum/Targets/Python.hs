@@ -44,6 +44,7 @@ module Nirum.Targets.Python ( Code
                             , unionInstallRequires
                             ) where
 
+import Control.Monad (forM)
 import qualified Control.Monad.State as ST
 import qualified Data.List as L
 import Data.Maybe (fromMaybe)
@@ -133,7 +134,7 @@ import Nirum.Package.Metadata ( Author (Author, name, email)
 import qualified Nirum.Package.ModuleSet as MS
 
 minimumRuntime :: SV.Version
-minimumRuntime = SV.version 0 3 9 [] []
+minimumRuntime = SV.version 0 4 0 [] []
 
 data Python = Python { packageName :: T.Text
                      , minimumRuntimeVersion :: SV.Version
@@ -304,29 +305,27 @@ toIndentedCodes f traversable concatenator =
 compileParameters :: (ParameterName -> ParameterType -> Code)
                -> [(T.Text, Code)]
                -> Code
-compileParameters gen nameNTypes = toIndentedCodes (uncurry gen) nameNTypes ", "
+compileParameters gen nameTypePairs =
+    toIndentedCodes (uncurry gen) nameTypePairs ", "
 
-compileFieldInitializers :: DS.DeclarationSet Field -> Code
-compileFieldInitializers fields =
-    T.intercalate "\n        " $ classFieldInitializers
+compileFieldInitializers :: DS.DeclarationSet Field -> CodeGen Code
+compileFieldInitializers fields = do
+    initializers <- forM (toList fields) compileFieldInitializer
+    return $ T.intercalate "\n     " initializers
   where
-    compileFieldInitializer :: Field -> Code
+    compileFieldInitializer :: Field -> CodeGen Code
     compileFieldInitializer (Field fieldName' fieldType' _) =
-        [qq|self.{attributeName} = $attributeValue|]
+        case fieldType' of
+            SetModifier _ -> return [qq|frozenset($attributeName)|]
+            ListModifier _ -> do
+                let imports = [("nirum.datastructures", ["List"])]
+                insertThirdPartyImports imports
+                return [qq|List($attributeName)|]
+            _ -> return attributeName
       where
-        attributeName :: T.Text
+        attributeName :: Code
         attributeName = toAttributeName' fieldName'
-        attributeValue :: T.Text
-        attributeValue = case fieldType' of
-                             SetModifier _ -> [qq|frozenset($attributeName)|]
-                             ListModifier _ -> [qq|tuple($attributeName)|]
-                             _ -> attributeName
 
-    classFieldInitializers :: [Code]
-    classFieldInitializers =
-        [ [qq|self.{toAttributeName' n} = {compileFieldInitializer field}|]
-        | field@Field {fieldName = n} <- toList fields
-        ]
 
 quote :: T.Text -> T.Text
 quote s = [qq|'{s}'|]
@@ -440,6 +439,7 @@ compileUnionTag source parentname d@(Tag typename' fields _) = do
     typeRepr <- typeReprCompiler
     arg <- parameterCompiler
     ret <- returnCompiler
+    initializers <- compileFieldInitializers fields
     return [qq|
 class $className($parentClass):
 {compileDocstringWithFields "    " d fields}
@@ -455,7 +455,7 @@ class $className($parentClass):
     ])
 
     def __init__(self, {compileParameters arg nameNTypes}){ ret "None" }:
-        {compileFieldInitializers fields}
+        $initializers
         validate_union_type(self)
 
     def __repr__(self){ ret "str" }:
@@ -668,6 +668,7 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
     arg <- parameterCompiler
     ret <- returnCompiler
     typeRepr <- typeReprCompiler
+    initializers <- compileFieldInitializers fields
     let clsType = arg "cls" "type"
     return [qq|
 class $className(object):
@@ -686,7 +687,7 @@ class $className(object):
     ])
 
     def __init__(self, {compileParameters arg nameNTypes}){ret "None"}:
-        {compileFieldInitializers fields}
+        $initializers
         validate_record_type(self)
 
     def __repr__(self){ret "bool"}:
