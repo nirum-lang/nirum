@@ -641,8 +641,11 @@ $fieldCodes'
         toNamePair
         [name' | (name', _) <- tagNameNFields]
         ",\n        "
-compileTypeDeclaration src ServiceDeclaration { serviceName = name'
-                                              , service = Service methods } = do
+compileTypeDeclaration
+    src@Source { sourcePackage = Package { metadata = metadata' } }
+    ServiceDeclaration { serviceName = name'
+                       , service = Service methods
+                       } = do
     let methods' = toList methods
     methodMetadata <- mapM compileMethodMetadata methods'
     let methodMetadata' = commaNl methodMetadata
@@ -661,6 +664,7 @@ compileTypeDeclaration src ServiceDeclaration { serviceName = name'
     return [qq|
 class $className(service_type):
 
+    __nirum_schema_version__ = \'{SV.toText $ version metadata'}\'
     __nirum_service_methods__ = \{
         {methodMetadata'}
     \}
