@@ -69,6 +69,14 @@ a misleading name (or an outdated name) to a more clear name (or an up-to-date
 name).
 
 
+Type alias
+----------
+
+Type aliases are not distinct.  While it's being compiled all type aliases are
+simply replaced by types they refer to.  So every type alias doesn't break
+backward compatibility.  Feel free to define type aliases!
+
+
 Unboxed type
 ------------
 
@@ -119,6 +127,41 @@ unboxed types are useful:
 The above change doesn't affect to JSON payloads the `find-distance` method
 returns, but in program codes we become able to deal with distance using `meter`
 type rather than primitive `bigint` type.
+
+
+Interchangeability of enum type and `text`
+------------------------------------------
+
+Enum types are represented as JSON strings as like `text`.  If a field had been
+represented as `text` but there are only the limited number of values, it's
+okay to be refactored to `enum` type.
+
+Suppose the following record had represented `gender` as freeform `text`:
+
+    record person (
+        text name,
+        text gender,  // represented as texts e.g. "male", "female"
+    );
+
+Although it had become `text` due to a design mistake, we still have a chance
+to make up for it.  Because there are only few cases:
+
+~~~ json
+{"_type": "person", "name": "Jane Doe", "gender": "male"}
+~~~
+
+~~~ json
+{"_type": "person", "name": "John Doe", "gender": "female"}
+~~~
+
+The following change is still mostly compatible with the previous revision:
+
+    enum gender = male | female | unknown;
+
+    record person (
+        text name,
+        gender gender,
+    );
 
 
 Making field optional
