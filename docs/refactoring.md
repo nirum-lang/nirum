@@ -69,6 +69,58 @@ a misleading name (or an outdated name) to a more clear name (or an up-to-date
 name).
 
 
+Unboxed type
+------------
+
+Unboxed types can be used for semi-refactoring: you can make people to say
+things by a specific name in program codes, while leave programs to communicate
+each other in the way they've done.
+
+The key difference between unboxed types and single-field records is that
+unboxed types don't make additional structure on its inner type whereas
+records always adds object structure to wrap its fields.
+
+For example, the following two types are seemingly equivalent to program codes
+and programmers:
+
+    unboxed meter (bigint);
+
+    record meter (bigint value);
+
+However, they make different JSON payloads:
+
+~~~ json
+"123"
+~~~
+
+~~~ json
+{"_type": "meter", "value": "123"}
+~~~
+
+This means unboxed types are indistinguishable from their inner types in JSON
+payloads, while in program codes they are distinct individual types.
+
+Suppose we've represented distance `bigint` with assuming 1 means 1 meter.
+
+    service map-service (
+        bigint find-distance(coord a, coord b),
+    );
+
+As such scale/unit assumptions are error-prone, we want to encode them
+as distinct type without breaking backward compatibility.  It's the when
+unboxed types are useful:
+
+    unboxed meter (bigint);
+
+    service map-service (
+        meter find-distance (coord a, coord b),
+    );
+
+The above change doesn't affect to JSON payloads the `find-distance` method
+returns, but in program codes we become able to deal with distance using `meter`
+type rather than primitive `bigint` type.
+
+
 Making field optional
 ---------------------
 
