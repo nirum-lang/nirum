@@ -82,3 +82,29 @@ On the other hand, when it comes to reversed, optional fields cannot be
 required without any compatible breakage.  Also, if two programs communicate
 each other, one deserializing and receiving payloads has to be deployed before
 other one serializing and sending payloads.
+
+
+Interchangeability of set and list
+----------------------------------
+
+A set contains zero or more unique values of the same type, without order.
+
+A list contains zero or more values of the same type, in an order, and allows
+duplicated values.
+
+However, both set and list types are serialized to equally an array in JSON
+payloads.  So a set field and a list type are interchangeable each other
+unless their element types are different.
+
+(More accurately, a set and a list still might be interchangeable even if
+their element types are different since two element types may be
+interchangeable.  For example, `{[a]}` and `[{a}]` are interchangeable since
+`[a]` and `{a}` are interchangeable, and `a` and `a` are interchangeable again.)
+
+When a JSON array serialized from a set field is deserialized to a list,
+its order becomes arbitrary.  A program accepting payloads have to deal with
+its lack of order if necessary.
+
+When a JSON array serialized from a list field is deserialized to a set,
+the same values shown more than once are collapsed to unique values.
+Also, its order is not preserved.
