@@ -13,8 +13,9 @@ import Text.InterpolatedString.Perl6 (q)
 
 import Nirum.Constructs (Construct (toCode))
 import Nirum.Constructs.Annotation (empty)
-import Nirum.Constructs.Docs (Docs)
+import Nirum.Constructs.Declaration (Documented (docs))
 import qualified Nirum.Constructs.DeclarationSet as DS
+import Nirum.Constructs.Docs (Docs)
 import Nirum.Constructs.Identifier (Identifier)
 import Nirum.Constructs.ModulePath (ModulePath)
 import Nirum.Constructs.TypeDeclaration ( JsonType (Boolean, Number, String)
@@ -71,6 +72,9 @@ instance Construct Module where
                           Import {} -> False
                           _ -> True
                     ]
+
+instance Documented Module where
+    docs (Module _ docs') = docs'
 
 imports :: Module -> M.Map ModulePath (S.Set Identifier)
 imports (Module decls _) =

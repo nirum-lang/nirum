@@ -30,10 +30,10 @@ import qualified Data.Set as S
 import System.Directory (doesDirectoryExist, listDirectory)
 import System.FilePath ((</>))
 
-import Nirum.Constructs.Docs (Docs)
 import qualified Nirum.Constructs.DeclarationSet as DS
 import Nirum.Constructs.Identifier (Identifier)
 import qualified Nirum.Constructs.Module as Mod
+import Nirum.Constructs.Declaration (Documented (docs))
 import Nirum.Constructs.ModulePath (ModulePath, fromFilePath)
 import Nirum.Constructs.TypeDeclaration ( Type
                                         , TypeDeclaration ( Import
@@ -149,8 +149,8 @@ findInBoundModule valueWhenExist valueWhenNotExist
 types :: Target t => BoundModule t -> DS.DeclarationSet TypeDeclaration
 types = findInBoundModule Mod.types DS.empty
 
-docs :: Target t => BoundModule t -> Maybe Docs
-docs = findInBoundModule Mod.docs Nothing
+instance Target t => Documented (BoundModule t) where
+    docs = findInBoundModule Mod.docs Nothing
 
 data TypeLookup = Missing
                 | Local Type

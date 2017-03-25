@@ -427,6 +427,7 @@ tag = do
             char ')'
             return f
         Nothing -> return empty
+    spaces
     docs' <- optional $ do
         d <- docs <?> "union tag docs"
         spaces
