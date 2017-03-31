@@ -35,6 +35,7 @@ import Nirum.Docs.Html (renderInlines)
 import Nirum.Package ( BoundModule (boundPackage, modulePath)
                      , Package (Package, metadata, modules)
                      , resolveBoundModule
+                     , resolveModule
                      , types
                      )
 import Nirum.Package.Metadata ( Author (Author, email, name, uri)
@@ -99,6 +100,8 @@ $case expr'
 module' :: BoundModule Docs -> Html
 module' docsModule = layout pkg path $ [shamlet|
     <h1><code>#{path}</code>
+    $maybe tit <- title
+        <p>#{tit}
     $forall (ident, decl) <- types'
         <div class="#{showKind decl}" id="#{toNormalizedText ident}">
             #{typeDecl docsModule ident decl}
@@ -115,6 +118,13 @@ module' docsModule = layout pkg path $ [shamlet|
                     TD.Import {} -> False
                     _ -> True
              ]
+    mod' :: Maybe Module
+    mod' = resolveModule (modulePath docsModule) pkg
+    title :: Maybe Html
+    title =
+        case mod' of
+            Just mod'' -> moduleTitle mod''
+            _ -> Nothing
 
 typeDecl :: BoundModule Docs -> Identifier -> TD.TypeDeclaration -> Html
 typeDecl mod' ident
