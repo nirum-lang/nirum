@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedLists, QuasiQuotes, TypeFamilies #-}
-module Nirum.Targets.Docs (Docs, makeFilePath, makeUri) where
+module Nirum.Targets.Docs (Docs, makeFilePath, makeUri, moduleTitle) where
 
 import Data.Maybe (mapMaybe)
 import GHC.Exts (IsList (fromList, toList))
@@ -220,17 +220,18 @@ contents pkg@Package { metadata = md
                 <dd.author>#{n}
 |]
   where
-    moduleTitle :: Module -> Maybe Html
-    moduleTitle Module { docs = docs' } = do
-        d <- docs'
-        t <- D.title d
-        nodes <- case t of
-                     Heading _ inlines ->
-                        Just $ filterReferences inlines
-                     _ -> Nothing
-        return $ preEscapedToMarkup $ renderInlines nodes
     emailText :: E.EmailAddress -> T.Text
     emailText = decodeUtf8 . E.toByteString
+
+moduleTitle :: Module -> Maybe Html
+moduleTitle Module { docs = docs' } = do
+    d <- docs'
+    t <- D.title d
+    nodes <- case t of
+                 Heading _ inlines ->
+                    Just $ filterReferences inlines
+                 _ -> Nothing
+    return $ preEscapedToMarkup $ renderInlines nodes
 
 compilePackage' :: Package Docs -> Map FilePath (Either Error Html)
 compilePackage' pkg =
