@@ -69,11 +69,16 @@ union status = run
 
 service null-service ();
 
+@error
+union rpc-error = connection-lose-error
+                | not-found-error (text message,)
+                ;
+
 service ping-service (
     # Service docs.
     bool ping (
         # Method docs.
         text nonce,
         # Parameter docs.
-    ),
+    ) throws rpc-error,
 );
