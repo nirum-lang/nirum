@@ -4,6 +4,7 @@ Nirum
 [![Build Status (Travis CI)][ci-svg]][ci]
 [![Build Status (AppVeyor)][ciw-svg]][ciw]
 [![Docker Automated Build][docker-svg]][docker]
+[![Total lines of code][loc]][repo]
 [![Gitter][chat-svg]][chat]
 
 [ci-svg]: https://travis-ci.org/spoqa/nirum.svg
@@ -12,6 +13,8 @@ Nirum
 [ciw]: https://ci.appveyor.com/project/dahlia/nirum-k5n5y
 [docker]: https://hub.docker.com/r/spoqa/nirum/
 [docker-svg]: https://img.shields.io/docker/automated/spoqa/nirum.svg
+[loc]: https://tokei.rs/b1/github/spoqa/nirum
+[repo]: https://github.com/spoqa/nirum
 [chat-svg]: https://badges.gitter.im/spoqa/nirum.svg
 [chat]: https://gitter.im/spoqa/nirum?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge
 
