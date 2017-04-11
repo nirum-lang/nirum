@@ -97,12 +97,35 @@ You can run the test suite of Nirum:
 [6]: https://www.haskellstack.org/
 
 
+Related projects & tools
+------------------------
+
+See also the [list of Nirum-related projects][7] on GitHub.  Have you kicked off
+a new project related to Nirum?  Please add *nirum* [topic][8] to your project
+on GitHub!
+
+### Editor supports
+
+- [nirum.vim](https://github.com/spoqa/nirum.vim): Nirum syntax highlighter for
+  Vim/Neovim.
+- [sublime-nirum](https://github.com/spoqa/sublime-nirum): Nirum package for
+  Sublime Text 3.
+
+### Language runtimes
+
+- [nirum-python](https://github.com/spoqa/nirum-python): The official Python
+  runtime library for Nirum.
+
+[7]: https://github.com/search?q=topic:nirum+fork:false
+[8]: https://github.com/blog/2309-introducing-topics
+
+
 Etymology
 ---------
 
 **니름** (IPA: /niɾɯm/; *nireum*) is a sort of telepathy in the fictional world
-of [The Bird That Drinks Tears][7] (눈물을 마시는 새 *Nunmureul masineun sae*)
-by [Lee Yeongdo][8] (이영도).
+of [The Bird That Drinks Tears][9] (눈물을 마시는 새 *Nunmureul masineun sae*)
+by [Lee Yeongdo][10] (이영도).
 
-[7]: https://en.wikipedia.org/wiki/The_Bird_That_Drinks_Tears
-[8]: https://en.wikipedia.org/wiki/Lee_Yeongdo
+[9]: https://en.wikipedia.org/wiki/The_Bird_That_Drinks_Tears
+[10]: https://en.wikipedia.org/wiki/Lee_Yeongdo
