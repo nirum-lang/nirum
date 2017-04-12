@@ -99,9 +99,10 @@ $case expr'
 
 module' :: BoundModule Docs -> Html
 module' docsModule = layout pkg path $ [shamlet|
-    <h1><code>#{path}</code>
     $maybe tit <- title
-        <p>#{tit}
+        <h1><code>#{path}</code> &mdash; #{tit}
+    $nothing
+        <h1><code>#{path}</code>
     $forall (ident, decl) <- types'
         <div class="#{showKind decl}" id="#{toNormalizedText ident}">
             #{typeDecl docsModule ident decl}
@@ -121,10 +122,9 @@ module' docsModule = layout pkg path $ [shamlet|
     mod' :: Maybe Module
     mod' = resolveModule (modulePath docsModule) pkg
     title :: Maybe Html
-    title =
-        case mod' of
-            Just mod'' -> moduleTitle mod''
-            _ -> Nothing
+    title = do
+        m <- mod'
+        moduleTitle m
 
 typeDecl :: BoundModule Docs -> Identifier -> TD.TypeDeclaration -> Html
 typeDecl mod' ident
