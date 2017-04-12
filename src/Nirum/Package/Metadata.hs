@@ -1,7 +1,13 @@
 {-# LANGUAGE GADTs, QuasiQuotes, RankNTypes, ScopedTypeVariables,
              StandaloneDeriving, TypeFamilies #-}
 module Nirum.Package.Metadata ( Author (Author, email, name, uri)
-                              , Metadata (Metadata, authors, target, version)
+                              , Classifier
+                              , Metadata ( Metadata
+                                         , authors
+                                         , classifiers
+                                         , target
+                                         , version
+                                         )
                               , MetadataError ( FieldError
                                               , FieldTypeError
                                               , FieldValueError
@@ -70,6 +76,7 @@ import Text.Toml.Types (Node ( VArray
                              , VTArray
                              )
                        , Table
+                       , VArray
                        , VTArray
                        )
 import Text.URI (URI, parseURI)
@@ -91,12 +98,15 @@ deriving instance (Ord t, Target t) => Ord (Package t)
 deriving instance (Show t, Target t) => Show (Package t)
 
 packageTarget :: Target t => Package t -> t
-packageTarget Package { metadata = Metadata _ _ t } = t
+packageTarget Package { metadata = Metadata _ _ t _ } = t
+
+type Classifier = Text
 
 data Metadata t =
     Metadata { version :: SV.Version
              , authors :: [Author]
              , target :: (Eq t, Ord t, Show t, Target t) => t
+             , classifiers :: [Classifier]
              }
 -- TODO: uri, dependencies
 
@@ -172,6 +182,7 @@ parseMetadata metadataPath' tomlText = do
         Right t -> Right t
     version' <- versionField "version" table
     authors' <- authorsField "authors" table
+    classifiers' <- classifiersField "classifiers" table
     targets <- case tableField "targets" table of
         Left (FieldError _) -> Right HM.empty
         otherwise' -> otherwise'
@@ -251,6 +262,13 @@ stringField = typedField "string" $ \ n -> case n of
                                                 VString s -> Just s
                                                 _ -> Nothing
 
+arrayField :: MetadataField -> Table -> Either MetadataError VArray
+arrayField =
+    typedField "array" $ \ node ->
+        case node of
+            VArray array -> Just array
+            _ -> Nothing
+
 tableArrayField :: MetadataField -> Table -> Either MetadataError VTArray
 tableArrayField f t =
     case arrayF f t of
@@ -287,6 +305,17 @@ versionField field' table = do
         Right v -> return v
         Left _ -> Left $ FieldValueError field' $
                     "expected a semver string (e.g. \"1.2.3\"), not " ++ show s
+
+classifiersField :: MetadataField -> Table -> Either MetadataError [Classifier]
+classifiersField field' table = do
+    array <- arrayField field' table
+    classifiers' <- mapM parseS array -- [Either MetadatError Text]
+    return $ sequence classifiers'
+  where
+    parseS :: Node -> Either MetadataError Text
+    parseS (VString s) = Right s
+    parseS o = Left $ FieldTypeError field'
+    
 
 authorsField :: MetadataField -> Table -> Either MetadataError [Author]
 authorsField field' table = do
