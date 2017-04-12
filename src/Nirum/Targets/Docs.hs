@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedLists, QuasiQuotes, TypeFamilies #-}
-module Nirum.Targets.Docs (Docs, makeFilePath, makeUri) where
+module Nirum.Targets.Docs (Docs, makeFilePath, makeUri, moduleTitle) where
 
 import Data.Maybe (mapMaybe)
 import GHC.Exts (IsList (fromList, toList))
@@ -35,6 +35,7 @@ import Nirum.Docs.Html (renderInlines)
 import Nirum.Package ( BoundModule (boundPackage, modulePath)
                      , Package (Package, metadata, modules)
                      , resolveBoundModule
+                     , resolveModule
                      , types
                      )
 import Nirum.Package.Metadata ( Author (Author, email, name, uri)
@@ -98,7 +99,10 @@ $case expr'
 
 module' :: BoundModule Docs -> Html
 module' docsModule = layout pkg path $ [shamlet|
-    <h1><code>#{path}</code>
+    $maybe tit <- title
+        <h1><code>#{path}</code> &mdash; #{tit}
+    $nothing
+        <h1><code>#{path}</code>
     $forall (ident, decl) <- types'
         <div class="#{showKind decl}" id="#{toNormalizedText ident}">
             #{typeDecl docsModule ident decl}
@@ -115,6 +119,12 @@ module' docsModule = layout pkg path $ [shamlet|
                     TD.Import {} -> False
                     _ -> True
              ]
+    mod' :: Maybe Module
+    mod' = resolveModule (modulePath docsModule) pkg
+    title :: Maybe Html
+    title = do
+        m <- mod'
+        moduleTitle m
 
 typeDecl :: BoundModule Docs -> Identifier -> TD.TypeDeclaration -> Html
 typeDecl mod' ident
@@ -220,17 +230,18 @@ contents pkg@Package { metadata = md
                 <dd.author>#{n}
 |]
   where
-    moduleTitle :: Module -> Maybe Html
-    moduleTitle Module { docs = docs' } = do
-        d <- docs'
-        t <- D.title d
-        nodes <- case t of
-                     Heading _ inlines ->
-                        Just $ filterReferences inlines
-                     _ -> Nothing
-        return $ preEscapedToMarkup $ renderInlines nodes
     emailText :: E.EmailAddress -> T.Text
     emailText = decodeUtf8 . E.toByteString
+
+moduleTitle :: Module -> Maybe Html
+moduleTitle Module { docs = docs' } = do
+    d <- docs'
+    t <- D.title d
+    nodes <- case t of
+                 Heading _ inlines ->
+                    Just $ filterReferences inlines
+                 _ -> Nothing
+    return $ preEscapedToMarkup $ renderInlines nodes
 
 compilePackage' :: Package Docs -> Map FilePath (Either Error Html)
 compilePackage' pkg =

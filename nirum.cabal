@@ -132,6 +132,7 @@ test-suite spec
   default-extensions:  OverloadedStrings
   -- omit version specifiers for shared dependencies to library
   build-depends:       base
+               ,       blaze-html
                ,       bytestring
                ,       containers
                ,       directory
