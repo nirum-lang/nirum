@@ -758,14 +758,14 @@ $tagCodes'
         ",\n        "
     compileExtendClasses :: A.AnnotationSet -> [Code]
     compileExtendClasses annotations' =
-        if length extendClasses == 0
+        if null extendClasses
             then ["object"]
             else extendClasses
       where
         extendsClassMap :: M.Map I.Identifier Code
         extendsClassMap = [("error", "Exception")]
         extendClasses :: [Code]
-        extendClasses = catMaybes $
+        extendClasses = catMaybes
             [ M.lookup annotationName extendsClassMap
             | (A.Annotation annotationName _) <- A.toList annotations'
             ]
@@ -783,7 +783,7 @@ compileTypeDeclaration
     let dummyMethods' = T.intercalate "\n\n" dummyMethods
         clientMethods' = T.intercalate "\n\n" clientMethods
         methodErrorTypes' =
-            T.intercalate "," $ [ e | Just e <- methodErrorTypes ]
+            T.intercalate "," $ catMaybes methodErrorTypes
     insertStandardImport "json"
     insertThirdPartyImports [ ("nirum.constructs", ["name_dict_type"])
                             , ("nirum.deserialize", ["deserialize_meta"])
