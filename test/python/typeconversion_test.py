@@ -1,3 +1,5 @@
+from nirum.datastructures import List
+
 from fixture.foo import Album, Name, People, Person, Song
 
 
@@ -5,7 +7,7 @@ def test_sequence_to_tuple():
     album = Album(name='25', tracks=[
         Song(name='Hello')
     ])
-    assert isinstance(album.tracks, tuple)
+    assert isinstance(album.tracks, List)
     assert hash(album)
 
 
