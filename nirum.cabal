@@ -42,6 +42,7 @@ library
                  ,     Nirum.Constructs.TypeExpression
                  ,     Nirum.Docs
                  ,     Nirum.Docs.Html
+                 ,     Nirum.Docs.ReStructuredText
                  ,     Nirum.Package
                  ,     Nirum.Package.Metadata
                  ,     Nirum.Package.ModuleSet
@@ -123,6 +124,7 @@ test-suite spec
                ,       Nirum.Constructs.TypeExpressionSpec
                ,       Nirum.DocsSpec
                ,       Nirum.Docs.HtmlSpec
+                 ,     Nirum.Docs.ReStructuredTextSpec
                ,       Nirum.Package.MetadataSpec
                ,       Nirum.Package.ModuleSetSpec
                ,       Nirum.PackageSpec
@@ -139,6 +141,7 @@ test-suite spec
   build-depends:       aeson                    >=1.0.2   && <2
                ,       aeson-pretty             >=0.8     && <0.9
                ,       base
+               ,       blaze-html
                ,       bytestring
                ,       containers
                ,       directory

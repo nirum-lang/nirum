@@ -62,7 +62,9 @@ import qualified Data.Text as T
 
 import Nirum.Constructs (Construct (toCode))
 import Nirum.Constructs.Annotation as A (AnnotationSet, empty, lookupDocs)
-import Nirum.Constructs.Declaration (Declaration (annotations, name), docs)
+import Nirum.Constructs.Declaration ( Declaration (annotations, name)
+                                    , Documented (docs)
+                                    )
 import Nirum.Constructs.Docs (Docs (Docs), toCodeWithPrefix)
 import Nirum.Constructs.DeclarationSet (DeclarationSet, null', toList)
 import Nirum.Constructs.Identifier (Identifier)
@@ -93,6 +95,8 @@ instance Construct EnumMember where
                                              , toCodeWithPrefix "\n" (docs e)
                                              ]
 
+instance Documented EnumMember
+
 instance Declaration EnumMember where
     name (EnumMember name' _) = name'
     annotations (EnumMember _ anno') = anno'
@@ -115,6 +119,8 @@ instance Construct Field where
                  , toCodeWithPrefix "\n" (docs field)
                  ]
 
+instance Documented Field
+
 instance Declaration Field where
     name (Field name' _ _) = name'
     annotations (Field _ _ anno') = anno'
@@ -135,6 +141,8 @@ instance Construct Tag where
                       ]
       where
         fieldsCode = T.intercalate " " $ map toCode $ toList fields'
+
+instance Documented Tag
 
 instance Declaration Tag where
     name (Tag name' _ _) = name'
@@ -259,6 +267,8 @@ instance Construct TypeDeclaration where
                                                , toCode ident
                                                , ");\n"
                                                ]
+
+instance Documented TypeDeclaration
 
 instance Declaration TypeDeclaration where
     name TypeDeclaration { typename = name' } = name'

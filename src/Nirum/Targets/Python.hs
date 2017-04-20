@@ -63,6 +63,7 @@ import Text.InterpolatedString.Perl6 (q, qq)
 
 import qualified Nirum.CodeGen as C
 import Nirum.CodeGen (Failure)
+import Nirum.Constructs.Declaration (Documented (docsBlock))
 import qualified Nirum.Constructs.DeclarationSet as DS
 import qualified Nirum.Constructs.Identifier as I
 import Nirum.Constructs.ModulePath ( ModulePath
@@ -101,6 +102,7 @@ import Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
                                                         , TypeIdentifier
                                                         )
                                        )
+import Nirum.Docs.ReStructuredText (ReStructuredText, render)
 import Nirum.Package ( BoundModule
                      , Package (Package, metadata, modules)
                      , TypeLookup (Imported, Local, Missing)
@@ -302,6 +304,58 @@ toIndentedCodes f traversable concatenator =
 quote :: T.Text -> T.Text
 quote s = [qq|'{s}'|]
 
+compileDocs :: Documented a => a -> Maybe ReStructuredText
+compileDocs = fmap render . docsBlock
+
+quoteDocstring :: ReStructuredText -> Code
+quoteDocstring rst = T.concat ["r'''", rst, "\n'''\n"]
+
+compileDocstring' :: Documented a => Code -> a -> [ReStructuredText] -> Code
+compileDocstring' indentSpace d extra =
+    case (compileDocs d, extra) of
+        (Nothing, []) -> "\n"
+        (result, extra') -> indent indentSpace $ quoteDocstring $
+            T.append (fromMaybe "" result) $
+                     T.concat ['\n' `T.cons` e `T.snoc` '\n' | e <- extra']
+
+compileDocstring :: Documented a => Code -> a -> Code
+compileDocstring indentSpace d = compileDocstring' indentSpace d []
+
+compileDocstringWithFields :: Documented a
+                           => Code -> a -> DS.DeclarationSet Field -> Code
+compileDocstringWithFields indentSpace decl fields =
+    compileDocstring' indentSpace decl extra
+  where
+    extra :: [ReStructuredText]
+    extra =
+        [ case compileDocs f of
+              Nothing -> T.concat [ ".. attribute:: "
+                                  , toAttributeName' n
+                                  , "\n"
+                                  ]
+              Just docs' -> T.concat [ ".. attribute:: "
+                                     , toAttributeName' n
+                                     , "\n\n"
+                                     , indent "   " docs'
+                                     ]
+        | f@(Field n _ _) <- toList fields
+        ]
+
+compileDocsComment :: Documented a => Code -> a -> Code
+compileDocsComment indentSpace d =
+    case compileDocs d of
+        Nothing -> "\n"
+        Just rst -> indent (indentSpace `T.append` "#: ") rst
+
+indent :: Code -> Code -> Code
+indent space =
+    T.intercalate "\n" . map indentLn . T.lines
+  where
+    indentLn :: Code -> Code
+    indentLn line
+      | T.null line = T.empty
+      | otherwise = space `T.append` line
+
 typeReprCompiler :: CodeGen (Code -> Code)
 typeReprCompiler = do
     ver <- getPythonVersion
@@ -329,12 +383,8 @@ returnCompiler = do
                         Python2 -> ""
                         Python3 -> [qq| -> $r|]
 
-compileUnionTag :: Source
-                -> Name
-                -> Name
-                -> DS.DeclarationSet Field
-                -> CodeGen Code
-compileUnionTag source parentname typename' fields = do
+compileUnionTag :: Source -> Name -> Tag -> CodeGen Code
+compileUnionTag source parentname d@(Tag typename' fields _) = do
     typeExprCodes <- mapM (compileTypeExpression source)
         [typeExpr | (Field _ typeExpr _) <- toList fields]
     let className = toClassName' typename'
@@ -367,8 +417,7 @@ compileUnionTag source parentname typename' fields = do
     ret <- returnCompiler
     return [qq|
 class $className($parentClass):
-    # TODO: docstring
-
+{compileDocstringWithFields "    " d fields}
     __slots__ = (
         $slots
     )
@@ -469,15 +518,23 @@ compileTypeExpression source modifier = do
 compileTypeDeclaration :: Source -> TypeDeclaration -> CodeGen Code
 compileTypeDeclaration _ TypeDeclaration { type' = PrimitiveType {} } =
     return ""  -- never used
-compileTypeDeclaration src TypeDeclaration { typename = typename'
-                                           , type' = Alias ctype } = do
+compileTypeDeclaration src d@TypeDeclaration { typename = typename'
+                                             , type' = Alias ctype
+                                             } = do
     ctypeExpr <- compileTypeExpression src ctype
     return [qq|
-# TODO: docstring
+$docsComment
 {toClassName' typename'} = $ctypeExpr
     |]
-compileTypeDeclaration src TypeDeclaration { typename = typename'
-                                           , type' = UnboxedType itype } = do
+  where
+    docsComment :: Code
+    docsComment =
+        case compileDocs d of
+            Nothing -> ""
+            Just rst -> indent "#: " rst
+compileTypeDeclaration src d@TypeDeclaration { typename = typename'
+                                             , type' = UnboxedType itype
+                                             } = do
     let className = toClassName' typename'
     itypeExpr <- compileTypeExpression src itype
     insertThirdPartyImports [ ("nirum.validate", ["validate_boxed_type"])
@@ -489,8 +546,7 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
     ret <- returnCompiler
     return [qq|
 class $className(object):
-    # TODO: docstring
-
+{compileDocstring "    " d}
     __nirum_inner_type__ = $itypeExpr
 
     def __init__(self, { arg "value" itypeExpr }){ ret "None" }:
@@ -525,22 +581,29 @@ class $className(object):
     def __hash__(self){ ret "int" }:
         return hash(self.value)
 |]
-compileTypeDeclaration _ TypeDeclaration { typename = typename'
-                                         , type' = EnumType members } = do
+compileTypeDeclaration _ d@TypeDeclaration { typename = typename'
+                                           , type' = EnumType members
+                                           } = do
     let className = toClassName' typename'
         memberNames = T.intercalate
-            "\n    "
-            [ [qq|{toAttributeName' memberName} = '{I.toSnakeCaseText bn}'|]
-            | EnumMember memberName@(Name _ bn) _ <- toList members
+            "\n"
+            [ T.concat [ compileDocsComment "    " m
+                       , "\n    "
+                       , toAttributeName' memberName
+                       , " = '"
+                       , I.toSnakeCaseText bn
+                       , "'"
+                       ]
+            | m@(EnumMember memberName@(Name _ bn) _) <- toList members
             ]
     insertEnumImport
     arg <- parameterCompiler
     ret <- returnCompiler
     return [qq|
 class $className(enum.Enum):
-    # TODO: docstring
+{compileDocstring "    " d}
 
-    $memberNames
+$memberNames
 
     def __nirum_serialize__(self){ ret "str" }:
         return self.value
@@ -552,19 +615,21 @@ class $className(enum.Enum):
     ){ ret $ quote className }:
         return cls(value.replace('-', '_'))  # FIXME: validate input
 |]
-compileTypeDeclaration src TypeDeclaration { typename = typename'
-                                           , type' = RecordType fields } = do
-    typeExprCodes <- mapM (compileTypeExpression src)
-        [typeExpr | (Field _ typeExpr _) <- toList fields]
+compileTypeDeclaration src d@TypeDeclaration { typename = typename'
+                                             , type' = RecordType fields
+                                             } = do
     let className = toClassName' typename'
-        fieldNames = map toAttributeName' [ name'
-                                          | (Field name' _ _) <- toList fields
+        fieldList = toList fields
+    typeExprCodes <- mapM (compileTypeExpression src)
+        [typeExpr | (Field _ typeExpr _) <- fieldList]
+    let fieldNames = map toAttributeName' [ name'
+                                          | (Field name' _ _) <- fieldList
                                           ]
-        nameNTypes = zip fieldNames typeExprCodes
+        nameTypePairs = zip fieldNames typeExprCodes
         slotTypes = toIndentedCodes
-            (\ (n, t) -> [qq|'{n}': {t}|]) nameNTypes ",\n        "
+            (\ (n, t) -> [qq|'{n}': {t}|]) nameTypePairs ",\n        "
         slots = toIndentedCodes (\ n -> [qq|'{n}'|]) fieldNames ",\n        "
-        initialArgs gen = toIndentedCodes (uncurry gen) nameNTypes ", "
+        initialArgs gen = toIndentedCodes (uncurry gen) nameTypePairs ", "
         initialValues = toIndentedCodes
             (\ n -> [qq|self.{n} = {n}|]) fieldNames "\n        "
         nameMaps = toIndentedCodes
@@ -584,8 +649,7 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
     let clsType = arg "cls" "type"
     return [qq|
 class $className(object):
-    # TODO: docstring
-
+{compileDocstringWithFields "    " d fields}
     __slots__ = (
         $slots,
     )
@@ -629,11 +693,12 @@ class $className(object):
     def __hash__(self){ret "int"}:
         return hash(($hashText,))
 |]
-compileTypeDeclaration src TypeDeclaration { typename = typename'
-                                           , type' = UnionType tags } = do
-    fieldCodes <- mapM (uncurry (compileUnionTag src typename')) tagNameNFields
+compileTypeDeclaration src d@TypeDeclaration { typename = typename'
+                                             , type' = UnionType tags
+                                             } = do
+    tagCodes <- mapM (compileUnionTag src typename') $ toList tags
     let className = toClassName' typename'
-        fieldCodes' = T.intercalate "\n\n" fieldCodes
+        tagCodes' = T.intercalate "\n\n" tagCodes
         enumMembers = toIndentedCodes
             (\ (t, b) -> [qq|$t = '{b}'|]) enumMembers' "\n        "
     importTypingForPython3
@@ -647,6 +712,7 @@ compileTypeDeclaration src TypeDeclaration { typename = typename'
     arg <- parameterCompiler
     return [qq|
 class $className(object):
+{compileDocstring "    " d}
 
     __nirum_union_behind_name__ = '{I.toSnakeCaseText $ N.behindName typename'}'
     __nirum_field_names__ = name_dict_type([
@@ -673,13 +739,9 @@ class $className(object):
         return deserialize_union_type(cls, value)
 
 
-$fieldCodes'
+$tagCodes'
             |]
   where
-    tagNameNFields :: [(Name, DS.DeclarationSet Field)]
-    tagNameNFields = [ (tagName, fields)
-                     | (Tag tagName fields _) <- toList tags
-                     ]
     enumMembers' :: [(T.Text, T.Text)]
     enumMembers' = [ ( toAttributeName' tagName
                      , I.toSnakeCaseText $ N.behindName tagName
@@ -689,10 +751,13 @@ $fieldCodes'
     nameMaps :: T.Text
     nameMaps = toIndentedCodes
         toNamePair
-        [name' | (name', _) <- tagNameNFields]
+        [name' | Tag name' _ _ <- toList tags]
         ",\n        "
-compileTypeDeclaration src ServiceDeclaration { serviceName = name'
-                                              , service = Service methods } = do
+compileTypeDeclaration
+    src@Source { sourcePackage = Package { metadata = metadata' } }
+    d@ServiceDeclaration { serviceName = name'
+                         , service = Service methods
+                         } = do
     let methods' = toList methods
     methodMetadata <- mapM compileMethodMetadata methods'
     let methodMetadata' = commaNl methodMetadata
@@ -710,7 +775,8 @@ compileTypeDeclaration src ServiceDeclaration { serviceName = name'
                             ]
     return [qq|
 class $className(service_type):
-
+{compileDocstring "    " d}
+    __nirum_schema_version__ = \'{SV.toText $ version metadata'}\'
     __nirum_service_methods__ = \{
         {methodMetadata'}
     \}
@@ -733,13 +799,21 @@ class {className}_Client(client_type, $className):
     commaNl :: [T.Text] -> T.Text
     commaNl = T.intercalate ",\n"
     compileMethod :: Method -> CodeGen Code
-    compileMethod (Method mName params rtype _etype _anno) = do
+    compileMethod m@(Method mName params rtype _etype _anno) = do
         let mName' = toAttributeName' mName
         params' <- mapM compileMethodParameter $ toList params
+        let paramDocs = [ T.concat [ ":param "
+                                   , toAttributeName' pName
+                                   , maybe "" (T.append ": ") $ compileDocs p
+                                   -- TODO: types
+                                   ]
+                        | p@(Parameter pName _ _) <- toList params
+                        ]
         rtypeExpr <- compileTypeExpression src rtype
         ret <- returnCompiler
         return [qq|
     def {mName'}(self, {commaNl params'}){ ret rtypeExpr }:
+{compileDocstring' "        " m paramDocs}
         raise NotImplementedError('$className has to implement {mName'}()')
 |]
     compileMethodParameter :: Parameter -> CodeGen Code
@@ -810,11 +884,7 @@ compileModuleBody :: Source -> CodeGen Code
 compileModuleBody src@Source { sourceModule = boundModule } = do
     let types' = types boundModule
     typeCodes <- mapM (compileTypeDeclaration src) $ toList types'
-    let moduleCode = T.intercalate "\n\n" typeCodes
-    return [qq|
-# TODO: docs
-$moduleCode
-    |]
+    return $ T.intercalate "\n\n" typeCodes
 
 data InstallRequires =
     InstallRequires { dependencies :: S.Set T.Text
@@ -853,6 +923,7 @@ compileModule pythonVersion' source =
         (Left errMsg, _) -> Left errMsg
         (Right code, context) -> codeWithDeps context $
             [qq|# -*- coding: utf-8 -*-
+{compileDocstring "" $ sourceModule source}
 {imports $ standardImports context}
 
 {fromImports $ localImports context}

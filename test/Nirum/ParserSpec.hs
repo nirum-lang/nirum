@@ -39,7 +39,7 @@ import Nirum.Constructs.Service ( Method (Method)
                                 )
 import Nirum.Constructs.TypeDeclaration ( EnumMember (EnumMember)
                                         , Field (Field, fieldAnnotations)
-                                        , Tag (Tag, tagFields)
+                                        , Tag (Tag, tagAnnotations, tagFields)
                                         , Type (..)
                                         , TypeDeclaration (..)
                                         )
@@ -712,6 +712,35 @@ union shape
                                                 , Tag "none" [] fooAnnotationSet
                                                 ]
                                        }
+                      }
+            parse' [s|
+union shape
+    = circle (point origin, offset radius,)
+    # tag docs
+    | rectangle (point upper-left, point lower-right,)
+    | none
+    ;|] `shouldBeRight`
+                    a { type' = union'
+                            { tags = [ circleTag
+                                        { tagAnnotations = singleDocs "tag docs"
+                                        }
+                                     , rectTag, noneTag
+                                     ]
+                            }
+                      }
+            parse' [s|
+union shape
+    = circle (point origin, offset radius,)
+    | rectangle (point upper-left, point lower-right,)
+    | none  # tag docs
+    ;|] `shouldBeRight`
+                    a { type' = union'
+                            { tags = [ circleTag, rectTag
+                                     , noneTag
+                                        { tagAnnotations = singleDocs "tag docs"
+                                        }
+                                     ]
+                            }
                       }
             parse' [s|
 union shape

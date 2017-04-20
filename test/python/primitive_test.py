@@ -235,6 +235,8 @@ def test_union_with_special_case():
 def test_service():
     assert issubclass(NullService, Service)
     assert issubclass(PingService, Service)
+    assert getattr(PingService, '__nirum_schema_version__') == '0.3.0'
+    assert getattr(NullService, '__nirum_schema_version__') == '0.3.0'
     if PY3:
         assert set(PingService.ping.__annotations__) == {'nonce', 'return'}
         assert PingService.ping.__annotations__['nonce'] is text_type
