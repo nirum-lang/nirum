@@ -1,4 +1,5 @@
-{-# LANGUAGE FlexibleInstances, GeneralizedNewtypeDeriving, MultiParamTypeClasses, TypeOperators #-}
+{-# LANGUAGE FlexibleInstances, GeneralizedNewtypeDeriving,
+             MultiParamTypeClasses, TypeOperators #-}
 -- | The 'CodeBuilder' monad.
 module Nirum.CodeBuilder (
     -- * The CodeBuilder monad
@@ -58,7 +59,9 @@ get' = CodeBuilder ST.get
 put' :: Target t => BuildState t s -> CodeBuilder t s ()
 put' = CodeBuilder . ST.put
 
-modify' :: Target t => (BuildState t s -> BuildState t s) -> CodeBuilder t s ()
+modify' :: Target t
+        => (BuildState t s -> BuildState t s)
+        -> CodeBuilder t s ()
 modify' = CodeBuilder . ST.modify
 
 -- | Put the line below the builder output.
@@ -67,10 +70,12 @@ writeLine :: Target t
           -> CodeBuilder t s ()
 writeLine code = modify' $ \s -> s { output = output s $+$ code }
 
--- | Nest (or indent) an output of inner builder computation by a given number of positions.
+-- | Nest (or indent) an output of inner builder computation by a given number
+-- of positions.
 nest :: Target t
      => Integer            -- ^ indentation size (may also be negative)
-     -> CodeBuilder t s a  -- ^ inner builder computation to generate the nested document
+     -> CodeBuilder t s a  -- ^ inner builder computation to generate the
+                           --   nested document
      -> CodeBuilder t s a
 nest n code = do
     st <- get'
@@ -81,9 +86,10 @@ nest n code = do
     modify' $ \s -> s { output = output st $+$ P.nest (fromIntegral n) (output after) }
     return ret
 
--- | Look up the actual type by the name from the context of the builder computation.
+-- | Look up the actual type by the name from the context of the builder
+-- computation.
 lookupType :: Target t
-           => Identifier                     -- ^ The given name of the type to find
+           => Identifier                     -- ^ name of the type to find
            -> CodeBuilder t s PK.TypeLookup
 lookupType identifier = do
     m <- fmap boundModule get'
@@ -98,8 +104,9 @@ runBuilder :: Target t
            -> (a, B.Builder)     -- ^ return value and build result
 runBuilder package modPath st (CodeBuilder a) = (ret, rendered)
   where
+    mod' = fromMaybe (error "asdf") (resolveBoundModule modPath package)
     initialState = BuildState { output = P.empty
-                              , boundModule = fromMaybe (error "asdf") (resolveBoundModule modPath package)
+                              , boundModule = mod'
                               , innerState = st
                               }
     (ret, finalState) = runState a initialState
