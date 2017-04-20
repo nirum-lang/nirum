@@ -311,17 +311,18 @@ compileParameters gen nameTypePairs =
 compileFieldInitializers :: DS.DeclarationSet Field -> CodeGen Code
 compileFieldInitializers fields = do
     initializers <- forM (toList fields) compileFieldInitializer
-    return $ T.intercalate "\n     " initializers
+    return $ T.intercalate "\n        " initializers
   where
     compileFieldInitializer :: Field -> CodeGen Code
     compileFieldInitializer (Field fieldName' fieldType' _) =
         case fieldType' of
-            SetModifier _ -> return [qq|frozenset($attributeName)|]
+            SetModifier _ ->
+                return [qq|self.$attributeName = frozenset($attributeName)|]
             ListModifier _ -> do
                 let imports = [("nirum.datastructures", ["List"])]
                 insertThirdPartyImports imports
-                return [qq|List($attributeName)|]
-            _ -> return attributeName
+                return [qq|self.$attributeName = List($attributeName)|]
+            _ -> return [qq|self.$attributeName = $attributeName|]
       where
         attributeName :: Code
         attributeName = toAttributeName' fieldName'
@@ -686,7 +687,7 @@ class $className(object):
         $nameMaps
     ])
 
-    def __init__(self, {compileParameters arg nameNTypes}){ret "None"}:
+    def __init__(self, {compileParameters arg nameTypePairs}){ret "None"}:
         $initializers
         validate_record_type(self)
 
