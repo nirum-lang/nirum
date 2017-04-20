@@ -14,6 +14,7 @@ import qualified Text.PrettyPrint as P
 import Nirum.CodeBuilder
 import qualified Nirum.Constructs.DeclarationSet as DS
 import Nirum.Constructs.Module (Module (..))
+import Nirum.Constructs.ModulePath (ModulePath (..))
 import qualified Nirum.Constructs.TypeDeclaration as TD
 import Nirum.Package (TypeLookup (..))
 import Nirum.Package.Metadata (Metadata (..), Package (..), Target (..))
@@ -72,8 +73,8 @@ spec = do
     describe "lookupType" $
         specify "primitives" $ do
             let run' = fst . runBuilder package ["fruits"] ()
-            run' (lookupType "text") `shouldBe` Local (TD.PrimitiveType TD.Text TD.String)
-            run' (lookupType "int32") `shouldBe` Local (TD.PrimitiveType TD.Int32 TD.String)
+            run' (lookupType "text") `shouldBe` Imported (ModuleName "core") (TD.PrimitiveType TD.Text TD.String)
+            run' (lookupType "int32") `shouldBe` Imported (ModuleName "core") (TD.PrimitiveType TD.Int32 TD.Number)
 
 
 data DummyTarget = DummyTarget deriving (Eq, Ord, Show)
