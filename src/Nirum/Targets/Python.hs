@@ -46,7 +46,7 @@ module Nirum.Targets.Python ( Code
 
 import qualified Control.Monad.State as ST
 import qualified Data.List as L
-import Data.Maybe (fromMaybe)
+import Data.Maybe (catMaybes, fromMaybe)
 import Data.Typeable (Typeable)
 import GHC.Exts (IsList (toList))
 import Text.Printf (printf)
@@ -63,9 +63,10 @@ import Text.InterpolatedString.Perl6 (q, qq)
 
 import qualified Nirum.CodeGen as C
 import Nirum.CodeGen (Failure)
-import Nirum.Constructs.Declaration (Documented (docsBlock))
+import qualified Nirum.Constructs.Annotation as A
 import qualified Nirum.Constructs.DeclarationSet as DS
 import qualified Nirum.Constructs.Identifier as I
+import Nirum.Constructs.Declaration (Documented (docsBlock))
 import Nirum.Constructs.ModulePath ( ModulePath
                                    , fromIdentifiers
                                    , hierarchy
@@ -693,9 +694,11 @@ class $className(object):
     def __hash__(self){ret "int"}:
         return hash(($hashText,))
 |]
-compileTypeDeclaration src d@TypeDeclaration { typename = typename'
-                                             , type' = UnionType tags
-                                             } = do
+compileTypeDeclaration src
+                       d@TypeDeclaration { typename = typename'
+                                         , type' = UnionType tags
+                                         , typeAnnotations = annotations
+                                         } = do
     tagCodes <- mapM (compileUnionTag src typename') $ toList tags
     let className = toClassName' typename'
         tagCodes' = T.intercalate "\n\n" tagCodes
@@ -711,7 +714,7 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
     ret <- returnCompiler
     arg <- parameterCompiler
     return [qq|
-class $className(object):
+class $className({T.intercalate "," $ compileExtendClasses annotations}):
 {compileDocstring "    " d}
 
     __nirum_union_behind_name__ = '{I.toSnakeCaseText $ N.behindName typename'}'
@@ -753,6 +756,19 @@ $tagCodes'
         toNamePair
         [name' | Tag name' _ _ <- toList tags]
         ",\n        "
+    compileExtendClasses :: A.AnnotationSet -> [Code]
+    compileExtendClasses annotations' =
+        if null extendClasses
+            then ["object"]
+            else extendClasses
+      where
+        extendsClassMap :: M.Map I.Identifier Code
+        extendsClassMap = [("error", "Exception")]
+        extendClasses :: [Code]
+        extendClasses = catMaybes
+            [ M.lookup annotationName extendsClassMap
+            | (A.Annotation annotationName _) <- A.toList annotations'
+            ]
 compileTypeDeclaration
     src@Source { sourcePackage = Package { metadata = metadata' } }
     d@ServiceDeclaration { serviceName = name'
@@ -763,8 +779,11 @@ compileTypeDeclaration
     let methodMetadata' = commaNl methodMetadata
     dummyMethods <- mapM compileMethod methods'
     clientMethods <- mapM compileClientMethod methods'
+    methodErrorTypes <- mapM compileErrorType methods'
     let dummyMethods' = T.intercalate "\n\n" dummyMethods
         clientMethods' = T.intercalate "\n\n" clientMethods
+        methodErrorTypes' =
+            T.intercalate "," $ catMaybes methodErrorTypes
     insertStandardImport "json"
     insertThirdPartyImports [ ("nirum.constructs", ["name_dict_type"])
                             , ("nirum.deserialize", ["deserialize_meta"])
@@ -783,6 +802,7 @@ class $className(service_type):
     __nirum_method_names__ = name_dict_type([
         $methodNameMap
     ])
+    __nirum_method_error_types__ = dict([$methodErrorTypes'])
 
     {dummyMethods'}
 
@@ -798,6 +818,13 @@ class {className}_Client(client_type, $className):
     className = toClassName' name'
     commaNl :: [T.Text] -> T.Text
     commaNl = T.intercalate ",\n"
+    compileErrorType :: Method -> CodeGen (Maybe Code)
+    compileErrorType (Method mn _ _ me _) =
+        case me of
+            Just errorTypeExpression -> do
+                et <- compileTypeExpression src errorTypeExpression
+                return $ Just [qq|('{toAttributeName' mn}', $et)|]
+            Nothing -> return Nothing
     compileMethod :: Method -> CodeGen Code
     compileMethod m@(Method mName params rtype _etype _anno) = do
         let mName' = toAttributeName' mName

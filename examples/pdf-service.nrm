@@ -1,3 +1,5 @@
+@error
+union markdown-parse-error = symbol-error | syntax-error (text reason);
 
 type html = text;
 
@@ -13,4 +15,9 @@ service pdf-service (
         # Renders a PDF from the given HTML text.
         html html,
     ),
+
+    binary render-md (
+        # Renders a PDF from the given HTML text.
+        text md,
+    ) throws markdown-parse-error,
 );
