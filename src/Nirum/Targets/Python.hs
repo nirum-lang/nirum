@@ -694,18 +694,12 @@ class $className(object):
     def __hash__(self){ret "int"}:
         return hash(($hashText,))
 |]
-<<<<<<< b134a67f11ff6a67c8d8da509e3f78fc07bd781a
-compileTypeDeclaration src d@TypeDeclaration { typename = typename'
-                                             , type' = UnionType tags
-                                             } = do
-    tagCodes <- mapM (compileUnionTag src typename') $ toList tags
-=======
 compileTypeDeclaration src
-                       TypeDeclaration { typename = typename'
-                                       , type' = UnionType tags
-                                       , typeAnnotations = annotations } = do
-    fieldCodes <- mapM (uncurry (compileUnionTag src typename')) tagNameNFields
->>>>>>> Compile throws syntax on Python
+                       d@TypeDeclaration { typename = typename'
+                                         , type' = UnionType tags
+                                         , typeAnnotations = annotations
+                                         } = do
+    tagCodes <- mapM (compileUnionTag src typename') $ toList tags
     let className = toClassName' typename'
         tagCodes' = T.intercalate "\n\n" tagCodes
         enumMembers = toIndentedCodes
@@ -720,12 +714,8 @@ compileTypeDeclaration src
     ret <- returnCompiler
     arg <- parameterCompiler
     return [qq|
-<<<<<<< b134a67f11ff6a67c8d8da509e3f78fc07bd781a
-class $className(object):
-{compileDocstring "    " d}
-=======
 class $className({T.intercalate "," $ compileExtendClasses annotations}):
->>>>>>> Compile throws syntax on Python
+{compileDocstring "    " d}
 
     __nirum_union_behind_name__ = '{I.toSnakeCaseText $ N.behindName typename'}'
     __nirum_field_names__ = name_dict_type([
