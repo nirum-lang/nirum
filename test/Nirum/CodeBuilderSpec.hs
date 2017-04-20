@@ -54,7 +54,8 @@ spec = do
                 writeLine "b"
         run w `shouldBe` "a\nb\n"
     specify "writeLine 2" $ do
-        let w = forM_ ([1..10] :: [Integer]) $ \i -> writeLine $ P.text $ show i
+        let w = forM_ ([1 .. 10] :: [Integer]) $ \ i ->
+                    writeLine $ P.text $ show i
         run w `shouldBe` "1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n"
     describe "nest" $ do
         it "should indent its own context" $ do
@@ -73,8 +74,11 @@ spec = do
     describe "lookupType" $
         specify "primitives" $ do
             let run' = fst . runBuilder package ["fruits"] ()
-            run' (lookupType "text") `shouldBe` Imported (ModuleName "core") (TD.PrimitiveType TD.Text TD.String)
-            run' (lookupType "int32") `shouldBe` Imported (ModuleName "core") (TD.PrimitiveType TD.Int32 TD.Number)
+            let core = ModuleName "core"
+            run' (lookupType "text") `shouldBe`
+                Imported core (TD.PrimitiveType TD.Text TD.String)
+            run' (lookupType "int32") `shouldBe`
+                Imported core (TD.PrimitiveType TD.Int32 TD.Number)
 
 
 data DummyTarget = DummyTarget deriving (Eq, Ord, Show)

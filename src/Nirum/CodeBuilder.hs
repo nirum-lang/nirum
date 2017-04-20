@@ -68,7 +68,7 @@ modify' = CodeBuilder . ST.modify
 writeLine :: Target t
           => P.Doc               -- ^ The line to append
           -> CodeBuilder t s ()
-writeLine code = modify' $ \s -> s { output = output s $+$ code }
+writeLine code = modify' $ \ s -> s { output = output s $+$ code }
 
 -- | Nest (or indent) an output of inner builder computation by a given number
 -- of positions.
@@ -83,7 +83,9 @@ nest n code = do
     put' st'
     ret <- code
     after <- get'
-    modify' $ \s -> s { output = output st $+$ P.nest (fromIntegral n) (output after) }
+    modify' $ \ s -> s {
+        output = output st $+$ P.nest (fromIntegral n) (output after)
+    }
     return ret
 
 -- | Look up the actual type by the name from the context of the builder
@@ -110,7 +112,8 @@ runBuilder package modPath st (CodeBuilder a) = (ret, rendered)
                               , innerState = st
                               }
     (ret, finalState) = runState a initialState
-    rendered = P.fullRender P.PageMode 80 1.5 concat' (B.singleton '\n') (output finalState)
+    out' = output finalState
+    rendered = P.fullRender P.PageMode 80 1.5 concat' (B.singleton '\n') out'
     concat' (P.Chr c) rest = B.singleton c <> rest
     concat' (P.Str s) rest = B.fromString s <> rest
     concat' (P.PStr s) rest = concat' (P.Str s) rest
