@@ -25,6 +25,7 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:     Nirum.Cli
+                 ,     Nirum.CodeBuilder
                  ,     Nirum.CodeGen
                  ,     Nirum.Constructs
                  ,     Nirum.Constructs.Annotation
@@ -67,6 +68,7 @@ library
                ,       optparse-applicative     >=0.13.1  && <0.14
                ,       parsec
                        -- only for dealing with htoml's ParserError
+               ,       pretty                   >=1.1.3   && <2
                ,       semver                   >=0.3.0   && <1.0
                ,       shakespeare              >=2.0.12  && <2.1
                ,       template-haskell         >=2.11    && <3
@@ -105,6 +107,7 @@ test-suite spec
   hs-source-dirs:      test
   main-is:             Spec.hs
   other-modules:       Nirum.CliSpec
+               ,       Nirum.CodeBuilderSpec
                ,       Nirum.CodeGenSpec
                ,       Nirum.Constructs.AnnotationSpec
                ,       Nirum.Constructs.DocsSpec
@@ -148,6 +151,7 @@ test-suite spec
                ,       nirum
                ,       parsec
                        -- only for dealing with htoml's ParserError
+               ,       pretty
                ,       process                  >=1.1     && <2
                ,       semigroups
                ,       semver
