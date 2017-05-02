@@ -4,7 +4,7 @@ from fixture.foo import Album, Name, People, Person, Song
 
 
 def test_sequence_to_tuple():
-    album = Album(name='25', tracks=[
+    album = Album(name=u'25', tracks=[
         Song(name=u'Hello')
     ])
     assert isinstance(album.tracks, List)
