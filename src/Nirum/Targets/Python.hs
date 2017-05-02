@@ -319,7 +319,7 @@ compileFieldInitializers fields = do
             SetModifier _ ->
                 return [qq|self.$attributeName = frozenset($attributeName)|]
             ListModifier _ -> do
-                let imports = [("nirum.datastructures", ["List"])]
+                let imports = [("nirum.datastructures", ["list_type"])]
                 insertThirdPartyImports imports
                 return [qq|self.$attributeName = List($attributeName)|]
             _ -> return [qq|self.$attributeName = $attributeName|]
