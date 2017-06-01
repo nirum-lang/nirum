@@ -1,22 +1,22 @@
 {-# LANGUAGE ExtendedDefaultRules, QuasiQuotes #-}
 module Nirum.Cli (main, writeFiles) where
 
+import Control.Concurrent (threadDelay)
+import Control.Monad (forM_, forever, when)
 import GHC.Exts (IsList (toList))
+import System.IO
 
 import qualified Data.ByteString as B
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
-import Control.Concurrent (threadDelay)
 import Control.Concurrent.STM (atomically, newTVar, readTVar, TVar, writeTVar)
-import Control.Monad (forM_, forever, when)
 import Data.Monoid ((<>))
 import qualified Options.Applicative as OPT
 import System.Directory (createDirectoryIfMissing)
 import System.Exit (die)
 import System.FilePath (takeDirectory, takeExtension, (</>))
 import System.FSNotify
-import System.IO
 import Text.InterpolatedString.Perl6 (qq)
 import Text.Megaparsec (Token)
 import Text.Megaparsec.Error ( Dec
