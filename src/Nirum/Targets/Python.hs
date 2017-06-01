@@ -303,8 +303,8 @@ toIndentedCodes f traversable concatenator =
     T.intercalate concatenator $ map f traversable
 
 compileParameters :: (ParameterName -> ParameterType -> Code)
-               -> [(T.Text, Code)]
-               -> Code
+                  -> [(T.Text, Code)]
+                  -> Code
 compileParameters gen nameTypePairs =
     toIndentedCodes (uncurry gen) nameTypePairs ", "
 
@@ -321,7 +321,7 @@ compileFieldInitializers fields = do
             ListModifier _ -> do
                 let imports = [("nirum.datastructures", ["list_type"])]
                 insertThirdPartyImports imports
-                return [qq|self.$attributeName = List($attributeName)|]
+                return [qq|self.$attributeName = list_type($attributeName)|]
             _ -> return [qq|self.$attributeName = $attributeName|]
       where
         attributeName :: Code
