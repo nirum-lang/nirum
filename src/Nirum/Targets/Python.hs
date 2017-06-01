@@ -44,6 +44,7 @@ module Nirum.Targets.Python ( Code
                             , unionInstallRequires
                             ) where
 
+import Control.Monad (forM)
 import qualified Control.Monad.State as ST
 import qualified Data.List as L
 import Data.Maybe (catMaybes, fromMaybe)
@@ -134,7 +135,7 @@ import Nirum.Package.Metadata ( Author (Author, name, email)
 import qualified Nirum.Package.ModuleSet as MS
 
 minimumRuntime :: SV.Version
-minimumRuntime = SV.version 0 3 9 [] []
+minimumRuntime = SV.version 0 4 0 [] []
 
 data Python = Python { packageName :: T.Text
                      , minimumRuntimeVersion :: SV.Version
@@ -302,6 +303,32 @@ toIndentedCodes :: (a -> T.Text) -> [a] -> T.Text -> T.Text
 toIndentedCodes f traversable concatenator =
     T.intercalate concatenator $ map f traversable
 
+compileParameters :: (ParameterName -> ParameterType -> Code)
+                  -> [(T.Text, Code)]
+                  -> Code
+compileParameters gen nameTypePairs =
+    toIndentedCodes (uncurry gen) nameTypePairs ", "
+
+compileFieldInitializers :: DS.DeclarationSet Field -> CodeGen Code
+compileFieldInitializers fields = do
+    initializers <- forM (toList fields) compileFieldInitializer
+    return $ T.intercalate "\n        " initializers
+  where
+    compileFieldInitializer :: Field -> CodeGen Code
+    compileFieldInitializer (Field fieldName' fieldType' _) =
+        case fieldType' of
+            SetModifier _ ->
+                return [qq|self.$attributeName = frozenset($attributeName)|]
+            ListModifier _ -> do
+                let imports = [("nirum.datastructures", ["list_type"])]
+                insertThirdPartyImports imports
+                return [qq|self.$attributeName = list_type($attributeName)|]
+            _ -> return [qq|self.$attributeName = $attributeName|]
+      where
+        attributeName :: Code
+        attributeName = toAttributeName' fieldName'
+
+
 quote :: T.Text -> T.Text
 quote s = [qq|'{s}'|]
 
@@ -384,6 +411,7 @@ returnCompiler = do
                         Python2 -> ""
                         Python3 -> [qq| -> $r|]
 
+
 compileUnionTag :: Source -> Name -> Tag -> CodeGen Code
 compileUnionTag source parentname d@(Tag typename' fields _) = do
     typeExprCodes <- mapM (compileTypeExpression source)
@@ -402,9 +430,6 @@ compileUnionTag source parentname d@(Tag typename' fields _) = do
           where
             attributes :: T.Text
             attributes = toIndentedCodes (\ n -> [qq|self.{n}|]) tagNames ", "
-        initialArgs gen = toIndentedCodes (uncurry gen) nameNTypes ", "
-        initialValues =
-            toIndentedCodes (\ n -> [qq|self.{n} = {n}|]) tagNames "\n        "
         nameMaps = toIndentedCodes
             toNamePair
             (map fieldName $ toList fields)
@@ -416,6 +441,7 @@ compileUnionTag source parentname d@(Tag typename' fields _) = do
     typeRepr <- typeReprCompiler
     arg <- parameterCompiler
     ret <- returnCompiler
+    initializers <- compileFieldInitializers fields
     return [qq|
 class $className($parentClass):
 {compileDocstringWithFields "    " d fields}
@@ -430,8 +456,8 @@ class $className($parentClass):
         $nameMaps
     ])
 
-    def __init__(self, {initialArgs arg}){ ret "None" }:
-        $initialValues
+    def __init__(self, {compileParameters arg nameNTypes}){ ret "None" }:
+        $initializers
         validate_union_type(self)
 
     def __repr__(self){ ret "str" }:
@@ -630,9 +656,6 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
         slotTypes = toIndentedCodes
             (\ (n, t) -> [qq|'{n}': {t}|]) nameTypePairs ",\n        "
         slots = toIndentedCodes (\ n -> [qq|'{n}'|]) fieldNames ",\n        "
-        initialArgs gen = toIndentedCodes (uncurry gen) nameTypePairs ", "
-        initialValues = toIndentedCodes
-            (\ n -> [qq|self.{n} = {n}|]) fieldNames "\n        "
         nameMaps = toIndentedCodes
             toNamePair
             (map fieldName $ toList fields)
@@ -647,6 +670,7 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
     arg <- parameterCompiler
     ret <- returnCompiler
     typeRepr <- typeReprCompiler
+    initializers <- compileFieldInitializers fields
     let clsType = arg "cls" "type"
     return [qq|
 class $className(object):
@@ -664,8 +688,8 @@ class $className(object):
         $nameMaps
     ])
 
-    def __init__(self, {initialArgs arg}){ret "None"}:
-        $initialValues
+    def __init__(self, {compileParameters arg nameTypePairs}){ret "None"}:
+        $initializers
         validate_record_type(self)
 
     def __repr__(self){ret "bool"}:

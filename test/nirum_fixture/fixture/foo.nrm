@@ -13,7 +13,7 @@ type irum = name;
 enum gender
     # Enum docs.
     = female/yeoseong
-    | male 
+    | male
     ;
 enum eva-char = soryu-asuka-langley
               | ayanami-rei
@@ -67,6 +67,15 @@ union status = run
              | stop
              ;
 
+record song (
+  text name,
+);
+
+record album (
+  text name,
+  [song] tracks,
+);
+
 service null-service ();
 
 @error
@@ -81,4 +90,13 @@ service ping-service (
         text nonce,
         # Parameter docs.
     ) throws rpc-error,
+);
+
+record person (
+  irum first-name,
+  irum last-name,
+);
+
+record people (
+  {person} people
 );
