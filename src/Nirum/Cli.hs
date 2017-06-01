@@ -1,18 +1,22 @@
 {-# LANGUAGE ExtendedDefaultRules, QuasiQuotes #-}
 module Nirum.Cli (main, writeFiles) where
 
-import Control.Monad (forM_)
+import Control.Concurrent (threadDelay)
+import Control.Monad (forM_, forever, when)
 import GHC.Exts (IsList (toList))
+import System.IO
 
 import qualified Data.ByteString as B
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
+import Control.Concurrent.STM (atomically, newTVar, readTVar, TVar, writeTVar)
 import Data.Monoid ((<>))
 import qualified Options.Applicative as OPT
 import System.Directory (createDirectoryIfMissing)
 import System.Exit (die)
-import System.FilePath (takeDirectory, (</>))
+import System.FilePath (takeDirectory, takeExtension, (</>))
+import System.FSNotify
 import Text.InterpolatedString.Perl6 (qq)
 import Text.Megaparsec (Token)
 import Text.Megaparsec.Error ( Dec
@@ -31,7 +35,6 @@ import Nirum.Package ( PackageError ( ImportError
                                     )
                      , scanModules
                      )
-import Nirum.Package.Metadata (TargetName)
 import Nirum.Package.ModuleSet ( ImportError ( CircularImportError
                                              , MissingImportError
                                              , MissingModulePathError
@@ -43,6 +46,26 @@ import Nirum.Targets ( BuildError (CompileError, PackageError, TargetNameError)
                      , targetNames
                      )
 import Nirum.Version (versionString)
+
+type TFlag = TVar Bool
+type Nanosecond = Int
+
+data Opts = Opts { outDirectory :: !String
+                 , targetOption :: !String
+                 , watch :: !Bool
+                 , packageDirectory :: !String
+                 }
+
+data AppOptions = AppOptions { outputPath :: FilePath
+                             , packagePath :: FilePath
+                             , targetLanguage :: T.Text
+                             , watching :: Bool
+                             , building :: TFlag
+                             , changed :: TFlag
+                             }
+
+debounceDelay :: Nanosecond
+debounceDelay = 1 * 1000 * 1000
 
 parseErrortoPrettyMessage :: ParseError (Token T.Text) Dec
                           -> FilePath
@@ -113,12 +136,15 @@ importErrorsToPrettyMessage importErrors =
 targetNamesText :: T.Text
 targetNamesText = T.intercalate ", " $ S.toAscList targetNames
 
-runCli :: FilePath -> FilePath -> TargetName -> IO ()
-runCli src outDir target = do
+build :: AppOptions -> IO ()
+build options@AppOptions { packagePath = src
+                         , outputPath = outDir
+                         , targetLanguage = target
+                         } = do
     result <- buildPackage target src
     case result of
         Left (TargetNameError targetName') ->
-            die [qq|Couldn't find "$targetName'" target.
+            tryDie' [qq|Couldn't find "$targetName'" target.
 Available targets: $targetNamesText|]
         Left (PackageError (ParseError modulePath error')) -> do
             {- FIXME: find more efficient way to determine filename from
@@ -127,20 +153,22 @@ Available targets: $targetNamesText|]
             case M.lookup modulePath filePaths of
                 Just filePath' -> do
                     m <- parseErrortoPrettyMessage error' filePath'
-                    die m
-                Nothing -> die [qq|$modulePath not found|]
+                    tryDie' m
+                Nothing -> tryDie' [qq|$modulePath not found|]
         Left (PackageError (ImportError importErrors)) ->
-            die [qq|Import error:
+            tryDie' [qq|Import error:
 {importErrorsToPrettyMessage importErrors}
 |]
         Left (PackageError (ScanError _ error')) ->
-            die [qq|Scan error: $error'|]
+            tryDie' [qq|Scan error: $error'|]
         Left (PackageError (MetadataError error')) ->
-            die [qq|Metadata error: $error'|]
+            tryDie' [qq|Metadata error: $error'|]
         Left (CompileError errors) ->
             forM_ (M.toList errors) $ \ (filePath, compileError) ->
-                die [qq|error: $filePath: $compileError|]
+                tryDie' [qq|error: $filePath: $compileError|]
         Right buildResult -> writeFiles outDir buildResult
+  where
+    tryDie' = tryDie options
 
 writeFiles :: FilePath -> BuildResult -> IO ()
 writeFiles outDir files =
@@ -150,18 +178,67 @@ writeFiles outDir files =
         putStrLn outPath
         B.writeFile outPath code
 
-data Opts = Opts { outDirectory :: !String
-                 , targetOption :: !String
-                 , packageDirectory :: !String
-                 }
+
+onFileChanged :: AppOptions -> Event -> IO ()
+onFileChanged
+    options@AppOptions { building = building'
+                       , changed = changed'
+                       }
+                       event
+  | takeExtension path == ".nrm" = do
+        atomically $ writeTVar changed' True
+        buildable <- atomically $ do
+            b <- readTVar building'
+            writeTVar building' True
+            return $ not b
+        when buildable $ do
+            threadDelay debounceDelay
+            reactiveBuild options
+  | otherwise = return ()
+  where
+    path :: FilePath
+    path = eventPath event
+
+reactiveBuild :: AppOptions -> IO ()
+reactiveBuild options@AppOptions { building = building'
+                                 , changed = changed'
+                                 } = do
+    changed'' <- atomically $ readTVar changed'
+    when changed'' $ do
+        atomically $ writeTVar changed' False
+        build options
+        atomically $ writeTVar building' False
+        changedDuringBuild <- atomically $ readTVar changed'
+        when changedDuringBuild $ reactiveBuild options
+
+tryDie :: AppOptions -> String -> IO ()
+tryDie AppOptions { watching = watching' } errorMessage
+  | watching' = hPutStrLn stderr errorMessage
+  | otherwise = die errorMessage
 
 main :: IO ()
-main = do
+main =
+  withManager $ \ mgr -> do
     opts <- OPT.execParser optsParser
-    let packageDirectoryPath = packageDirectory opts
-        outDirectoryPath = outDirectory opts
-        targetName = T.pack $ targetOption opts
-    runCli packageDirectoryPath outDirectoryPath targetName
+    building' <- atomically $ newTVar False
+    changed' <- atomically $ newTVar True
+    let watch' = watch opts
+        packagePath' = packageDirectory opts
+        options = AppOptions
+            { outputPath = outDirectory opts
+            , packagePath = packagePath'
+            , targetLanguage = T.pack $ targetOption opts
+            , watching = watch'
+            , building = building'
+            , changed = changed'
+            }
+
+    when watch' $ do
+        _ <- watchDir mgr packagePath' (const True) (onFileChanged options)
+        return ()
+    reactiveBuild options
+    -- sleep forever (until interrupted)
+    when watch' $ forever $ threadDelay 1000000
   where
     optsParser :: OPT.ParserInfo Opts
     optsParser =
@@ -185,5 +262,8 @@ main = do
             (OPT.long "target" <> OPT.short 't' <> OPT.metavar "TARGET" <>
              OPT.help [qq|Target language name.
                           Available: $targetNamesText|]) <*>
+        OPT.switch
+            (OPT.long "watch" <> OPT.short 'w' <>
+             OPT.help "Watch files for change and rebuild") <*>
         OPT.strArgument
             (OPT.metavar "DIR" <> OPT.help "Package directory")
