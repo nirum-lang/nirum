@@ -80,17 +80,9 @@ Using Haskell Stack:
 
     $ stack build
 
-Using vanilla Cabal:
-
-    $ cabal sandbox init
-    $ cabal install --only-dependencies
-    $ cabal configure
-    $ cabal build
-
 You can run the test suite of Nirum:
 
     $ stack test  # using Hasekll Stack
-    $ cabal test  # using Haskell Platform
     $ ./lint.sh   # run style lint as well
 
 [5]: https://www.haskell.org/platform/

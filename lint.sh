@@ -17,18 +17,11 @@ EOF
   chmod +x .git/hooks/pre-commit
 fi
 
-if [[ "$(which stack)" != "" ]] && stack --help | head -n1 | grep -qi haskell
-then
-  stack test hlint
-  if [[ "$(stack exec scan -- -v)" = "" ]]; then
-    stack install scan
-  fi
-  scan=(stack exec scan --)
-else
-  cabal test hlint
-  cabal install scan
-  scan=(scan)
+stack test hlint
+if [[ "$(stack exec scan -- -v)" = "" ]]; then
+  stack install scan
 fi
+scan=(stack exec scan --)
 
 # Haskell style scanner doesn't provide proper exit code ---
 # it always exists with zero even if it found errors.
