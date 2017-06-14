@@ -16,7 +16,7 @@ description: ! >
 category: Language
 author: Nirum team
 maintainer: Nirum team
-copyright: (c) 2017 Nirum team
+copyright: (c) 2016–2017 Nirum team
 license: GPL-3
 homepage: https://github.com/spoqa/nirum
 bug-reports: https://github.com/spoqa/nirum/issues
@@ -32,35 +32,6 @@ library:
   ghc-options:
   - -fwarn-incomplete-uni-patterns
   - -fprint-explicit-kinds
-  exposed-modules:
-  - Nirum.Cli
-  - Nirum.CodeBuilder
-  - Nirum.CodeGen
-  - Nirum.Constructs
-  - Nirum.Constructs.Annotation
-  - Nirum.Constructs.Annotation.Internal
-  - Nirum.Constructs.Declaration
-  - Nirum.Constructs.DeclarationSet
-  - Nirum.Constructs.Docs
-  - Nirum.Constructs.Identifier
-  - Nirum.Constructs.Module
-  - Nirum.Constructs.ModulePath
-  - Nirum.Constructs.Name
-  - Nirum.Constructs.Service
-  - Nirum.Constructs.TypeDeclaration
-  - Nirum.Constructs.TypeExpression
-  - Nirum.Docs
-  - Nirum.Docs.Html
-  - Nirum.Docs.ReStructuredText
-  - Nirum.Package
-  - Nirum.Package.Metadata
-  - Nirum.Package.ModuleSet
-  - Nirum.Parser
-  - Nirum.Targets
-  - Nirum.Targets.Docs
-  - Nirum.Targets.List
-  - Nirum.Targets.Python
-  - Nirum.Version
   dependencies:
   - base >=4.7 && <5
   - blaze-html >=0.8.1.3 && <0.9
