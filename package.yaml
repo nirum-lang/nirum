@@ -1,0 +1,149 @@
+name: nirum
+version: '0.3.0'
+synopsis: ! >
+  IDL compiler and RPC/distributed object framework for microservices
+description: ! >
+  Nirum is an IDL compiler and RPC/distributed object
+  framework for microservices, built on top of the modern
+  Web server technologies such as RESTful HTTP and JSON.
+
+
+  You can find how its IDL looks like from source codes in
+  the examples/ directory.
+
+
+  See also README.md for more details.
+category: Language
+author: Nirum team
+maintainer: Nirum team
+copyright: (c) 2017 Nirum team
+license: GPL-3
+homepage: https://github.com/spoqa/nirum
+bug-reports: https://github.com/spoqa/nirum/issues
+extra-source-files:
+- README.md
+default-extensions:
+- OverloadedStrings
+ghc-options:
+- -Wall
+- -Werror
+library:
+  source-dirs: src
+  ghc-options:
+  - -fwarn-incomplete-uni-patterns
+  - -fprint-explicit-kinds
+  exposed-modules:
+  - Nirum.Cli
+  - Nirum.CodeBuilder
+  - Nirum.CodeGen
+  - Nirum.Constructs
+  - Nirum.Constructs.Annotation
+  - Nirum.Constructs.Annotation.Internal
+  - Nirum.Constructs.Declaration
+  - Nirum.Constructs.DeclarationSet
+  - Nirum.Constructs.Docs
+  - Nirum.Constructs.Identifier
+  - Nirum.Constructs.Module
+  - Nirum.Constructs.ModulePath
+  - Nirum.Constructs.Name
+  - Nirum.Constructs.Service
+  - Nirum.Constructs.TypeDeclaration
+  - Nirum.Constructs.TypeExpression
+  - Nirum.Docs
+  - Nirum.Docs.Html
+  - Nirum.Docs.ReStructuredText
+  - Nirum.Package
+  - Nirum.Package.Metadata
+  - Nirum.Package.ModuleSet
+  - Nirum.Parser
+  - Nirum.Targets
+  - Nirum.Targets.Docs
+  - Nirum.Targets.List
+  - Nirum.Targets.Python
+  - Nirum.Version
+  dependencies:
+  - base >=4.7 && <5
+  - blaze-html >=0.8.1.3 && <0.9
+  - blaze-markup >=0.7.1.1 && <0.8
+  - bytestring
+  - cmark >=0.5 && <0.6
+  - containers >=0.5.6.2 && <0.6
+  - directory >=1.2.5 && <1.4
+  - email-validate >=2.0.0 && <3.0.0
+  - filepath >=1.4 && <1.5
+  - fsnotify >=0.2.1 && <0.3.0
+  - htoml >=1.0.0.0 && <1.1.0.0
+  - interpolatedstring-perl6 >=1.0.0 && <1.1.0
+  - megaparsec >=5 && <5.3
+  - mtl >=2.2.1 && <3
+  - optparse-applicative >=0.13.1 && <0.14
+  - parsec
+  - pretty >=1.1.3 && <2
+  - semver >=0.3.0 && <1.0
+  - shakespeare >=2.0.12 && <2.1
+  - stm >=2.4.4.1
+  - template-haskell >=2.11 && <3
+  - text >=0.9.1.0 && <1.3
+  - unordered-containers
+  - uri >=0.1 && <1.0
+executables:
+  nirum:
+    main: Main.hs
+    ghc-options:
+    - -fwarn-incomplete-uni-patterns
+    - -threaded
+    - -with-rtsopts=-N
+    dependencies:
+    - base >=4.7 && <5
+    - nirum
+  nirum-static:
+    main: Main.hs
+    ghc-options:
+    - -fwarn-incomplete-uni-patterns
+    - -threaded
+    - -with-rtsopts=-N
+    - -static
+    dependencies:
+    - base >=4.7 && <5
+    - nirum
+tests:
+  hlint:
+    main: HLint.hs
+    source-dirs: test
+    dependencies:
+    - base
+    - hlint >=1.9 && <2
+  spec:
+    main: Spec.hs
+    source-dirs: test
+    ghc-options:
+    - -fno-warn-incomplete-uni-patterns
+    - -fno-warn-missing-signatures
+    - -threaded
+    - -with-rtsopts=-N
+    dependencies:
+    - base
+    - blaze-html
+    - bytestring
+    - containers
+    - directory
+    - email-validate
+    - filepath
+    - hspec
+    - hspec-core
+    - hspec-meta
+    - htoml
+    - interpolatedstring-perl6
+    - megaparsec
+    - mtl
+    - nirum
+    - parsec
+    - pretty
+    - process >=1.1 && <2
+    - semigroups
+    - semver
+    - string-qq >=0.0.2 && <0.1.0
+    - temporary >=1.2 && <1.3
+    - text
+    - unordered-containers
+stability: alpha
