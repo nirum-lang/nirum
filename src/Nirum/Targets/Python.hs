@@ -135,7 +135,7 @@ import Nirum.Package.Metadata ( Author (Author, name, email)
 import qualified Nirum.Package.ModuleSet as MS
 
 minimumRuntime :: SV.Version
-minimumRuntime = SV.version 0 5 1 [] []
+minimumRuntime = SV.version 0 6 0 [] []
 
 data Python = Python { packageName :: T.Text
                      , minimumRuntimeVersion :: SV.Version
@@ -420,7 +420,7 @@ compileUnionTag source parentname d@(Tag typename' fields _) = do
         tagNames = map (toAttributeName' . fieldName) (toList fields)
         nameNTypes = zip tagNames typeExprCodes
         slotTypes = toIndentedCodes
-            (\ (n, t) -> [qq|'{n}': {t}|]) nameNTypes ",\n        "
+            (\ (n, t) -> [qq|('{n}', {t})|]) nameNTypes ",\n        "
         slots = if length tagNames == 1
                 then [qq|'{head tagNames}'|] `T.snoc` ','
                 else toIndentedCodes (\ n -> [qq|'{n}'|]) tagNames ",\n        "
@@ -449,12 +449,13 @@ class $className($parentClass):
         $slots
     )
     __nirum_tag__ = $parentClass.Tag.{toAttributeName' typename'}
-    __nirum_tag_types__ = \{
-        $slotTypes
-    \}
     __nirum_tag_names__ = name_dict_type([
         $nameMaps
     ])
+
+    @staticmethod
+    def __nirum_tag_types__():
+        return [$slotTypes]
 
     def __init__(self, {compileParameters arg nameNTypes}){ ret "None" }:
         $initializers
@@ -574,7 +575,9 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
     return [qq|
 class $className(object):
 {compileDocstring "    " d}
-    __nirum_inner_type__ = $itypeExpr
+    @staticmethod
+    def __nirum_get_inner_type__():
+        return $itypeExpr
 
     def __init__(self, { arg "value" itypeExpr }){ ret "None" }:
         validate_boxed_type(value, $itypeExpr)
@@ -681,12 +684,11 @@ class $className(object):
     __nirum_record_behind_name__ = (
         '{I.toSnakeCaseText $ N.behindName typename'}'
     )
-    __nirum_field_types__ = \{
-        $slotTypes
-    \}
-    __nirum_field_names__ = name_dict_type([
-        $nameMaps
-    ])
+    __nirum_field_names__ = name_dict_type([$nameMaps])
+
+    @staticmethod
+    def __nirum_field_types__():
+        return \{$slotTypes\}
 
     def __init__(self, {compileParameters arg nameTypePairs}){ret "None"}:
         $initializers
@@ -742,9 +744,7 @@ class $className({T.intercalate "," $ compileExtendClasses annotations}):
 {compileDocstring "    " d}
 
     __nirum_union_behind_name__ = '{I.toSnakeCaseText $ N.behindName typename'}'
-    __nirum_field_names__ = name_dict_type([
-        $nameMaps
-    ])
+    __nirum_field_names__ = name_dict_type([$nameMaps])
 
     class Tag(enum.Enum):
         $enumMembers
@@ -826,7 +826,12 @@ class $className(service_type):
     __nirum_method_names__ = name_dict_type([
         $methodNameMap
     ])
-    __nirum_method_error_types__ = dict([$methodErrorTypes'])
+
+    @staticmethod
+    def __nirum_method_error_types__(k, d=None):
+        return dict([
+            $methodErrorTypes'
+        ]).get(k, d)
 
     {dummyMethods'}
 
@@ -883,7 +888,8 @@ class {className}_Client(client_type, $className):
         let paramMetadata' = commaNl paramMetadata
         insertThirdPartyImports [("nirum.constructs", ["name_dict_type"])]
         return [qq|'{toAttributeName' mName}': \{
-            '_return': $rtypeExpr,
+            '_v': 2,
+            '_return': lambda: $rtypeExpr,
             '_names': name_dict_type([{paramNameMap params'}]),
             {paramMetadata'}
         \}|]
@@ -891,7 +897,7 @@ class {className}_Client(client_type, $className):
     compileParameterMetadata (Parameter pName pType _) = do
         let pName' = toAttributeName' pName
         pTypeExpr <- compileTypeExpression src pType
-        return [qq|'{pName'}': $pTypeExpr|]
+        return [qq|'{pName'}': lambda: $pTypeExpr|]
     methodNameMap :: T.Text
     methodNameMap = toIndentedCodes
         toNamePair
@@ -917,8 +923,9 @@ class {className}_Client(client_type, $className):
         return [qq|
     def {clientMethodName'}(self, {commaNl params'}){ ret rtypeExpr }:
         meta = self.__nirum_service_methods__['{clientMethodName'}']
+        rtype = meta['_return']() if meta.get('_v', 1) >= 2 else meta['_return']
         return deserialize_meta(
-            meta['_return'],
+            rtype,
             json.loads(
                 self.remote_call(
                     self.__nirum_method_names__['{clientMethodName'}'],
