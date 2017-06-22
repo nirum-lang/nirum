@@ -135,7 +135,7 @@ import Nirum.Package.Metadata ( Author (Author, name, email)
 import qualified Nirum.Package.ModuleSet as MS
 
 minimumRuntime :: SV.Version
-minimumRuntime = SV.version 0 4 0 [] []
+minimumRuntime = SV.version 0 5 1 [] []
 
 data Python = Python { packageName :: T.Text
                      , minimumRuntimeVersion :: SV.Version
