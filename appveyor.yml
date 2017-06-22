@@ -10,6 +10,7 @@ cache:
 install:
 - ps: Invoke-WebRequest -OutFile C:\upx391w.zip http://upx.sourceforge.net/download/upx391w.zip
 - 7z x -oC:\ C:\upx391w.zip
+- ps: set LANG=en_US
 - ps: ls C:\
 - ps: ls C:\upx391w
 - ps: $env:PATH = 'C:\upx391w;' + $env:PATH;
