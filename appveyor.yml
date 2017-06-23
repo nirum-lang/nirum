@@ -29,7 +29,7 @@ install:
     }
     $env:PATH = $env:STACK_ROOT + ';C:\msys64\usr\bin;' + $env:PATH;
 - if not exist "%LOCALAPPDATA%\Programs\stack" ( stack --no-terminal --skip-msys setup )
-- C:\Python35\python -m pip install --upgrade tox pip setuptools
+- C:\Python36\python -m pip install --upgrade tox pip setuptools
 build_script:
 - stack --no-terminal build --copy-bins
 after_build:
@@ -40,9 +40,8 @@ after_build:
 - ps: upx.exe -9 nirum-win-${env:PLATFORM}.exe
 test_script:
 - stack test
-# FIXME: duplicate code with test.sh
-- stack exec -- nirum -o nirum_fixture -t python test/nirum_fixture
-- C:\Python35\Scripts\tox
+- C:\Python36\Scripts\tox -e devruntime
+- C:\Python36\Scripts\tox
 artifacts:
 - path: nirum-win-x86.exe
 - path: nirum-win-x64.exe
