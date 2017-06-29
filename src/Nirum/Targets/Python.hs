@@ -79,6 +79,7 @@ import Nirum.Constructs.ModulePath ( ModulePath
 import Nirum.Constructs.Name (Name (Name))
 import qualified Nirum.Constructs.Name as N
 import Nirum.Constructs.Service ( Method ( Method
+                                         , errorType
                                          , methodName
                                          , parameters
                                          , returnType
@@ -345,10 +346,6 @@ compileFieldInitializers fields = do
         attributeName :: Code
         attributeName = toAttributeName' fieldName'
 
-
-quote :: T.Text -> T.Text
-quote s = [qq|'{s}'|]
-
 compileDocs :: Documented a => a -> Maybe ReStructuredText
 compileDocs = fmap render . docsBlock
 
@@ -419,14 +416,16 @@ parameterCompiler = do
     ver <- getPythonVersion
     return $ \ n t -> case ver of
                           Python2 -> n
-                          Python3 -> [qq|$n: $t|]
+                          Python3 -> [qq|$n: '{t}'|]
 
 returnCompiler :: CodeGen (ReturnType -> Code)
 returnCompiler = do
     ver <- getPythonVersion
-    return $ \ r -> case ver of
-                        Python2 -> ""
-                        Python3 -> [qq| -> $r|]
+    return $ \ r ->
+        case (ver, r) of
+            (Python2, _) -> ""
+            (Python3, "None") -> [qq| -> None|]
+            (Python3, _) -> [qq| -> '{r}'|]
 
 
 compileUnionTag :: Source -> Name -> Tag -> CodeGen Code
@@ -618,7 +617,7 @@ class $className(object):
     def __nirum_deserialize__(
         {arg "cls" "type"},
         {arg "value" "typing.Any"}
-    ){ ret $ quote className }:
+    ){ ret className }:
         return deserialize_boxed_type(cls, value)
 
     def __repr__(self){ ret "str" }:
@@ -660,7 +659,7 @@ $memberNames
     def __nirum_deserialize__(
         {arg "cls" "type"},
         {arg "value" "str"}
-    ){ ret $ quote className }:
+    ){ ret className }:
         return cls(value.replace('-', '_'))  # FIXME: validate input
 |]
 compileTypeDeclaration src d@TypeDeclaration { typename = typename'
@@ -735,7 +734,7 @@ class $className(object):
         return serialize_record_type(self)
 
     @classmethod
-    def __nirum_deserialize__($clsType, value){ ret $ quote className }:
+    def __nirum_deserialize__($clsType, value){ ret className }:
         return deserialize_record_type(cls, value)
 
     def __hash__(self){ret "int"}:
@@ -786,7 +785,7 @@ class $className({T.intercalate "," $ compileExtendClasses annotations}):
     @classmethod
     def __nirum_deserialize__(
         {arg "cls" "type"}, value
-    ){ ret $ quote className }:
+    ){ ret className }:
         return deserialize_union_type(cls, value)
 
 
@@ -832,16 +831,16 @@ compileTypeDeclaration
         clientMethods' = T.intercalate "\n\n" clientMethods
         methodErrorTypes' =
             T.intercalate "," $ catMaybes methodErrorTypes
+    param <- parameterCompiler
+    ret <- returnCompiler
     insertStandardImport "json"
     insertThirdPartyImports [ ("nirum.deserialize", ["deserialize_meta"])
                             , ("nirum.serialize", ["serialize_meta"])
                             ]
     insertThirdPartyImportsA
         [ ("nirum.constructs", [("name_dict_type", "NameDict")])
-        , ("nirum.rpc", [ ("service_type", "Service")
-                        , ("client_type", "Client")
-                        ]
-          )
+        , ("nirum.rpc", [("service_type", "Service")])
+        , ("nirum.transport", [("transport_type", "Transport")])
         ]
     return [qq|
 class $className(service_type):
@@ -865,9 +864,19 @@ class $className(service_type):
 
 # FIXME client MUST be generated & saved on diffrent module
 #       where service isn't included.
-class {className}_Client(client_type, $className):
+class {className}_Client($className):
+    """The client object of :class:`{className}`."""
+
+    def __init__(self,
+                 { param "transport" "transport_type" }){ ret "None" }:
+        if not isinstance(transport, transport_type):
+            raise TypeError(
+                'expected an instance of \{0.__module__\}.\{0.__name__\}, not '
+                '\{1!r\}'.format(transport_type, transport)
+            )
+        self.__nirum_transport__ = transport  # type: transport_type
+
     {clientMethods'}
-    pass
 |]
   where
     className :: T.Text
@@ -937,30 +946,43 @@ class {className}_Client(client_type, $className):
     compileClientPayload :: Parameter -> CodeGen Code
     compileClientPayload (Parameter pName _ _) = do
         let pName' = toAttributeName' pName
-        return [qq|meta['_names']['{pName'}']: serialize_meta({pName'})|]
+        return [qq|'{I.toSnakeCaseText $ N.behindName pName}':
+                   serialize_meta({pName'})|]
     compileClientMethod :: Method -> CodeGen Code
     compileClientMethod Method { methodName = mName
                                , parameters = params
                                , returnType = rtype
+                               , errorType = etypeM
                                } = do
         let clientMethodName' = toAttributeName' mName
         params' <- mapM compileMethodParameter $ toList params
         rtypeExpr <- compileTypeExpression src rtype
+        errorCode <- case etypeM of
+             Just e -> do
+                e' <- compileTypeExpression src e
+                return $ "result_type = " `T.append` e'
+             Nothing ->
+                return "raise UnexpectedNirumResponseError(serialized)"
         payloadArguments <- mapM compileClientPayload $ toList params
         ret <- returnCompiler
         return [qq|
-    def {clientMethodName'}(self, {commaNl params'}){ ret rtypeExpr }:
-        meta = self.__nirum_service_methods__['{clientMethodName'}']
-        rtype = meta['_return']() if meta.get('_v', 1) >= 2 else meta['_return']
-        return deserialize_meta(
-            rtype,
-            json.loads(
-                self.remote_call(
-                    self.__nirum_method_names__['{clientMethodName'}'],
-                    payload=\{{commaNl payloadArguments}\}
-                )
-            )
+    def {clientMethodName'}(self, {commaNl params'}){ret rtypeExpr}:
+        successful, serialized = self.__nirum_transport__(
+            '{I.toSnakeCaseText $ N.behindName mName}',
+            payload=\{{commaNl payloadArguments}\},
+            # FIXME Give annotations.
+            service_annotations=\{\},
+            method_annotations=\{\},
+            parameter_annotations=\{\}
         )
+        if successful:
+            result_type = $rtypeExpr
+        else:
+            $errorCode
+        result = deserialize_meta(result_type, serialized)
+        if successful:
+            return result
+        raise result
 |]
 
 compileTypeDeclaration _ Import {} =
