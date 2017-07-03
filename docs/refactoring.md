@@ -49,7 +49,7 @@ class Point2d:
         self.top = top
 ~~~
 
-For example, `Point(left=1.23, top=4.56)` value is serialized to the following
+For example, `Point2d(left=1.23, top=4.56)` value is serialized to the following
 JSON payload:
 
 ~~~ json
