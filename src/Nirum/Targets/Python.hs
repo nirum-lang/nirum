@@ -31,6 +31,8 @@ module Nirum.Targets.Python ( Code
                             , insertLocalImport
                             , insertStandardImport
                             , insertThirdPartyImports
+                            , insertThirdPartyImportsA
+                            , localImportsMap
                             , minimumRuntime
                             , parseModulePath
                             , renameModulePath
@@ -161,11 +163,15 @@ instance Failure CodeGenContext CompileError' where
 
 data CodeGenContext
     = CodeGenContext { standardImports :: S.Set T.Text
-                     , thirdPartyImports :: M.Map T.Text (S.Set T.Text)
+                     , thirdPartyImports :: M.Map T.Text (M.Map T.Text T.Text)
                      , localImports :: M.Map T.Text (S.Set T.Text)
                      , pythonVersion :: PythonVersion
                      }
     deriving (Eq, Ord, Show)
+
+localImportsMap :: CodeGenContext -> M.Map T.Text (M.Map T.Text T.Text)
+localImportsMap CodeGenContext { localImports = imports } =
+    M.map (M.fromSet id) imports
 
 sourceDirectory :: PythonVersion -> T.Text
 sourceDirectory Python2 = "src-py2"
@@ -192,12 +198,21 @@ insertStandardImport module' = ST.modify insert'
         c { standardImports = S.insert module' si }
 
 insertThirdPartyImports :: [(T.Text, S.Set T.Text)] -> CodeGen ()
-insertThirdPartyImports imports = ST.modify insert'
+insertThirdPartyImports imports =
+    insertThirdPartyImportsA [ (from, M.fromSet id objects)
+                             | (from, objects) <- imports
+                             ]
+
+insertThirdPartyImportsA :: [(T.Text, M.Map T.Text T.Text)] -> CodeGen ()
+insertThirdPartyImportsA imports =
+    ST.modify insert'
   where
     insert' c@CodeGenContext { thirdPartyImports = ti } =
-        c { thirdPartyImports = L.foldl (M.unionWith S.union) ti importList }
-    importList :: [M.Map T.Text (S.Set T.Text)]
-    importList = map (uncurry M.singleton) imports
+        c { thirdPartyImports = L.foldl (M.unionWith M.union) ti importList }
+    importList :: [M.Map T.Text (M.Map T.Text T.Text)]
+    importList = [ M.singleton from objects
+                 | (from, objects) <- imports
+                 ]
 
 insertLocalImport :: T.Text -> T.Text -> CodeGen ()
 insertLocalImport module' object = ST.modify insert'
@@ -320,8 +335,10 @@ compileFieldInitializers fields = do
             SetModifier _ ->
                 return [qq|self.$attributeName = frozenset($attributeName)|]
             ListModifier _ -> do
-                let imports = [("nirum.datastructures", ["list_type"])]
-                insertThirdPartyImports imports
+                insertThirdPartyImportsA [ ( "nirum.datastructures"
+                                           , [("list_type", "List")]
+                                           )
+                                         ]
                 return [qq|self.$attributeName = list_type($attributeName)|]
             _ -> return [qq|self.$attributeName = $attributeName|]
       where
@@ -435,9 +452,10 @@ compileUnionTag source parentname d@(Tag typename' fields _) = do
             (map fieldName $ toList fields)
             ",\n        "
         parentClass = toClassName' parentname
-    insertThirdPartyImports [ ("nirum.validate", ["validate_union_type"])
-                            , ("nirum.constructs", ["name_dict_type"])
-                            ]
+    insertThirdPartyImportsA
+        [ ("nirum.validate", [("validate_union_type", "validate_union_type")])
+        , ("nirum.constructs", [("name_dict_type", "NameDict")])
+        ]
     typeRepr <- typeReprCompiler
     arg <- parameterCompiler
     ret <- returnCompiler
@@ -668,8 +686,11 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
     insertThirdPartyImports [ ("nirum.validate", ["validate_record_type"])
                             , ("nirum.serialize", ["serialize_record_type"])
                             , ("nirum.deserialize", ["deserialize_record_type"])
-                            , ("nirum.constructs", ["name_dict_type"])
                             ]
+    insertThirdPartyImportsA [ ( "nirum.constructs"
+                               , [("name_dict_type", "NameDict")]
+                               )
+                             ]
     arg <- parameterCompiler
     ret <- returnCompiler
     typeRepr <- typeReprCompiler
@@ -734,8 +755,11 @@ compileTypeDeclaration src
     insertEnumImport
     insertThirdPartyImports [ ("nirum.serialize", ["serialize_union_type"])
                             , ("nirum.deserialize", ["deserialize_union_type"])
-                            , ("nirum.constructs", ["name_dict_type"])
                             ]
+    insertThirdPartyImportsA [ ( "nirum.constructs"
+                               , [("name_dict_type", "NameDict")]
+                               )
+                             ]
     typeRepr <- typeReprCompiler
     ret <- returnCompiler
     arg <- parameterCompiler
@@ -809,13 +833,16 @@ compileTypeDeclaration
         methodErrorTypes' =
             T.intercalate "," $ catMaybes methodErrorTypes
     insertStandardImport "json"
-    insertThirdPartyImports [ ("nirum.constructs", ["name_dict_type"])
-                            , ("nirum.deserialize", ["deserialize_meta"])
+    insertThirdPartyImports [ ("nirum.deserialize", ["deserialize_meta"])
                             , ("nirum.serialize", ["serialize_meta"])
-                            , ("nirum.rpc", [ "service_type"
-                                            , "client_type"
-                                            ])
                             ]
+    insertThirdPartyImportsA
+        [ ("nirum.constructs", [("name_dict_type", "NameDict")])
+        , ("nirum.rpc", [ ("service_type", "Service")
+                        , ("client_type", "Client")
+                        ]
+          )
+        ]
     return [qq|
 class $className(service_type):
 {compileDocstring "    " d}
@@ -886,7 +913,8 @@ class {className}_Client(client_type, $className):
         rtypeExpr <- compileTypeExpression src rtype
         paramMetadata <- mapM compileParameterMetadata params'
         let paramMetadata' = commaNl paramMetadata
-        insertThirdPartyImports [("nirum.constructs", ["name_dict_type"])]
+        insertThirdPartyImportsA
+            [("nirum.constructs", [("name_dict_type", "NameDict")])]
         return [qq|'{toAttributeName' mName}': \{
             '_v': 2,
             '_return': lambda: $rtypeExpr,
@@ -984,7 +1012,7 @@ compileModule pythonVersion' source =
 {compileDocstring "" $ sourceModule source}
 {imports $ standardImports context}
 
-{fromImports $ localImports context}
+{fromImports $ localImportsMap context}
 
 {fromImports $ thirdPartyImports context}
 
@@ -998,12 +1026,17 @@ compileModule pythonVersion' source =
         if S.null importSet
         then ""
         else "import " `T.append` T.intercalate "," (S.elems importSet)
-    fromImports :: M.Map T.Text (S.Set T.Text) -> T.Text
+    fromImports :: M.Map T.Text (M.Map T.Text T.Text) -> T.Text
     fromImports importMap =
         T.intercalate "\n"
-            [ [qq|from $from import {T.intercalate ", " $ S.elems vars}|]
-            | (from, vars) <- M.assocs importMap
+            [ [qq|from $from import {T.intercalate ", " $ map importString
+                                                        $ M.assocs objects}|]
+            | (from, objects) <- M.assocs importMap
             ]
+    importString :: (T.Text, T.Text) -> T.Text
+    importString (alias, var)
+      | var == alias = alias
+      | otherwise = [qq|$var as $alias|]
     has :: S.Set T.Text -> T.Text -> Bool
     has set module' = module' `S.member` set ||
                       any (T.isPrefixOf $ module' `T.snoc` '.') set

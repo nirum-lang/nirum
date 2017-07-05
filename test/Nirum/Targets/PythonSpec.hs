@@ -63,6 +63,8 @@ import Nirum.Targets.Python ( Source (Source)
                             , insertLocalImport
                             , insertStandardImport
                             , insertThirdPartyImports
+                            , insertThirdPartyImportsA
+                            , localImportsMap
                             , minimumRuntime
                             , parseModulePath
                             , renameModulePath
@@ -142,13 +144,30 @@ spec = parallel $ forM_ ([Python2, Python3] :: [PythonVersion]) $ \ ver -> do
                     insertLocalImport ".." "Gender"
                     insertStandardImport "os"
                     insertThirdPartyImports [("nirum", ["serialize_enum_type"])]
+                    insertThirdPartyImportsA
+                        [("nirum.constructs", [("name_dict_type", "NameDict")])]
                     insertLocalImport ".." "Path"
             let (e, ctx) = runCodeGen c empty'
             e `shouldSatisfy` isRight
             standardImports ctx `shouldBe` ["os", "sys"]
             thirdPartyImports ctx `shouldBe`
-                [("nirum", ["serialize_unboxed_type", "serialize_enum_type"])]
+                [ ( "nirum"
+                  , [ ("serialize_unboxed_type", "serialize_unboxed_type")
+                    , ("serialize_enum_type", "serialize_enum_type")
+                    ]
+                  )
+                , ( "nirum.constructs"
+                  , [("name_dict_type", "NameDict")]
+                  )
+                ]
             localImports ctx `shouldBe` [("..", ["Gender", "Path"])]
+            localImportsMap ctx `shouldBe`
+                [ ( ".."
+                  , [ ("Gender", "Gender")
+                    , ("Path", "Path")
+                    ]
+                  )
+                ]
         specify "insertStandardImport" $ do
             let codeGen1 = insertStandardImport "sys"
             let (e1, ctx1) = runCodeGen codeGen1 empty'
