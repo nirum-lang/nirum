@@ -2,7 +2,7 @@
 import enum
 
 from pytest import raises
-from nirum.rpc import Service
+from nirum.service import Service
 from six import PY3
 
 from fixture.foo import (CultureAgnosticName, EastAsianName,

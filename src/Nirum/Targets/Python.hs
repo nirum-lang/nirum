@@ -839,7 +839,7 @@ compileTypeDeclaration
                             ]
     insertThirdPartyImportsA
         [ ("nirum.constructs", [("name_dict_type", "NameDict")])
-        , ("nirum.rpc", [("service_type", "Service")])
+        , ("nirum.service", [("service_type", "Service")])
         , ("nirum.transport", [("transport_type", "Transport")])
         ]
     return [qq|
