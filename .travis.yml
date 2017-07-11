@@ -16,9 +16,6 @@ matrix:
         - python3.6
         - libgmp10
         - upx-ucl
-env:
-# Remove following environment variables after nirum-python 0.6.0 is released.
-- DEVRUNTIME_REPO=dahlia/nirum-python DEVRUNTIME_REF=transport
 cache:
   directories:
   - "$HOME/.stack"
