@@ -107,6 +107,10 @@ on GitHub!
 
 - [nirum-python](https://github.com/spoqa/nirum-python): The official Python
   runtime library for Nirum.
+    - [nirim-python-http](https://github.com/spoqa/nirum-python-http):
+      Nirum HTTP transport for Python.
+    - [nirum-python-wsgi](https://github.com/spoqa/nirum-python-wsgi):
+      Adapt Nirum services to WSGI apps.
 
 [7]: https://github.com/search?q=topic:nirum+fork:false
 [8]: https://github.com/blog/2309-introducing-topics

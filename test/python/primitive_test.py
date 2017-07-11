@@ -2,8 +2,8 @@
 import enum
 
 from pytest import raises
-from nirum.rpc import Service
-from six import PY3, text_type
+from nirum.service import Service
+from six import PY3
 
 from fixture.foo import (CultureAgnosticName, EastAsianName,
                          EvaChar, FloatUnbox, Gender, ImportedTypeUnbox, Irum,
@@ -238,9 +238,11 @@ def test_service():
     assert getattr(PingService, '__nirum_schema_version__') == '0.3.0'
     assert getattr(NullService, '__nirum_schema_version__') == '0.3.0'
     if PY3:
-        assert set(PingService.ping.__annotations__) == {'nonce', 'return'}
-        assert PingService.ping.__annotations__['nonce'] is text_type
-        assert PingService.ping.__annotations__['return'] is bool
+        import typing
+        annots = typing.get_type_hints(PingService.ping)
+        assert set(annots) == {'nonce', 'return'}
+        assert annots['nonce'] is str
+        assert annots['return'] is bool
     with raises(NotImplementedError):
         PingService().ping(u'nonce')
     with raises(NotImplementedError):

@@ -1,4 +1,5 @@
 module Nirum.Constructs.Service ( Method ( Method
+                                         , errorType
                                          , methodAnnotations
                                          , methodName
                                          , parameters
