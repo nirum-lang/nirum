@@ -419,6 +419,11 @@ tag = do
     tagName <- name <?> "union tag name"
     spaces
     paren <- optional $ char '('
+    spaces
+    frontDocs <- optional $ do
+        d <- docs <?> "union tag docs"
+        spaces
+        return d
     fields' <- case paren of
         Just _ -> do
             spaces
@@ -428,10 +433,12 @@ tag = do
             return f
         Nothing -> return empty
     spaces
-    docs' <- optional $ do
-        d <- docs <?> "union tag docs"
-        spaces
-        return d
+    docs' <- case frontDocs of
+        d@(Just _) -> return d
+        Nothing -> optional $ do
+            d <- docs <?> "union tag docs"
+            spaces
+            return d
     annotationSet'' <- annotationsWithDocs annotationSet' docs'
     return $ Tag tagName fields' annotationSet''
 

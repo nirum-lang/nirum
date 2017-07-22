@@ -23,16 +23,20 @@ record point (
     # Record type definition.
 
     offset left/x,
-    # for backward compatibility, you can specify *behind name*.
+    # For backward compatibility, you can specify *behind name*.
 
     offset top,
-    # trailing comma is okay
+    # Trailing comma is okay.
 );
 
 union shape
     # Type constructors in a sum type become translated to subtypes in OO
     # languages, and datatypes in functional languages.
-    = rectangle (point upper-left, point lower-right)
+    = rectangle (
+          # Each tag can have zero or more fields like record types.
+          point upper-left,
+          point lower-right
+      )
     | circle (point origin, offset radius)
     ;
 
