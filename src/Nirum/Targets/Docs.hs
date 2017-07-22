@@ -1,5 +1,10 @@
 {-# LANGUAGE OverloadedLists, QuasiQuotes, TypeFamilies #-}
-module Nirum.Targets.Docs (Docs, makeFilePath, makeUri, moduleTitle) where
+module Nirum.Targets.Docs ( Docs
+                          , blockToHtml
+                          , makeFilePath
+                          , makeUri
+                          , moduleTitle
+                          ) where
 
 import Data.Maybe (mapMaybe)
 import GHC.Exts (IsList (fromList, toList))
@@ -127,12 +132,15 @@ module' docsModule = layout pkg path $ [shamlet|
         m <- mod'
         moduleTitle m
 
+blockToHtml :: Block -> Html
+blockToHtml b = preEscapedToMarkup $ render b
+
 typeDecl :: BoundModule Docs -> Identifier -> TD.TypeDeclaration -> Html
 typeDecl mod' ident
          tc@TD.TypeDeclaration { TD.type' = TD.Alias cname } = [shamlet|
     <h2>type <code>#{toNormalizedText ident}</code>
     $maybe d <- docsBlock tc
-        <p>#{preEscapedToMarkup $ render d}
+        <p>#{blockToHtml d}
     <p>= <span class="canonical-type">#{typeExpression mod' cname}</span>
 |]
 typeDecl mod' ident
@@ -140,50 +148,50 @@ typeDecl mod' ident
     [shamlet|
         <h2>unboxed <code>#{toNormalizedText ident}</code>
         $maybe d <- docsBlock tc
-            <p>#{preEscapedToMarkup $ render d}
+            <p>#{blockToHtml d}
         <p>(<span class="inner-type">#{typeExpression mod' innerType}</span>)
     |]
 typeDecl _ ident
          tc@TD.TypeDeclaration { TD.type' = TD.EnumType members } = [shamlet|
     <h2>enum <code>#{toNormalizedText ident}</code>
     $maybe d <- docsBlock tc
-        <p>#{preEscapedToMarkup $ render d}
+        <p>#{blockToHtml d}
     <dl class="members">
         $forall decl <- DES.toList members
             <dt class="member-name"><code>#{nameText $ DE.name decl}</code>
                 <dd class="member-doc">
                     $maybe d <- docsBlock decl
-                        #{preEscapedToMarkup $ render d}
+                        #{blockToHtml d}
 |]
 typeDecl mod' ident
          tc@TD.TypeDeclaration { TD.type' = TD.RecordType fields } = [shamlet|
     <h2>record <code>#{toNormalizedText ident}</code>
     $maybe d <- docsBlock tc
-        <p>#{preEscapedToMarkup $ render d}
+        <p>#{blockToHtml d}
     <dl class="fields">
         $forall fieldDecl@(TD.Field _ fieldType _) <- DES.toList fields
             <dt class="field-name"><code>#{nameText $ DE.name fieldDecl}</code>
             <dd class="field-type">#{typeExpression mod' fieldType}
             $maybe d <- docsBlock fieldDecl
-                <dd>#{preEscapedToMarkup $ render d}
+                <dd>#{blockToHtml d}
 |]
 typeDecl mod' ident
          tc@TD.TypeDeclaration { TD.type' = TD.UnionType tags } = [shamlet|
     <h2>union <code>#{toNormalizedText ident}</code>
     $maybe d <- docsBlock tc
-        <p>#{preEscapedToMarkup $ render d}
+        <p>#{blockToHtml d}
     $forall tagDecl@(TD.Tag _ fields _) <- DES.toList tags
         <h3 class="tag">
             <code>#{nameText $ DE.name tagDecl}
         $maybe d <- docsBlock tagDecl
-            <p>#{preEscapedToMarkup $ render d}
+            <p>#{blockToHtml d}
         <dl class="fields">
             $forall fieldDecl@(TD.Field _ fieldType _) <- DES.toList fields
                 <dt class="field-name">
                     <code>#{nameText $ DE.name fieldDecl}
                 <dd class="field-type">#{typeExpression mod' fieldType}
                 $maybe d <- docsBlock fieldDecl
-                    <dd>#{preEscapedToMarkup $ render d}
+                    <dd>#{blockToHtml d}
 |]
 typeDecl _ ident
          TD.TypeDeclaration { TD.type' = TD.PrimitiveType {} } = [shamlet|
@@ -194,14 +202,14 @@ typeDecl mod' ident
     [shamlet|
         <h2>service <code>#{toNormalizedText ident}</code>
         $maybe d <- docsBlock tc
-            <p>#{preEscapedToMarkup $ render d}
+            <p>#{blockToHtml d}
         $forall methodDecl@(S.Method _ ps ret err _) <- DES.toList methods
             <h3 class="method">
                 <code class="method-name">#{nameText $ DE.name methodDecl}()
                 &rarr;
                 <code class="return-type">#{typeExpression mod' ret}
             $maybe d <- docsBlock methodDecl
-                <p>#{preEscapedToMarkup $ render d}
+                <p>#{blockToHtml d}
             $maybe errType <- err
                 <p class="error-type">#{typeExpression mod' errType}
             <dl class="parameters">
@@ -210,7 +218,7 @@ typeDecl mod' ident
                         <code>#{nameText $ DE.name paramDecl}
                     <dd class="parameter-type">#{typeExpression mod' paramType}
                     $maybe d <- docsBlock paramDecl
-                        <dd>#{preEscapedToMarkup $ render d}
+                        <dd>#{blockToHtml d}
 |]
 typeDecl _ _ TD.Import {} =
     error ("It shouldn't happen; please report it to Nirum's bug tracker:\n" ++
