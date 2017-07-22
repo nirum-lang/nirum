@@ -6,6 +6,7 @@ Nirum
 [![Docker Automated Build][docker-svg]][docker]
 [![Total lines of code][loc]][repo]
 [![Gitter][chat-svg]][chat]
+[![codecov][cov-svg]][cov]
 
 [ci-svg]: https://travis-ci.org/spoqa/nirum.svg
 [ci]: https://travis-ci.org/spoqa/nirum
@@ -17,6 +18,8 @@ Nirum
 [repo]: https://github.com/spoqa/nirum
 [chat-svg]: https://badges.gitter.im/spoqa/nirum.svg
 [chat]: https://gitter.im/spoqa/nirum?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge
+[cov-svg]: https://codecov.io/gh/spoqa/nirum/branch/master/graph/badge.svg
+[cov]: https://codecov.io/gh/spoqa/nirum
 
 Nirum is an [IDL][1] compiler and [RPC][2]/[distributed object][3] framework
 for [microservices][4], built on top of the modern Web server technologies
