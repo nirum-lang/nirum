@@ -15,6 +15,7 @@ import Text.Blaze.Html.Renderer.Utf8 (renderHtml)
 import Text.Hamlet (Html, shamlet)
 
 import Nirum.Constructs (Construct (toCode))
+import Nirum.Constructs.Declaration (Documented (docsBlock))
 import qualified Nirum.Constructs.Declaration as DE
 import qualified Nirum.Constructs.DeclarationSet as DES
 import qualified Nirum.Constructs.Docs as D
@@ -31,7 +32,7 @@ import qualified Nirum.Constructs.TypeExpression as TE
 import Nirum.Docs ( Block (Heading)
                   , filterReferences
                   )
-import Nirum.Docs.Html (renderInlines)
+import Nirum.Docs.Html (render, renderInlines)
 import Nirum.Package ( BoundModule (boundPackage, modulePath)
                      , Package (Package, metadata, modules)
                      , resolveBoundModule
@@ -128,60 +129,88 @@ module' docsModule = layout pkg path $ [shamlet|
 
 typeDecl :: BoundModule Docs -> Identifier -> TD.TypeDeclaration -> Html
 typeDecl mod' ident
-         TD.TypeDeclaration { TD.type' = TD.Alias cname } = [shamlet|
+         tc@TD.TypeDeclaration { TD.type' = TD.Alias cname } = [shamlet|
     <h2>type <code>#{toNormalizedText ident}</code>
+    $maybe d <- docsBlock tc
+        <p>#{preEscapedToMarkup $ render d}
     <p>= <span class="canonical-type">#{typeExpression mod' cname}</span>
 |]
 typeDecl mod' ident
-         TD.TypeDeclaration { TD.type' = TD.UnboxedType innerType } = [shamlet|
-    <h2>unboxed <code>#{toNormalizedText ident}</code>
-    <p>(<span class="inner-type">#{typeExpression mod' innerType}</span>)
-|]
+         tc@TD.TypeDeclaration { TD.type' = TD.UnboxedType innerType } =
+    [shamlet|
+        <h2>unboxed <code>#{toNormalizedText ident}</code>
+        $maybe d <- docsBlock tc
+            <p>#{preEscapedToMarkup $ render d}
+        <p>(<span class="inner-type">#{typeExpression mod' innerType}</span>)
+    |]
 typeDecl _ ident
-         TD.TypeDeclaration { TD.type' = TD.EnumType members } = [shamlet|
+         tc@TD.TypeDeclaration { TD.type' = TD.EnumType members } = [shamlet|
     <h2>enum <code>#{toNormalizedText ident}</code>
-    <ul class="members">
+    $maybe d <- docsBlock tc
+        <p>#{preEscapedToMarkup $ render d}
+    <dl class="members">
         $forall decl <- DES.toList members
-            <li class="member"><code>#{nameText $ DE.name decl}</code>
+            <dt class="member-name"><code>#{nameText $ DE.name decl}</code>
+                <dd class="member-doc">
+                    $maybe d <- docsBlock decl
+                        #{preEscapedToMarkup $ render d}
 |]
 typeDecl mod' ident
-         TD.TypeDeclaration { TD.type' = TD.RecordType fields } = [shamlet|
+         tc@TD.TypeDeclaration { TD.type' = TD.RecordType fields } = [shamlet|
     <h2>record <code>#{toNormalizedText ident}</code>
+    $maybe d <- docsBlock tc
+        <p>#{preEscapedToMarkup $ render d}
     <dl class="fields">
         $forall fieldDecl@(TD.Field _ fieldType _) <- DES.toList fields
             <dt class="field-name"><code>#{nameText $ DE.name fieldDecl}</code>
             <dd class="field-type">#{typeExpression mod' fieldType}
+            $maybe d <- docsBlock fieldDecl
+                <dd>#{preEscapedToMarkup $ render d}
 |]
 typeDecl mod' ident
-         TD.TypeDeclaration { TD.type' = TD.UnionType tags } = [shamlet|
+         tc@TD.TypeDeclaration { TD.type' = TD.UnionType tags } = [shamlet|
     <h2>union <code>#{toNormalizedText ident}</code>
+    $maybe d <- docsBlock tc
+        <p>#{preEscapedToMarkup $ render d}
     $forall tagDecl@(TD.Tag _ fields _) <- DES.toList tags
         <h3 class="tag">
             <code>#{nameText $ DE.name tagDecl}
+        $maybe d <- docsBlock tagDecl
+            <p>#{preEscapedToMarkup $ render d}
         <dl class="fields">
             $forall fieldDecl@(TD.Field _ fieldType _) <- DES.toList fields
                 <dt class="field-name">
                     <code>#{nameText $ DE.name fieldDecl}
                 <dd class="field-type">#{typeExpression mod' fieldType}
+                $maybe d <- docsBlock fieldDecl
+                    <dd>#{preEscapedToMarkup $ render d}
 |]
 typeDecl _ ident
          TD.TypeDeclaration { TD.type' = TD.PrimitiveType {} } = [shamlet|
     <h2>primitive <code>#{toNormalizedText ident}</code>
 |]
 typeDecl mod' ident
-         TD.ServiceDeclaration { TD.service = S.Service methods } = [shamlet|
-    <h2>service <code>#{toNormalizedText ident}</code>
-    $forall methodDecl@(S.Method _ params ret err _) <- DES.toList methods
-        <h3 class="method">
-            <code>#{nameText $ DE.name methodDecl}
-        <p class="return-type">#{typeExpression mod' ret}
-        $maybe errType <- err
-            <p class="error-type">#{typeExpression mod' errType}
-        <dl class="parameters">
-            $forall paramDecl@(S.Parameter _ paramType _) <- DES.toList params
-                <dt class="parameter-name">
-                    <code>#{nameText $ DE.name paramDecl}
-                <dd class="parameter-type">#{typeExpression mod' paramType}
+         tc@TD.ServiceDeclaration { TD.service = S.Service methods } =
+    [shamlet|
+        <h2>service <code>#{toNormalizedText ident}</code>
+        $maybe d <- docsBlock tc
+            <p>#{preEscapedToMarkup $ render d}
+        $forall methodDecl@(S.Method _ ps ret err _) <- DES.toList methods
+            <h3 class="method">
+                <code class="method-name">#{nameText $ DE.name methodDecl}()
+                &rarr;
+                <code class="return-type">#{typeExpression mod' ret}
+            $maybe d <- docsBlock methodDecl
+                <p>#{preEscapedToMarkup $ render d}
+            $maybe errType <- err
+                <p class="error-type">#{typeExpression mod' errType}
+            <dl class="parameters">
+                $forall paramDecl@(S.Parameter _ paramType _) <- DES.toList ps
+                    <dt class="parameter-name">
+                        <code>#{nameText $ DE.name paramDecl}
+                    <dd class="parameter-type">#{typeExpression mod' paramType}
+                    $maybe d <- docsBlock paramDecl
+                        <dd>#{preEscapedToMarkup $ render d}
 |]
 typeDecl _ _ TD.Import {} =
     error ("It shouldn't happen; please report it to Nirum's bug tracker:\n" ++
