@@ -717,14 +717,21 @@ union shape
 union shape
     = circle (point origin, offset radius,)
     # tag docs
-    | rectangle (point upper-left, point lower-right,)
+    | rectangle (
+          # front docs
+          point upper-left, point lower-right,
+      )
     | none
     ;|] `shouldBeRight`
                     a { type' = union'
                             { tags = [ circleTag
                                         { tagAnnotations = singleDocs "tag docs"
                                         }
-                                     , rectTag, noneTag
+                                     , rectTag
+                                        { tagAnnotations =
+                                              singleDocs "front docs"
+                                        }
+                                     , noneTag
                                      ]
                             }
                       }
