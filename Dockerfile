@@ -13,7 +13,7 @@ COPY ./stack.yaml /opt/nirum/stack.yaml
 RUN stack build --only-snapshot
 
 COPY . /opt/nirum
-RUN stack build
+RUN stack build --copy-bins
 
 ENV CMD=nirum
 ENTRYPOINT ["./docker-entrypoint.sh"]
