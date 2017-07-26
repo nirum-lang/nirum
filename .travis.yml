@@ -106,7 +106,7 @@ script:
 - 'TOX="$(which tox)" stack --no-terminal test -j4 --coverage'
 - ./lint.sh
 after_script:
-- stack install --install-ghc --no-terminal codecov-haskell
+- stack build --install-ghc --no-terminal
 - codecov-haskell Main
 before_deploy:
 - stack build --no-terminal --copy-bins
