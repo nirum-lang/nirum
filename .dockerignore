@@ -1,3 +1,4 @@
 .git
 .stack-work
 dist
+*.hpc
