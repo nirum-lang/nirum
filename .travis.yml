@@ -107,7 +107,9 @@ script:
 - ./lint.sh
 after_script:
 - stack build --install-ghc --no-terminal --copy-bins
-- codecov-haskell Main
+- find . -name '*.tix'
+- find . -name '*.mix'
+- codecov-haskell --tix-dir ./.stack-work/install/x86_64-*/lts-*/*/hpc/nirum/ --mix-dir ./.stack-work/dist/x86_64-*/Cabal-*/hpc/ spec
 before_deploy:
 - stack build --no-terminal --copy-bins
 - mkdir -p /tmp/nirum-build
