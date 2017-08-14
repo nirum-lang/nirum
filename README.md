@@ -76,20 +76,18 @@ For more infomration, use `--help` option:
 Building
 --------
 
-If you already installed [Haskell Platform][5] or [Haskell Stack][6],
-you can build the project in the same way to build other Haskell projects.
-
-Using Haskell Stack:
+If you already installed [Haskell Stack][5], you can build the project
+in the same way to build other Haskell softwares:
 
     $ stack build
 
 You can run the test suite of Nirum:
 
-    $ stack test  # using Hasekll Stack
-    $ ./lint.sh   # run style lint as well
+    $ stack test  # unit test for compiler
+    $ ./test.sh   # integration test for targets
+    $ ./lint.sh   # style lint
 
-[5]: https://www.haskell.org/platform/
-[6]: https://www.haskellstack.org/
+[5]: https://www.haskellstack.org/
 
 
 Related projects & tools
