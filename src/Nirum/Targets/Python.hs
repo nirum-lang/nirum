@@ -130,6 +130,7 @@ import Nirum.Package.Metadata ( Author (Author, name, email)
                                        , targetName
                                        , toByteString
                                        )
+                              , booleanField
                               , fieldType
                               , stringField
                               , tableField

@@ -32,6 +32,7 @@ import Nirum.Package.Metadata ( Metadata (Metadata, version)
                                        , targetName
                                        , toByteString
                                        )
+                              , booleanField
                               , fieldType
                               , metadataFilename
                               , metadataPath
@@ -193,6 +194,15 @@ spec =
                 Left (FieldTypeError "d" "string" "float (1.0)")
             versionField "e" table `shouldBe` Left (FieldValueError "e"
                 "expected a semver string (e.g. \"1.2.3\"), not \"1.2.3.4\"")
+        specify "booleanField" $ do
+            let Right table = parseTomlDoc "<string>"
+                                            [q|flag_true = true
+                                               flag_false = false
+                                               flag_awesome = "awesome"|]
+            booleanField "flag_true" table `shouldBe` Right True
+            booleanField "flag_false" table `shouldBe` Right False
+            booleanField "flag_awesome" table `shouldBe` Left (FieldValueError "flag_awesome"
+                "expected a boolean (e.g. True, False), not string (awesome)")
         specify "fieldType" $ do
             let Right table = parseTomlDoc "<string>"
                     [q|s = "foobar"
