@@ -144,6 +144,7 @@ minimumRuntime = SV.version 0 6 0 [] []
 data Python = Python { packageName :: T.Text
                      , minimumRuntimeVersion :: SV.Version
                      , renames :: RenameMap
+                     , supportAsyncIO :: Bool
                      } deriving (Eq, Ord, Show, Typeable)
 
 type RenameMap = M.Map ModulePath ModulePath
@@ -825,11 +826,17 @@ compileTypeDeclaration
     let methods' = toList methods
     methodMetadata <- mapM compileMethodMetadata methods'
     let methodMetadata' = commaNl methodMetadata
-    dummyMethods <- mapM compileMethod methods'
+    dummyMethods <- mapM (compileMethod False) methods'
+    asyncMethods <- mapM (compileMethod True) methods'
     clientMethods <- mapM compileClientMethod methods'
     methodErrorTypes <- mapM compileErrorType methods'
+    ver <- getPythonVersion
     let dummyMethods' = T.intercalate "\n\n" dummyMethods
         clientMethods' = T.intercalate "\n\n" clientMethods
+        supportAsync' = supportAsyncIO $ target metadata'
+        asyncMethods' = case ver of
+            Python2 -> "pass"
+            Python3 -> if supportAsync' then T.intercalate "\n\n" asyncMethods else "pass"
         methodErrorTypes' =
             T.intercalate "," $ catMaybes methodErrorTypes
     param <- parameterCompiler
@@ -878,6 +885,13 @@ class {className}_Client($className):
         self.__nirum_transport__ = transport  # type: transport_type
 
     {clientMethods'}
+
+class {className}_Async($className):
+    """
+    The service object of :class:`{className}`, written in async.import
+    Supports only python 3.5+
+    """
+    {asyncMethods'}
 |]
   where
     className :: T.Text
@@ -891,8 +905,8 @@ class {className}_Client($className):
                 et <- compileTypeExpression src errorTypeExpression
                 return $ Just [qq|('{toAttributeName' mn}', $et)|]
             Nothing -> return Nothing
-    compileMethod :: Method -> CodeGen Code
-    compileMethod m@(Method mName params rtype _etype _anno) = do
+    compileMethod :: Bool -> Method -> CodeGen Code
+    compileMethod isAsync m@(Method mName params rtype _etype _anno) = do
         let mName' = toAttributeName' mName
         params' <- mapM compileMethodParameter $ toList params
         let paramDocs = [ T.concat [ ":param "
@@ -904,8 +918,9 @@ class {className}_Client($className):
                         ]
         rtypeExpr <- compileTypeExpression src rtype
         ret <- returnCompiler
+        let defKeyword = T.append (if isAsync then "async " else "") "def"
         return [qq|
-    def {mName'}(self, {commaNl params'}){ ret rtypeExpr }:
+    {defKeyword} {mName'}(self, {commaNl params'}){ ret rtypeExpr }:
 {compileDocstring' "        " m paramDocs}
         raise NotImplementedError('$className has to implement {mName'}()')
 |]
@@ -1244,6 +1259,9 @@ instance Target Python where
         minRuntime <- case versionField "minimum_runtime" table of
             Left (FieldError _) -> Right minimumRuntime
             otherwise' -> otherwise'
+        supportAsync <- case booleanField "support_async" table of
+            Right t -> Right t
+            _ -> Right False
         renameTable <- case tableField "renames" table of
             Right t -> Right t
             Left (FieldError _) -> Right HM.empty
@@ -1263,6 +1281,7 @@ instance Target Python where
         return Python { packageName = name'
                       , minimumRuntimeVersion = max minRuntime minimumRuntime
                       , renames = M.fromList renamePairs
+                      , supportAsyncIO = supportAsync
                       }
     compilePackage = compilePackage'
     showCompileError _ e = e
