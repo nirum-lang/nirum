@@ -4,7 +4,6 @@ version = "0.3.0"
 name = "nirum"
 email = "dev@nirum.org"
 
-[targets]
 [targets.python]
 name = "nirum_fixture_async"
 support_async = true

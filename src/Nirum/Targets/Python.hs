@@ -144,7 +144,7 @@ minimumRuntime = SV.version 0 6 0 [] []
 data Python = Python { packageName :: T.Text
                      , minimumRuntimeVersion :: SV.Version
                      , renames :: RenameMap
-                     , supportAsyncIO :: Bool
+                     , supportAsyncIO :: TransportType
                      } deriving (Eq, Ord, Show, Typeable)
 
 type RenameMap = M.Map ModulePath ModulePath
@@ -153,6 +153,10 @@ type CompileError' = T.Text
 
 data PythonVersion = Python2
                    | Python3
+                   deriving (Eq, Ord, Show)
+
+data TransportType = SupportAsync
+                   | SyncOnly
                    deriving (Eq, Ord, Show)
 
 data Source = Source { sourcePackage :: Package'
@@ -836,7 +840,7 @@ compileTypeDeclaration
         supportAsync' = supportAsyncIO $ target metadata'
         asyncMethods' = case ver of
             Python2 -> "pass"
-            Python3 -> if supportAsync' then T.intercalate "\n\n" asyncMethods else "pass"
+            Python3 -> T.intercalate "\n\n" asyncMethods
         methodErrorTypes' =
             T.intercalate "," $ catMaybes methodErrorTypes
     param <- parameterCompiler
@@ -886,12 +890,7 @@ class {className}_Client($className):
 
     {clientMethods'}
 
-class {className}_Async($className):
-    """
-    The service object of :class:`{className}`, written in async.import
-    Supports only python 3.5+
-    """
-    {asyncMethods'}
+{asyncClass}
 |]
   where
     className :: T.Text
@@ -999,6 +998,17 @@ class {className}_Async($className):
         if successful:
             return result
         raise result
+|]
+    asyncClass :: CodeGen Code
+    asyncClass = case supportAsync' of 
+        SyncOnly -> ""
+        SupportAsync -> [qq|
+class {className}_Async($className):
+    """
+    The service object of :class:`{className}`, written in async.import
+    Supports only python 3.5+
+    """
+    {asyncMethods'}
 |]
 
 compileTypeDeclaration _ Import {} =
@@ -1260,8 +1270,8 @@ instance Target Python where
             Left (FieldError _) -> Right minimumRuntime
             otherwise' -> otherwise'
         supportAsync <- case booleanField "support_async" table of
-            Right t -> Right t
-            _ -> Right False
+            Right t -> SupportAsync
+            _ -> SyncOnly
         renameTable <- case tableField "renames" table of
             Right t -> Right t
             Left (FieldError _) -> Right HM.empty

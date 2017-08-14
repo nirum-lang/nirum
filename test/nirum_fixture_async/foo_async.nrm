@@ -1,5 +1,3 @@
 service pong-service (
     bool pong (),
-
-
 );
