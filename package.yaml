@@ -64,8 +64,7 @@ library:
   - uri >=0.1 && <1.0
 executables:
   nirum:
-    main: nirum.hs
-    source-dirs: app
+    main: app/nirum.hs
     ghc-options:
     - -fwarn-incomplete-uni-patterns
     - -threaded
@@ -73,8 +72,7 @@ executables:
     dependencies:
     - nirum
   nirum-static:
-    main: nirum.hs
-    source-dirs: app
+    main: app/nirum.hs
     ghc-options:
     - -fwarn-incomplete-uni-patterns
     - -threaded
