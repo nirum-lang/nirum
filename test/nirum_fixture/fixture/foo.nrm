@@ -100,3 +100,10 @@ record person (
 record people (
   {person} people
 );
+
+record product (
+    text name,
+    int64? price,
+    bool sale,
+    uri? url,
+);

@@ -8,8 +8,8 @@ from six import PY3
 from fixture.foo import (CultureAgnosticName, EastAsianName,
                          EvaChar, FloatUnbox, Gender, ImportedTypeUnbox, Irum,
                          Line, MixedName, NullService,
-                         Point1, Point2, Point3d, Pop, PingService, Rnb,
-                         Run, Stop, Way, WesternName)
+                         Point1, Point2, Point3d, Pop, PingService, Product,
+                         Rnb, Run, Stop, Way, WesternName)
 from fixture.foo.bar import PathUnbox, IntUnbox, Point
 from fixture.qux import Path, Name
 
@@ -249,3 +249,9 @@ def test_service():
         PingService().ping(nonce=u'nonce')
     with raises(TypeError):
         PingService().ping(wrongkwd=u'a')
+
+
+def test_optional_initializer_test():
+    product = Product(name=u'coffee', sale=False)
+    assert product.price is None
+    assert product.url is None
