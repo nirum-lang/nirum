@@ -45,7 +45,7 @@ is an example:
 
     [[authors]]
     name = "John Doe"  # (required)
-    email = "johndoe@example.com/"
+    email = "johndoe@example.com"
     uri = "http://example.com/~johndoe/"
 
 It consists of the following fields (*emphasized fields* are required):
