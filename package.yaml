@@ -58,6 +58,7 @@ library:
   - cmark >=0.5 && <0.6
   - fsnotify >=0.2.1 && <0.3.0
   - optparse-applicative >=0.13.1 && <0.14
+  - process >=1.4.3.0 && < 1.7
   - shakespeare >=2.0.12 && <2.1
   - stm >=2.4.4.1
   - template-haskell >=2.11 && <3
@@ -80,6 +81,14 @@ executables:
     - -static
     dependencies:
     - base >=4.7 && <5
+    - nirum
+  nirum-quickstart:
+    main: app/nirum-quickstart.hs
+    ghc-options:
+    - -fwarn-incomplete-uni-patterns
+    - -threaded
+    - -with-rtsopts=-N
+    dependencies:
     - nirum
 tests:
   hlint:
