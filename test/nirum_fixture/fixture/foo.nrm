@@ -100,3 +100,14 @@ record person (
 record people (
   {person} people
 );
+
+record product (
+    text name,
+    int64? price,
+    bool sale,
+    uri? url,
+);
+
+union animal = cat
+             | dog (text name, text? kind, int64 age, int64? weight)
+             ;

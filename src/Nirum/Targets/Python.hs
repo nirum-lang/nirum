@@ -60,6 +60,7 @@ import qualified Data.SemVer as SV
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
+import Data.Function (on)
 import System.FilePath (joinPath)
 import qualified Text.Email.Validate as E
 import Text.InterpolatedString.Perl6 (q, qq)
@@ -320,16 +321,20 @@ toIndentedCodes f traversable concatenator =
     T.intercalate concatenator $ map f traversable
 
 compileParameters :: (ParameterName -> ParameterType -> Code)
-                  -> [(T.Text, Code)]
+                  -> [(T.Text, Code, Bool)]
                   -> Code
-compileParameters gen nameTypePairs =
-    toIndentedCodes (uncurry gen) nameTypePairs ", "
+compileParameters gen nameTypeTriples =
+    toIndentedCodes
+        (\ (n, t, o) -> gen n t `T.append` if o then "=None" else "")
+        nameTypeTriples ", "
 
-compileFieldInitializers :: DS.DeclarationSet Field -> CodeGen Code
-compileFieldInitializers fields = do
+compileFieldInitializers :: DS.DeclarationSet Field -> Int -> CodeGen Code
+compileFieldInitializers fields depth = do
     initializers <- forM (toList fields) compileFieldInitializer
-    return $ T.intercalate "\n        " initializers
+    return $ T.intercalate indentSpaces initializers
   where
+    indentSpaces :: T.Text
+    indentSpaces = "\n" `T.append` T.replicate depth "    "
     compileFieldInitializer :: Field -> CodeGen Code
     compileFieldInitializer (Field fieldName' fieldType' _) =
         case fieldType' of
@@ -432,11 +437,19 @@ compileUnionTag :: Source -> Name -> Tag -> CodeGen Code
 compileUnionTag source parentname d@(Tag typename' fields _) = do
     typeExprCodes <- mapM (compileTypeExpression source)
         [typeExpr | (Field _ typeExpr _) <- toList fields]
-    let className = toClassName' typename'
+    let optionFlags = [ case typeExpr of
+                            OptionModifier _ -> True
+                            _ -> False
+                      | (Field _ typeExpr _) <- toList fields
+                      ]
+        className = toClassName' typename'
         tagNames = map (toAttributeName' . fieldName) (toList fields)
-        nameNTypes = zip tagNames typeExprCodes
+        getOptFlag :: (T.Text, Code, Bool) -> Bool
+        getOptFlag (_, _, flag) = flag
+        nameTypeTriples = L.sortBy (compare `on` getOptFlag)
+                                   (zip3 tagNames typeExprCodes optionFlags)
         slotTypes = toIndentedCodes
-            (\ (n, t) -> [qq|('{n}', {t})|]) nameNTypes ",\n        "
+            (\ (n, t, _) -> [qq|('{n}', {t})|]) nameTypeTriples ",\n        "
         slots = if length tagNames == 1
                 then [qq|'{head tagNames}'|] `T.snoc` ','
                 else toIndentedCodes (\ n -> [qq|'{n}'|]) tagNames ",\n        "
@@ -458,7 +471,27 @@ compileUnionTag source parentname d@(Tag typename' fields _) = do
     typeRepr <- typeReprCompiler
     arg <- parameterCompiler
     ret <- returnCompiler
-    initializers <- compileFieldInitializers fields
+    pyVer <- getPythonVersion
+    initializers <- compileFieldInitializers fields $ case pyVer of
+        Python3 -> 2
+        Python2 -> 3
+    let initParams = compileParameters arg nameTypeTriples
+        inits = case pyVer of
+            Python2 -> [qq|
+    def __init__(self, **kwargs):
+        def __init__($initParams):
+            $initializers
+            pass
+        __init__(**kwargs)
+        validate_union_type(self)
+            |]
+            Python3 -> [qq|
+    def __init__(self{ if null nameTypeTriples
+                         then T.empty
+                         else ", *, " `T.append` initParams }) -> None:
+        $initializers
+        validate_union_type(self)
+            |]
     return [qq|
 class $className($parentClass):
 {compileDocstringWithFields "    " d fields}
@@ -474,9 +507,7 @@ class $className($parentClass):
     def __nirum_tag_types__():
         return [$slotTypes]
 
-    def __init__(self, {compileParameters arg nameNTypes}){ ret "None" }:
-        $initializers
-        validate_union_type(self)
+    { inits :: T.Text }
 
     def __repr__(self){ ret "str" }:
         return '\{0\}(\{1\})'.format(
@@ -669,12 +700,20 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
         fieldList = toList fields
     typeExprCodes <- mapM (compileTypeExpression src)
         [typeExpr | (Field _ typeExpr _) <- fieldList]
-    let fieldNames = map toAttributeName' [ name'
+    let optionFlags = [ case typeExpr of
+                            OptionModifier _ -> True
+                            _ -> False
+                      | (Field _ typeExpr _) <- fieldList
+                      ]
+        fieldNames = map toAttributeName' [ name'
                                           | (Field name' _ _) <- fieldList
                                           ]
-        nameTypePairs = zip fieldNames typeExprCodes
+        getOptFlag :: (T.Text, Code, Bool) -> Bool
+        getOptFlag (_, _, flag) = flag
+        nameTypeTriples = L.sortBy (compare `on` getOptFlag)
+                                   (zip3 fieldNames typeExprCodes optionFlags)
         slotTypes = toIndentedCodes
-            (\ (n, t) -> [qq|'{n}': {t}|]) nameTypePairs ",\n        "
+            (\ (n, t, _) -> [qq|'{n}': {t}|]) nameTypeTriples ",\n        "
         slots = toIndentedCodes (\ n -> [qq|'{n}'|]) fieldNames ",\n        "
         nameMaps = toIndentedCodes
             toNamePair
@@ -693,7 +732,27 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
     arg <- parameterCompiler
     ret <- returnCompiler
     typeRepr <- typeReprCompiler
-    initializers <- compileFieldInitializers fields
+    pyVer <- getPythonVersion
+    initializers <- compileFieldInitializers fields $ case pyVer of
+        Python3 -> 2
+        Python2 -> 3
+    let initParams = compileParameters arg nameTypeTriples
+        inits = case pyVer of
+            Python2 -> [qq|
+    def __init__(self, **kwargs):
+        def __init__($initParams):
+            $initializers
+            pass
+        __init__(**kwargs)
+        validate_record_type(self)
+            |]
+            Python3 -> [qq|
+    def __init__(self{ if null nameTypeTriples
+                         then T.empty
+                         else ", *, " `T.append` initParams }) -> None:
+        $initializers
+        validate_record_type(self)
+            |]
     let clsType = arg "cls" "type"
     return [qq|
 class $className(object):
@@ -710,9 +769,7 @@ class $className(object):
     def __nirum_field_types__():
         return \{$slotTypes\}
 
-    def __init__(self, {compileParameters arg nameTypePairs}){ret "None"}:
-        $initializers
-        validate_record_type(self)
+    {inits :: T.Text}
 
     def __repr__(self){ret "bool"}:
         return '\{0\}(\{1\})'.format(

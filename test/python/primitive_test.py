@@ -5,11 +5,11 @@ from pytest import raises
 from nirum.service import Service
 from six import PY3
 
-from fixture.foo import (CultureAgnosticName, EastAsianName,
+from fixture.foo import (CultureAgnosticName, Dog, EastAsianName,
                          EvaChar, FloatUnbox, Gender, ImportedTypeUnbox, Irum,
                          Line, MixedName, NullService,
-                         Point1, Point2, Point3d, Pop, PingService, Rnb,
-                         Run, Stop, Way, WesternName)
+                         Point1, Point2, Point3d, Pop, PingService, Product,
+                         Rnb, Run, Stop, Way, WesternName)
 from fixture.foo.bar import PathUnbox, IntUnbox, Point
 from fixture.qux import Path, Name
 
@@ -159,6 +159,14 @@ def test_record_with_one_field():
     assert Line(length=3).__nirum_serialize__() == expected
 
 
+def test_record_optional_initializer():
+    product = Product(name=u'coffee', sale=False)
+    assert product.name == u'coffee'
+    assert product.price is None
+    assert not product.sale
+    assert product.url is None
+
+
 def test_union():
     assert isinstance(MixedName, type)
     assert MixedName.Tag.western_name.value == 'western_name'
@@ -230,6 +238,14 @@ def test_union_with_special_case():
     assert Rnb(country=u'KR').__nirum_tag__.value == 'rhythm_and_ballad'
     assert Run().__nirum_tag__.value == 'run'
     assert Stop().__nirum_tag__.value == 'stop'
+
+
+def test_union_tags_optional_initializer():
+    dog = Dog(name=u"Max", age=10)
+    assert dog.name == u"Max"
+    assert dog.kind is None
+    assert dog.age == 10
+    assert dog.weight is None
 
 
 def test_service():
