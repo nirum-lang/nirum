@@ -253,5 +253,7 @@ def test_service():
 
 def test_record_optional_initializer():
     product = Product(name=u'coffee', sale=False)
+    assert product.name == u'coffee'
     assert product.price is None
+    assert not product.sale
     assert product.url is None
