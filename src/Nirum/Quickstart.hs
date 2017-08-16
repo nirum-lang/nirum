@@ -13,13 +13,16 @@ import qualified Data.Text.IO as TIO
 import qualified System.Process as P
 import qualified Control.Exception as E
 
+defaultVersion :: T.Text
+defaultVersion = "0.0.1"
+
 main :: IO ()
 main = do
     hSetBuffering stdout NoBuffering
-    TIO.putStr "version: (1.0.0) "
+    TIO.putStr $ "version: (" <> defaultVersion <> ")"
     inputVersionText <- TIO.getLine
     let versionText = if T.null inputVersionText
-        then "1.0.0"
+        then defaultVersion
         else inputVersionText
     TIO.putStrLn versionText
 
