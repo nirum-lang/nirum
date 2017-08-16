@@ -107,3 +107,7 @@ record product (
     bool sale,
     uri? url,
 );
+
+union animal = cat
+             | dog (text name, text? kind, int64 age, int64? weight)
+             ;

@@ -5,7 +5,7 @@ from pytest import raises
 from nirum.service import Service
 from six import PY3
 
-from fixture.foo import (CultureAgnosticName, EastAsianName,
+from fixture.foo import (CultureAgnosticName, Dog, EastAsianName,
                          EvaChar, FloatUnbox, Gender, ImportedTypeUnbox, Irum,
                          Line, MixedName, NullService,
                          Point1, Point2, Point3d, Pop, PingService, Product,
@@ -257,3 +257,11 @@ def test_record_optional_initializer():
     assert product.price is None
     assert not product.sale
     assert product.url is None
+
+
+def test_union_tags_optional_initializer():
+    dog = Dog(name=u"Max", age=10)
+    assert dog.name == u"Max"
+    assert dog.kind is None
+    assert dog.age == 10
+    assert dog.weight is None
