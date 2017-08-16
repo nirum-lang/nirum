@@ -159,6 +159,14 @@ def test_record_with_one_field():
     assert Line(length=3).__nirum_serialize__() == expected
 
 
+def test_record_optional_initializer():
+    product = Product(name=u'coffee', sale=False)
+    assert product.name == u'coffee'
+    assert product.price is None
+    assert not product.sale
+    assert product.url is None
+
+
 def test_union():
     assert isinstance(MixedName, type)
     assert MixedName.Tag.western_name.value == 'western_name'
@@ -232,6 +240,14 @@ def test_union_with_special_case():
     assert Stop().__nirum_tag__.value == 'stop'
 
 
+def test_union_tags_optional_initializer():
+    dog = Dog(name=u"Max", age=10)
+    assert dog.name == u"Max"
+    assert dog.kind is None
+    assert dog.age == 10
+    assert dog.weight is None
+
+
 def test_service():
     assert issubclass(NullService, Service)
     assert issubclass(PingService, Service)
@@ -249,19 +265,3 @@ def test_service():
         PingService().ping(nonce=u'nonce')
     with raises(TypeError):
         PingService().ping(wrongkwd=u'a')
-
-
-def test_record_optional_initializer():
-    product = Product(name=u'coffee', sale=False)
-    assert product.name == u'coffee'
-    assert product.price is None
-    assert not product.sale
-    assert product.url is None
-
-
-def test_union_tags_optional_initializer():
-    dog = Dog(name=u"Max", age=10)
-    assert dog.name == u"Max"
-    assert dog.kind is None
-    assert dog.age == 10
-    assert dog.weight is None
