@@ -251,7 +251,7 @@ def test_service():
         PingService().ping(wrongkwd=u'a')
 
 
-def test_optional_initializer_test():
+def test_record_optional_initializer():
     product = Product(name=u'coffee', sale=False)
     assert product.price is None
     assert product.url is None
