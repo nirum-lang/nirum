@@ -19,7 +19,7 @@ defaultVersion = "0.0.1"
 main :: IO ()
 main = do
     hSetBuffering stdout NoBuffering
-    TIO.putStr $ "version: (" <> defaultVersion <> ")"
+    TIO.putStr $ "version: (" <> defaultVersion <> ") "
     inputVersionText <- TIO.getLine
     let versionText = if T.null inputVersionText
         then defaultVersion
@@ -49,6 +49,6 @@ readConfig cfg = do
 inputConfig :: T.Text -> Maybe T.Text -> IO T.Text
 inputConfig prompt gitName = do
     let name = maybe T.empty (\n -> n) gitName
-    TIO.putStr $ prompt <>  maybe "" (\n -> "(" <> n <> ")") gitName
+    TIO.putStr $ prompt <>  maybe "" (\n -> "(" <> n <> ") ") gitName
     authorName <- TIO.getLine
     return $ if T.null authorName then name else authorName
