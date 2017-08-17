@@ -5,13 +5,13 @@ import Control.Monad (forM_)
 import Data.Either (isLeft, isRight, lefts, rights)
 import Data.List (isSuffixOf)
 import Data.Maybe (fromJust)
-import Prelude hiding (readFile)
 import System.Directory (getDirectoryContents)
 
+import qualified Data.ByteString as B
 import qualified Data.List.NonEmpty as NE
 import Data.String.QQ (s)
 import qualified Data.Text as T
-import Data.Text.IO (readFile)
+import qualified Data.Text.Encoding as E
 import Test.Hspec.Meta
 import Text.Megaparsec (eof, runParser)
 import Text.Megaparsec.Char (string)
@@ -1149,8 +1149,9 @@ service method-dups (
         files <- getDirectoryContents "examples"
         let examples = map ("examples/" ++) $ filter (isSuffixOf ".nrm") files
         forM_ examples $ \ filePath -> do
-            sourceCode <- readFile filePath
-            let parseResult = P.parse (filePath ++ " (text)") sourceCode
+            sourceCode <- B.readFile filePath
+            let parseResult = P.parse (filePath ++ " (text)")
+                                      (E.decodeUtf8 sourceCode)
             parseResult `shouldSatisfy` isRight
             let Right module' = parseResult
             P.parse (filePath ++ " (text inverse)") (toCode module')
