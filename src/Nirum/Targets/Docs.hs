@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedLists, QuasiQuotes, TypeFamilies #-}
+{-# LANGUAGE QuasiQuotes, TypeFamilies #-}
 module Nirum.Targets.Docs ( Docs
                           , blockToHtml
                           , makeFilePath
@@ -9,14 +9,17 @@ module Nirum.Targets.Docs ( Docs
 import Data.Maybe (mapMaybe)
 import GHC.Exts (IsList (fromList, toList))
 
+import qualified Data.ByteString as BS
 import Data.ByteString.Lazy (toStrict)
 import qualified Text.Email.Parser as E
 import Data.Map.Strict (Map, union)
 import qualified Data.Text as T
-import Data.Text.Encoding (decodeUtf8)
+import qualified Data.Text.Lazy as TL
+import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import System.FilePath ((</>))
 import Text.Blaze (ToMarkup (preEscapedToMarkup))
 import Text.Blaze.Html.Renderer.Utf8 (renderHtml)
+import Text.Cassius (cassius, renderCss)
 import Text.Hamlet (Html, shamlet)
 
 import Nirum.Constructs (Construct (toCode))
@@ -72,8 +75,8 @@ makeUri modulePath' =
     T.intercalate "/" $
                   map toNormalizedText (toList modulePath') ++ ["index.html"]
 
-layout :: ToMarkup m => Package Docs -> m -> Html -> Html
-layout Package { metadata = md } title body = [shamlet|
+layout :: ToMarkup m => Package Docs -> Int -> m -> Html -> Html
+layout Package { metadata = md } dirDepth title body = [shamlet|
 $doctype 5
 <html>
     <head>
@@ -82,11 +85,12 @@ $doctype 5
         <meta name="generator" content="Nirum #{versionText}">
         $forall Author { name = name' } <- authors md
             <meta name="author" content="#{name'}">
+        <link rel="stylesheet" href="#{T.replicate dirDepth "../"}style.css">
     <body>#{body}
 |]
 
 typeExpression :: BoundModule Docs -> TE.TypeExpression -> Html
-typeExpression _ expr = [shamlet|<code>#{typeExpr expr}|]
+typeExpression _ expr = [shamlet|#{typeExpr expr}|]
   where
     typeExpr :: TE.TypeExpression -> Html
     typeExpr expr' = [shamlet|
@@ -104,9 +108,10 @@ $case expr'
 |]
 
 module' :: BoundModule Docs -> Html
-module' docsModule = layout pkg path $ [shamlet|
+module' docsModule = layout pkg depth path $ [shamlet|
     $maybe tit <- title
-        <h1><code>#{path}</code> &mdash; #{tit}
+        <h1><code>#{path}</code>
+        <p>#{tit}
     $nothing
         <h1><code>#{path}</code>
     $forall (ident, decl) <- types'
@@ -114,10 +119,12 @@ module' docsModule = layout pkg path $ [shamlet|
             #{typeDecl docsModule ident decl}
 |]
   where
+    docsModulePath :: ModulePath
+    docsModulePath = modulePath docsModule
     pkg :: Package Docs
     pkg = boundPackage docsModule
     path :: T.Text
-    path = toCode $ modulePath docsModule
+    path = toCode docsModulePath
     types' :: [(Identifier, TD.TypeDeclaration)]
     types' = [ (facialName $ DE.name decl, decl)
              | decl <- DES.toList $ types docsModule
@@ -126,11 +133,13 @@ module' docsModule = layout pkg path $ [shamlet|
                     _ -> True
              ]
     mod' :: Maybe Module
-    mod' = resolveModule (modulePath docsModule) pkg
+    mod' = resolveModule docsModulePath pkg
     title :: Maybe Html
     title = do
         m <- mod'
         moduleTitle m
+    depth :: Int
+    depth = length $ toList docsModulePath
 
 blockToHtml :: Block -> Html
 blockToHtml b = preEscapedToMarkup $ render b
@@ -138,24 +147,30 @@ blockToHtml b = preEscapedToMarkup $ render b
 typeDecl :: BoundModule Docs -> Identifier -> TD.TypeDeclaration -> Html
 typeDecl mod' ident
          tc@TD.TypeDeclaration { TD.type' = TD.Alias cname } = [shamlet|
-    <h2>type <code>#{toNormalizedText ident}</code>
+    <h2>
+        <span.type>type
+        <code>#{toNormalizedText ident}</code>
+        =
+        <code>#{typeExpression mod' cname}</code>
     $maybe d <- docsBlock tc
-        <p>#{blockToHtml d}
-    <p>= <span class="canonical-type">#{typeExpression mod' cname}</span>
+        #{blockToHtml d}
 |]
 typeDecl mod' ident
          tc@TD.TypeDeclaration { TD.type' = TD.UnboxedType innerType } =
     [shamlet|
-        <h2>unboxed <code>#{toNormalizedText ident}</code>
+        <h2>
+            <span.type>unboxed
+            <code>#{toNormalizedText ident} (#{typeExpression mod' innerType})
         $maybe d <- docsBlock tc
-            <p>#{blockToHtml d}
-        <p>(<span class="inner-type">#{typeExpression mod' innerType}</span>)
+            #{blockToHtml d}
     |]
 typeDecl _ ident
          tc@TD.TypeDeclaration { TD.type' = TD.EnumType members } = [shamlet|
-    <h2>enum <code>#{toNormalizedText ident}</code>
+    <h2>
+        <span.type>enum
+        <code>#{toNormalizedText ident}
     $maybe d <- docsBlock tc
-        <p>#{blockToHtml d}
+        #{blockToHtml d}
     <dl class="members">
         $forall decl <- DES.toList members
             <dt class="member-name"><code>#{nameText $ DE.name decl}</code>
@@ -165,33 +180,33 @@ typeDecl _ ident
 |]
 typeDecl mod' ident
          tc@TD.TypeDeclaration { TD.type' = TD.RecordType fields } = [shamlet|
-    <h2>record <code>#{toNormalizedText ident}</code>
+    <h2>
+        <span.type>record
+        <code>#{toNormalizedText ident}
     $maybe d <- docsBlock tc
-        <p>#{blockToHtml d}
-    <dl class="fields">
-        $forall fieldDecl@(TD.Field _ fieldType _) <- DES.toList fields
-            <dt class="field-name"><code>#{nameText $ DE.name fieldDecl}</code>
-            <dd class="field-type">#{typeExpression mod' fieldType}
-            $maybe d <- docsBlock fieldDecl
-                <dd>#{blockToHtml d}
+        #{blockToHtml d}
+    $forall fieldDecl@(TD.Field _ fieldType _) <- DES.toList fields
+        <h3>
+            <span.type>#{typeExpression mod' fieldType}
+            <code>#{nameText $ DE.name fieldDecl}
+        $maybe d <- docsBlock fieldDecl
+            #{blockToHtml d}
 |]
 typeDecl mod' ident
          tc@TD.TypeDeclaration { TD.type' = TD.UnionType tags } = [shamlet|
     <h2>union <code>#{toNormalizedText ident}</code>
     $maybe d <- docsBlock tc
-        <p>#{blockToHtml d}
+        #{blockToHtml d}
     $forall tagDecl@(TD.Tag _ fields _) <- DES.toList tags
-        <h3 class="tag">
-            <code>#{nameText $ DE.name tagDecl}
+        <h3 class="tag"><code>#{nameText $ DE.name tagDecl}</code>
         $maybe d <- docsBlock tagDecl
-            <p>#{blockToHtml d}
-        <dl class="fields">
-            $forall fieldDecl@(TD.Field _ fieldType _) <- DES.toList fields
-                <dt class="field-name">
-                    <code>#{nameText $ DE.name fieldDecl}
-                <dd class="field-type">#{typeExpression mod' fieldType}
-                $maybe d <- docsBlock fieldDecl
-                    <dd>#{blockToHtml d}
+            #{blockToHtml d}
+        $forall fieldDecl@(TD.Field _ fieldType _) <- DES.toList fields
+            <h4>
+                <span.type>#{typeExpression mod' fieldType}
+                <code>#{nameText $ DE.name fieldDecl}
+            $maybe d <- docsBlock fieldDecl
+                #{blockToHtml d}
 |]
 typeDecl _ ident
          TD.TypeDeclaration { TD.type' = TD.PrimitiveType {} } = [shamlet|
@@ -202,23 +217,28 @@ typeDecl mod' ident
     [shamlet|
         <h2>service <code>#{toNormalizedText ident}</code>
         $maybe d <- docsBlock tc
-            <p>#{blockToHtml d}
-        $forall methodDecl@(S.Method _ ps ret err _) <- DES.toList methods
+            #{blockToHtml d}
+        $forall md@(S.Method _ ps ret err _) <- DES.toList methods
             <h3 class="method">
-                <code class="method-name">#{nameText $ DE.name methodDecl}()
-                &rarr;
-                <code class="return-type">#{typeExpression mod' ret}
-            $maybe d <- docsBlock methodDecl
-                <p>#{blockToHtml d}
-            $maybe errType <- err
-                <p class="error-type">#{typeExpression mod' errType}
-            <dl class="parameters">
-                $forall paramDecl@(S.Parameter _ paramType _) <- DES.toList ps
-                    <dt class="parameter-name">
-                        <code>#{nameText $ DE.name paramDecl}
-                    <dd class="parameter-type">#{typeExpression mod' paramType}
-                    $maybe d <- docsBlock paramDecl
-                        <dd>#{blockToHtml d}
+                <code class="method-name">#{nameText $ DE.name md}</code>(
+                    <i>
+                        $forall pd@(S.Parameter _ pt _) <- DES.toList ps
+                            #{typeExpression mod' pt} #{nameText $ DE.name pd}
+                    )
+            $maybe d <- docsBlock md
+                #{blockToHtml d}
+            <dl class="result">
+                <dt class="return-label">returns:
+                <dd class="return-type">#{typeExpression mod' ret}
+                $maybe errType <- err
+                    <dt class="raise-label">raises:
+                    <dd class="raise-type">#{typeExpression mod' errType}
+            $forall paramDecl@(S.Parameter _ paramType _) <- DES.toList ps
+                $maybe d <- docsBlock paramDecl
+                    <h4>
+                        <span.type>#{typeExpression mod' paramType}
+                        <code>#{nameText $ DE.name paramDecl}</code>:
+                    #{blockToHtml d}
 |]
 typeDecl _ _ TD.Import {} =
     error ("It shouldn't happen; please report it to Nirum's bug tracker:\n" ++
@@ -241,15 +261,16 @@ showKind TD.Import {} = "import"
 contents :: Package Docs -> Html
 contents pkg@Package { metadata = md
                      , modules = ms
-                     } = layout pkg ("Package docs" :: T.Text) [shamlet|
+                     } = layout pkg 0 ("Package docs" :: T.Text) [shamlet|
 <h1>Modules
-<ul>
-    $forall (modulePath', mod) <- MS.toAscList ms
-        <li>
-            <a href="#{makeUri modulePath'}">
-                <code>#{toCode modulePath'} </code>
-                    $maybe tit <- moduleTitle mod
-                        &mdash; #{tit}
+$forall (modulePath', mod) <- MS.toAscList ms
+    $maybe tit <- moduleTitle mod
+        <h2>
+            <a href="#{makeUri modulePath'}"><code>#{toCode modulePath'}</code>
+        <p>#{tit}
+    $nothing
+        <h2>
+            <a href="#{makeUri modulePath'}"><code>#{toCode modulePath'}</code>
 <hr>
 <dl>
     <dt.author>
@@ -280,12 +301,61 @@ moduleTitle Module { docs = docs' } = do
                  _ -> Nothing
     return $ preEscapedToMarkup $ renderInlines nodes
 
-compilePackage' :: Package Docs -> Map FilePath (Either Error Html)
+stylesheet :: TL.Text
+stylesheet = renderCss ([cassius|
+@import url(
+https://fonts.googleapis.com/css?family=Source+Code+Pro:300,400|Source+Sans+Pro
+)
+body
+    font-family: Source Sans Pro
+    color: #{gray8}
+code
+    font-family: Source Code Pro
+    font-weight: 300
+    background-color: #{gray1}
+pre
+    padding: 16px 10px
+    background-color: #{gray1}
+    code
+        background: none
+div
+    border-top: 1px solid #{gray3}
+h1, h2, h3, h4, h5, h6
+    code
+        font-weight: 400
+        background-color: #{gray3}
+a
+    text-decoration: none
+a:link
+    color: #{indigo8}
+a:visited
+    color: #{graph8}
+a:hover
+    text-decoration: underline
+|] undefined)
+  where
+    -- from Open Color https://yeun.github.io/open-color/
+    gray1 :: T.Text
+    gray1 = "#f1f3f5"
+    gray3 :: T.Text
+    gray3 = "#dee2e6"
+    gray8 :: T.Text
+    gray8 = "#343a40"
+    graph8 :: T.Text
+    graph8 = "#9c36b5"
+    indigo8 :: T.Text
+    indigo8 = "#3b5bdb"
+
+compilePackage' :: Package Docs -> Map FilePath (Either Error BS.ByteString)
 compilePackage' pkg =
-    [("index.html", Right $ contents pkg)] `union`
-          (fromList [ (makeFilePath $ modulePath m, Right $ module' m)
+    fromList [ ("style.css", Right $ encodeUtf8 $ TL.toStrict stylesheet)
+             , ("index.html", Right $ toStrict $ renderHtml $ contents pkg)
+             ] `union`
+          (fromList [ ( makeFilePath $ modulePath m
+                      , Right $ toStrict $ renderHtml $ module' m
+                      )
                     | m <- modules'
-                    ] :: Map FilePath (Either Error Html))
+                    ] :: Map FilePath (Either Error BS.ByteString))
   where
     paths' :: [ModulePath]
     paths' = MS.keys $ modules pkg
@@ -293,10 +363,10 @@ compilePackage' pkg =
     modules' = mapMaybe (`resolveBoundModule` pkg) paths'
 
 instance Target Docs where
-    type CompileResult Docs = Html
+    type CompileResult Docs = BS.ByteString
     type CompileError Docs = Error
     targetName _ = "docs"
     parseTarget _ = return Docs
     compilePackage = compilePackage'
     showCompileError _ = id
-    toByteString _ = toStrict . renderHtml
+    toByteString _ = id
