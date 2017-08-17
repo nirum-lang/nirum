@@ -41,6 +41,7 @@ dependencies:
 - parsec  # only for dealing with htoml's ParserError
 - pretty >=1.1.3 && <2
 - semver >=0.3.0 && <1.0
+- text >=0.9.1.0 && <1.3
 - unordered-containers  # only for dealing with htoml's data structures
 library:
   source-dirs: src
@@ -57,7 +58,6 @@ library:
   - shakespeare >=2.0.12 && <2.1
   - stm >=2.4.4.1
   - template-haskell >=2.11 && <3
-  - text >=0.9.1.0 && <1.3
   - uri >=0.1 && <1.0
 executables:
   nirum:
@@ -101,5 +101,9 @@ tests:
     - semigroups
     - string-qq >=0.0.2 && <0.1.0
     - temporary >=1.2 && <1.3
-    - text
+  targets:
+    main: test-targets.hs
+    source-dirs: app
+    dependencies:
+    - turtle
 stability: alpha

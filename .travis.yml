@@ -48,9 +48,8 @@ install:
 - travis_long stack --no-terminal setup
 - travis_long stack --no-terminal install scan -j4
 script:
-- stack --no-terminal test -j4 --coverage
+- 'TOX="$(which tox)" stack --no-terminal test -j4 --coverage'
 - ./lint.sh
-- ./test.sh
 after_script:
 - stack install --install-ghc --no-terminal codecov-haskell
 - codecov-haskell Main

@@ -84,7 +84,6 @@ in the same way to build other Haskell softwares:
 You can run the test suite of Nirum:
 
     $ stack test  # unit test for compiler
-    $ ./test.sh   # integration test for targets
     $ ./lint.sh   # style lint
 
 [5]: https://www.haskellstack.org/

@@ -48,11 +48,16 @@ we should test:
 The former is unit testing and the latter one is integration testing.  We have
 two commands/scripts to run corresponding testing:
 
- 1. `stack test`
- 2. `./test.sh`
+ 1. `stack test :spec`
+ 2. `stack test :targets`
 
-If you've changed things related to a target backend you should run both
-commands.  If you've changed pure internals of the compiler probably it's okay
+If you've changed things related to a target backend you should test everything:
+
+~~~~~~~~ bash
+stack test
+~~~~~~~~
+
+If you've changed pure internals of the compiler probably it's okay
 to run only the former command.  Anyway both testings are run by CI so that
 changes breaking either testing cannot be merged.
 
