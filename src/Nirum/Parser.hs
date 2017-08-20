@@ -34,11 +34,11 @@ module Nirum.Parser ( Parser
 import Control.Applicative ((<$>))
 import Control.Monad (join, void)
 import Data.List (foldl1')
-import Prelude hiding (readFile)
+import qualified System.IO as SIO
 
 import Data.Set (elems)
 import qualified Data.Text as T
-import Data.Text.IO (readFile)
+import qualified Data.Text.IO as TIO
 import Text.Megaparsec ( Token
                        , choice
                        , eof
@@ -645,7 +645,9 @@ parse = runParser file
 parseFile :: FilePath -- ^ Source path
           -> IO (Either ParseError Module)
 parseFile path = do
-    code <- readFile path
+    code <- SIO.withFile path SIO.ReadMode $ \ h -> do
+        SIO.hSetEncoding h SIO.utf8_bom
+        TIO.hGetContents h
     return $ runParser file path code
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}

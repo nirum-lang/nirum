@@ -8,7 +8,7 @@ Nirum
 [![Gitter][chat-svg]][chat]
 [![codecov][cov-svg]][cov]
 
-[ci-svg]: https://travis-ci.org/spoqa/nirum.svg
+[ci-svg]: https://travis-ci.org/spoqa/nirum.svg?branch=master
 [ci]: https://travis-ci.org/spoqa/nirum
 [ciw-svg]: https://ci.appveyor.com/api/projects/status/jf9bsrnalcb1xrp0?svg=true
 [ciw]: https://ci.appveyor.com/project/dahlia/nirum-k5n5y
@@ -84,7 +84,6 @@ in the same way to build other Haskell softwares:
 You can run the test suite of Nirum:
 
     $ stack test  # unit test for compiler
-    $ ./test.sh   # integration test for targets
     $ ./lint.sh   # style lint
 
 [5]: https://www.haskellstack.org/

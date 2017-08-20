@@ -1,0 +1,19 @@
+image: ubuntu:16.04
+pipelines:
+  default:
+  - step:
+      caches: [ghc, haskell-stack]
+      script:
+      - apt-get -y update
+      - apt-get -y install build-essential curl netbase software-properties-common
+      - add-apt-repository -y ppa:deadsnakes/ppa
+      - apt-get -y update
+      - apt-get -y install python2.7 python3.4 python3.5 python3.6 tox
+      - 'curl -L https://get.haskellstack.org/ | sh'
+      - stack --no-terminal setup
+      - stack --no-terminal test -j4
+      - ./lint.sh
+definitions:
+  caches:
+    ghc: ~/.ghc
+    haskell-stack: ~/.stack

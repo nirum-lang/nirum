@@ -4,6 +4,7 @@ platform:
 - x64
 environment:
   STACK_ROOT: C:\sr
+  TOX: C:\Python36\Scripts\tox.exe
 cache:
 - '%STACK_ROOT% -> appveyor.yml'
 - '%LOCALAPPDATA%\Programs\stack -> appveyor.yml'
@@ -40,8 +41,6 @@ after_build:
 - ps: upx.exe -9 nirum-win-${env:PLATFORM}.exe
 test_script:
 - stack --no-terminal test --jobs 1
-- C:\Python36\Scripts\tox -e devruntime
-- C:\Python36\Scripts\tox
 artifacts:
 - path: nirum-win-x86.exe
 - path: nirum-win-x64.exe
