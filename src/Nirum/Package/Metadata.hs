@@ -30,6 +30,7 @@ module Nirum.Package.Metadata ( Author (Author, email, name, uri)
                                        )
                               , TargetName
                               , VTArray
+                              , booleanField
                               , fieldType
                               , metadataFilename
                               , metadataPath
@@ -303,3 +304,11 @@ authorsField field' table = do
                       , email = email'
                       , uri = uri'
                       }
+
+booleanField :: MetadataField -> Table -> Either MetadataError Bool
+booleanField field' table = do
+    b <- field field' table
+    case b of
+        (VBoolean x) -> Right x
+        _ -> Left $ FieldValueError field' $
+                        "expected a boolean (e.g. True, False), not " ++ unpack (fieldType b)

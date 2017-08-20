@@ -1,0 +1,9 @@
+version = "0.3.0"
+
+[[authors]]
+name = "nirum"
+email = "dev@nirum.org"
+
+[targets.python]
+name = "nirum_fixture_async"
+support_async = true

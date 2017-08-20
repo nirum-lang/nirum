@@ -95,7 +95,7 @@ makeDummySource' pathPrefix m renames =
                     , uri = Nothing
                     }
               ]
-        , target = Python "sample-package" minimumRuntime renames
+        , target = Python "sample-package" minimumRuntime renames False
         }
     pkg :: Package Python
     pkg = createPackage
