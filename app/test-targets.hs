@@ -8,6 +8,7 @@ import Text.InterpolatedString.Perl6 (qq)
 
 import Turtle
 
+-- | Invoke a process.
 proc' :: T.Text -> [T.Text] -> IO ()
 proc' prog args =
     catchIOError (procs prog args empty) $ \ex ->
@@ -17,14 +18,22 @@ proc' prog args =
                 exit $ ExitFailure 1
         else ioError ex
 
-main :: IO ()
-main = do
+-- | Run the IO operation only if it's run on CI.
+whenCi :: IO () -> IO ()
+whenCi block = do
     ciEnv <- lookupEnv "CI"
     let ci = maybe False (/= "") ciEnv
+    when ci block
 
-    -- Python target
+-- | Teget all targets.
+main :: IO ()
+main =
+    python
+
+-- | Test Python target.
+python :: IO ()
+python = do
     toxEnv <- lookupEnv "TOX"
     let tox = maybe "tox" T.pack toxEnv
-    when ci $
-        proc' tox ["-e", "devruntime"]
+    whenCi $ proc' tox ["-e", "devruntime"]
     proc' tox ["--skip-missing-interpreters"]
