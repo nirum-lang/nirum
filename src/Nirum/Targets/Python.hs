@@ -117,7 +117,11 @@ import Nirum.Package ( BoundModule
                      , types
                      )
 import Nirum.Package.Metadata ( Author (Author, name, email)
-                              , Metadata (Metadata, authors, target, version)
+                              , Metadata ( Metadata
+                                         , authors
+                                         , classifiers
+                                         , target
+                                         , version)
                               , MetadataError ( FieldError
                                               , FieldTypeError
                                               , FieldValueError
@@ -1195,9 +1199,16 @@ setup(
     setup_requires=setup_requires,
     install_requires=install_requires,
     extras_require=extras_require,
+    classifiers=[$classifiersCode]
 )
 |]
   where
+    classifiers' :: [Code]
+    classifiers' = classifiers metadata'
+    classifiersCode :: Code
+    classifiersCode = T.intercalate "," $ map addQuote classifiers'
+    addQuote :: T.Text -> T.Text
+    addQuote t = T.snoc (T.cons '\'' t) '\''
     target' :: Python
     target' = target metadata'
     csStrings :: [T.Text] -> T.Text
