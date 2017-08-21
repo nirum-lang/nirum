@@ -38,6 +38,7 @@ modules' = case m of
 package :: Package DummyTarget
 package = Package { metadata = Metadata { version = SV.version 0 0 1 [] []
                                         , authors = []
+                                        , description = Nothing
                                         , target = DummyTarget
                                         }
                   , modules = modules'

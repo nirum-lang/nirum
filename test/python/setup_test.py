@@ -21,3 +21,4 @@ def test_setup_metadata():
         'renamed', 'renamed.foo', 'renamed.foo.bar',
     }
     assert ['0.3.0'] == pkg['Version']
+    assert ['Package description'] == pkg['Summary']

@@ -117,7 +117,12 @@ import Nirum.Package ( BoundModule
                      , types
                      )
 import Nirum.Package.Metadata ( Author (Author, name, email)
-                              , Metadata (Metadata, authors, target, version)
+                              , Metadata (Metadata
+                                         , authors
+                                         , target
+                                         , version
+                                         , description
+                                         )
                               , MetadataError ( FieldError
                                               , FieldTypeError
                                               , FieldValueError
@@ -1186,6 +1191,7 @@ if sys.version_info < (3, 0):
 setup(
     name='{pName}',
     version='{pVersion}',
+    description=$pDescription,
     author=$author,
     author_email=$authorEmail,
     package_dir=\{'': SOURCE_ROOT},
@@ -1207,6 +1213,10 @@ setup(
     pName = packageName $ target metadata'
     pVersion :: Code
     pVersion = SV.toText $ version metadata'
+    pDescription :: Code
+    pDescription = case description metadata' of
+                     Just value -> T.intercalate "" ["'", value, "'"]
+                     Nothing -> "None"
     strings :: [Code] -> Code
     strings values = T.intercalate ", " $ map stringLiteral (L.sort values)
     author :: Code

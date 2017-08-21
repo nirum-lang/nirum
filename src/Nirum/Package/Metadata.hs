@@ -1,7 +1,12 @@
 {-# LANGUAGE GADTs, QuasiQuotes, RankNTypes, ScopedTypeVariables,
              StandaloneDeriving, TypeFamilies #-}
 module Nirum.Package.Metadata ( Author (Author, email, name, uri)
-                              , Metadata (Metadata, authors, target, version)
+                              , Metadata (Metadata
+                                         , authors
+                                         , target
+                                         , version
+                                         , description
+                                         )
                               , MetadataError ( FieldError
                                               , FieldTypeError
                                               , FieldValueError
@@ -91,10 +96,11 @@ deriving instance (Ord t, Target t) => Ord (Package t)
 deriving instance (Show t, Target t) => Show (Package t)
 
 packageTarget :: Target t => Package t -> t
-packageTarget Package { metadata = Metadata _ _ t } = t
+packageTarget Package { metadata = Metadata _ _ _ t } = t
 
 data Metadata t =
     Metadata { version :: SV.Version
+             , description :: Maybe Text
              , authors :: [Author]
              , target :: (Eq t, Ord t, Show t, Target t) => t
              }
@@ -172,6 +178,7 @@ parseMetadata metadataPath' tomlText = do
         Right t -> Right t
     version' <- versionField "version" table
     authors' <- authorsField "authors" table
+    description' <- optional $ stringField "description" table
     targets <- case tableField "targets" table of
         Left (FieldError _) -> Right HM.empty
         otherwise' -> otherwise'
@@ -184,6 +191,7 @@ parseMetadata metadataPath' tomlText = do
                        $ prependMetadataErrorField targetName' e
         otherwise' -> otherwise'
     return Metadata { version = version'
+                    , description = description'
                     , authors = authors'
                     , target = target'
                     }

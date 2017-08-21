@@ -35,7 +35,12 @@ import Nirum.Package ( BoundModule (boundPackage, modulePath)
                      , scanPackage
                      , types
                      )
-import Nirum.Package.Metadata ( Metadata (Metadata, authors, target, version)
+import Nirum.Package.Metadata ( Metadata (Metadata
+                                         , authors
+                                         , target
+                                         , version
+                                         , description
+                                         )
                               , MetadataError (FormatError)
                               , Target (targetName)
                               )
@@ -56,6 +61,7 @@ createPackage metadata' modules' =
 createValidPackage :: t -> Package t
 createValidPackage t = createPackage Metadata { version = SV.initial
                                               , authors = []
+                                              , description = Nothing
                                               , target = t
                                               } validModules
 
@@ -103,6 +109,7 @@ testPackage target' = do
                               ] :: [(ModulePath, Module)]
                     metadata' = Metadata { version = SV.version 0 3 0 [] []
                                          , authors = []
+                                         , description = Nothing
                                          , target = target'
                                          }
                 metadata package `shouldBe` metadata'

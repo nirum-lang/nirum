@@ -37,7 +37,11 @@ import Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
                                        )
 import Nirum.Package (Package (metadata, modules), resolveBoundModule)
 import Nirum.Package.Metadata ( Author (Author, email, name, uri)
-                              , Metadata (Metadata, authors, target, version)
+                              , Metadata (Metadata
+                                         , authors
+                                         , target
+                                         , version
+                                         , description)
                               , Target (compilePackage)
                               )
 import qualified Nirum.Package.ModuleSet as MS
@@ -95,6 +99,7 @@ makeDummySource' pathPrefix m renames =
                     , uri = Nothing
                     }
               ]
+        , description = Just "Package description"
         , target = Python "sample-package" minimumRuntime renames
         }
     pkg :: Package Python
