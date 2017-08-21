@@ -1,4 +1,22 @@
 {-# LANGUAGE OverloadedStrings, QuasiQuotes #-}
+-- How to add a test suite for a new target
+--
+-- a. Define a function of the same name to the target name
+--    (i.e. `targetName :: Target t => Proxy t -> TargetName`),
+--    which is a type of `IO ()`.  See `python :: IO ()` for example.
+--
+-- b. If a test suite requires any external programs list them
+--    in "External dependencies" section of CONTRIBUTING.md docs.
+--
+-- c. Add the defined function to `do` block of `main` function.
+--    Please keep functions in lexicographical order.
+--
+-- d. If an action is necessary for only CI builds invoke it using
+--    `whenCi :: IO () -> IO ()`.
+--
+-- e. This script is written in Turtle, a DSL embeded in Haskell for
+--    shell scripting.
+--    See also <https://github.com/Gabriel439/Haskell-Turtle-Library>.
 import Control.Monad (when)
 import System.Environment (lookupEnv)
 import System.IO.Error (catchIOError, isDoesNotExistError)
