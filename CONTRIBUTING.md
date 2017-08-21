@@ -4,7 +4,7 @@ Contirubtion guide
 Build
 -----
 
-In the same way other Haskell softwares, Nirum compiler can be built using
+In the same way to other Haskell softwares, Nirum compiler can be built using
 [Haskell Stack][].  If you didn't install it yet see also its
 [installation guide][1].
 
