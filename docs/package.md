@@ -42,6 +42,7 @@ about the package (e.g. `version`, `authors`).  The following [TOML][] code
 is an example:
 
     version = "1.0.0"  # (required)
+    description = "Short description on the package"
 
     [[authors]]
     name = "John Doe"  # (required)
@@ -52,6 +53,9 @@ It consists of the following fields (*emphasized fields* are required):
 
 *`version`* (string)
 :   The required [semver][] of the package.
+
+`description` (string)
+:   An optional short description of the package.
 
 `authors` (array of tables)
 :   The list of authors.  Note that it can be empty, but `name` field is
