@@ -117,7 +117,7 @@ import Nirum.Package ( BoundModule
                      , types
                      )
 import Nirum.Package.Metadata ( Author (Author, name, email)
-                              , Metadata (Metadata
+                              , Metadata ( Metadata
                                          , authors
                                          , target
                                          , version

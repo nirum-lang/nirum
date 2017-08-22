@@ -37,7 +37,7 @@ import Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
                                        )
 import Nirum.Package (Package (metadata, modules), resolveBoundModule)
 import Nirum.Package.Metadata ( Author (Author, email, name, uri)
-                              , Metadata (Metadata
+                              , Metadata ( Metadata
                                          , authors
                                          , target
                                          , version

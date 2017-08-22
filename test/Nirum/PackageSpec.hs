@@ -35,7 +35,7 @@ import Nirum.Package ( BoundModule (boundPackage, modulePath)
                      , scanPackage
                      , types
                      )
-import Nirum.Package.Metadata ( Metadata (Metadata
+import Nirum.Package.Metadata ( Metadata ( Metadata
                                          , authors
                                          , target
                                          , version

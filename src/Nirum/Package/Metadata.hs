@@ -1,7 +1,7 @@
 {-# LANGUAGE GADTs, QuasiQuotes, RankNTypes, ScopedTypeVariables,
              StandaloneDeriving, TypeFamilies #-}
 module Nirum.Package.Metadata ( Author (Author, email, name, uri)
-                              , Metadata (Metadata
+                              , Metadata ( Metadata
                                          , authors
                                          , target
                                          , version
