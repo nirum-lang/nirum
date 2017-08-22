@@ -121,6 +121,13 @@ spec =
                         , "string"
                         , "array of 0 values"
                         )
+                      , ( [q|version = "1.2.3"
+                             description = 123
+                          |]
+                        , "description"
+                        , "string"
+                        , "integer (123)"
+                        )
                       ] $ \ (toml, field, expected, actual) -> do
                         let Left e = parse toml
                             FieldTypeError field' expected' actual' = e
