@@ -1215,7 +1215,7 @@ setup(
     pVersion = SV.toText $ version metadata'
     pDescription :: Code
     pDescription = case description metadata' of
-                     Just value -> T.intercalate "" ["'", value, "'"]
+                     Just value -> stringLiteral value
                      Nothing -> "None"
     strings :: [Code] -> Code
     strings values = T.intercalate ", " $ map stringLiteral (L.sort values)
