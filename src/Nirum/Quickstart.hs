@@ -120,4 +120,4 @@ main = do
                                   , version = version'
                                   , description = desc
                                   }
-    putStrLn $ T.unpack text
+    writeFile "package.toml" $ T.unpack text
