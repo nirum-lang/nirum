@@ -176,6 +176,8 @@ parseMetadata metadataPath' tomlText = do
     table <- case parseTomlDoc metadataPath' tomlText of
         Left e -> Left $ FormatError e
         Right t -> Right t
+    -- NOTE: When a new field is added please write docs about it in
+    -- docs/package.md file.
     version' <- versionField "version" table
     authors' <- authorsField "authors" table
     description' <- optional $ stringField "description" table
