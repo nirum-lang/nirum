@@ -4,7 +4,7 @@ Contirubtion guide
 Build
 -----
 
-In the same way other Haskell softwares, Nirum compiler can be built using
+In the same way to other Haskell softwares, Nirum compiler can be built using
 [Haskell Stack][].  If you didn't install it yet see also its
 [installation guide][1].
 
@@ -68,3 +68,17 @@ changes breaking either testing cannot be merged.
 [ci]: https://travis-ci.org/spoqa/nirum
 [ciw-svg]: https://ci.appveyor.com/api/projects/status/jf9bsrnalcb1xrp0?svg=true
 [ciw]: https://ci.appveyor.com/project/dahlia/nirum-k5n5y
+
+
+External dependencies
+---------------------
+
+Each target test suite has its external dependencies (i.e. non-library program
+dependencies):
+
+ -  Python
+     -  All Python versions that Nirum should support: Python 2.7, and
+        3.4---3.5
+     -  [`tox`][tox]
+
+[tox]: https://tox.readthedocs.io/
