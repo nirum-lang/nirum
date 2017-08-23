@@ -1,12 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Nirum.Package.Metadata.Writer (encode) where
+module Nirum.Package.Metadata.Writer ( encode
+                                     , metadataToToml
+                                     , renderTable
+                                     ) where
 
 import qualified Data.HashMap.Lazy as HM
 import qualified Data.SemVer as SV
 import qualified Data.Int as I
 import qualified Data.List as L
-import Data.Maybe (fromMaybe)
-import Data.Monoid ((<>))
+import qualified Data.Maybe as M
+import qualified Data.Monoid as MO
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as ENC
 import qualified Data.Time.Clock as TC
@@ -20,20 +23,20 @@ renderTable :: HM.HashMap T.Text TM.Node -> T.Text
 renderTable t = T.intercalate "\n" rendered
   where
     rendered :: [T.Text]
-    rendered = [ renderKey k n <> renderNode n
+    rendered = [ renderKey k n MO.<> renderNode n
                | (k, n) <- L.sortOn nodePriority $ HM.toList t
                ]
     renderKey :: T.Text -> TM.Node -> T.Text
-    renderKey k (TM.VTable _) = "\n[" <> k <> "]\n"
-    renderKey k (TM.VTArray _) = "\n[[" <> k <> "]]\n"
-    renderKey k _ = k <> " = "
+    renderKey k (TM.VTable _) = "\n[" MO.<> k MO.<> "]\n"
+    renderKey k (TM.VTArray _) = "\n[[" MO.<> k MO.<> "]]\n"
+    renderKey k _ = k MO.<> " = "
     nodePriority :: (T.Text, TM.Node) -> Int
     nodePriority (_, TM.VTable _) = 1
     nodePriority (_, TM.VTArray _) = 2
     nodePriority (_, _) = 0
 
 renderText :: T.Text -> T.Text
-renderText t = "\"" <> t <> "\""
+renderText t = "\"" MO.<> t MO.<> "\""
 
 renderTableArray :: V.Vector TM.Table -> T.Text
 renderTableArray v = T.intercalate "\n" [ renderTable t | t <- V.toList v ]
@@ -78,7 +81,7 @@ metadataToToml M.Metadata { M.version = version'
                           } =
     HM.fromList [ ("authors", TM.VTArray $ V.fromList authors'')
                 , ("version", TM.VString $ SV.toText version')
-                , ("description", TM.VString $ fromMaybe "" description')
+                , ("description", TM.VString $ M.fromMaybe "" description')
                 ]
   where
     authors'' :: [TM.Table]
