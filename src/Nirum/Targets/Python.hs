@@ -1215,14 +1215,14 @@ setup(
     pName = packageName $ target metadata'
     pVersion :: Code
     pVersion = SV.toText $ version metadata'
+    fromMaybeToMeta :: Maybe T.Text -> T.Text
+    fromMaybeToMeta s = case s of
+                          Just value -> stringLiteral value
+                          Nothing -> "None"
     pDescription :: Code
-    pDescription = case description metadata' of
-                     Just value -> stringLiteral value
-                     Nothing -> "None"
+    pDescription = fromMaybeToMeta $ description metadata'
     pLicense :: Code
-    pLicense = case license metadata' of
-                     Just value -> stringLiteral value
-                     Nothing -> "None"
+    pLicense = fromMaybeToMeta $ license metadata'
     strings :: [Code] -> Code
     strings values = T.intercalate ", " $ map stringLiteral (L.sort values)
     author :: Code
