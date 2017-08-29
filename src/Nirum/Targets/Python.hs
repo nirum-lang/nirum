@@ -1187,8 +1187,7 @@ SOURCE_ROOT = '{sourceDirectory Python3}'
 if sys.version_info < (3, 0):
     SOURCE_ROOT = '{sourceDirectory Python2}'
 
-# TODO: description, long_description, url, license,
-#       keywords, classifiers
+# TODO: long_description, url, keywords, classifiers
 setup(
     name='{pName}',
     version='{pVersion}',
