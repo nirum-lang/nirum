@@ -122,6 +122,7 @@ import Nirum.Package.Metadata ( Author (Author, name, email)
                                          , target
                                          , version
                                          , description
+                                         , license
                                          )
                               , MetadataError ( FieldError
                                               , FieldTypeError
@@ -1192,6 +1193,7 @@ setup(
     name='{pName}',
     version='{pVersion}',
     description=$pDescription,
+    license=$pLicense,
     author=$author,
     author_email=$authorEmail,
     package_dir=\{'': SOURCE_ROOT},
@@ -1215,6 +1217,10 @@ setup(
     pVersion = SV.toText $ version metadata'
     pDescription :: Code
     pDescription = case description metadata' of
+                     Just value -> stringLiteral value
+                     Nothing -> "None"
+    pLicense :: Code
+    pLicense = case license metadata' of
                      Just value -> stringLiteral value
                      Nothing -> "None"
     strings :: [Code] -> Code

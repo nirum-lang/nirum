@@ -6,6 +6,7 @@ module Nirum.Package.Metadata ( Author (Author, email, name, uri)
                                          , target
                                          , version
                                          , description
+                                         , license
                                          )
                               , MetadataError ( FieldError
                                               , FieldTypeError
@@ -96,11 +97,12 @@ deriving instance (Ord t, Target t) => Ord (Package t)
 deriving instance (Show t, Target t) => Show (Package t)
 
 packageTarget :: Target t => Package t -> t
-packageTarget Package { metadata = Metadata _ _ _ t } = t
+packageTarget Package { metadata = Metadata _ _ _ _ t } = t
 
 data Metadata t =
     Metadata { version :: SV.Version
              , description :: Maybe Text
+             , license :: Maybe Text
              , authors :: [Author]
              , target :: (Eq t, Ord t, Show t, Target t) => t
              }
@@ -181,6 +183,7 @@ parseMetadata metadataPath' tomlText = do
     version' <- versionField "version" table
     authors' <- authorsField "authors" table
     description' <- optional $ stringField "description" table
+    license' <- optional $ stringField "license" table
     targets <- case tableField "targets" table of
         Left (FieldError _) -> Right HM.empty
         otherwise' -> otherwise'
@@ -194,6 +197,7 @@ parseMetadata metadataPath' tomlText = do
         otherwise' -> otherwise'
     return Metadata { version = version'
                     , description = description'
+                    , license = license'
                     , authors = authors'
                     , target = target'
                     }

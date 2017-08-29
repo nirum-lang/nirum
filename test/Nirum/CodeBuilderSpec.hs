@@ -39,6 +39,7 @@ package :: Package DummyTarget
 package = Package { metadata = Metadata { version = SV.version 0 0 1 [] []
                                         , authors = []
                                         , description = Nothing
+                                        , license = Nothing
                                         , target = DummyTarget
                                         }
                   , modules = modules'
