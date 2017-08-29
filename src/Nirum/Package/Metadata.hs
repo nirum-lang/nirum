@@ -97,7 +97,7 @@ deriving instance (Ord t, Target t) => Ord (Package t)
 deriving instance (Show t, Target t) => Show (Package t)
 
 packageTarget :: Target t => Package t -> t
-packageTarget Package { metadata = Metadata _ _ _ _ t } = t
+packageTarget Package { metadata = Metadata { target = t } } = t
 
 data Metadata t =
     Metadata { version :: SV.Version
