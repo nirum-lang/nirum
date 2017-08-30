@@ -40,6 +40,7 @@ import Nirum.Package.Metadata ( Metadata ( Metadata
                                          , target
                                          , version
                                          , description
+                                         , license
                                          )
                               , MetadataError (FormatError)
                               , Target (targetName)
@@ -62,6 +63,7 @@ createValidPackage :: t -> Package t
 createValidPackage t = createPackage Metadata { version = SV.initial
                                               , authors = []
                                               , description = Nothing
+                                              , license = Nothing
                                               , target = t
                                               } validModules
 
@@ -110,6 +112,7 @@ testPackage target' = do
                     metadata' = Metadata { version = SV.version 0 3 0 [] []
                                          , authors = []
                                          , description = Nothing
+                                         , license = Nothing
                                          , target = target'
                                          }
                 metadata package `shouldBe` metadata'

@@ -22,3 +22,4 @@ def test_setup_metadata():
     }
     assert ['0.3.0'] == pkg['Version']
     assert ['Package description'] == pkg['Summary']
+    assert ['MIT'] == pkg['License']

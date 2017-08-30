@@ -41,7 +41,8 @@ import Nirum.Package.Metadata ( Author (Author, email, name, uri)
                                          , authors
                                          , target
                                          , version
-                                         , description)
+                                         , description
+                                         , license)
                               , Target (compilePackage)
                               )
 import qualified Nirum.Package.ModuleSet as MS
@@ -100,6 +101,7 @@ makeDummySource' pathPrefix m renames =
                     }
               ]
         , description = Just "Package description"
+        , license = Just "MIT"
         , target = Python "sample-package" minimumRuntime renames
         }
     pkg :: Package Python

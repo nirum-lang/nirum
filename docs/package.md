@@ -43,6 +43,7 @@ is an example:
 
     version = "1.0.0"  # (required)
     description = "Short description on the package"
+    license = "MIT"
 
     [[authors]]
     name = "John Doe"  # (required)
@@ -56,6 +57,9 @@ It consists of the following fields (*emphasized fields* are required):
 
 `description` (string)
 :   An optional short description of the package.
+
+`license` (string)
+:   An optional license of the package.
 
 `authors` (array of tables)
 :   The list of authors.  Note that it can be empty, but `name` field is

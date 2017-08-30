@@ -122,6 +122,7 @@ import Nirum.Package.Metadata ( Author (Author, name, email)
                                          , target
                                          , version
                                          , description
+                                         , license
                                          )
                               , MetadataError ( FieldError
                                               , FieldTypeError
@@ -1186,12 +1187,12 @@ SOURCE_ROOT = '{sourceDirectory Python3}'
 if sys.version_info < (3, 0):
     SOURCE_ROOT = '{sourceDirectory Python2}'
 
-# TODO: description, long_description, url, license,
-#       keywords, classifiers
+# TODO: long_description, url, keywords, classifiers
 setup(
     name='{pName}',
     version='{pVersion}',
     description=$pDescription,
+    license=$pLicense,
     author=$author,
     author_email=$authorEmail,
     package_dir=\{'': SOURCE_ROOT},
@@ -1213,10 +1214,14 @@ setup(
     pName = packageName $ target metadata'
     pVersion :: Code
     pVersion = SV.toText $ version metadata'
+    fromMaybeToMeta :: Maybe T.Text -> T.Text
+    fromMaybeToMeta s = case s of
+                          Just value -> stringLiteral value
+                          Nothing -> "None"
     pDescription :: Code
-    pDescription = case description metadata' of
-                     Just value -> stringLiteral value
-                     Nothing -> "None"
+    pDescription = fromMaybeToMeta $ description metadata'
+    pLicense :: Code
+    pLicense = fromMaybeToMeta $ license metadata'
     strings :: [Code] -> Code
     strings values = T.intercalate ", " $ map stringLiteral (L.sort values)
     author :: Code
