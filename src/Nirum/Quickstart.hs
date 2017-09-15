@@ -64,12 +64,10 @@ readConfig cfg = do
     let proc = (P.proc "git" ["config", T.unpack cfg]) {
                    P.std_out = P.CreatePipe
                }
-    stream <- E.catch
-                  (do
-                      (_, s, _, _) <- P.createProcess proc
-                      return s
-                  )
-                  ((\ _ -> return Nothing) :: E.IOException -> IO (Maybe a))
+        catchFn _ = return Nothing
+    stream <- (`E.catch` (catchFn :: E.IOException -> IO (Maybe a))) $ do
+        (_, s, _, _) <- P.createProcess proc
+        return s
     case stream of
         Just s -> do
             c <- TIO.hGetLine s
