@@ -78,11 +78,9 @@ metadataToToml :: M.Target t => M.Metadata t -> TM.Table
 metadataToToml M.Metadata { M.version = version'
                           , M.authors = authors'
                           , M.description = description'
+                          , M.license = license'
                           } =
-    HM.fromList [ ("authors", TM.VTArray $ V.fromList authors'')
-                , ("version", TM.VString $ SV.toText version')
-                , ("description", TM.VString $ M.fromMaybe "" description')
-                ]
+    HM.fromList [(name, value) | (name, Just value) <- fields]
   where
     authors'' :: [TM.Table]
     authors'' = [ HM.fromList [ ("name", TM.VString name')
@@ -95,3 +93,10 @@ metadataToToml M.Metadata { M.version = version'
       where
         toEmailText :: EV.EmailAddress -> T.Text
         toEmailText e = ENC.decodeUtf8 $ EV.toByteString e
+    fields :: [(T.Text, Maybe TM.Node)]
+    fields =
+        [ ("authors", Just $ TM.VTArray $ V.fromList authors'')
+        , ("version", Just $ TM.VString $ SV.toText version')
+        , ("description", Just $ TM.VString $ M.fromMaybe "" description')
+        , ("license", fmap TM.VString $ license')
+        ]

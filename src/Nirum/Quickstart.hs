@@ -35,6 +35,7 @@ import Nirum.Package.Metadata ( Author ( Author
                               , Metadata ( Metadata
                                           , authors
                                           , description
+                                          , license
                                           , target
                                           , version
                                           )
@@ -110,12 +111,16 @@ main = do
     gitEmail <- readConfig "user.email"
     email' <- inputConfig "author.email: " gitEmail
     description' <- inputConfig "description: " $ Just ""
+    license' <- inputConfig "license: " $ Nothing
     version' <- parseSemVer semVer
     let author = parseAuthor name' email'
-        desc = if T.null description' then Just description' else Nothing
         text = MW.encode Metadata { target = Quickstart
                                   , authors = [author]
                                   , version = version'
-                                  , description = desc
+                                  , description = textToMaybe description'
+                                  , license = textToMaybe license'
                                   }
     writeFile "package.toml" $ T.unpack text
+  where
+    textToMaybe :: T.Text -> Maybe T.Text
+    textToMaybe t = if T.null t then Nothing else Just t
