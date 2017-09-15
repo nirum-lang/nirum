@@ -107,6 +107,9 @@ on GitHub!
 
 ### Editor supports
 
+ -   [nirum.tmbundle](https://github.com/spoqa/nirum.tmbundle): TextMate bundle
+     for Nirum.  Also can be used by IntelliJ IDEA (or any other JetBrain's
+     IDEs, e.g., PyCharm, WebStorm) through [TextMate bundles support][9].
  -   [nirum.vim](https://github.com/spoqa/nirum.vim): Nirum syntax highlighter for
      Vim/Neovim.
  -   [sublime-nirum](https://github.com/spoqa/sublime-nirum): Nirum package for
@@ -114,6 +117,7 @@ on GitHub!
 
 [7]: https://github.com/search?q=topic:nirum+fork:false
 [8]: https://github.com/blog/2309-introducing-topics
+[9]: https://github.com/spoqa/nirum.tmbundle#installation-intellij-idea-pycharm-etc
 
 
 Etymology
