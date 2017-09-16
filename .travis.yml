@@ -16,6 +16,8 @@ matrix:
         - python3.6
         - libgmp10
         - upx-ucl
+env:
+- PIP_MINVER=9.0.1 SETUPTOOLS_MINVER=36.5.0
 cache:
   directories:
   - "$HOME/.stack"
@@ -39,12 +41,19 @@ before_install:
 - curl -o "$HOME/.local/bin/travis_long" -L https://raw.githubusercontent.com/futurice/fum2github/master/travis_long
 - chmod +x "$HOME/.local/bin/travis_long"
 install:
-- | 
-  if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then
-    pip3 install --user --upgrade tox pip setuptools
-  else
-    pip install --user --upgrade tox pip setuptools
+- |
+  if ! python3 -c "import pip"; then
+    if ! python3 -c "import setuptools"; then
+      pushd /tmp
+      curl -L "https://github.com/pypa/setuptools/archive/v$SETUPTOOLS_MINVER.tar.gz" | tar xvfz -
+      cd setuptools-*/
+      python3 bootstrap.py
+      python3 setup.py install --user
+      popd
+    fi
+    python3 -m easy_install --user -U "pip>=$PIP_MINVER"
   fi
+- python3 -m pip install --user --upgrade tox "pip>=$PIP_MINVER" setuptools
 - travis_long stack --no-terminal setup
 - travis_long stack --no-terminal install scan -j4
 script:
