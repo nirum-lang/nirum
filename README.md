@@ -96,24 +96,28 @@ See also the [list of Nirum-related projects][7] on GitHub.  Have you kicked off
 a new project related to Nirum?  Please add *nirum* [topic][8] to your project
 on GitHub!
 
-### Editor supports
-
-- [nirum.vim](https://github.com/spoqa/nirum.vim): Nirum syntax highlighter for
-  Vim/Neovim.
-- [sublime-nirum](https://github.com/spoqa/sublime-nirum): Nirum package for
-  Sublime Text 3.
-
 ### Language runtimes
 
-- [nirum-python](https://github.com/spoqa/nirum-python): The official Python
-  runtime library for Nirum.
-    - [nirim-python-http](https://github.com/spoqa/nirum-python-http):
-      Nirum HTTP transport for Python.
-    - [nirum-python-wsgi](https://github.com/spoqa/nirum-python-wsgi):
-      Adapt Nirum services to WSGI apps.
+ -   [nirum-python](https://github.com/spoqa/nirum-python): The official Python
+     runtime library for Nirum.
+     -   [nirim-python-http](https://github.com/spoqa/nirum-python-http):
+         Nirum HTTP transport for Python.
+     -   [nirum-python-wsgi](https://github.com/spoqa/nirum-python-wsgi):
+         Adapt Nirum services to WSGI apps.
+
+### Editor supports
+
+ -   [nirum.tmbundle](https://github.com/spoqa/nirum.tmbundle): TextMate bundle
+     for Nirum.  Also can be used by IntelliJ IDEA (or any other JetBrain's
+     IDEs, e.g., PyCharm, WebStorm) through [TextMate bundles support][9].
+ -   [nirum.vim](https://github.com/spoqa/nirum.vim): Nirum syntax highlighter for
+     Vim/Neovim.
+ -   [sublime-nirum](https://github.com/spoqa/sublime-nirum): Nirum package for
+     Sublime Text 3.
 
 [7]: https://github.com/search?q=topic:nirum+fork:false
 [8]: https://github.com/blog/2309-introducing-topics
+[9]: https://github.com/spoqa/nirum.tmbundle#installation-intellij-idea-pycharm-etc
 
 
 Etymology
