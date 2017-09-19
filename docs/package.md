@@ -44,6 +44,7 @@ is an example:
     version = "1.0.0"  # (required)
     description = "Short description on the package"
     license = "MIT"
+    keywords = "sample example nirum"
 
     [[authors]]
     name = "John Doe"  # (required)
@@ -60,6 +61,9 @@ It consists of the following fields (*emphasized fields* are required):
 
 `license` (string)
 :   An optional license of the package.
+
+`keywords` (string)
+:   An optional keywords of the package.
 
 `authors` (array of tables)
 :   The list of authors.  Note that it can be empty, but `name` field is
