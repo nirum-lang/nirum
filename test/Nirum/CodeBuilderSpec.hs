@@ -40,7 +40,7 @@ package = Package { metadata = Metadata { version = SV.version 0 0 1 [] []
                                         , authors = []
                                         , description = Nothing
                                         , license = Nothing
-                                        , packageKeywords = Nothing
+                                        , keywords = Nothing
                                         , target = DummyTarget
                                         }
                   , modules = modules'

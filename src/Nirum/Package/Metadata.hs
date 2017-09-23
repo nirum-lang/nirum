@@ -7,7 +7,7 @@ module Nirum.Package.Metadata ( Author (Author, email, name, uri)
                                          , version
                                          , description
                                          , license
-                                         , packageKeywords
+                                         , keywords
                                          )
                               , MetadataError ( FieldError
                                               , FieldTypeError
@@ -104,7 +104,7 @@ data Metadata t =
     Metadata { version :: SV.Version
              , description :: Maybe Text
              , license :: Maybe Text
-             , packageKeywords :: Maybe Text
+             , keywords :: Maybe Text
              , authors :: [Author]
              , target :: (Eq t, Ord t, Show t, Target t) => t
              }
@@ -201,7 +201,7 @@ parseMetadata metadataPath' tomlText = do
     return Metadata { version = version'
                     , description = description'
                     , license = license'
-                    , packageKeywords = keywords'
+                    , keywords = keywords'
                     , authors = authors'
                     , target = target'
                     }

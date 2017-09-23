@@ -123,7 +123,6 @@ import Nirum.Package.Metadata ( Author (Author, name, email)
                                          , version
                                          , description
                                          , license
-                                         , packageKeywords
                                          )
                               , MetadataError ( FieldError
                                               , FieldTypeError
@@ -144,6 +143,7 @@ import Nirum.Package.Metadata ( Author (Author, name, email)
                               , versionField
                               )
 import qualified Nirum.Package.ModuleSet as MS
+import qualified Nirum.Package.Metadata as MD
 
 minimumRuntime :: SV.Version
 minimumRuntime = SV.version 0 6 0 [] []
@@ -1225,7 +1225,7 @@ setup(
     pLicense :: Code
     pLicense = fromMaybeToMeta $ license metadata'
     pKeywords :: Code
-    pKeywords = fromMaybeToMeta $ packageKeywords metadata'
+    pKeywords = fromMaybeToMeta $ MD.keywords metadata'
     strings :: [Code] -> Code
     strings values = T.intercalate ", " $ map stringLiteral (L.sort values)
     author :: Code
