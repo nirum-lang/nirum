@@ -136,11 +136,11 @@ spec =
                         , "integer (123)"
                         )
                       , ( [q|version = "1.2.3"
-                             keywords = 789
+                             keywords = "sample example nirum"
                           |]
                         , "keywords"
-                        , "string"
-                        , "integer (789)"
+                        , "array"
+                        , "string (sample example nirum)"
                         )
                       ] $ \ (toml, field, expected, actual) -> do
                         let Left e = parse toml

@@ -104,7 +104,7 @@ makeDummySource' pathPrefix m renames =
               ]
         , description = Just "Package description"
         , license = Just "MIT"
-        , keywords = Just "test example examples"
+        , keywords = ["sample", "example", "nirum"]
         , target = Python "sample-package" minimumRuntime renames
         }
     pkg :: Package Python

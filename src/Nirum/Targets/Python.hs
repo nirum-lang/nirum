@@ -1209,9 +1209,9 @@ setup(
   where
     target' :: Python
     target' = target metadata'
-    csStrings :: [T.Text] -> T.Text
-    csStrings [] = "None"
-    csStrings s = stringLiteral $ T.intercalate ", " s
+    csStrings :: T.Text -> [T.Text] -> T.Text
+    csStrings _ [] = "None"
+    csStrings d s = stringLiteral $ T.intercalate d s
     pName :: Code
     pName = packageName $ target metadata'
     pVersion :: Code
@@ -1225,13 +1225,15 @@ setup(
     pLicense :: Code
     pLicense = fromMaybeToMeta $ license metadata'
     pKeywords :: Code
-    pKeywords = fromMaybeToMeta $ MD.keywords metadata'
+    pKeywords = csStrings " " $ MD.keywords metadata'
     strings :: [Code] -> Code
     strings values = T.intercalate ", " $ map stringLiteral (L.sort values)
     author :: Code
-    author = csStrings [aName | Author { name = aName } <- authors metadata']
+    author = csStrings ", " [aName
+                            | Author { name = aName } <- authors metadata'
+                            ]
     authorEmail :: Code
-    authorEmail = csStrings [ decodeUtf8 (E.toByteString e)
+    authorEmail = csStrings ", " [ decodeUtf8 (E.toByteString e)
                             | Author { email = Just e } <- authors metadata'
                             ]
     pPackages :: Code

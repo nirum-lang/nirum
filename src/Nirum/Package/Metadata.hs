@@ -78,6 +78,7 @@ import Text.Toml.Types (Node ( VArray
                              )
                        , Table
                        , VTArray
+                       , VArray
                        )
 import Text.URI (URI, parseURI)
 
@@ -104,7 +105,7 @@ data Metadata t =
     Metadata { version :: SV.Version
              , description :: Maybe Text
              , license :: Maybe Text
-             , keywords :: Maybe Text
+             , keywords :: [Text]
              , authors :: [Author]
              , target :: (Eq t, Ord t, Show t, Target t) => t
              }
@@ -186,7 +187,7 @@ parseMetadata metadataPath' tomlText = do
     authors' <- authorsField "authors" table
     description' <- optional $ stringField "description" table
     license' <- optional $ stringField "license" table
-    keywords' <- optional $ stringField "keywords" table
+    keywords' <- textArrayField "keywords" table
     targets <- case tableField "targets" table of
         Left (FieldError _) -> Right HM.empty
         otherwise' -> otherwise'
@@ -269,6 +270,20 @@ stringField = typedField "string" $ \ n -> case n of
                                                 VString s -> Just s
                                                 _ -> Nothing
 
+arrayField :: MetadataField -> Table -> Either MetadataError VArray
+arrayField f t =
+    case arrayF f t of
+        Right vector -> Right vector
+        Left (FieldError _) -> Right $ fromList []
+        Left error' -> Left error'
+  where
+    arrayF :: MetadataField -> Table -> Either MetadataError VArray
+    arrayF = typedField "array" $ \ node ->
+        case node of
+            VArray array -> Just array
+            _ -> Nothing
+
+
 tableArrayField :: MetadataField -> Table -> Either MetadataError VTArray
 tableArrayField f t =
     case arrayF f t of
@@ -305,6 +320,16 @@ versionField field' table = do
         Right v -> return v
         Left _ -> Left $ FieldValueError field' $
                     "expected a semver string (e.g. \"1.2.3\"), not " ++ show s
+
+textArrayField :: MetadataField -> Table -> Either MetadataError [Text]
+textArrayField field' table = do
+    array <- arrayField field' table
+    textArray' <- mapM parseText array
+    return $ toList textArray'
+  where
+    parseText :: Node -> Either MetadataError Text
+    parseText (VString s) = Right s
+    parseText a = Left $ FieldTypeError field' "array" $ fieldType a
 
 authorsField :: MetadataField -> Table -> Either MetadataError [Author]
 authorsField field' table = do

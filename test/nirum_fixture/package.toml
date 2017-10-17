@@ -1,7 +1,7 @@
 version = "0.3.0"
 description = "Package description"
 license = "MIT"
-keywords = "test example examples"
+keywords = ["sample", "example", "nirum"]
 
 [[authors]]
 name = "nirum"

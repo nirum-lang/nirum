@@ -65,7 +65,7 @@ createValidPackage t = createPackage Metadata { version = SV.initial
                                               , authors = []
                                               , description = Nothing
                                               , license = Nothing
-                                              , keywords = Nothing
+                                              , keywords = []
                                               , target = t
                                               } validModules
 
@@ -115,7 +115,7 @@ testPackage target' = do
                                          , authors = []
                                          , description = Nothing
                                          , license = Nothing
-                                         , keywords = Nothing
+                                         , keywords = []
                                          , target = target'
                                          }
                 metadata package `shouldBe` metadata'
