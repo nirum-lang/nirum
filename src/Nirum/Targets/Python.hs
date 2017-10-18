@@ -143,6 +143,7 @@ import Nirum.Package.Metadata ( Author (Author, name, email)
                               , versionField
                               )
 import qualified Nirum.Package.ModuleSet as MS
+import qualified Nirum.Package.Metadata as MD
 
 minimumRuntime :: SV.Version
 minimumRuntime = SV.version 0 6 0 [] []
@@ -1187,12 +1188,13 @@ SOURCE_ROOT = '{sourceDirectory Python3}'
 if sys.version_info < (3, 0):
     SOURCE_ROOT = '{sourceDirectory Python2}'
 
-# TODO: long_description, url, keywords, classifiers
+# TODO: long_description, url, classifiers
 setup(
     name='{pName}',
     version='{pVersion}',
     description=$pDescription,
     license=$pLicense,
+    keywords=$pKeywords,
     author=$author,
     author_email=$authorEmail,
     package_dir=\{'': SOURCE_ROOT},
@@ -1207,9 +1209,9 @@ setup(
   where
     target' :: Python
     target' = target metadata'
-    csStrings :: [T.Text] -> T.Text
-    csStrings [] = "None"
-    csStrings s = stringLiteral $ T.intercalate ", " s
+    csStrings :: T.Text -> [T.Text] -> T.Text
+    csStrings _ [] = "None"
+    csStrings d s = stringLiteral $ T.intercalate d s
     pName :: Code
     pName = packageName $ target metadata'
     pVersion :: Code
@@ -1222,12 +1224,16 @@ setup(
     pDescription = fromMaybeToMeta $ description metadata'
     pLicense :: Code
     pLicense = fromMaybeToMeta $ license metadata'
+    pKeywords :: Code
+    pKeywords = csStrings " " $ MD.keywords metadata'
     strings :: [Code] -> Code
     strings values = T.intercalate ", " $ map stringLiteral (L.sort values)
     author :: Code
-    author = csStrings [aName | Author { name = aName } <- authors metadata']
+    author = csStrings ", " [aName
+                            | Author { name = aName } <- authors metadata'
+                            ]
     authorEmail :: Code
-    authorEmail = csStrings [ decodeUtf8 (E.toByteString e)
+    authorEmail = csStrings ", " [ decodeUtf8 (E.toByteString e)
                             | Author { email = Just e } <- authors metadata'
                             ]
     pPackages :: Code
