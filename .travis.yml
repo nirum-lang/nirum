@@ -17,11 +17,12 @@ matrix:
         - libgmp10
         - upx-ucl
 env:
-- PIP_MINVER=9.0.1 SETUPTOOLS_MINVER=36.5.0
+- PIP_MINVER=9.0.1 SETUPTOOLS_MINVER=36.6.0
 cache:
   directories:
   - "$HOME/.stack"
   - "$HOME/.ghc"
+  - "$HOME/Library/Caches/Homebrew"
 before_install:
 - mkdir -p "$HOME/.local/bin"
 - export PATH="$HOME/.local/bin:$PATH"
@@ -35,8 +36,14 @@ before_install:
 - |
   if [[ "$TRAVIS_OS_NAME" = "osx" ]]
   then 
-    brew tap drolando/deadsnakes
-    brew install python34 python35 python3 || brew upgrade python34 python35 python3 || true
+    brew update || true
+    brew upgrade || true
+    brew update || true
+    brew tap drolando/homebrew-deadsnakes
+    brew install python34 python35 python3 || \
+      brew upgrade python34 python35 python3 || \
+      true
+    pip3 install --upgrade pip setuptools
   fi
 - curl -o "$HOME/.local/bin/travis_long" -L https://raw.githubusercontent.com/futurice/fum2github/master/travis_long
 - chmod +x "$HOME/.local/bin/travis_long"
