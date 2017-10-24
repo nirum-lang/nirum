@@ -30,10 +30,10 @@ renderTable t = T.intercalate "\n" rendered
     renderKey k (TM.VTable _) = "\n[" MO.<> k MO.<> "]\n"
     renderKey k (TM.VTArray _) = "\n[[" MO.<> k MO.<> "]]\n"
     renderKey k _ = k MO.<> " = "
-    nodePriority :: (T.Text, TM.Node) -> Int
-    nodePriority (_, TM.VTable _) = 1
-    nodePriority (_, TM.VTArray _) = 2
-    nodePriority (_, _) = 0
+    nodePriority :: (T.Text, TM.Node) -> T.Text
+    nodePriority (k, TM.VTable _) = "1" MO.<> k
+    nodePriority (k, TM.VTArray _) = "2" MO.<> k
+    nodePriority (k, _) = "0" MO.<> k
 
 renderText :: T.Text -> T.Text
 renderText t = "\"" MO.<> t MO.<> "\""

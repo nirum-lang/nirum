@@ -16,7 +16,7 @@ spec =
             let s = W.renderTable $ HM.fromList [ ("foo", TM.VString "bar")
                                                 , ("baz", TM.VString "boo")
                                                 ]
-            s `shouldBe` "foo = \"bar\"\nbaz = \"boo\""
+            s `shouldBe` "baz = \"boo\"\nfoo = \"bar\""
         it "render table" $ do
             let t = TM.VTable $ HM.fromList [("bar", TM.VString "baz")]
                 s = W.renderTable $ HM.fromList [("foo", t)]

@@ -35,6 +35,7 @@ import Nirum.Package.Metadata ( Author ( Author
                               , Metadata ( Metadata
                                           , authors
                                           , description
+                                          , keywords
                                           , license
                                           , target
                                           , version
@@ -119,6 +120,7 @@ main = do
                                   , version = version'
                                   , description = textToMaybe description'
                                   , license = textToMaybe license'
+                                  , keywords = []
                                   }
     writeFile "package.toml" $ T.unpack text
   where
