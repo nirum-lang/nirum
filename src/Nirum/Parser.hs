@@ -33,30 +33,12 @@ module Nirum.Parser ( Parser
 
 import Control.Applicative ((<$>))
 import Control.Monad (join, void)
-import Data.List (foldl1')
 import qualified System.IO as SIO
 
-import Data.Set (elems)
+import Data.Set hiding (empty, foldl, fromList, map)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
-import Text.Megaparsec ( Token
-                       , choice
-                       , eof
-                       , many
-                       , manyTill
-                       , notFollowedBy
-                       , option
-                       , optional
-                       , runParser
-                       , sepBy1
-                       , sepEndBy
-                       , sepEndBy1
-                       , skipMany
-                       , skipSome
-                       , try
-                       , (<|>)
-                       , (<?>)
-                       )
+import Text.Megaparsec hiding (ParseError, label, parse)
 import Text.Megaparsec.Char ( char
                             , eol
                             , noneOf
@@ -129,12 +111,14 @@ identifier :: Parser Identifier
 identifier =
     quotedIdentifier <|> bareIdentifier <?> "identifier"
   where
-    keywords :: Parser String
-    keywords = foldl1' (<|>) $ map (string' . toString) $ elems reservedKeywords
     bareIdentifier :: Parser Identifier
-    bareIdentifier = do
-        notFollowedBy keywords
-        identifierRule
+    bareIdentifier = try $ do
+        ident <- lookAhead identifierRule
+        if ident `member` reservedKeywords
+            then fail $ "\"" ++ toString ident ++ "\" is a reserved keyword; "
+                        ++ "wrap it with backquotes to use it as a normal "
+                        ++ "identifier (i.e. \"`" ++ toString ident ++ "`\")"
+            else identifierRule
     quotedIdentifier :: Parser Identifier
     quotedIdentifier = do
         char '`'
