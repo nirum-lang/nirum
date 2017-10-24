@@ -674,7 +674,7 @@ compileTypeDeclaration _ d@TypeDeclaration { typename = typename'
             "\n"
             [ T.concat [ compileDocsComment "    " m
                        , "\n    "
-                       , toAttributeName' memberName
+                       , toEnumMemberName memberName
                        , " = '"
                        , I.toSnakeCaseText bn
                        , "'"
@@ -700,6 +700,16 @@ $memberNames
     ){ ret className }:
         return cls(value.replace('-', '_'))  # FIXME: validate input
 |]
+  where
+    memberKeywords :: [T.Text]
+    memberKeywords = ["mro"]
+    toEnumMemberName :: Name -> T.Text
+    toEnumMemberName name' = if attributeName `elem` memberKeywords
+                            then T.snoc attributeName '_'
+                            else attributeName
+      where
+        attributeName :: T.Text
+        attributeName = toAttributeName' name'
 compileTypeDeclaration src d@TypeDeclaration { typename = typename'
                                              , type' = RecordType fields
                                              } = do
