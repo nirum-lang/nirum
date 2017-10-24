@@ -162,7 +162,7 @@ spec =
                           |]
                         , "email"
                         , [q|expected an email address, not invalid#email
-                             ; @: not enough input|]
+                             ; at sign > @: not enough input|]
                         )
                       ] $ \ (toml, field, msg) -> do
                         let Left e = parse toml
