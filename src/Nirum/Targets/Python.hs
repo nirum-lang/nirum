@@ -705,8 +705,8 @@ $memberNames
     memberKeywords = ["mro"]
     toEnumMemberName :: Name -> T.Text
     toEnumMemberName name' = if attributeName `elem` memberKeywords
-                            then T.snoc attributeName '_'
-                            else attributeName
+                             then attributeName `T.snoc` '_'
+                             else attributeName
       where
         attributeName :: T.Text
         attributeName = toAttributeName' name'
