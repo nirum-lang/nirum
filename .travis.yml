@@ -63,6 +63,7 @@ install:
 - python3 -m pip install --user --upgrade tox "pip>=$PIP_MINVER" setuptools
 - travis_long stack --no-terminal setup
 - travis_long stack --no-terminal install scan -j4
+- travis_long stack --no-terminal install --only-dependencies
 script:
 - 'TOX="$(which tox)" stack --no-terminal test -j4 --coverage'
 - ./lint.sh
