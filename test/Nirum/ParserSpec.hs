@@ -134,6 +134,9 @@ spec = do
                 identifier' "valid-identifier"
             parse' "valid_identifier" `shouldBeRight`
                 identifier' "valid_identifier"
+        it "can parse even if a keyword is a prefix of identifier" $ do
+            parse' "enumeration" `shouldBeRight` identifier' "enumeration"
+            parse' "types" `shouldBeRight` identifier' "types"
         it "can parse reserved keywords iff they are quoted" $
             forM_ keywords $ \ kwd ->
                 parse' ('`' `T.cons` kwd `T.snoc` '`') `shouldBeRight`
@@ -642,8 +645,8 @@ record dup (
     text c/b,
 );|] 5 1
         it "fails to parse if there's no space between field type and name" $ do
-            expectError "record a (typename);" 1 11
-            expectError "record a (typename\n#docs\n);" 1 11
+            expectError "record a (texta);" 1 16
+            expectError "record a (textb\n#docs\n);" 2 1
         it "fails to parse if trailing semicolon is missing" $ do
             let (_, expectErr) = helperFuncs P.module'
             expectErr
