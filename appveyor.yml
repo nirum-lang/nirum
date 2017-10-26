@@ -31,8 +31,9 @@ install:
     $env:PATH = $env:STACK_ROOT + ';C:\msys64\usr\bin;' + $env:PATH;
 - if not exist "%LOCALAPPDATA%\Programs\stack" ( stack --no-terminal --skip-msys setup )
 - C:\Python36\python -m pip install --upgrade tox pip setuptools
+- stack --no-terminal install -j4 --only-dependencies
 build_script:
-- stack --no-terminal build --copy-bins
+- stack --no-terminal build -j4 --copy-bins
 after_build:
 - stack --skip-msys --no-terminal path --local-bin
 - ps: ls $(stack path --skip-msys --no-terminal --local-bin)

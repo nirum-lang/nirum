@@ -4,7 +4,7 @@ language: c
 matrix:
   include:
   - os: osx
-    osx_image: xcode7.3
+    osx_image: xcode8.3
   - addons:
       apt:
         sources: [hvr-ghc, deadsnakes]
@@ -20,6 +20,7 @@ env:
 - PIP_MINVER=9.0.1 SETUPTOOLS_MINVER=36.6.0
 cache:
   directories:
+  - "$HOME/.cabal"
   - "$HOME/.stack"
   - "$HOME/.ghc"
   - "$HOME/Library/Caches/Homebrew"
@@ -39,7 +40,7 @@ before_install:
     brew update || true
     brew upgrade || true
     brew update || true
-    brew tap drolando/homebrew-deadsnakes
+    brew tap dahlia/homebrew-deadsnakes
     brew install python34 python35 python3 || \
       brew upgrade python34 python35 python3 || \
       true
@@ -63,6 +64,7 @@ install:
 - python3 -m pip install --user --upgrade tox "pip>=$PIP_MINVER" setuptools
 - travis_long stack --no-terminal setup
 - travis_long stack --no-terminal install scan -j4
+- travis_long stack --no-terminal install -j4 --only-dependencies
 script:
 - 'TOX="$(which tox)" stack --no-terminal test -j4 --coverage'
 - ./lint.sh
