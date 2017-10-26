@@ -21,6 +21,9 @@ enum eva-char = soryu-asuka-langley
               | katsuragi-misato
               | nagisa-kaworu
               ;
+enum duplicate-keyword = mro
+                       | no-mro
+                       ;
 
 record point1 (
     # Record docs.

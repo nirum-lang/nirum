@@ -5,8 +5,9 @@ from pytest import raises
 from nirum.service import Service
 from six import PY3
 
-from fixture.foo import (CultureAgnosticName, Dog, EastAsianName,
-                         EvaChar, FloatUnbox, Gender, ImportedTypeUnbox, Irum,
+from fixture.foo import (CultureAgnosticName, Dog, DuplicateKeyword,
+                         EastAsianName, EvaChar,
+                         FloatUnbox, Gender, ImportedTypeUnbox, Irum,
                          Line, MixedName, NullService,
                          Point1, Point2, Point3d, Pop, PingService, Product,
                          Rnb, Run, Stop, Way, WesternName)
@@ -265,3 +266,14 @@ def test_service():
         PingService().ping(nonce=u'nonce')
     with raises(TypeError):
         PingService().ping(wrongkwd=u'a')
+
+
+def test_enum_duplicate_member_name():
+    assert hasattr(DuplicateKeyword, 'mro_')
+    assert hasattr(DuplicateKeyword, 'no_mro')
+    assert (DuplicateKeyword.__nirum_deserialize__(u'mro') ==
+            DuplicateKeyword.mro_)
+    assert (DuplicateKeyword.__nirum_deserialize__(u'no-mro') ==
+            DuplicateKeyword.no_mro)
+    assert DuplicateKeyword.mro_.__nirum_serialize__() == 'mro'
+    assert DuplicateKeyword.no_mro.__nirum_serialize__() == 'no_mro'
