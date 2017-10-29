@@ -28,7 +28,8 @@ scan=(stack exec scan --)
 scanout="$(mktemp)"
 find src test -name '*.hs' -and -not -exec grep -q TemplateHaskell {} \; \
     -print0 | \
-        xargs -0 "${scan[@]}" -t -j false -c false > "$scanout"
+        xargs -0 "${scan[@]}" -t -j false -c false | \
+        grep -v 'back slash at line end .may disturb cpp.' || true > "$scanout"
 cat "$scanout"
 if [[ "$(cat "$scanout")" != "" ]]; then
   exit 1
