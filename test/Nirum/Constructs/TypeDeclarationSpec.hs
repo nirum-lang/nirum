@@ -1,17 +1,13 @@
 {-# LANGUAGE OverloadedLists, QuasiQuotes #-}
 module Nirum.Constructs.TypeDeclarationSpec where
 
-import Data.Either (rights)
+
 import Data.String.QQ (s)
 import qualified Data.Text as T
 import Test.Hspec.Meta
 
 import Nirum.Constructs (Construct (toCode))
-import Nirum.Constructs.Annotation ( Annotation (Annotation)
-                                   , AnnotationSet
-                                   , fromList
-                                   , empty
-                                   )
+import Nirum.Constructs.Annotation hiding (docs, name)
 import Nirum.Constructs.Declaration (Declaration (name), docs)
 import Nirum.Constructs.DeclarationSet (DeclarationSet)
 import Nirum.Constructs.Service (Method (Method), Service (Service))
@@ -26,7 +22,7 @@ import Nirum.Constructs.TypeDeclaration ( EnumMember (EnumMember)
 import Util (singleDocs)
 
 barAnnotationSet :: AnnotationSet
-barAnnotationSet = head $ rights [fromList [Annotation "bar" (Just "baz")]]
+barAnnotationSet = singleton $ Annotation "bar" [("val", "baz")]
 
 spec :: Spec
 spec = do
@@ -131,9 +127,9 @@ record person (
                         , Tag "rectangle" rectangleFields empty
                         , Tag "none" [] empty
                         ]
-                union = UnionType tags'
+                union' = UnionType tags'
                 a = TypeDeclaration { typename = "shape"
-                                    , type' = union
+                                    , type' = union'
                                     , typeAnnotations = empty
                                     }
                 b = a { typeAnnotations = singleDocs "shape type" }
@@ -184,7 +180,7 @@ service ping-service (
     bool ping ()
 );|]
                 toCode annoDecl `shouldBe`
-                    "@bar(\"baz\")\nservice anno-service (bool ping ());"
+                    "@bar(val = \"baz\")\nservice anno-service (bool ping ());"
                 -- TODO: more tests
         context "Import" $ do
             let import' = Import ["foo", "bar"] "baz" empty

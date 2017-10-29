@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Nirum.Constructs.Docs ( Docs (Docs)
-                             , annotationDocsName
+                             , docsAnnotationName
+                             , docsAnnotationParameter
                              , title
                              , toBlock
                              , toCode
@@ -16,8 +17,11 @@ import Nirum.Constructs (Construct (toCode))
 import Nirum.Constructs.Identifier (Identifier)
 import Nirum.Docs (Block (Document, Heading), parse)
 
-annotationDocsName :: Identifier
-annotationDocsName = "docs"
+docsAnnotationName :: Identifier
+docsAnnotationName = "docs"
+
+docsAnnotationParameter :: Identifier
+docsAnnotationParameter = "docs"
 
 -- | Docstring for constructs.
 newtype Docs = Docs T.Text deriving (Eq, Ord, Show)

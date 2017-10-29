@@ -1,52 +1,44 @@
 {-# LANGUAGE OverloadedLists #-}
 module Nirum.Constructs.AnnotationSpec where
 
+import Prelude hiding (null)
+
 import Test.Hspec.Meta
 import qualified Data.Map.Strict as M
 
 import Nirum.Constructs.Annotation as A
-    ( Annotation (Annotation)
-    , NameDuplication (AnnotationNameDuplication)
-    , docs
-    , empty
-    , fromList
-    , insertDocs
-    , lookup
-    , lookupDocs
-    , singleton
-    , toCode
-    , toList
-    , union
-    )
 import Nirum.Constructs.Annotation.Internal ( AnnotationSet (AnnotationSet) )
 
 spec :: Spec
 spec = do
-    let annotation = Annotation "foo" Nothing
-        loremAnno = Annotation "lorem" (Just "ipsum")
-        escapeCharAnno = Annotation "quote" (Just "\"")
-        longNameAnno = Annotation "long-cat-is-long" (Just "nyancat")
+    let annotation = Annotation "foo" M.empty
+        loremAnno = Annotation "lorem" [("arg", "ipsum")]
+        escapeCharAnno = Annotation "quote" [("arg", "\"")]
+        longNameAnno = Annotation "long-cat-is-long" [("long", "nyancat")]
         docsAnno = docs "Description"
     describe "Annotation" $ do
         describe "toCode Annotation" $
             it "prints annotation properly" $ do
                 toCode annotation `shouldBe` "@foo"
-                toCode loremAnno `shouldBe` "@lorem(\"ipsum\")"
-                toCode escapeCharAnno `shouldBe` "@quote(\"\\\"\")"
+                toCode loremAnno `shouldBe` "@lorem(arg = \"ipsum\")"
+                toCode escapeCharAnno `shouldBe` "@quote(arg = \"\\\"\")"
         specify "docs" $
-            docsAnno `shouldBe` Annotation "docs" (Just "Description\n")
+            docsAnno `shouldBe`
+                Annotation "docs" [("docs", "Description\n")]
     describe "AnnotationSet" $ do
-        it "empty" $ empty `shouldBe` AnnotationSet M.empty
-        it "singleton" $ do
-            singleton (Annotation "foo" Nothing) `shouldBe`
-                AnnotationSet [("foo", Nothing)]
-            singleton (Annotation "bar" (Just "baz")) `shouldBe`
-                AnnotationSet [("bar", Just "baz")]
+        specify "empty" $
+            empty `shouldSatisfy` null
+        specify "singleton" $ do
+            singleton (Annotation "foo" []) `shouldBe`
+                AnnotationSet [("foo", [])]
+            singleton (Annotation "bar" [("arg", "baz")]) `shouldBe`
+                AnnotationSet [("bar", [("arg", "baz")])]
         describe "fromList" $ do
             it "success" $ do
-                fromList [] `shouldBe` Right (AnnotationSet M.empty)
-                fromList [annotation] `shouldBe` Right
-                    (AnnotationSet $ M.fromList [("foo", Nothing)])
+                let Right empty' = fromList []
+                empty' `shouldSatisfy` null
+                fromList [annotation] `shouldBe`
+                    Right (AnnotationSet [("foo", [])])
             it "name duplication" $ do
                 let duplicationAnnotations = fromList [ annotation
                                                       , loremAnno
@@ -57,12 +49,12 @@ spec = do
         specify "union" $ do
             let Right a = fromList [annotation, loremAnno]
             let Right b = fromList [docsAnno, escapeCharAnno]
-            let c = AnnotationSet [("foo", Just "bar")]
+            let c = AnnotationSet [("foo", [("arg", "bar")])]
             A.union a b `shouldBe`
-                AnnotationSet [ ("foo", Nothing)
-                              , ("lorem", Just "ipsum")
-                              , ("quote", Just "\"")
-                              , ("docs", Just "Description\n")
+                AnnotationSet [ ("foo", [])
+                              , ("lorem", [("arg", "ipsum")])
+                              , ("quote", [("arg", "\"")])
+                              , ("docs", [("docs", "Description\n")])
                               ]
             A.union a c `shouldBe` a
         let Right annotationSet = fromList [ annotation
@@ -93,6 +85,6 @@ spec = do
         describe "insertDocs" $ do
             it "should insert the doc comment as an annotation" $
                 A.insertDocs "yay" empty `shouldReturn`
-                    AnnotationSet [("docs", Just "yay\n")]
+                    AnnotationSet [("docs", [("docs", "yay\n")])]
             it "should fail on the annotation that already have a doc" $
                 A.insertDocs "yay" annotationSet `shouldThrow` anyException

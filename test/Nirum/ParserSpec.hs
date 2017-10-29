@@ -2,7 +2,7 @@
 module Nirum.ParserSpec where
 
 import Control.Monad (forM_)
-import Data.Either (isLeft, isRight, lefts, rights)
+import Data.Either
 import Data.List (isSuffixOf)
 import Data.Maybe (fromJust)
 import System.Directory (getDirectoryContents)
@@ -21,12 +21,7 @@ import Text.Megaparsec.Text (Parser)
 
 import qualified Nirum.Parser as P
 import Nirum.Constructs (Construct (toCode))
-import Nirum.Constructs.Annotation as A ( Annotation (Annotation)
-                                        , AnnotationSet
-                                        , empty
-                                        , fromList
-                                        , union
-                                        )
+import Nirum.Constructs.Annotation as A
 import Nirum.Constructs.Docs (Docs (Docs))
 import Nirum.Constructs.DeclarationSet (DeclarationSet)
 import Nirum.Constructs.DeclarationSetSpec (SampleDecl (..))
@@ -87,10 +82,10 @@ helperFuncs parser =
 
 
 fooAnnotationSet :: AnnotationSet
-fooAnnotationSet = head $ rights [fromList [Annotation "foo" (Just "bar")]]
+fooAnnotationSet = A.singleton $ Annotation "foo" [("v", "bar")]
 
 bazAnnotationSet :: AnnotationSet
-bazAnnotationSet = head $ rights [fromList [Annotation "baz" Nothing]]
+bazAnnotationSet = A.singleton $ Annotation "baz" []
 
 
 spec :: Spec
@@ -184,31 +179,33 @@ spec = do
     describe "annotation" $ do
         let (parse', expectError) = helperFuncs P.annotation
         context "with single argument" $ do
-            let rightAnnotaiton = Annotation "name-abc" (Just "wo\"rld")
+            let rightAnnotaiton = Annotation "name-abc" [("foo", "wo\"rld")]
             it "success" $ do
-                parse' "@name-abc(\"wo\\\"rld\")"
+                parse' "@name-abc(foo=\"wo\\\"rld\")"
                     `shouldBeRight` rightAnnotaiton
-                parse' "@name-abc( \"wo\\\"rld\")"
+                parse' "@name-abc( foo=\"wo\\\"rld\")"
                     `shouldBeRight` rightAnnotaiton
-                parse' "@name-abc(\"wo\\\"rld\" )"
+                parse' "@name-abc(foo=\"wo\\\"rld\" )"
                     `shouldBeRight` rightAnnotaiton
-                parse' "@name-abc( \"wo\\\"rld\" )"
+                parse' "@name-abc( foo=\"wo\\\"rld\" )"
                     `shouldBeRight` rightAnnotaiton
-                parse' "@ name-abc ( \"wo\\\"rld\")"
+                parse' "@ name-abc ( foo=\"wo\\\"rld\")"
                     `shouldBeRight` rightAnnotaiton
-                parse' "@name-abc ( \"wo\\\"rld\")"
+                parse' "@name-abc ( foo=\"wo\\\"rld\")"
                     `shouldBeRight` rightAnnotaiton
-                parse' "@name-abc(\"wo\\\"rld\\n\")" `shouldBeRight`
-                    Annotation "name-abc" (Just "wo\"rld\n")
+                parse' "@name-abc(foo=\"wo\\\"rld\\n\")" `shouldBeRight`
+                    Annotation "name-abc" [("foo", "wo\"rld\n")]
             it "fails to parse if annotation name start with hyphen" $ do
-                expectError "@-abc(\"helloworld\")" 1 2
-                expectError "@-abc-d(\"helloworld\")" 1 2
+                expectError "@-abc(v=\"helloworld\")" 1 2
+                expectError "@-abc-d(v = \"helloworld\")" 1 2
             it "fails to parse without parentheses" $
                 expectError "@foobar \"helloworld\"" 1 9
-            it "fails to parse without double quotes" $
-                expectError "@foobar(helloworld)" 1 9
+            it "fails to parse arguments without names" $
+                expectError "@foobar(\"helloworld\")" 1 9
+            it "fails to parse arguments without double quotes" $
+                expectError "@foobar(v=helloworld)" 1 11
         context "without arguments" $ do
-            let rightAnnotaiton = Annotation "name-abc" Nothing
+            let rightAnnotaiton = Annotation "name-abc" []
             it "success" $ do
                 parse' "@name-abc" `shouldBeRight` rightAnnotaiton
                 parse' "@name-abc " `shouldBeRight` rightAnnotaiton
@@ -222,16 +219,16 @@ spec = do
 
     describe "annotationSet" $ do
         let (parse', expectError) = helperFuncs P.annotationSet
-            annotationSet = head $ rights [fromList [ Annotation "a" (Just "b")
-                                                    , Annotation "c" Nothing
-                                                    ]
-                                          ]
+            Right annotationSet = fromList
+                [ Annotation "a" [("arg", "b")]
+                , Annotation "c" []
+                ]
         it "success" $ do
-            parse' "@a(\"b\")@c" `shouldBeRight` annotationSet
-            parse' "@a(\"b\") @c" `shouldBeRight` annotationSet
-            parse' "@a(\"b\") @c() " `shouldBeRight` annotationSet
+            parse' "@a(arg=\"b\")@c" `shouldBeRight` annotationSet
+            parse' "@a(arg=\"b\") @c" `shouldBeRight` annotationSet
+            parse' "@a(arg=\"b\") @c() " `shouldBeRight` annotationSet
         it "fails to parse if has duplicated name" $
-            expectError "@a(\"b\")@a" 1 10
+            expectError "@a(arg=\"b\")@a" 1 14
 
     describe "typeIdentifier" $ do
         let (parse', expectError) = helperFuncs P.typeIdentifier
@@ -414,7 +411,7 @@ spec = do
             parse' "type path = text;\n# docs\n# docs..." `shouldBeRight`
                 TypeDeclaration "path" (Alias "text")
                                 (singleDocs "docs\ndocs...\n")
-            parse' "@foo ( \"bar\" ) type path = text;\n# docs\n# docs..."
+            parse' "@foo ( v = \"bar\" ) type path = text;\n# docs\n# docs..."
                 `shouldBeRight`
                 TypeDeclaration "path" (Alias "text")
                                 (A.union (singleDocs "docs\ndocs...\n")
@@ -446,7 +443,8 @@ spec = do
                 `shouldBeRight`
                     TypeDeclaration "offset" (UnboxedType "float64")
                                     (singleDocs "docs\ndocs...\n")
-            parse' "@foo(\"bar\")\nunboxed offset (float64);\n# docs\n# docs..."
+            parse' "@foo(v=\"bar\")\nunboxed offset (float64);\n# docs\n\
+                   \# docs..."
                 `shouldBeRight`
                     TypeDeclaration "offset" (UnboxedType "float64")
                                     (A.union (singleDocs "docs\ndocs...\n")
@@ -495,7 +493,7 @@ spec = do
                 `shouldBeRight` TypeDeclaration "gender"
                                                 (EnumType membersWithDocs)
                                                 empty
-            parse' "@foo (\"bar\")\nenum gender=male|female|unknown;"
+            parse' "@foo (v = \"bar\")\nenum gender=male|female|unknown;"
                 `shouldBeRight`
                     TypeDeclaration "gender" (EnumType members')
                                     fooAnnotationSet
@@ -503,7 +501,7 @@ spec = do
                 `shouldBeRight`
                     TypeDeclaration "gender" (EnumType members')
                                     bazAnnotationSet
-            parse' "@baz\nenum gender=\n@foo (\"bar\")\nmale|female|unknown;"
+            parse' "@baz\nenum gender=\n@foo (v=\"bar\")\nmale|female|unknown;"
                 `shouldBeRight`
                     TypeDeclaration "gender" (EnumType membersWithAnnots)
                                     bazAnnotationSet
@@ -575,7 +573,7 @@ record person (
             -- without docs, last field with trailing comma,
             -- with annotation with single argument
             parse' [s|
-@foo("bar")
+@foo(v = "bar")
 record person (
     text name,
     date dob,
@@ -614,7 +612,7 @@ record person (
             parse' [s|
 record person (
     text name,
-    @foo ("bar")
+    @foo (v = "bar")
     date dob,
     # date of birth
     @baz
@@ -698,7 +696,7 @@ union shape
     | none
     ;|] `shouldBeRight` b
             parse' [s|
-@docs ("shape type\n")
+@docs (docs = "shape type\n")
 union shape
     = circle (point origin, offset radius,)
     | rectangle (point upper-left, point lower-right,)
@@ -708,7 +706,7 @@ union shape
 union shape
     = circle (point origin, offset radius,)
     | rectangle (point upper-left, point lower-right,)
-    | @foo ("bar") none
+    | @foo (v = "bar") none
     ;|] `shouldBeRight`
                     a { type' = union' { tags = [ circleTag
                                                 , rectTag
@@ -755,7 +753,7 @@ union shape
             parse' [s|
 union shape
     = circle (point origin, @baz offset radius,)
-    | rectangle (point upper-left, @foo ("bar") point lower-right,)
+    | rectangle (point upper-left, @foo (v = "bar") point lower-right,)
     | none
     ;|] `shouldBeRight`
                     a { type' = union'
@@ -811,8 +809,10 @@ union dup
 
     describe "method" $ do
         let (parse', expectError) = helperFuncs P.method
-            httpGetAnnotation = head $
-                rights [fromList [Annotation "http-get" (Just "/get-name/")]]
+            httpGetAnnotation = singleton $ Annotation "http"
+                [ ("method", "GET")
+                , ("path", "/get-name/")
+                ]
         it "emits Method if succeeded to parse" $ do
             parse' "text get-name()" `shouldBeRight`
                 Method "get-name" [] "text" Nothing empty
@@ -825,8 +825,8 @@ union dup
                        , Parameter "default" "text" empty
                        ]
                        "text" Nothing empty
-            parse' ("@http-get(\"/get-name/\") text get-name  " `T.append`
-                    "( person user,text default )") `shouldBeRight`
+            parse' "@http(method = \"GET\", path = \"/get-name/\") \
+                   \text get-name  ( person user,text default )" `shouldBeRight`
                 Method "get-name"
                        [ Parameter "user" "person" empty
                        , Parameter "default" "text" empty
@@ -843,7 +843,7 @@ text get-name  ( person user,text default )
                        ]
                        "text" (Just "get-name-error") empty
             parse' [s|
-@http-get("/get-name/")
+@http(method = "GET", path = "/get-name/")
 text get-name  ( person user,text default )
                throws get-name-error|] `shouldBeRight`
                 Method "get-name"
@@ -989,7 +989,7 @@ service user-service (
                              ])
                     multiMethodsD
             parse' [s|
-@foo("bar")
+@foo(v = "bar")
 service null-service (
   # Service having no methods.
 );|] `shouldBeRight`
@@ -1006,11 +1006,11 @@ service null-service (
                                    (A.union noMethodsD bazAnnotationSet)
             parse' [s|
 service user-service (
-  @docs ("Creates a new user\n")
+  @docs (docs = "Creates a new user\n")
   user create-user (
     user user
   ),
-  @docs ("Gets an user by its id.\n")
+  @docs (docs = "Gets an user by its id.\n")
   user get-user (
     uuid user-id
   ),
@@ -1136,15 +1136,17 @@ service method-dups (
                 , Import ["foo", "bar"] "b" empty
                 ]
         it "can be annotated" $ do
-            parse' "import foo.bar (@foo (\"bar\") a, @baz b);" `shouldBeRight`
-                [ Import ["foo", "bar"] "a" fooAnnotationSet
-                , Import ["foo", "bar"] "b" bazAnnotationSet
-                ]
-            parse' "import foo.bar (@foo (\"bar\") @baz a, b);" `shouldBeRight`
-                [ Import ["foo", "bar"] "a" $
-                         union fooAnnotationSet bazAnnotationSet
-                , Import ["foo", "bar"] "b" empty
-                ]
+            parse' "import foo.bar (@foo (v = \"bar\") a, @baz b);"
+                `shouldBeRight`
+                    [ Import ["foo", "bar"] "a" fooAnnotationSet
+                    , Import ["foo", "bar"] "b" bazAnnotationSet
+                    ]
+            parse' "import foo.bar (@foo (v = \"bar\") @baz a, b);"
+                `shouldBeRight`
+                    [ Import ["foo", "bar"] "a" $
+                             union fooAnnotationSet bazAnnotationSet
+                    , Import ["foo", "bar"] "b" empty
+                    ]
         it "errors if parentheses have nothing" $
             expectError "import foo.bar ();" 1 17
 

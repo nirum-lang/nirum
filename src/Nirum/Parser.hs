@@ -31,10 +31,10 @@ module Nirum.Parser ( Parser
                     , unionTypeDeclaration
                     ) where
 
-import Control.Applicative ((<$>))
-import Control.Monad (join, void)
+import Control.Monad (void)
 import qualified System.IO as SIO
 
+import Data.Map.Strict as Map hiding (foldl)
 import Data.Set hiding (empty, foldl, fromList, map)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
@@ -53,13 +53,7 @@ import Text.Megaparsec.Lexer (charLiteral)
 import qualified Nirum.Constructs.Annotation as A
 import Nirum.Constructs.Declaration (Declaration)
 import Nirum.Constructs.Docs (Docs (Docs))
-import Nirum.Constructs.DeclarationSet ( DeclarationSet
-                                       , NameDuplication ( BehindNameDuplication
-                                                         , FacialNameDuplication
-                                                         )
-                                       , empty
-                                       , fromList
-                                       )
+import Nirum.Constructs.DeclarationSet as DeclarationSet
 import Nirum.Constructs.Identifier ( Identifier
                                    , identifierRule
                                    , reservedKeywords
@@ -114,7 +108,7 @@ identifier =
     bareIdentifier :: Parser Identifier
     bareIdentifier = try $ do
         ident <- lookAhead identifierRule
-        if ident `member` reservedKeywords
+        if ident `Data.Set.member` reservedKeywords
             then fail $ "\"" ++ toString ident ++ "\" is a reserved keyword; "
                         ++ "wrap it with backquotes to use it as a normal "
                         ++ "identifier (i.e. \"`" ++ toString ident ++ "`\")"
@@ -136,22 +130,39 @@ name = do
         identifier <?> "behind name"
     return $ Name facialName behindName
 
+annotationArgumentValue :: Parser T.Text
+annotationArgumentValue = do
+    char '"'
+    value <- manyTill charLiteral (char '"')
+    return $ T.pack value
+
+annotationArgument :: Parser (Identifier, T.Text)
+annotationArgument = do
+    arg <- identifier <?> "annotation parameter"
+    spaces
+    char '='
+    spaces
+    value <- annotationArgumentValue <?> "annotation argument value"
+    return (arg, value)
+
 annotation :: Parser A.Annotation
 annotation = do
     char '@'
     spaces
     name' <- identifier
     spaces
-    metadata <- optional $ do
+    args' <- option Map.empty $ do
         char '('
         spaces
-        m <- optional ((char '"' >> manyTill charLiteral (char '"'))
-                       <?> "annotation metadata")
+        args <- (`sepEndBy` char ',') $ do
+            spaces
+            a <- annotationArgument
+            spaces
+            return a
         spaces
         char ')'
-        return m
-    let metadata' = T.pack <$> join metadata
-    return $ A.Annotation name' metadata'
+        return $ Map.fromList args
+    return $ A.Annotation name' args'
 
 annotationSet :: Parser A.AnnotationSet
 annotationSet = do
@@ -288,7 +299,7 @@ handleNameDuplication :: Declaration a
                       -> (DeclarationSet a -> Parser b)
                       -> Parser b
 handleNameDuplication label declarations cont =
-    case fromList declarations of
+    case DeclarationSet.fromList declarations of
         Left (BehindNameDuplication (Name _ bname)) ->
             fail ("the behind " ++ label ++ " name `" ++ toString bname ++
                   "` is duplicated")
@@ -319,7 +330,7 @@ enumTypeDeclaration = do
     annotationSet'' <- annotationsWithDocs annotationSet' docs'
     members <- (enumMember `sepBy1` (spaces >> char '|' >> spaces))
                    <?> "enum members"
-    case fromList members of
+    case DeclarationSet.fromList members of
         Left (BehindNameDuplication (Name _ bname)) ->
             fail ("the behind member name `" ++ toString bname ++
                   "` is duplicated")
@@ -415,7 +426,7 @@ tag = do
             spaces
             char ')'
             return f
-        Nothing -> return empty
+        Nothing -> return DeclarationSet.empty
     spaces
     docs' <- case frontDocs of
         d@(Just _) -> return d
@@ -478,7 +489,7 @@ parameters :: Parser [Parameter]
 parameters = fieldsOrParameters ("parameter", "parameters") Parameter
 
 parameterSet :: Parser (DeclarationSet Parameter)
-parameterSet = option empty $ try $ do
+parameterSet = option DeclarationSet.empty $ try $ do
     params <- parameters <?> "method parameters"
     handleNameDuplication "parameter" params return
 
