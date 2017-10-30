@@ -2,13 +2,10 @@
 module Nirum.Constructs.ServiceSpec where
 
 import Data.String.QQ (s)
+import Data.Map.Strict as Map (fromList)
 import Test.Hspec.Meta
 
-import Nirum.Constructs.Annotation ( Annotation (Annotation)
-                                   , empty
-                                   , fromList
-                                   , union
-                                   )
+import Nirum.Constructs.Annotation
 import Nirum.Constructs.Docs (toCode)
 import Nirum.Constructs.Service (Method (Method), Parameter (Parameter))
 import Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
@@ -20,7 +17,10 @@ import Util (singleDocs)
 
 spec :: Spec
 spec = do
-    let Right methodAnno = fromList [Annotation "http-get" (Just "/ping/")]
+    let methodAnno = singleton $ Annotation "http" $ Map.fromList
+            [ ("method", "GET")
+            , ("path", "/ping/")
+            ]
     let docsAnno = singleDocs "docs..."
     describe "Parameter" $
         specify "toCode" $ do
@@ -36,7 +36,7 @@ spec = do
             toCode (Method "ping" [] "bool"
                            Nothing
                            methodAnno) `shouldBe`
-                "@http-get(\"/ping/\")\nbool ping (),"
+                "@http(method = \"GET\", path = \"/ping/\")\nbool ping (),"
             toCode (Method "ping" [] "bool"
                            Nothing
                            docsAnno) `shouldBe`
@@ -52,11 +52,12 @@ spec = do
             toCode (Method "ping" [] "bool"
                            Nothing
                            methodAnno) `shouldBe`
-                "@http-get(\"/ping/\")\nbool ping (),"
+                "@http(method = \"GET\", path = \"/ping/\")\nbool ping (),"
             toCode (Method "ping" [] "bool"
                            (Just "ping-error")
                            methodAnno) `shouldBe`
-                "@http-get(\"/ping/\")\nbool ping () throws ping-error,"
+                "@http(method = \"GET\", path = \"/ping/\")\n\
+                \bool ping () throws ping-error,"
             toCode (Method "get-user"
                            [Parameter "user-id" "uuid" empty]
                            (OptionModifier "user")
@@ -237,7 +238,7 @@ user? get-user (
                            (ListModifier "post")
                            (Just "search-posts-error")
                            (docsAnno `union` methodAnno)) `shouldBe` [s|
-@http-get("/ping/")
+@http(method = "GET", path = "/ping/")
 [post] search-posts (
   # docs...
   uuid blog-id,
