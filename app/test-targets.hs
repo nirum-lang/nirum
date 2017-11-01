@@ -46,6 +46,8 @@ whenCi block = do
 -- | Teget all targets.
 main :: IO ()
 main =
+    -- CHECK: If an added test suite requires any external programs
+    -- list them in "External dependencies" section of CONTRIBUTING.md docs.
     python
 
 -- | Test Python target.
