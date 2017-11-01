@@ -9,7 +9,7 @@ matrix:
       apt:
         sources: [hvr-ghc, deadsnakes]
         packages:
-        - ghc-8.0.1
+        - ghc-8.0.2
         - python2.7
         - python3.4
         - python3.5
