@@ -38,7 +38,12 @@ import Nirum.Package.Metadata ( Metadata (Metadata, target)
                               )
 import Nirum.Targets.List (targetProxyMapQ)
 
--- these targets adds automatically
+-- Imported targets below are automatically added to the list of targets.
+-- These target names become options of `[targets.*]` sections of package.toml
+-- and `-t`/`--target` of CLI as well.
+--
+-- CHECK: When a new target `Nirum.Targets.X` is added, write docs for it in
+-- docs/target/x.md file too.
 import Nirum.Targets.Docs ()
 import Nirum.Targets.Python ()
 

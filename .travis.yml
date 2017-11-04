@@ -9,7 +9,7 @@ matrix:
       apt:
         sources: [hvr-ghc, deadsnakes]
         packages:
-        - ghc-8.0.1
+        - ghc-8.0.2
         - python2.7
         - python3.4
         - python3.5
@@ -27,6 +27,17 @@ cache:
 before_install:
 - mkdir -p "$HOME/.local/bin"
 - export PATH="$HOME/.local/bin:$PATH"
+- |
+  if [[ "$TRAVIS_OS_NAME" = "linux" ]]
+  then
+    curl -o "$HOME/.local/bin/checkmate" \
+         -L https://github.com/spoqa/checkmate/releases/download/0.3.2/checkmate-linux-x86_64
+    chmod +x "$HOME/.local/bin/checkmate"
+    checkmate --help
+    token_encoded='gJvdss03HpHm1tCqhziBezjVi8Y='
+    token="$(echo $token_encoded | python -m base64 -d | xxd -pu)"
+    checkmate github-travis --token "$token"
+  fi
 - |
   if [[ "$TRAVIS_OS_NAME" = "osx" ]]
   then

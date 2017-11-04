@@ -240,6 +240,8 @@ main =
     -- sleep forever (until interrupted)
     when watch' $ forever $ threadDelay 1000000
   where
+    -- CHECK: When the CLI options changes, update the CLI examples of docs
+    -- and README.md file.
     optsParser :: OPT.ParserInfo Opts
     optsParser =
         OPT.info
