@@ -832,6 +832,9 @@ compileTypeDeclaration src
     tagCodes <- mapM (compileUnionTag src typename') $ toList tags
     let className = toClassName' typename'
         tagCodes' = T.intercalate "\n\n" tagCodes
+        tagClasses = T.intercalate ", " [ toClassName' tagName
+                                        | Tag tagName _ _ <- toList tags
+                                        ]
         enumMembers = toIndentedCodes
             (\ (t, b) -> [qq|$t = '{b}'|]) enumMembers' "\n        "
     importTypingForPython3
@@ -841,6 +844,10 @@ compileTypeDeclaration src
                             ]
     insertThirdPartyImportsA [ ( "nirum.constructs"
                                , [("name_dict_type", "NameDict")]
+                               )
+                             ]
+    insertThirdPartyImportsA [ ( "nirum.datastructures"
+                               , [("map_type", "Map")]
                                )
                              ]
     typeRepr <- typeReprCompiler
@@ -875,6 +882,11 @@ class $className({T.intercalate "," $ compileExtendClasses annotations}):
 
 
 $tagCodes'
+
+$className.__nirum_tag_classes__ = map_type(
+    (tcls.__nirum_tag__, tcls)
+    for tcls in [$tagClasses]
+)
             |]
   where
     enumMembers' :: [(T.Text, T.Text)]

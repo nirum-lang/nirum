@@ -10,7 +10,7 @@ from fixture.foo import (CultureAgnosticName, Dog, DuplicateKeyword,
                          FloatUnbox, Gender, ImportedTypeUnbox, Irum,
                          Line, MixedName, Music, NullService,
                          Point1, Point2, Point3d, Pop, PingService, Product,
-                         Rnb, Run, Status, Stop, Way, WesternName)
+                         Rnb, RpcError, Run, Status, Stop, Way, WesternName)
 from fixture.foo.bar import PathUnbox, IntUnbox, Point
 from fixture.qux import Path, Name
 
@@ -299,5 +299,22 @@ def test_nirum_type():
     assert Status.__nirum_type__ == 'union'
     assert Run.__nirum_type__ == 'union'
     assert Stop.__nirum_type__ == 'union'
+    assert RpcError.__nirum_type__ == 'union'
     assert NullService.__nirum_type__ == 'service'
     assert PingService.__nirum_type__ == 'service'
+
+
+def test_nirum_tag_classes():
+    assert MixedName.__nirum_tag_classes__ == {
+        MixedName.Tag.western_name: WesternName,
+        MixedName.Tag.east_asian_name: EastAsianName,
+        MixedName.Tag.culture_agnostic_name: CultureAgnosticName,
+    }
+    assert Music.__nirum_tag_classes__ == {
+        Music.Tag.pop: Pop,
+        Music.Tag.rnb: Rnb,
+    }
+    assert Status.__nirum_tag_classes__ == {
+        Status.Tag.run: Run,
+        Status.Tag.stop: Stop,
+    }
