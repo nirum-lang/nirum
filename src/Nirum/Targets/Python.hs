@@ -505,6 +505,7 @@ class $className($parentClass):
     __slots__ = (
         $slots
     )
+    __nirum_type__ = 'union'
     __nirum_tag__ = $parentClass.Tag.{toAttributeName' typename'}
     __nirum_tag_names__ = name_dict_type([
         $nameMaps
@@ -630,6 +631,9 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
     return [qq|
 class $className(object):
 {compileDocstring "    " d}
+
+    __nirum_type__ = 'unboxed'
+
     @staticmethod
     def __nirum_get_inner_type__():
         return $itypeExpr
@@ -699,6 +703,11 @@ $memberNames
         {arg "value" "str"}
     ){ ret className }:
         return cls(value.replace('-', '_'))  # FIXME: validate input
+
+
+# Since enum.Enum doesn't allow to define non-member when the class is defined,
+# __nirum_type__ should be defined after the class is defined.
+$className.__nirum_type__ = 'enum'
 |]
   where
     memberKeywords :: [T.Text]
@@ -777,6 +786,7 @@ class $className(object):
     __slots__ = (
         $slots,
     )
+    __nirum_type__ = 'record'
     __nirum_record_behind_name__ = (
         '{I.toSnakeCaseText $ N.behindName typename'}'
     )
@@ -840,6 +850,7 @@ compileTypeDeclaration src
 class $className({T.intercalate "," $ compileExtendClasses annotations}):
 {compileDocstring "    " d}
 
+    __nirum_type__ = 'union'
     __nirum_union_behind_name__ = '{I.toSnakeCaseText $ N.behindName typename'}'
     __nirum_field_names__ = name_dict_type([$nameMaps])
 
@@ -919,6 +930,7 @@ compileTypeDeclaration
     return [qq|
 class $className(service_type):
 {compileDocstring "    " d}
+    __nirum_type__ = 'service'
     __nirum_schema_version__ = \'{SV.toText $ version metadata'}\'
     __nirum_service_methods__ = \{
         {methodMetadata'}

@@ -8,9 +8,9 @@ from six import PY3
 from fixture.foo import (CultureAgnosticName, Dog, DuplicateKeyword,
                          EastAsianName, EvaChar,
                          FloatUnbox, Gender, ImportedTypeUnbox, Irum,
-                         Line, MixedName, NullService,
+                         Line, MixedName, Music, NullService,
                          Point1, Point2, Point3d, Pop, PingService, Product,
-                         Rnb, Run, Stop, Way, WesternName)
+                         Rnb, Run, Status, Stop, Way, WesternName)
 from fixture.foo.bar import PathUnbox, IntUnbox, Point
 from fixture.qux import Path, Name
 
@@ -277,3 +277,27 @@ def test_enum_duplicate_member_name():
             DuplicateKeyword.no_mro)
     assert DuplicateKeyword.mro_.__nirum_serialize__() == 'mro'
     assert DuplicateKeyword.no_mro.__nirum_serialize__() == 'no_mro'
+
+
+def test_nirum_type():
+    assert FloatUnbox.__nirum_type__ == 'unboxed'
+    assert Way.__nirum_type__ == 'unboxed'
+    assert Gender.__nirum_type__ == 'enum'
+    assert EvaChar.__nirum_type__ == 'enum'
+    assert Point1.__nirum_type__ == 'record'
+    assert Point2.__nirum_type__ == 'record'
+    assert Point3d.__nirum_type__ == 'record'
+    assert Line.__nirum_type__ == 'record'
+    assert Product.__nirum_type__ == 'record'
+    assert MixedName.__nirum_type__ == 'union'
+    assert WesternName.__nirum_type__ == 'union'
+    assert EastAsianName.__nirum_type__ == 'union'
+    assert CultureAgnosticName.__nirum_type__ == 'union'
+    assert Music.__nirum_type__ == 'union'
+    assert Pop.__nirum_type__ == 'union'
+    assert Rnb.__nirum_type__ == 'union'
+    assert Status.__nirum_type__ == 'union'
+    assert Run.__nirum_type__ == 'union'
+    assert Stop.__nirum_type__ == 'union'
+    assert NullService.__nirum_type__ == 'service'
+    assert PingService.__nirum_type__ == 'service'
