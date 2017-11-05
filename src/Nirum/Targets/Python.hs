@@ -289,6 +289,16 @@ toAttributeName identifier =
 toAttributeName' :: Name -> T.Text
 toAttributeName' = toAttributeName . N.facialName
 
+toEnumMemberName :: Name -> T.Text
+toEnumMemberName name'
+  | attributeName `elem` memberKeywords = attributeName `T.snoc` '_'
+  | otherwise = attributeName
+  where
+    memberKeywords :: [T.Text]
+    memberKeywords = ["mro"]
+    attributeName :: T.Text
+    attributeName = toAttributeName' name'
+
 toImportPath' :: ModulePath -> T.Text
 toImportPath' = T.intercalate "." . map toAttributeName . toList
 
@@ -506,7 +516,7 @@ class $className($parentClass):
         $slots
     )
     __nirum_type__ = 'union'
-    __nirum_tag__ = $parentClass.Tag.{toAttributeName' typename'}
+    __nirum_tag__ = $parentClass.Tag.{toEnumMemberName typename'}
     __nirum_tag_names__ = name_dict_type([
         $nameMaps
     ])
@@ -709,16 +719,6 @@ $memberNames
 # __nirum_type__ should be defined after the class is defined.
 $className.__nirum_type__ = 'enum'
 |]
-  where
-    memberKeywords :: [T.Text]
-    memberKeywords = ["mro"]
-    toEnumMemberName :: Name -> T.Text
-    toEnumMemberName name' = if attributeName `elem` memberKeywords
-                             then attributeName `T.snoc` '_'
-                             else attributeName
-      where
-        attributeName :: T.Text
-        attributeName = toAttributeName' name'
 compileTypeDeclaration src d@TypeDeclaration { typename = typename'
                                              , type' = RecordType fields
                                              } = do
@@ -890,7 +890,7 @@ $className.__nirum_tag_classes__ = map_type(
             |]
   where
     enumMembers' :: [(T.Text, T.Text)]
-    enumMembers' = [ ( toAttributeName' tagName
+    enumMembers' = [ ( toEnumMemberName tagName
                      , I.toSnakeCaseText $ N.behindName tagName
                      )
                    | (Tag tagName _ _) <- toList tags
