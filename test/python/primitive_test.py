@@ -5,12 +5,13 @@ from pytest import raises
 from nirum.service import Service
 from six import PY3
 
-from fixture.foo import (CultureAgnosticName, Dog, DuplicateKeyword,
+from fixture.foo import (CultureAgnosticName, Dog,
                          EastAsianName, EvaChar,
                          FloatUnbox, Gender, ImportedTypeUnbox, Irum,
-                         Line, MixedName, NullService,
+                         Line, MixedName, Mro, Music, NoMro, NullService,
                          Point1, Point2, Point3d, Pop, PingService, Product,
-                         Rnb, Run, Stop, Way, WesternName)
+                         ReservedKeywordEnum, ReservedKeywordUnion,
+                         Rnb, RpcError, Run, Status, Stop, Way, WesternName)
 from fixture.foo.bar import PathUnbox, IntUnbox, Point
 from fixture.qux import Path, Name
 
@@ -268,12 +269,64 @@ def test_service():
         PingService().ping(wrongkwd=u'a')
 
 
-def test_enum_duplicate_member_name():
-    assert hasattr(DuplicateKeyword, 'mro_')
-    assert hasattr(DuplicateKeyword, 'no_mro')
-    assert (DuplicateKeyword.__nirum_deserialize__(u'mro') ==
-            DuplicateKeyword.mro_)
-    assert (DuplicateKeyword.__nirum_deserialize__(u'no-mro') ==
-            DuplicateKeyword.no_mro)
-    assert DuplicateKeyword.mro_.__nirum_serialize__() == 'mro'
-    assert DuplicateKeyword.no_mro.__nirum_serialize__() == 'no_mro'
+def test_enum_reserved_keyword_for_member():
+    assert hasattr(ReservedKeywordEnum, 'mro_')
+    assert hasattr(ReservedKeywordEnum, 'no_mro')
+    assert (ReservedKeywordEnum.__nirum_deserialize__(u'mro') ==
+            ReservedKeywordEnum.mro_)
+    assert (ReservedKeywordEnum.__nirum_deserialize__(u'no-mro') ==
+            ReservedKeywordEnum.no_mro)
+    assert ReservedKeywordEnum.mro_.__nirum_serialize__() == 'mro'
+    assert ReservedKeywordEnum.no_mro.__nirum_serialize__() == 'no_mro'
+
+
+def test_union_reserved_keyword_for_tag():
+    assert ReservedKeywordUnion.Tag.mro_.value == 'mro'
+    assert ReservedKeywordUnion.Tag.no_mro.value == 'no_mro'
+    assert Mro.__nirum_tag__ is ReservedKeywordUnion.Tag.mro_
+    assert NoMro.__nirum_tag__ is ReservedKeywordUnion.Tag.no_mro
+    assert ReservedKeywordUnion.__nirum_tag_classes__ == {
+        ReservedKeywordUnion.Tag.mro_: Mro,
+        ReservedKeywordUnion.Tag.no_mro: NoMro,
+    }
+
+
+def test_nirum_type():
+    assert FloatUnbox.__nirum_type__ == 'unboxed'
+    assert Way.__nirum_type__ == 'unboxed'
+    assert Gender.__nirum_type__ == 'enum'
+    assert EvaChar.__nirum_type__ == 'enum'
+    assert Point1.__nirum_type__ == 'record'
+    assert Point2.__nirum_type__ == 'record'
+    assert Point3d.__nirum_type__ == 'record'
+    assert Line.__nirum_type__ == 'record'
+    assert Product.__nirum_type__ == 'record'
+    assert MixedName.__nirum_type__ == 'union'
+    assert WesternName.__nirum_type__ == 'union'
+    assert EastAsianName.__nirum_type__ == 'union'
+    assert CultureAgnosticName.__nirum_type__ == 'union'
+    assert Music.__nirum_type__ == 'union'
+    assert Pop.__nirum_type__ == 'union'
+    assert Rnb.__nirum_type__ == 'union'
+    assert Status.__nirum_type__ == 'union'
+    assert Run.__nirum_type__ == 'union'
+    assert Stop.__nirum_type__ == 'union'
+    assert RpcError.__nirum_type__ == 'union'
+    assert NullService.__nirum_type__ == 'service'
+    assert PingService.__nirum_type__ == 'service'
+
+
+def test_nirum_tag_classes():
+    assert MixedName.__nirum_tag_classes__ == {
+        MixedName.Tag.western_name: WesternName,
+        MixedName.Tag.east_asian_name: EastAsianName,
+        MixedName.Tag.culture_agnostic_name: CultureAgnosticName,
+    }
+    assert Music.__nirum_tag_classes__ == {
+        Music.Tag.pop: Pop,
+        Music.Tag.rnb: Rnb,
+    }
+    assert Status.__nirum_tag_classes__ == {
+        Status.Tag.run: Run,
+        Status.Tag.stop: Stop,
+    }

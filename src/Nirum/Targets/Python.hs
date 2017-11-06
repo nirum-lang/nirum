@@ -289,6 +289,16 @@ toAttributeName identifier =
 toAttributeName' :: Name -> T.Text
 toAttributeName' = toAttributeName . N.facialName
 
+toEnumMemberName :: Name -> T.Text
+toEnumMemberName name'
+  | attributeName `elem` memberKeywords = attributeName `T.snoc` '_'
+  | otherwise = attributeName
+  where
+    memberKeywords :: [T.Text]
+    memberKeywords = ["mro"]
+    attributeName :: T.Text
+    attributeName = toAttributeName' name'
+
 toImportPath' :: ModulePath -> T.Text
 toImportPath' = T.intercalate "." . map toAttributeName . toList
 
@@ -505,7 +515,8 @@ class $className($parentClass):
     __slots__ = (
         $slots
     )
-    __nirum_tag__ = $parentClass.Tag.{toAttributeName' typename'}
+    __nirum_type__ = 'union'
+    __nirum_tag__ = $parentClass.Tag.{toEnumMemberName typename'}
     __nirum_tag_names__ = name_dict_type([
         $nameMaps
     ])
@@ -630,6 +641,9 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
     return [qq|
 class $className(object):
 {compileDocstring "    " d}
+
+    __nirum_type__ = 'unboxed'
+
     @staticmethod
     def __nirum_get_inner_type__():
         return $itypeExpr
@@ -699,17 +713,12 @@ $memberNames
         {arg "value" "str"}
     ){ ret className }:
         return cls(value.replace('-', '_'))  # FIXME: validate input
+
+
+# Since enum.Enum doesn't allow to define non-member when the class is defined,
+# __nirum_type__ should be defined after the class is defined.
+$className.__nirum_type__ = 'enum'
 |]
-  where
-    memberKeywords :: [T.Text]
-    memberKeywords = ["mro"]
-    toEnumMemberName :: Name -> T.Text
-    toEnumMemberName name' = if attributeName `elem` memberKeywords
-                             then attributeName `T.snoc` '_'
-                             else attributeName
-      where
-        attributeName :: T.Text
-        attributeName = toAttributeName' name'
 compileTypeDeclaration src d@TypeDeclaration { typename = typename'
                                              , type' = RecordType fields
                                              } = do
@@ -777,6 +786,7 @@ class $className(object):
     __slots__ = (
         $slots,
     )
+    __nirum_type__ = 'record'
     __nirum_record_behind_name__ = (
         '{I.toSnakeCaseText $ N.behindName typename'}'
     )
@@ -822,6 +832,9 @@ compileTypeDeclaration src
     tagCodes <- mapM (compileUnionTag src typename') $ toList tags
     let className = toClassName' typename'
         tagCodes' = T.intercalate "\n\n" tagCodes
+        tagClasses = T.intercalate ", " [ toClassName' tagName
+                                        | Tag tagName _ _ <- toList tags
+                                        ]
         enumMembers = toIndentedCodes
             (\ (t, b) -> [qq|$t = '{b}'|]) enumMembers' "\n        "
     importTypingForPython3
@@ -833,6 +846,10 @@ compileTypeDeclaration src
                                , [("name_dict_type", "NameDict")]
                                )
                              ]
+    insertThirdPartyImportsA [ ( "nirum.datastructures"
+                               , [("map_type", "Map")]
+                               )
+                             ]
     typeRepr <- typeReprCompiler
     ret <- returnCompiler
     arg <- parameterCompiler
@@ -840,6 +857,7 @@ compileTypeDeclaration src
 class $className({T.intercalate "," $ compileExtendClasses annotations}):
 {compileDocstring "    " d}
 
+    __nirum_type__ = 'union'
     __nirum_union_behind_name__ = '{I.toSnakeCaseText $ N.behindName typename'}'
     __nirum_field_names__ = name_dict_type([$nameMaps])
 
@@ -864,10 +882,15 @@ class $className({T.intercalate "," $ compileExtendClasses annotations}):
 
 
 $tagCodes'
+
+$className.__nirum_tag_classes__ = map_type(
+    (tcls.__nirum_tag__, tcls)
+    for tcls in [$tagClasses]
+)
             |]
   where
     enumMembers' :: [(T.Text, T.Text)]
-    enumMembers' = [ ( toAttributeName' tagName
+    enumMembers' = [ ( toEnumMemberName tagName
                      , I.toSnakeCaseText $ N.behindName tagName
                      )
                    | (Tag tagName _ _) <- toList tags
@@ -919,6 +942,7 @@ compileTypeDeclaration
     return [qq|
 class $className(service_type):
 {compileDocstring "    " d}
+    __nirum_type__ = 'service'
     __nirum_schema_version__ = \'{SV.toText $ version metadata'}\'
     __nirum_service_methods__ = \{
         {methodMetadata'}
