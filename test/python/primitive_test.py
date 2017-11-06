@@ -203,6 +203,16 @@ def test_union():
                                        last_name=u'wrong')
     assert hash(WesternName(first_name=u'foo', middle_name=u'bar',
                             last_name=u'baz'))
+    if PY3:
+        assert repr(western_name) == (
+            "fixture.foo.MixedName.WesternName(first_name='foo', "
+            "middle_name='bar', last_name='baz')"
+        )
+    else:
+        assert repr(western_name) == (
+            "fixture.foo.MixedName.WesternName(first_name=u'foo', "
+            "middle_name=u'bar', last_name=u'baz')"
+        )
     assert EastAsianName is MixedName.EastAsianName
     assert isinstance(EastAsianName, type)
     assert issubclass(EastAsianName, MixedName)
