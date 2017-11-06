@@ -545,6 +545,11 @@ class $className($parentClass):
 
     def __hash__(self){ ret "int" }:
         return hash($hashTuple)
+
+
+$parentClass.$className = $className
+if hasattr($parentClass, '__qualname__'):
+    $className.__qualname__ = $parentClass.__qualname__ + '.{className}'
 |]
 compilePrimitiveType :: PrimitiveTypeIdentifier -> CodeGen Code
 compilePrimitiveType primitiveTypeIdentifier = do
