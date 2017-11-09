@@ -485,7 +485,6 @@ compileUnionTag source parentname d@(Tag typename' fields _) = do
         [ ("nirum.validate", [("validate_union_type", "validate_union_type")])
         , ("nirum.constructs", [("name_dict_type", "NameDict")])
         ]
-    typeRepr <- typeReprCompiler
     arg <- parameterCompiler
     ret <- returnCompiler
     pyVer <- getPythonVersion
@@ -528,10 +527,11 @@ class $className($parentClass):
     { inits :: T.Text }
 
     def __repr__(self){ ret "str" }:
-        return '\{0\}(\{1\})'.format(
-            {typeRepr "type(self)"},
-            ', '.join('\{\}=\{\}'.format(attr, getattr(self, attr))
-                      for attr in self.__slots__)
+        return (
+            $parentClass.__module__ + '.$parentClass.$className(' +
+            ', '.join('\{0\}=\{1!r\}'.format(attr, getattr(self, attr))
+                      for attr in self.__slots__) +
+            ')'
         )
 
     def __eq__(self, other){ ret "bool" }:
@@ -545,6 +545,11 @@ class $className($parentClass):
 
     def __hash__(self){ ret "int" }:
         return hash($hashTuple)
+
+
+$parentClass.$className = $className
+if hasattr($parentClass, '__qualname__'):
+    $className.__qualname__ = $parentClass.__qualname__ + '.{className}'
 |]
 compilePrimitiveType :: PrimitiveTypeIdentifier -> CodeGen Code
 compilePrimitiveType primitiveTypeIdentifier = do

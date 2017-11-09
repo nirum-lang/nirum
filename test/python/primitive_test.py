@@ -174,6 +174,7 @@ def test_union():
     assert MixedName.Tag.western_name.value == 'western_name'
     assert MixedName.Tag.east_asian_name.value == 'east_asian_name'
     assert MixedName.Tag.culture_agnostic_name.value == 'culture_agnostic_name'
+    assert WesternName is MixedName.WesternName  # alias
     assert isinstance(WesternName, type)
     assert issubclass(WesternName, MixedName)
     with raises(NotImplementedError):
@@ -202,6 +203,17 @@ def test_union():
                                        last_name=u'wrong')
     assert hash(WesternName(first_name=u'foo', middle_name=u'bar',
                             last_name=u'baz'))
+    if PY3:
+        assert repr(western_name) == (
+            "fixture.foo.MixedName.WesternName(first_name='foo', "
+            "middle_name='bar', last_name='baz')"
+        )
+    else:
+        assert repr(western_name) == (
+            "fixture.foo.MixedName.WesternName(first_name=u'foo', "
+            "middle_name=u'bar', last_name=u'baz')"
+        )
+    assert EastAsianName is MixedName.EastAsianName
     assert isinstance(EastAsianName, type)
     assert issubclass(EastAsianName, MixedName)
     east_asian_name = EastAsianName(family_name=u'foo', given_name=u'baz')
@@ -219,6 +231,7 @@ def test_union():
         EastAsianName(family_name=1, given_name=u'baz')
     with raises(TypeError):
         EastAsianName(family_name=u'foo', given_name=2)
+    assert CultureAgnosticName is MixedName.CultureAgnosticName
     assert isinstance(CultureAgnosticName, type)
     assert issubclass(CultureAgnosticName, MixedName)
     agnostic_name = CultureAgnosticName(fullname=u'foobar')
