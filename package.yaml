@@ -64,7 +64,7 @@ library:
   - time >=1.6.0.1 && <1.7.0
   - template-haskell >=2.11 && <3
   - uri >=0.1 && <1.0
-  - vector >= 0.11.0.0 && < 0.12
+  - vector >= 0.12.0.1 && < 0.13
 executables:
   nirum:
     main: app/nirum.hs
