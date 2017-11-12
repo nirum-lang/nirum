@@ -1098,12 +1098,13 @@ class {className}_Client($className):
     compileAnnotation :: I.Identifier -> A.AnnotationArgumentSet -> T.Text
     compileAnnotation ident annoArgument =
         toKeyItem ident $
-            wrapMap $ T.intercalate "," $ [ (toKeyStr ident' value) :: T.Text
-                                | (ident', value) <- M.toList annoArgument
-                                ]
+            wrapMap $ T.intercalate ","
+                [ toKeyStr ident' value :: T.Text
+                | (ident', value) <- M.toList annoArgument
+                ]
       where
         escapeSingle :: T.Text -> T.Text
-        escapeSingle = T.strip . (T.replace "'" "\\'")
+        escapeSingle = T.strip . T.replace "'" "\\'"
         toKeyStr :: I.Identifier -> T.Text -> T.Text
         toKeyStr k v =
             [qq|'{toAttributeName k}': '''{escapeSingle v}'''|]
@@ -1114,13 +1115,12 @@ class {className}_Client($className):
         toKeyItem (N.facialName mName) $ wrapMap annotationDict
       where
         annotationDict :: T.Text
-        annotationDict = T.intercalate "," $
-            [ (compileAnnotation ident annoArgSet) :: T.Text
-            | (ident, annoArgSet)
-            <- M.toList $ A.annotations annoSet
+        annotationDict = T.intercalate ","
+            [ compileAnnotation ident annoArgSet :: T.Text
+            | (ident, annoArgSet) <- M.toList $ A.annotations annoSet
             ]
     methodAnnotations' :: T.Text
-    methodAnnotations' = wrapMap $ commaNl $ map compileMethodAnnotation $
+    methodAnnotations' = wrapMap $ commaNl $ map compileMethodAnnotation
         methodList
 
 compileTypeDeclaration _ Import {} =
