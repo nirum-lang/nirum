@@ -16,9 +16,9 @@ import qualified Nirum.Constructs.DeclarationSet as DS
 import Nirum.Constructs.Module (Module (..))
 import Nirum.Constructs.ModulePath (ModulePath (..))
 import qualified Nirum.Constructs.TypeDeclaration as TD
-import Nirum.Package (TypeLookup (..))
 import Nirum.Package.Metadata (Metadata (..), Package (..), Target (..))
 import qualified Nirum.Package.ModuleSet as MS
+import Nirum.TypeInstance.BoundModule hiding (lookupType)
 
 
 emptyModule :: Module

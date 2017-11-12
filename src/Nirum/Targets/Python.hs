@@ -109,13 +109,7 @@ import Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
                                                         )
                                        )
 import Nirum.Docs.ReStructuredText (ReStructuredText, render)
-import Nirum.Package ( BoundModule
-                     , Package (Package, metadata, modules)
-                     , TypeLookup (Imported, Local, Missing)
-                     , lookupType
-                     , resolveBoundModule
-                     , types
-                     )
+import Nirum.Package hiding (target)
 import Nirum.Package.Metadata ( Author (Author, name, email)
                               , Metadata ( Metadata
                                          , authors
@@ -144,6 +138,7 @@ import Nirum.Package.Metadata ( Author (Author, name, email)
                               )
 import qualified Nirum.Package.ModuleSet as MS
 import qualified Nirum.Package.Metadata as MD
+import Nirum.TypeInstance.BoundModule
 
 minimumRuntime :: SV.Version
 minimumRuntime = SV.version 0 6 0 [] []
@@ -1093,7 +1088,7 @@ compileTypeDeclaration _ Import {} =
 
 compileModuleBody :: Source -> CodeGen Code
 compileModuleBody src@Source { sourceModule = boundModule } = do
-    let types' = types boundModule
+    let types' = boundTypes boundModule
     typeCodes <- mapM (compileTypeDeclaration src) $ toList types'
     return $ T.intercalate "\n\n" typeCodes
 

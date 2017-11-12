@@ -13,28 +13,9 @@ import Text.InterpolatedString.Perl6 (qq)
 import qualified Text.Parsec.Error as PE
 import Text.Parsec.Pos (sourceColumn, sourceLine)
 
-import Nirum.Constructs.Annotation (empty)
-import Nirum.Constructs.Module (Module (Module), coreModulePath)
+import Nirum.Constructs.Module
 import Nirum.Constructs.ModulePath (ModulePath)
-import Nirum.Constructs.TypeDeclaration ( JsonType (String)
-                                        , PrimitiveTypeIdentifier (Text)
-                                        , Type (Alias, PrimitiveType)
-                                        , TypeDeclaration ( Import
-                                                          , TypeDeclaration
-                                                          )
-                                        )
-import Nirum.Package ( BoundModule (boundPackage, modulePath)
-                     , Package (Package, metadata)
-                     , PackageError (ImportError, MetadataError, ScanError)
-                     , TypeLookup (Imported, Local, Missing)
-                     , docs
-                     , lookupType
-                     , resolveBoundModule
-                     , resolveModule
-                     , scanModules
-                     , scanPackage
-                     , types
-                     )
+import Nirum.Package hiding (modules, target)
 import Nirum.Package.Metadata ( Metadata ( Metadata
                                          , authors
                                          , target
@@ -87,11 +68,6 @@ testPackage target' = do
             resolveModule ["qux"] validPackage `shouldBe`
                 Just (Module [] $ Just "qux")
             resolveModule ["baz"] validPackage `shouldBe` Nothing
-        specify "resolveBoundModule" $ do
-            let Just bm = resolveBoundModule ["foo"] validPackage
-            boundPackage bm `shouldBe` validPackage
-            modulePath bm `shouldBe` ["foo"]
-            resolveBoundModule ["baz"] validPackage `shouldBe` Nothing
         describe "scanPackage" $ do
             it "returns Package value when all is well" $ do
                 let path = "." </> "examples"
@@ -148,31 +124,6 @@ testPackage target' = do
                              , (["address"], path </> "address.nrm")
                              , (["pdf-service"], path </> "pdf-service.nrm")
                              ]
-    describe [qq|BoundModule (target: $targetName')|] $ do
-        let Just bm = resolveBoundModule ["foo", "bar"] validPackage
-            Just abc = resolveBoundModule ["abc"] validPackage
-            Just xyz = resolveBoundModule ["xyz"] validPackage
-        specify "docs" $ do
-            docs bm `shouldBe` Just "foo.bar"
-            let Just bm' = resolveBoundModule ["foo"] validPackage
-            docs bm' `shouldBe` Just "foo"
-        specify "types" $ do
-            types bm `shouldBe` []
-            types abc `shouldBe` [TypeDeclaration "a" (Alias "text") empty]
-            types xyz `shouldBe` [ Import ["abc"] "a" empty
-                                 , TypeDeclaration "x" (Alias "text") empty
-                                 ]
-        specify "lookupType" $ do
-            lookupType "a" bm `shouldBe` Missing
-            lookupType "a" abc `shouldBe` Local (Alias "text")
-            lookupType "a" xyz `shouldBe` Imported ["abc"] (Alias "text")
-            lookupType "x" bm `shouldBe` Missing
-            lookupType "x" abc `shouldBe` Missing
-            lookupType "x" xyz `shouldBe` Local (Alias "text")
-            lookupType "text" bm `shouldBe`
-                Imported coreModulePath (PrimitiveType Text String)
-            lookupType "text" abc `shouldBe` lookupType "text" bm
-            lookupType "text" xyz `shouldBe` lookupType "text" bm
   where
     scanPackage' :: FilePath -> IO (Either PackageError (Package t))
     scanPackage' = scanPackage

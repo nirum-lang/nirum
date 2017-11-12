@@ -26,9 +26,8 @@ import Text.PrettyPrint (($+$))
 
 import Nirum.Constructs.Identifier (Identifier)
 import Nirum.Constructs.ModulePath (ModulePath)
-import qualified Nirum.Package as PK
-import Nirum.Package (BoundModule (..), resolveBoundModule)
 import Nirum.Package.Metadata (Package (..), Target (..))
+import qualified Nirum.TypeInstance.BoundModule as BoundModule
 
 -- | A code builder monad parameterized by:
 --
@@ -42,7 +41,7 @@ newtype Target t => CodeBuilder t s a = CodeBuilder (State (BuildState t s) a)
 
 data Target t => BuildState t s =
     BuildState { output :: P.Doc
-               , boundModule :: BoundModule t
+               , boundModule :: BoundModule.BoundModule t
                , innerState :: s
                }
 
@@ -92,10 +91,10 @@ nest n code = do
 -- computation.
 lookupType :: Target t
            => Identifier                     -- ^ name of the type to find
-           -> CodeBuilder t s PK.TypeLookup
+           -> CodeBuilder t s BoundModule.TypeLookup
 lookupType identifier = do
     m <- fmap boundModule get'
-    return $ PK.lookupType identifier m
+    return $ BoundModule.lookupType identifier m
 
 -- | Execute the builder computation and retrive output.
 runBuilder :: Target t
@@ -106,7 +105,8 @@ runBuilder :: Target t
            -> (a, B.Builder)     -- ^ return value and build result
 runBuilder package modPath st (CodeBuilder a) = (ret, rendered)
   where
-    mod' = fromMaybe (error "asdf") (resolveBoundModule modPath package)
+    mod' = fromMaybe (error "asdf")
+                     (BoundModule.resolveBoundModule modPath package)
     initialState = BuildState { output = P.empty
                               , boundModule = mod'
                               , innerState = st

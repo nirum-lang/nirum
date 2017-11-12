@@ -41,12 +41,7 @@ import Nirum.Docs ( Block (Heading)
                   , filterReferences
                   )
 import Nirum.Docs.Html (render, renderInlines)
-import Nirum.Package ( BoundModule (boundPackage, modulePath)
-                     , Package (Package, metadata, modules)
-                     , resolveBoundModule
-                     , resolveModule
-                     , types
-                     )
+import Nirum.Package
 import Nirum.Package.Metadata ( Author (Author, email, name, uri)
                               , Metadata (authors)
                               , Target ( CompileError
@@ -59,6 +54,7 @@ import Nirum.Package.Metadata ( Author (Author, email, name, uri)
                                        )
                               )
 import qualified Nirum.Package.ModuleSet as MS
+import Nirum.TypeInstance.BoundModule
 import Nirum.Version (versionText)
 
 data Docs = Docs deriving (Eq, Ord, Show)
@@ -127,7 +123,7 @@ module' docsModule = layout pkg depth path $ [shamlet|
     path = toCode docsModulePath
     types' :: [(Identifier, TD.TypeDeclaration)]
     types' = [ (facialName $ DE.name decl, decl)
-             | decl <- DES.toList $ types docsModule
+             | decl <- DES.toList $ boundTypes docsModule
              , case decl of
                     TD.Import {} -> False
                     _ -> True

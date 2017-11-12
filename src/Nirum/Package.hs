@@ -1,22 +1,12 @@
-{-# LANGUAGE RankNTypes, StandaloneDeriving #-}
-module Nirum.Package ( BoundModule (boundPackage, modulePath)
-                     , Package (Package, metadata, modules)
-                     , PackageError ( ImportError
-                                    , MetadataError
-                                    , ParseError
-                                    , ScanError
-                                    )
-                     , TypeLookup (Imported, Local, Missing)
-                     , docs
-                     , findInBoundModule
-                     , lookupType
-                     , resolveBoundModule
-                     , resolveModule
-                     , scanModules
-                     , scanPackage
-                     , target
-                     , types
-                     ) where
+module Nirum.Package
+    ( Package (..)
+    , PackageError (..)
+    , docs
+    , resolveModule
+    , scanModules
+    , scanPackage
+    , target
+    ) where
 
 import System.IO.Error (catchIOError)
 
@@ -30,18 +20,8 @@ import qualified Data.Set as S
 import System.Directory (doesDirectoryExist, listDirectory)
 import System.FilePath ((</>))
 
-import qualified Nirum.Constructs.DeclarationSet as DS
-import Nirum.Constructs.Identifier (Identifier)
-import qualified Nirum.Constructs.Module as Mod
-import Nirum.Constructs.Declaration (Documented (docs))
+import Nirum.Constructs.Module
 import Nirum.Constructs.ModulePath (ModulePath, fromFilePath)
-import Nirum.Constructs.TypeDeclaration ( Type
-                                        , TypeDeclaration ( Import
-                                                          , ServiceDeclaration
-                                                          , TypeDeclaration
-                                                          , type'
-                                                          )
-                                        )
 import Nirum.Package.Metadata ( MetadataError
                               , Package (Package, metadata, modules)
                               , Target
@@ -55,14 +35,8 @@ import Nirum.Parser (ParseError, parseFile)
 target :: Target t => Package t -> t
 target = packageTarget
 
-resolveModule :: ModulePath -> Package t -> Maybe Mod.Module
+resolveModule :: ModulePath -> Package t -> Maybe Module
 resolveModule path Package { modules = ms } = MS.lookup path ms
-
-resolveBoundModule :: ModulePath -> Package t -> Maybe (BoundModule t)
-resolveBoundModule path package =
-    case resolveModule path package of
-        Just _ -> Just $ BoundModule package path
-        Nothing -> Nothing
 
 data PackageError = ScanError FilePath IOError
                   | ParseError ModulePath ParseError
@@ -87,9 +61,9 @@ scanPackage packagePath = runExceptT $ do
         Left error' -> throwError error'
   where
     excludeFailedParse :: ModulePath
-                       -> Either ParseError Mod.Module
-                       -> Either PackageError (M.Map ModulePath Mod.Module)
-                       -> Either PackageError (M.Map ModulePath Mod.Module)
+                       -> Either ParseError Module
+                       -> Either PackageError (M.Map ModulePath Module)
+                       -> Either PackageError (M.Map ModulePath Module)
     excludeFailedParse _ _ (Left error') = Left error'
     excludeFailedParse path (Left error') _ = Left $ ParseError path error'
     excludeFailedParse path (Right module') (Right map') =
@@ -128,48 +102,3 @@ scanModules packagePath = do
         realPath = case path of
                        [] -> packagePath
                        p -> packagePath </> p
-
-data BoundModule t = BoundModule { boundPackage :: Target t => Package t
-                                 , modulePath :: ModulePath
-                                 }
-
-deriving instance (Eq t, Target t) => Eq (BoundModule t)
-deriving instance (Ord t, Target t) => Ord (BoundModule t)
-deriving instance (Show t, Target t) => Show (BoundModule t)
-
-findInBoundModule :: Target t => (Mod.Module -> a) -> a -> BoundModule t -> a
-findInBoundModule valueWhenExist valueWhenNotExist
-                  BoundModule { boundPackage = Package { modules = ms }
-                              , modulePath = path
-                              } =
-    case MS.lookup path ms of
-        Nothing -> valueWhenNotExist
-        Just mod' -> valueWhenExist mod'
-
-types :: Target t => BoundModule t -> DS.DeclarationSet TypeDeclaration
-types = findInBoundModule Mod.types DS.empty
-
-instance Target t => Documented (BoundModule t) where
-    docs = findInBoundModule Mod.docs Nothing
-
-data TypeLookup = Missing
-                | Local Type
-                | Imported ModulePath Type
-                deriving (Eq, Ord, Show)
-
-lookupType :: Target t => Identifier -> BoundModule t -> TypeLookup
-lookupType identifier boundModule =
-    case DS.lookup identifier (types boundModule) of
-        Nothing -> toType Mod.coreModulePath
-            (DS.lookup identifier $ Mod.types Mod.coreModule)
-        Just TypeDeclaration { type' = t } -> Local t
-        Just (Import path _ _) ->
-            case resolveModule path (boundPackage boundModule) of
-                Nothing -> Missing
-                Just (Mod.Module decls _) ->
-                    toType path (DS.lookup identifier decls)
-        Just ServiceDeclaration {} -> Missing
-  where
-    toType :: ModulePath -> Maybe TypeDeclaration -> TypeLookup
-    toType mp (Just TypeDeclaration { type' = t }) = Imported mp t
-    toType _ _ = Missing
