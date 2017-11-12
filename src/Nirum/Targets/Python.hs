@@ -942,6 +942,7 @@ compileTypeDeclaration
                             ]
     insertThirdPartyImportsA
         [ ("nirum.constructs", [("name_dict_type", "NameDict")])
+        , ("nirum.datastructures", [(nirumMapName, "Map")])
         , ("nirum.service", [("service_type", "Service")])
         , ("nirum.transport", [("transport_type", "Transport")])
         ]
@@ -984,6 +985,8 @@ class {className}_Client($className):
     {clientMethods'}
 |]
   where
+    nirumMapName :: T.Text
+    nirumMapName = "map_type"
     className :: T.Text
     className = toClassName' name'
     commaNl :: [T.Text] -> T.Text
@@ -1094,7 +1097,7 @@ class {className}_Client($className):
     toKeyItem :: I.Identifier -> T.Text -> T.Text
     toKeyItem ident v = [qq|'{toAttributeName ident}': {v}|]
     wrapMap :: T.Text -> T.Text
-    wrapMap items = [qq|map_type(\{$items\})|]
+    wrapMap items = [qq|$nirumMapName(\{$items\})|]
     compileAnnotation :: I.Identifier -> A.AnnotationArgumentSet -> T.Text
     compileAnnotation ident annoArgument =
         toKeyItem ident $
