@@ -88,6 +88,9 @@ union rpc-error = connection-lose-error
 
 service ping-service (
     # Service docs.
+
+    @http-resource(method="GET", path="/ping")
+    @quote(single="'", triple="'''")
     bool ping (
         # Method docs.
         text nonce,

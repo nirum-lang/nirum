@@ -1,4 +1,5 @@
 @error
+@http-status(code="400")
 union markdown-parse-error = symbol-error | syntax-error (text reason);
 
 type html = text;
@@ -6,16 +7,19 @@ type html = text;
 service pdf-service (
     # A microservice which renders a PDF from the given URI or HTML.
 
+    @http-resource(method="GET", path="/pdf/{uri}")
     binary render-uri (
         # Renders a PDF from the given URI.
         uri uri,
     ),
 
+    @http-resource(method="POST", path="/pdf/")
     binary render-html (
         # Renders a PDF from the given HTML text.
         html html,
     ),
 
+    @http-resource(method="POST", path="/pdf/")
     binary render-md (
         # Renders a PDF from the given HTML text.
         text md,
