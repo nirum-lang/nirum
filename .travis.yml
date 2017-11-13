@@ -61,7 +61,10 @@ before_install:
 - chmod +x "$HOME/.local/bin/travis_long"
 install:
 - |
-  if ! python3 -c "import pip"; then
+  if python3 -c "import pip"; then
+    python3 -m pip install --user -U setuptools
+    python3 -m pip install --user -U "pip>=$PIP_MINVER"
+  else
     if ! python3 -c "import setuptools"; then
       pushd /tmp
       curl -L "https://github.com/pypa/setuptools/archive/v$SETUPTOOLS_MINVER.tar.gz" | tar xvfz -
@@ -70,9 +73,10 @@ install:
       python3 setup.py install --user
       popd
     fi
+    python3 -m easy_install --user -U "setuptools>=$SETUPTOOLS_MINVER"
     python3 -m easy_install --user -U "pip>=$PIP_MINVER"
   fi
-- python3 -m pip install --user --upgrade tox "pip>=$PIP_MINVER" setuptools
+- python3 -m pip install --user --upgrade tox
 - travis_long stack --no-terminal setup
 - travis_long stack --no-terminal install scan -j4
 - travis_long stack --no-terminal install -j4 --only-dependencies
