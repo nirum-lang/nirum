@@ -35,7 +35,7 @@ import Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
                                                         , TypeIdentifier
                                                         )
                                        )
-import Nirum.Package (Package (metadata, modules), resolveBoundModule)
+import Nirum.Package hiding (target)
 import Nirum.Package.Metadata ( Author (Author, email, name, uri)
                               , Metadata ( Metadata
                                          , authors
@@ -82,6 +82,7 @@ import Nirum.Targets.Python ( Source (Source)
                             , toNamePair
                             , unionInstallRequires
                             )
+import Nirum.TypeInstance.BoundModule
 
 codeGen :: a -> CodeGen a
 codeGen = return
