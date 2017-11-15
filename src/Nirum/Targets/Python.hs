@@ -81,6 +81,7 @@ import Nirum.Constructs.Name (Name (Name))
 import qualified Nirum.Constructs.Name as N
 import Nirum.Constructs.Service ( Method ( Method
                                          , errorType
+                                         , methodAnnotations
                                          , methodName
                                          , parameters
                                          , returnType
@@ -936,6 +937,7 @@ compileTypeDeclaration
                             ]
     insertThirdPartyImportsA
         [ ("nirum.constructs", [("name_dict_type", "NameDict")])
+        , ("nirum.datastructures", [(nirumMapName, "Map")])
         , ("nirum.service", [("service_type", "Service")])
         , ("nirum.transport", [("transport_type", "Transport")])
         ]
@@ -950,6 +952,7 @@ class $className(service_type):
     __nirum_method_names__ = name_dict_type([
         $methodNameMap
     ])
+    __nirum_method_annotations__ = $methodAnnotations'
 
     @staticmethod
     def __nirum_method_error_types__(k, d=None):
@@ -977,6 +980,8 @@ class {className}_Client($className):
     {clientMethods'}
 |]
   where
+    nirumMapName :: T.Text
+    nirumMapName = "map_type"
     className :: T.Text
     className = toClassName' name'
     commaNl :: [T.Text] -> T.Text
@@ -1028,6 +1033,8 @@ class {className}_Client($className):
             '_names': name_dict_type([{paramNameMap params'}]),
             {paramMetadata'}
         \}|]
+    methodList :: [Method]
+    methodList = toList methods
     compileParameterMetadata :: Parameter -> CodeGen Code
     compileParameterMetadata (Parameter pName pType _) = do
         let pName' = toAttributeName' pName
@@ -1036,7 +1043,7 @@ class {className}_Client($className):
     methodNameMap :: T.Text
     methodNameMap = toIndentedCodes
         toNamePair
-        [mName | Method { methodName = mName } <- toList methods]
+        [mName | Method { methodName = mName } <- methodList]
         ",\n        "
     paramNameMap :: [Parameter] -> T.Text
     paramNameMap params = toIndentedCodes
@@ -1070,7 +1077,7 @@ class {className}_Client($className):
             payload=\{{commaNl payloadArguments}\},
             # FIXME Give annotations.
             service_annotations=\{\},
-            method_annotations=\{\},
+            method_annotations=self.__nirum_method_annotations__,
             parameter_annotations=\{\}
         )
         if successful:
@@ -1082,6 +1089,37 @@ class {className}_Client($className):
             return result
         raise result
 |]
+    toKeyItem :: I.Identifier -> T.Text -> T.Text
+    toKeyItem ident v = [qq|'{toAttributeName ident}': {v}|]
+    wrapMap :: T.Text -> T.Text
+    wrapMap items = [qq|$nirumMapName(\{$items\})|]
+    compileAnnotation :: I.Identifier -> A.AnnotationArgumentSet -> T.Text
+    compileAnnotation ident annoArgument =
+        toKeyItem ident $
+            wrapMap $ T.intercalate ","
+                [ toKeyStr ident' value :: T.Text
+                | (ident', value) <- M.toList annoArgument
+                ]
+      where
+        escapeSingle :: T.Text -> T.Text
+        escapeSingle = T.strip . T.replace "'" "\\'"
+        toKeyStr :: I.Identifier -> T.Text -> T.Text
+        toKeyStr k v =
+            [qq|'{toAttributeName k}': '''{escapeSingle v}'''|]
+    compileMethodAnnotation :: Method -> T.Text
+    compileMethodAnnotation Method { methodName = mName
+                                   , methodAnnotations = annoSet
+                                   } =
+        toKeyItem (N.facialName mName) $ wrapMap annotationDict
+      where
+        annotationDict :: T.Text
+        annotationDict = T.intercalate ","
+            [ compileAnnotation ident annoArgSet :: T.Text
+            | (ident, annoArgSet) <- M.toList $ A.annotations annoSet
+            ]
+    methodAnnotations' :: T.Text
+    methodAnnotations' = wrapMap $ commaNl $ map compileMethodAnnotation
+        methodList
 
 compileTypeDeclaration _ Import {} =
     return ""  -- Nothing to compile

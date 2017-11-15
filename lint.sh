@@ -17,7 +17,7 @@ EOF
   chmod +x .git/hooks/pre-commit
 fi
 
-stack test hlint
+stack test :hlint
 if [[ "$(stack exec scan -- -v)" = "" ]]; then
   stack install scan
 fi
