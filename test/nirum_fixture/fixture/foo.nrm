@@ -91,6 +91,7 @@ service ping-service (
 
     @http-resource(method="GET", path="/ping")
     @quote(single="'", triple="'''")
+    @unicode(unicode="유니코드")
     bool ping (
         # Method docs.
         text nonce,
