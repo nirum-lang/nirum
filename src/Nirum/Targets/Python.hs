@@ -1105,7 +1105,7 @@ class {className}_Client($className):
         escapeSingle = T.strip . T.replace "'" "\\'"
         toKeyStr :: I.Identifier -> T.Text -> T.Text
         toKeyStr k v =
-            [qq|'{toAttributeName k}': '''{escapeSingle v}'''|]
+            [qq|'{toAttributeName k}': u'''{escapeSingle v}'''|]
     compileMethodAnnotation :: Method -> T.Text
     compileMethodAnnotation Method { methodName = mName
                                    , methodAnnotations = annoSet
