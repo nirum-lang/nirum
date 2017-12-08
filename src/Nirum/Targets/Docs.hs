@@ -224,8 +224,9 @@ typeDecl mod' ident
             $maybe d <- docsBlock md
                 #{blockToHtml d}
             <dl class="result">
-                <dt class="return-label">returns:
-                <dd class="return-type">#{typeExpression mod' ret}
+                $maybe retType <- ret
+                    <dt class="return-label">returns:
+                    <dd class="return-type">#{typeExpression mod' retType}
                 $maybe errType <- err
                     <dt class="raise-label">raises:
                     <dd class="raise-type">#{typeExpression mod' errType}

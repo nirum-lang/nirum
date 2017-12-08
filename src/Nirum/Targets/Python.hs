@@ -449,7 +449,7 @@ returnCompiler = do
 compileUnionTag :: Source -> Name -> Tag -> CodeGen Code
 compileUnionTag source parentname d@(Tag typename' fields _) = do
     typeExprCodes <- mapM (compileTypeExpression source)
-        [typeExpr | (Field _ typeExpr _) <- toList fields]
+        [Just typeExpr | (Field _ typeExpr _) <- toList fields]
     let optionFlags = [ case typeExpr of
                             OptionModifier _ -> True
                             _ -> False
@@ -576,11 +576,11 @@ compilePrimitiveType primitiveTypeIdentifier = do
         (Uri, Python2) -> return "unicode"
         (Uri, Python3) -> return "str"
 
-compileTypeExpression :: Source -> TypeExpression -> CodeGen Code
+compileTypeExpression :: Source -> Maybe TypeExpression -> CodeGen Code
 compileTypeExpression Source { sourcePackage = Package { metadata = meta }
                              , sourceModule = boundModule
                              }
-                      (TypeIdentifier i) =
+                      (Just (TypeIdentifier i)) =
     case lookupType i boundModule of
         Missing -> fail $ "undefined identifier: " ++ I.toString i
         Imported _ (PrimitiveType p _) -> compilePrimitiveType p
@@ -591,13 +591,13 @@ compileTypeExpression Source { sourcePackage = Package { metadata = meta }
   where
     target' :: Python
     target' = target meta
-compileTypeExpression source (MapModifier k v) = do
-    kExpr <- compileTypeExpression source k
-    vExpr <- compileTypeExpression source v
+compileTypeExpression source (Just (MapModifier k v)) = do
+    kExpr <- compileTypeExpression source (Just k)
+    vExpr <- compileTypeExpression source (Just v)
     insertStandardImport "typing"
     return [qq|typing.Mapping[$kExpr, $vExpr]|]
-compileTypeExpression source modifier = do
-    expr <- compileTypeExpression source typeExpr
+compileTypeExpression source (Just modifier) = do
+    expr <- compileTypeExpression source (Just typeExpr)
     insertStandardImport "typing"
     return [qq|typing.$className[$expr]|]
   where
@@ -609,14 +609,16 @@ compileTypeExpression source modifier = do
         ListModifier t' -> (t', "Sequence")
         TypeIdentifier _ -> undefined  -- never happen!
         MapModifier _ _ -> undefined  -- never happen!
-
+compileTypeExpression _ Nothing =
+    return "None"
+            
 compileTypeDeclaration :: Source -> TypeDeclaration -> CodeGen Code
 compileTypeDeclaration _ TypeDeclaration { type' = PrimitiveType {} } =
     return ""  -- never used
 compileTypeDeclaration src d@TypeDeclaration { typename = typename'
                                              , type' = Alias ctype
                                              } = do
-    ctypeExpr <- compileTypeExpression src ctype
+    ctypeExpr <- compileTypeExpression src (Just ctype)
     return [qq|
 $docsComment
 {toClassName' typename'} = $ctypeExpr
@@ -631,7 +633,7 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
                                              , type' = UnboxedType itype
                                              } = do
     let className = toClassName' typename'
-    itypeExpr <- compileTypeExpression src itype
+    itypeExpr <- compileTypeExpression src (Just itype)
     insertThirdPartyImports [ ("nirum.validate", ["validate_boxed_type"])
                             , ("nirum.serialize", ["serialize_boxed_type"])
                             , ("nirum.deserialize", ["deserialize_boxed_type"])
@@ -726,7 +728,7 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
     let className = toClassName' typename'
         fieldList = toList fields
     typeExprCodes <- mapM (compileTypeExpression src)
-        [typeExpr | (Field _ typeExpr _) <- fieldList]
+        [Just typeExpr | (Field _ typeExpr _) <- fieldList]
     let optionFlags = [ case typeExpr of
                             OptionModifier _ -> True
                             _ -> False
@@ -990,7 +992,7 @@ class {className}_Client($className):
     compileErrorType (Method mn _ _ me _) =
         case me of
             Just errorTypeExpression -> do
-                et <- compileTypeExpression src errorTypeExpression
+                et <- compileTypeExpression src (Just errorTypeExpression)
                 return $ Just [qq|('{toAttributeName' mn}', $et)|]
             Nothing -> return Nothing
     compileMethod :: Method -> CodeGen Code
@@ -1013,7 +1015,7 @@ class {className}_Client($className):
 |]
     compileMethodParameter :: Parameter -> CodeGen Code
     compileMethodParameter (Parameter pName pType _) = do
-        pTypeExpr <- compileTypeExpression src pType
+        pTypeExpr <- compileTypeExpression src (Just pType)
         arg <- parameterCompiler
         return [qq|{arg (toAttributeName' pName) pTypeExpr}|]
     compileMethodMetadata :: Method -> CodeGen Code
@@ -1038,7 +1040,7 @@ class {className}_Client($className):
     compileParameterMetadata :: Parameter -> CodeGen Code
     compileParameterMetadata (Parameter pName pType _) = do
         let pName' = toAttributeName' pName
-        pTypeExpr <- compileTypeExpression src pType
+        pTypeExpr <- compileTypeExpression src (Just pType)
         return [qq|'{pName'}': lambda: $pTypeExpr|]
     methodNameMap :: T.Text
     methodNameMap = toIndentedCodes
@@ -1064,7 +1066,7 @@ class {className}_Client($className):
         rtypeExpr <- compileTypeExpression src rtype
         errorCode <- case etypeM of
              Just e -> do
-                e' <- compileTypeExpression src e
+                e' <- compileTypeExpression src (Just e)
                 return $ "result_type = " `T.append` e'
              Nothing ->
                 return "raise UnexpectedNirumResponseError(serialized)"

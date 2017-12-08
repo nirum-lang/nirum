@@ -44,7 +44,7 @@ instance Declaration Parameter where
 -- | 'Service' method.
 data Method = Method { methodName :: Name
                      , parameters :: DeclarationSet Parameter
-                     , returnType :: TypeExpression
+                     , returnType :: Maybe TypeExpression
                      , errorType :: Maybe TypeExpression
                      , methodAnnotations :: AnnotationSet
                      } deriving (Eq, Ord, Show)
@@ -58,8 +58,9 @@ instance Construct Method where
                          , methodAnnotations = annotationSet'
                          } =
         T.concat $ [ toCode annotationSet'
-                   , toCode $ returnType method
-                   , " "
+                   , case returnType method of
+                         Just v -> T.append (toCode v) " "
+                         Nothing -> ""
                    , toCode $ methodName method
                    , " ("
                    , toCodeWithPrefix "\n  " docs'

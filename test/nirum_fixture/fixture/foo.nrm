@@ -97,6 +97,9 @@ service ping-service (
         text nonce,
         # Parameter docs.
     ) throws rpc-error,
+
+    no-return-method (int32 foo),
+    no-return-method2 (int32 foo) throws rpc-error,
 );
 
 record person (
