@@ -254,6 +254,9 @@ renameModulePath renameMap path' =
 renameMP :: Python -> ModulePath -> ModulePath
 renameMP Python { renames = table } = renameModulePath table
 
+thd3 :: (a, b, c) -> c
+thd3 (_, _, v) = v
+
 -- | The set of Python reserved keywords.
 -- See also: https://docs.python.org/3/reference/lexical_analysis.html#keywords
 keywords :: S.Set T.Text
@@ -450,33 +453,10 @@ compileUnionTag :: Source -> Name -> Tag -> CodeGen Code
 compileUnionTag source parentname d@(Tag typename' fields _) = do
     typeExprCodes <- mapM (compileTypeExpression source)
         [Just typeExpr | (Field _ typeExpr _) <- toList fields]
-    let optionFlags = [ case typeExpr of
-                            OptionModifier _ -> True
-                            _ -> False
-                      | (Field _ typeExpr _) <- toList fields
-                      ]
-        className = toClassName' typename'
-        tagNames = map (toAttributeName' . fieldName) (toList fields)
-        getOptFlag :: (T.Text, Code, Bool) -> Bool
-        getOptFlag (_, _, flag) = flag
-        nameTypeTriples = L.sortBy (compare `on` getOptFlag)
+    let nameTypeTriples = L.sortBy (compare `on` thd3)
                                    (zip3 tagNames typeExprCodes optionFlags)
         slotTypes = toIndentedCodes
             (\ (n, t, _) -> [qq|('{n}', {t})|]) nameTypeTriples ",\n        "
-        slots = if length tagNames == 1
-                then [qq|'{head tagNames}'|] `T.snoc` ','
-                else toIndentedCodes (\ n -> [qq|'{n}'|]) tagNames ",\n        "
-        hashTuple = if null tagNames
-            then "self.__nirum_tag__"
-            else [qq|({attributes},)|] :: T.Text
-          where
-            attributes :: T.Text
-            attributes = toIndentedCodes (\ n -> [qq|self.{n}|]) tagNames ", "
-        nameMaps = toIndentedCodes
-            toNamePair
-            (map fieldName $ toList fields)
-            ",\n        "
-        parentClass = toClassName' parentname
     insertThirdPartyImportsA
         [ ("nirum.validate", [("validate_union_type", "validate_union_type")])
         , ("nirum.constructs", [("name_dict_type", "NameDict")])
@@ -547,6 +527,31 @@ $parentClass.$className = $className
 if hasattr($parentClass, '__qualname__'):
     $className.__qualname__ = $parentClass.__qualname__ + '.{className}'
 |]
+  where
+    optionFlags :: [Bool]
+    optionFlags = [ case typeExpr of
+                        OptionModifier _ -> True
+                        _ -> False
+                  | (Field _ typeExpr _) <- toList fields
+                  ]
+    className :: T.Text
+    className = toClassName' typename'
+    tagNames :: [T.Text]
+    tagNames = map (toAttributeName' . fieldName) (toList fields)
+    slots :: Code
+    slots = if length tagNames == 1
+            then [qq|'{head tagNames}'|] `T.snoc` ','
+            else toIndentedCodes (\ n -> [qq|'{n}'|]) tagNames ",\n        "
+    hashTuple :: Code
+    hashTuple = if null tagNames
+        then "self.__nirum_tag__"
+        else [qq|({toIndentedCodes (T.append "self.") tagNames ", "},)|]
+    fieldList :: [Field]
+    fieldList = toList fields
+    nameMaps :: Code
+    nameMaps = toIndentedCodes toNamePair (map fieldName fieldList) ",\n        "
+    parentClass :: T.Text
+    parentClass = toClassName' parentname
 compilePrimitiveType :: PrimitiveTypeIdentifier -> CodeGen Code
 compilePrimitiveType primitiveTypeIdentifier = do
     pyVer <- getPythonVersion
@@ -725,30 +730,12 @@ $className.__nirum_type__ = 'enum'
 compileTypeDeclaration src d@TypeDeclaration { typename = typename'
                                              , type' = RecordType fields
                                              } = do
-    let className = toClassName' typename'
-        fieldList = toList fields
     typeExprCodes <- mapM (compileTypeExpression src)
         [Just typeExpr | (Field _ typeExpr _) <- fieldList]
-    let optionFlags = [ case typeExpr of
-                            OptionModifier _ -> True
-                            _ -> False
-                      | (Field _ typeExpr _) <- fieldList
-                      ]
-        fieldNames = map toAttributeName' [ name'
-                                          | (Field name' _ _) <- fieldList
-                                          ]
-        getOptFlag :: (T.Text, Code, Bool) -> Bool
-        getOptFlag (_, _, flag) = flag
-        nameTypeTriples = L.sortBy (compare `on` getOptFlag)
+    let nameTypeTriples = L.sortBy (compare `on` thd3)
                                    (zip3 fieldNames typeExprCodes optionFlags)
         slotTypes = toIndentedCodes
             (\ (n, t, _) -> [qq|'{n}': {t}|]) nameTypeTriples ",\n        "
-        slots = toIndentedCodes (\ n -> [qq|'{n}'|]) fieldNames ",\n        "
-        nameMaps = toIndentedCodes
-            toNamePair
-            (map fieldName $ toList fields)
-            ",\n        "
-        hashText = toIndentedCodes (\ n -> [qq|self.{n}|]) fieldNames ", "
     importTypingForPython3
     insertThirdPartyImports [ ("nirum.validate", ["validate_record_type"])
                             , ("nirum.serialize", ["serialize_record_type"])
@@ -827,6 +814,28 @@ class $className(object):
     def __hash__(self){ret "int"}:
         return hash(($hashText,))
 |]
+  where
+    className :: T.Text
+    className = toClassName' typename'
+    fieldList :: [Field]
+    fieldList = toList fields
+    optionFlags :: [Bool]
+    optionFlags = [ case typeExpr of
+                        OptionModifier _ -> True
+                        _ -> False
+                  | (Field _ typeExpr _) <- fieldList
+                  ]
+    fieldNames :: [T.Text]
+    fieldNames = [toAttributeName' name' | Field name' _ _ <- fieldList]
+    slots :: Code
+    slots = toIndentedCodes (\ n -> [qq|'{n}'|]) fieldNames ",\n        "
+    nameMaps :: Code
+    nameMaps = toIndentedCodes
+        toNamePair
+        (map fieldName $ toList fields)
+        ",\n        "
+    hashText :: Code
+    hashText = toIndentedCodes (\ n -> [qq|self.{n}|]) fieldNames ", "
 compileTypeDeclaration src
                        d@TypeDeclaration { typename = typename'
                                          , type' = UnionType tags
