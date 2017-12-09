@@ -815,25 +815,25 @@ union dup
                 ]
         it "emits Method if succeeded to parse" $ do
             parse' "text get-name()" `shouldBeRight`
-                Method "get-name" [] "text" Nothing empty
+                Method "get-name" [] (Just "text") Nothing empty
             parse' "text get-name (person user)" `shouldBeRight`
                 Method "get-name" [Parameter "user" "person" empty]
-                       "text" Nothing empty
+                       (Just "text") Nothing empty
             parse' "text get-name  ( person user,text default )" `shouldBeRight`
                 Method "get-name"
                        [ Parameter "user" "person" empty
                        , Parameter "default" "text" empty
                        ]
-                       "text" Nothing empty
+                       (Just "text") Nothing empty
             parse' "@http(method = \"GET\", path = \"/get-name/\") \
                    \text get-name  ( person user,text default )" `shouldBeRight`
                 Method "get-name"
                        [ Parameter "user" "person" empty
                        , Parameter "default" "text" empty
                        ]
-                       "text" Nothing httpGetAnnotation
+                       (Just "text") Nothing httpGetAnnotation
             parse' "text get-name() throws name-error" `shouldBeRight`
-                Method "get-name" [] "text" (Just "name-error") empty
+                Method "get-name" [] (Just "text") (Just "name-error") empty
             parse' [s|
 text get-name  ( person user,text default )
                throws get-name-error|] `shouldBeRight`
@@ -841,7 +841,7 @@ text get-name  ( person user,text default )
                        [ Parameter "user" "person" empty
                        , Parameter "default" "text" empty
                        ]
-                       "text" (Just "get-name-error") empty
+                       (Just "text") (Just "get-name-error") empty
             parse' [s|
 @http(method = "GET", path = "/get-name/")
 text get-name  ( person user,text default )
@@ -850,20 +850,24 @@ text get-name  ( person user,text default )
                        [ Parameter "user" "person" empty
                        , Parameter "default" "text" empty
                        ]
-                       "text" (Just "get-name-error")
+                       (Just "text") (Just "get-name-error")
                        httpGetAnnotation
+            parse' "get-name()" `shouldBeRight`
+                Method "get-name" [] Nothing Nothing empty
+            parse' "get-name() throws name-error" `shouldBeRight`
+                Method "get-name" [] Nothing (Just "name-error") empty
         it "can have docs" $ do
             parse' [s|
 text get-name (
   # Gets the name.
 )|] `shouldBeRight`
-                Method "get-name" [] "text"
+                Method "get-name" [] (Just "text")
                        Nothing (singleDocs "Gets the name.")
             parse' [s|
 text get-name (
   # Gets the name.
 )throws name-error  |] `shouldBeRight`
-                Method "get-name" [] "text"
+                Method "get-name" [] (Just "text")
                        (Just "name-error")
                        (singleDocs "Gets the name.")
             parse' [s|
@@ -873,7 +877,7 @@ text get-name (
 )|] `shouldBeRight`
                 Method "get-name"
                        [Parameter "user" "person" empty]
-                       "text"
+                       (Just "text")
                        Nothing
                        (singleDocs "Gets the name of the user.")
             parse' [s|
@@ -883,7 +887,7 @@ text get-name (
 ) throws get-name-error|] `shouldBeRight`
                 Method "get-name"
                        [Parameter "user" "person" empty]
-                       "text"
+                       (Just "text")
                        (Just "get-name-error")
                        (singleDocs "Gets the name of the user.")
             let expectedUserPDocs = "The person to find their name."
@@ -896,7 +900,7 @@ text get-name (
                            , Parameter "default" "text" $
                                        singleDocs expectedDefaultPDocs
                            ]
-                           "text"
+                           (Just "text")
                            Nothing
                            (singleDocs "Gets the name of the user.")
             parse' [s|
@@ -940,7 +944,7 @@ service one-method-service(
                     "one-method-service"
                     (Service [ Method "get-user"
                                       [Parameter "user-id" "uuid" empty]
-                                      "user"
+                                      (Just "user")
                                       Nothing
                                       empty
                              ])
@@ -957,7 +961,7 @@ service one-method-service (
                     "one-method-service"
                     (Service [ Method "get-user"
                                       [Parameter "user-id" "uuid" empty]
-                                      "user"
+                                      (Just "user")
                                       (Just "get-user-error")
                                       getUserD
                              ])
@@ -978,12 +982,12 @@ service user-service (
                     "user-service"
                     (Service [ Method "create-user"
                                       [Parameter "user" "user" empty]
-                                      "user"
+                                      (Just "user")
                                       Nothing
                                       createUserD
                              , Method "get-user"
                                       [Parameter "user-id" "uuid" empty]
-                                      "user"
+                                      (Just "user")
                                       Nothing
                                       getUserD
                              ])
@@ -1019,12 +1023,12 @@ service user-service (
                     "user-service"
                     (Service [ Method "create-user"
                                       [Parameter "user" "user" empty]
-                                      "user"
+                                      (Just "user")
                                       Nothing
                                       createUserD
                              , Method "get-user"
                                       [Parameter "user-id" "uuid" empty]
-                                      "user"
+                                      (Just "user")
                                       Nothing
                                       getUserD
                              ])
@@ -1043,7 +1047,7 @@ service user-service (
                                       [ Parameter "user-id" "uuid" $
                                             A.union bazAnnotationSet userIdD
                                       ]
-                                      "user"
+                                      (Just "user")
                                       Nothing
                                       empty
                              ])

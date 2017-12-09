@@ -232,31 +232,31 @@ spec = parallel $ forM_ ([Python2, Python3] :: [PythonVersion]) $ \ ver -> do
         let s = makeDummySource $ Module [] Nothing
         specify "TypeIdentifier" $ do
             let (c, ctx) = run' $
-                    compileTypeExpression s (TypeIdentifier "bigint")
+                    compileTypeExpression s (Just $ TypeIdentifier "bigint")
             standardImports ctx `shouldBe` []
             localImports ctx `shouldBe` []
             c `shouldBe` Right "int"
         specify "OptionModifier" $ do
             let (c', ctx') = run' $
-                    compileTypeExpression s (OptionModifier "int32")
+                    compileTypeExpression s (Just $ OptionModifier "int32")
             standardImports ctx' `shouldBe` ["typing"]
             localImports ctx' `shouldBe` []
             c' `shouldBe` Right "typing.Optional[int]"
         specify "SetModifier" $ do
             let (c'', ctx'') = run' $
-                    compileTypeExpression s (SetModifier "int32")
+                    compileTypeExpression s (Just $ SetModifier "int32")
             standardImports ctx'' `shouldBe` ["typing"]
             localImports ctx'' `shouldBe` []
             c'' `shouldBe` Right "typing.AbstractSet[int]"
         specify "ListModifier" $ do
             let (c''', ctx''') = run' $
-                    compileTypeExpression s (ListModifier "int32")
+                    compileTypeExpression s (Just $ ListModifier "int32")
             standardImports ctx''' `shouldBe` ["typing"]
             localImports ctx''' `shouldBe` []
             c''' `shouldBe` Right "typing.Sequence[int]"
         specify "MapModifier" $ do
             let (c'''', ctx'''') = run' $
-                    compileTypeExpression s (MapModifier "uuid" "int32")
+                    compileTypeExpression s (Just $ MapModifier "uuid" "int32")
             standardImports ctx'''' `shouldBe` ["typing", "uuid"]
             localImports ctx'''' `shouldBe` []
             c'''' `shouldBe` Right "typing.Mapping[uuid.UUID, int]"

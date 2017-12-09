@@ -496,8 +496,13 @@ parameterSet = option DeclarationSet.empty $ try $ do
 method :: Parser Method
 method = do
     annotationSet' <- annotationSet <?> "service method annotation"
-    returnType <- typeExpression <?> "method return type"
-    spaces1
+
+    returnType <- optional $ try $ do
+        rt <- typeExpression <?> "method return type"
+        spaces1
+        notFollowedBy $ char '('
+        return rt
+    
     methodName <- name <?> "method name"
     spaces
     char '('

@@ -29,56 +29,56 @@ spec = do
                 "date dob,\n# docs..."
     describe "Method" $
         specify "toCode" $ do
-            toCode (Method "ping" [] "bool"
+            toCode (Method "ping" [] (Just "bool")
                            Nothing
                            empty) `shouldBe`
                 "bool ping (),"
-            toCode (Method "ping" [] "bool"
+            toCode (Method "ping" [] (Just "bool")
                            Nothing
                            methodAnno) `shouldBe`
                 "@http(method = \"GET\", path = \"/ping/\")\nbool ping (),"
-            toCode (Method "ping" [] "bool"
+            toCode (Method "ping" [] (Just "bool")
                            Nothing
                            docsAnno) `shouldBe`
                 "bool ping (\n  # docs...\n),"
-            toCode (Method "ping" [] "bool"
+            toCode (Method "ping" [] (Just "bool")
                            (Just "ping-error")
                            empty) `shouldBe`
                 "bool ping () throws ping-error,"
-            toCode (Method "ping" [] "bool"
+            toCode (Method "ping" [] (Just "bool")
                            (Just "ping-error")
                            docsAnno) `shouldBe`
                 "bool ping (\n  # docs...\n) throws ping-error,"
-            toCode (Method "ping" [] "bool"
+            toCode (Method "ping" [] (Just "bool")
                            Nothing
                            methodAnno) `shouldBe`
                 "@http(method = \"GET\", path = \"/ping/\")\nbool ping (),"
-            toCode (Method "ping" [] "bool"
+            toCode (Method "ping" [] (Just "bool")
                            (Just "ping-error")
                            methodAnno) `shouldBe`
                 "@http(method = \"GET\", path = \"/ping/\")\n\
                 \bool ping () throws ping-error,"
             toCode (Method "get-user"
                            [Parameter "user-id" "uuid" empty]
-                           (OptionModifier "user")
+                           (Just $ OptionModifier "user")
                            Nothing
                            empty) `shouldBe`
                 "user? get-user (uuid user-id),"
             toCode (Method "get-user"
                            [Parameter "user-id" "uuid" empty]
-                           (OptionModifier "user")
+                           (Just $ OptionModifier "user")
                            Nothing
                            docsAnno) `shouldBe`
                 "user? get-user (\n  # docs...\n  uuid user-id,\n),"
             toCode (Method "get-user"
                            [Parameter "user-id" "uuid" empty]
-                           (OptionModifier "user")
+                           (Just $ OptionModifier "user")
                            (Just "get-user-error")
                            empty) `shouldBe`
                 "user? get-user (uuid user-id) throws get-user-error,"
             toCode (Method "get-user"
                            [Parameter "user-id" "uuid" empty]
-                           (OptionModifier "user")
+                           (Just $ OptionModifier "user")
                            (Just "get-user-error")
                            docsAnno) `shouldBe` [s|
 user? get-user (
@@ -88,14 +88,14 @@ user? get-user (
             toCode (Method "get-user"
                            [Parameter "user-id" "uuid" $
                                       singleDocs "param docs..."]
-                           (OptionModifier "user")
+                           (Just $ OptionModifier "user")
                            Nothing
                            empty) `shouldBe`
                 "user? get-user (\n  uuid user-id,\n  # param docs...\n),"
             toCode (Method "get-user"
                            [Parameter "user-id" "uuid" $
                                       singleDocs "param docs..."]
-                           (OptionModifier "user")
+                           (Just $ OptionModifier "user")
                            Nothing
                            docsAnno) `shouldBe` [s|
 user? get-user (
@@ -106,7 +106,7 @@ user? get-user (
             toCode (Method "get-user"
                            [Parameter "user-id" "uuid" $
                                       singleDocs "param docs..."]
-                           (OptionModifier "user")
+                           (Just $ OptionModifier "user")
                            (Just "get-user-error")
                            empty) `shouldBe` [s|
 user? get-user (
@@ -116,7 +116,7 @@ user? get-user (
             toCode (Method "get-user"
                            [Parameter "user-id" "uuid" $
                                       singleDocs "param docs..."]
-                           (OptionModifier "user")
+                           (Just $ OptionModifier "user")
                            (Just "get-user-error")
                            docsAnno) `shouldBe` [s|
 user? get-user (
@@ -128,7 +128,7 @@ user? get-user (
                            [ Parameter "blog-id" "uuid" empty
                            , Parameter "keyword" "text" empty
                            ]
-                           (ListModifier "post")
+                           (Just $ ListModifier "post")
                            Nothing
                            empty) `shouldBe`
                 "[post] search-posts (\n  uuid blog-id,\n  text keyword,\n),"
@@ -136,7 +136,7 @@ user? get-user (
                            [ Parameter "blog-id" "uuid" empty
                            , Parameter "keyword" "text" empty
                            ]
-                           (ListModifier "post")
+                           (Just $ ListModifier "post")
                            Nothing
                            docsAnno) `shouldBe` [s|
 [post] search-posts (
@@ -148,7 +148,7 @@ user? get-user (
                            [ Parameter "blog-id" "uuid" empty
                            , Parameter "keyword" "text" empty
                            ]
-                           (ListModifier "post")
+                           (Just $ ListModifier "post")
                            (Just "search-posts-error")
                            empty) `shouldBe` [s|
 [post] search-posts (
@@ -159,7 +159,7 @@ user? get-user (
                            [ Parameter "blog-id" "uuid" empty
                            , Parameter "keyword" "text" empty
                            ]
-                           (ListModifier "post")
+                           (Just $ ListModifier "post")
                            (Just "search-posts-error")
                            docsAnno) `shouldBe` [s|
 [post] search-posts (
@@ -173,7 +173,7 @@ user? get-user (
                            , Parameter "keyword" "text" $
                                        singleDocs "keyword..."
                            ]
-                           (ListModifier "post")
+                           (Just $ ListModifier "post")
                            Nothing
                            empty) `shouldBe` [s|
 [post] search-posts (
@@ -188,7 +188,7 @@ user? get-user (
                            , Parameter "keyword" "text" $
                                        singleDocs "keyword..."
                            ]
-                           (ListModifier "post")
+                           (Just $ ListModifier "post")
                            Nothing
                            docsAnno) `shouldBe` [s|
 [post] search-posts (
@@ -204,7 +204,7 @@ user? get-user (
                            , Parameter "keyword" "text" $
                                        singleDocs "keyword..."
                            ]
-                           (ListModifier "post")
+                           (Just $ ListModifier "post")
                            (Just "search-posts-error")
                            empty) `shouldBe` [s|
 [post] search-posts (
@@ -219,7 +219,7 @@ user? get-user (
                            , Parameter "keyword" "text" $
                                        singleDocs "keyword..."
                            ]
-                           (ListModifier "post")
+                           (Just $ ListModifier "post")
                            (Just "search-posts-error")
                            docsAnno) `shouldBe` [s|
 [post] search-posts (
@@ -235,7 +235,7 @@ user? get-user (
                            , Parameter "keyword" "text" $
                                        singleDocs "keyword..."
                            ]
-                           (ListModifier "post")
+                           (Just $ ListModifier "post")
                            (Just "search-posts-error")
                            (docsAnno `union` methodAnno)) `shouldBe` [s|
 @http(method = "GET", path = "/ping/")
