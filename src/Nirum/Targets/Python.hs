@@ -1033,7 +1033,6 @@ compileTypeDeclaration
     ret <- returnCompiler
     insertStandardImport "json"
     insertThirdPartyImports [ ("nirum.deserialize", ["deserialize_meta"])
-                            , ("nirum.serialize", ["serialize_meta"])
                             ]
     insertThirdPartyImportsA
         [ ("nirum.constructs", [("name_dict_type", "NameDict")])
@@ -1149,10 +1148,10 @@ class {className}_Client($className):
     paramNameMap params = toIndentedCodes
         toNamePair [pName | Parameter pName _ _ <- params] ",\n        "
     compileClientPayload :: Parameter -> CodeGen Code
-    compileClientPayload (Parameter pName _ _) = do
+    compileClientPayload (Parameter pName pt _) = do
         let pName' = toAttributeName' pName
         return [qq|'{I.toSnakeCaseText $ N.behindName pName}':
-                   serialize_meta({pName'})|]
+                   ({compileSerializer src pt pName'})|]
     compileClientMethod :: Method -> CodeGen Code
     compileClientMethod Method { methodName = mName
                                , parameters = params
