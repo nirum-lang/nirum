@@ -1184,7 +1184,10 @@ class {className}_Client($className):
             result_type = $rtypeExpr
         else:
             $errorCode
-        result = deserialize_meta(result_type, serialized)
+        if result_type is None:
+            result = None
+        else:
+            result = deserialize_meta(result_type, serialized)
         if successful:
             return result
         raise result
