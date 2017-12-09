@@ -307,9 +307,7 @@ moduleTitle Module { docs = docs' } = do
 
 stylesheet :: TL.Text
 stylesheet = renderCss ([cassius|
-@import url(
-https://fonts.googleapis.com/css?family=Source+Code+Pro:300,400|Source+Sans+Pro
-)
+@import url("https://fonts.googleapis.com/css?family=Source+Code+Pro:300,400|Source+Sans+Pro")
 body
     font-family: Source Sans Pro
     color: #{gray8}
