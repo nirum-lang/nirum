@@ -99,6 +99,7 @@ import Nirum.Constructs.TypeDeclaration ( EnumMember (EnumMember)
                                                , RecordType
                                                , UnboxedType
                                                , UnionType
+                                               , primitiveTypeIdentifier
                                                )
                                         , TypeDeclaration (..)
                                         )
@@ -502,6 +503,13 @@ class $className($parentClass):
 
     { inits :: T.Text }
 
+    def __nirum_serialize__(self):
+        return \{
+            '_type': '{behindParentTypename}',
+            '_tag': '{behindTagName}',
+            $fieldSerializers
+        \}
+
     def __repr__(self){ ret "str" }:
         return (
             $parentClass.__module__ + '.$parentClass.$className(' +
@@ -536,8 +544,12 @@ if hasattr($parentClass, '__qualname__'):
                   ]
     className :: T.Text
     className = toClassName' typename'
+    behindParentTypename :: T.Text
+    behindParentTypename = I.toSnakeCaseText $ N.behindName parentname
     tagNames :: [T.Text]
     tagNames = map (toAttributeName' . fieldName) (toList fields)
+    behindTagName :: T.Text
+    behindTagName = I.toSnakeCaseText $ N.behindName typename'
     slots :: Code
     slots = if length tagNames == 1
             then [qq|'{head tagNames}'|] `T.snoc` ','
@@ -552,10 +564,18 @@ if hasattr($parentClass, '__qualname__'):
     nameMaps = toIndentedCodes toNamePair (map fieldName fieldList) ",\n        "
     parentClass :: T.Text
     parentClass = toClassName' parentname
+    fieldSerializers :: Code
+    fieldSerializers = T.intercalate ",\n"
+        [ T.concat [ "'", I.toSnakeCaseText (N.behindName fn), "': "
+                   , compileSerializer source ft
+                                       [qq|self.{toAttributeName' fn}|]
+                   ]
+        | Field fn ft _ <- fieldList
+        ]
 compilePrimitiveType :: PrimitiveTypeIdentifier -> CodeGen Code
-compilePrimitiveType primitiveTypeIdentifier = do
+compilePrimitiveType primitiveTypeIdentifier' = do
     pyVer <- getPythonVersion
-    case (primitiveTypeIdentifier, pyVer) of
+    case (primitiveTypeIdentifier', pyVer) of
         (Bool, _) -> return "bool"
         (Bigint, _) -> return "int"
         (Decimal, _) -> do
@@ -616,7 +636,65 @@ compileTypeExpression source (Just modifier) = do
         MapModifier _ _ -> undefined  -- never happen!
 compileTypeExpression _ Nothing =
     return "None"
-            
+
+compileSerializer :: Source -> TypeExpression -> Code -> Code
+compileSerializer Source { sourceModule = boundModule } =
+    compileSerializer' boundModule
+
+compileSerializer' :: BoundModule Python -> TypeExpression -> Code -> Code
+compileSerializer' mod' (OptionModifier typeExpr) pythonVar =
+    compileSerializer' mod' typeExpr pythonVar
+compileSerializer' mod' (SetModifier typeExpr) pythonVar =
+    compileSerializer' mod' (ListModifier typeExpr) pythonVar
+compileSerializer' mod' (ListModifier typeExpr) pythonVar =
+    [qq|[($serializer) for __{pythonVar}__elem__ in ($pythonVar)]|]
+  where
+    serializer :: Code
+    serializer = compileSerializer' mod' typeExpr [qq|__{pythonVar}__elem__|]
+compileSerializer' mod' (MapModifier kt vt) pythonVar =
+    [qq|\{({compileSerializer' mod' kt $ T.concat ["__", pythonVar, "__k__"]}):
+          ({compileSerializer' mod' vt $ T.concat ["__", pythonVar, "__v__"]})
+         for __{pythonVar}__k__, __{pythonVar}__v__ in ($pythonVar).items()\}|]
+compileSerializer' mod' (TypeIdentifier typeId) pythonVar =
+    case lookupType typeId mod' of
+        Missing -> "None"  -- must never happen
+        Local (Alias t) -> compileSerializer' mod' t pythonVar
+        Imported modulePath' (Alias t) ->
+            case resolveBoundModule modulePath' (boundPackage mod') of
+                Nothing -> "None"  -- must never happen
+                Just foundMod -> compileSerializer' foundMod t pythonVar
+        Local PrimitiveType { primitiveTypeIdentifier = p } ->
+            compilePrimitiveTypeSerializer p pythonVar
+        Imported _ PrimitiveType { primitiveTypeIdentifier = p } ->
+            compilePrimitiveTypeSerializer p pythonVar
+        Local EnumType {} -> serializerCall
+        Imported _ EnumType {} -> serializerCall
+        Local RecordType {} -> serializerCall
+        Imported _ RecordType {} -> serializerCall
+        Local UnboxedType {} -> serializerCall
+        Imported _ UnboxedType {} -> serializerCall
+        Local UnionType {} -> serializerCall
+        Imported _ UnionType {} -> serializerCall
+  where
+    serializerCall :: Code
+    serializerCall = [qq|$pythonVar.__nirum_serialize__()|]
+
+compilePrimitiveTypeSerializer :: PrimitiveTypeIdentifier -> Code -> Code
+compilePrimitiveTypeSerializer Bigint var = var
+compilePrimitiveTypeSerializer Decimal var = [qq|str($var)|]
+compilePrimitiveTypeSerializer Int32 var = var
+compilePrimitiveTypeSerializer Int64 var = var
+compilePrimitiveTypeSerializer Float32 var = var
+compilePrimitiveTypeSerializer Float64 var = var
+compilePrimitiveTypeSerializer Text var = var
+compilePrimitiveTypeSerializer Binary var =
+    [qq|__import__('base64').b64encode($var).decode('ascii')|]
+compilePrimitiveTypeSerializer Date var = [qq|($var).isoformat()|]
+compilePrimitiveTypeSerializer Datetime var = [qq|($var).isoformat()|]
+compilePrimitiveTypeSerializer Bool var = var
+compilePrimitiveTypeSerializer Uuid var = [qq|str($var)|]
+compilePrimitiveTypeSerializer Uri var = var
+
 compileTypeDeclaration :: Source -> TypeDeclaration -> CodeGen Code
 compileTypeDeclaration _ TypeDeclaration { type' = PrimitiveType {} } =
     return ""  -- never used
@@ -640,7 +718,6 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
     let className = toClassName' typename'
     itypeExpr <- compileTypeExpression src (Just itype)
     insertThirdPartyImports [ ("nirum.validate", ["validate_boxed_type"])
-                            , ("nirum.serialize", ["serialize_boxed_type"])
                             , ("nirum.deserialize", ["deserialize_boxed_type"])
                             ]
     arg <- parameterCompiler
@@ -670,8 +747,8 @@ class $className(object):
     def __hash__(self){ ret "int" }:
         return hash(self.value)
 
-    def __nirum_serialize__(self){ ret "typing.Any" }:
-        return serialize_boxed_type(self)
+    def __nirum_serialize__(self):
+        return ({ compileSerializer src itype "self.value" })
 
     @classmethod
     def __nirum_deserialize__(
@@ -738,7 +815,6 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
             (\ (n, t, _) -> [qq|'{n}': {t}|]) nameTypeTriples ",\n        "
     importTypingForPython3
     insertThirdPartyImports [ ("nirum.validate", ["validate_record_type"])
-                            , ("nirum.serialize", ["serialize_record_type"])
                             , ("nirum.deserialize", ["deserialize_record_type"])
                             ]
     insertThirdPartyImportsA [ ( "nirum.constructs"
@@ -777,9 +853,7 @@ class $className(object):
         $slots,
     )
     __nirum_type__ = 'record'
-    __nirum_record_behind_name__ = (
-        '{I.toSnakeCaseText $ N.behindName typename'}'
-    )
+    __nirum_record_behind_name__ = '{behindTypename}'
     __nirum_field_names__ = name_dict_type([$nameMaps])
 
     @staticmethod
@@ -804,8 +878,11 @@ class $className(object):
     def __ne__(self, other){ ret "bool" }:
         return not self == other
 
-    def __nirum_serialize__(self){ret "typing.Mapping[str, typing.Any]"}:
-        return serialize_record_type(self)
+    def __nirum_serialize__(self):
+        return \{
+            '_type': '{behindTypename}',
+            $fieldSerializers
+        \}
 
     @classmethod
     def __nirum_deserialize__($clsType, value){ ret className }:
@@ -819,6 +896,8 @@ class $className(object):
     className = toClassName' typename'
     fieldList :: [Field]
     fieldList = toList fields
+    behindTypename :: T.Text
+    behindTypename = I.toSnakeCaseText $ N.behindName typename'
     optionFlags :: [Bool]
     optionFlags = [ case typeExpr of
                         OptionModifier _ -> True
@@ -836,6 +915,13 @@ class $className(object):
         ",\n        "
     hashText :: Code
     hashText = toIndentedCodes (\ n -> [qq|self.{n}|]) fieldNames ", "
+    fieldSerializers :: Code
+    fieldSerializers = T.intercalate ",\n"
+        [ T.concat [ "'", I.toSnakeCaseText (N.behindName fn), "': "
+                   , compileSerializer src ft [qq|self.{ toAttributeName' fn}|]
+                   ]
+        | Field fn ft _ <- fieldList
+        ]
 compileTypeDeclaration src
                        d@TypeDeclaration { typename = typename'
                                          , type' = UnionType tags
@@ -851,8 +937,7 @@ compileTypeDeclaration src
             (\ (t, b) -> [qq|$t = '{b}'|]) enumMembers' "\n        "
     importTypingForPython3
     insertEnumImport
-    insertThirdPartyImports [ ("nirum.serialize", ["serialize_union_type"])
-                            , ("nirum.deserialize", ["deserialize_union_type"])
+    insertThirdPartyImports [ ("nirum.deserialize", ["deserialize_union_type"])
                             ]
     insertThirdPartyImportsA [ ( "nirum.constructs"
                                , [("name_dict_type", "NameDict")]
@@ -883,8 +968,12 @@ class $className({T.intercalate "," $ compileExtendClasses annotations}):
             "of it instead.".format({typeRepr "type(self)"})
         )
 
-    def __nirum_serialize__(self){ ret "typing.Mapping[str, typing.Any]" }:
-        return serialize_union_type(self)
+    def __nirum_serialize__(self):
+        raise NotImplementedError(
+            "\{0\} cannot be instantiated "
+            "since it is an abstract class.  Instantiate a concrete subtype "
+            "of it instead.".format({typeRepr "type(self)"})
+        )
 
     @classmethod
     def __nirum_deserialize__(
