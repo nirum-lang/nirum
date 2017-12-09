@@ -217,9 +217,11 @@ typeDecl mod' ident
         $forall md@(S.Method _ ps ret err _) <- DES.toList methods
             <h3 class="method">
                 <code class="method-name">#{nameText $ DE.name md}</code>(
-                    <i>
-                        $forall pd@(S.Parameter _ pt _) <- DES.toList ps
-                            #{typeExpression mod' pt} #{nameText $ DE.name pd}
+                    $forall (i, pd@(S.Parameter _ pt _)) <- enumerateParams ps
+                        $if i > 0
+                            , #
+                        <code class="type">#{typeExpression mod' pt}</code> #
+                        <var>#{nameText $ DE.name pd}</var>#
                     )
             $maybe d <- docsBlock md
                 #{blockToHtml d}
@@ -237,6 +239,11 @@ typeDecl mod' ident
                         <code>#{nameText $ DE.name paramDecl}</code>:
                     #{blockToHtml d}
 |]
+  where
+    enumerate :: [a] -> [(Int, a)]
+    enumerate = zip [0..]
+    enumerateParams :: DES.DeclarationSet S.Parameter -> [(Int, S.Parameter)]
+    enumerateParams = enumerate . DES.toList
 typeDecl _ _ TD.Import {} =
     error ("It shouldn't happen; please report it to Nirum's bug tracker:\n" ++
            "https://github.com/spoqa/nirum/issues")
