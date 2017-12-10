@@ -1151,6 +1151,22 @@ service method-dups (
                              union fooAnnotationSet bazAnnotationSet
                     , Import ["foo", "bar"] "b" empty
                     ]
+        specify "import names can have a trailing comma" $
+            parse' "import foo.bar (a, b,);" `shouldBeRight`
+                [ Import ["foo", "bar"] "a" empty
+                , Import ["foo", "bar"] "b" empty
+                ]
+        specify "import names in parentheses can be multiline" $ do
+            -- without a trailing comma
+            parse' "import foo.bar (\n  a,\n  b\n);" `shouldBeRight`
+                [ Import ["foo", "bar"] "a" empty
+                , Import ["foo", "bar"] "b" empty
+                ]
+            -- with a trailing comma
+            parse' "import foo.bar (\n  c,\n  d,\n);" `shouldBeRight`
+                [ Import ["foo", "bar"] "c" empty
+                , Import ["foo", "bar"] "d" empty
+                ]
         it "errors if parentheses have nothing" $
             expectError "import foo.bar ();" 1 17
 
