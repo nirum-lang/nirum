@@ -38,7 +38,7 @@ import Data.Map.Strict as Map hiding (foldl)
 import Data.Set hiding (empty, foldl, fromList, map)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
-import Text.Megaparsec hiding (ParseError, label, parse)
+import Text.Megaparsec hiding (ParseError, parse)
 import Text.Megaparsec.Char ( char
                             , eol
                             , noneOf
@@ -298,13 +298,13 @@ handleNameDuplication :: Declaration a
                       => String -> [a]
                       -> (DeclarationSet a -> Parser b)
                       -> Parser b
-handleNameDuplication label declarations cont =
+handleNameDuplication label' declarations cont =
     case DeclarationSet.fromList declarations of
         Left (BehindNameDuplication (Name _ bname)) ->
-            fail ("the behind " ++ label ++ " name `" ++ toString bname ++
+            fail ("the behind " ++ label' ++ " name `" ++ toString bname ++
                   "` is duplicated")
         Left (FacialNameDuplication (Name fname _)) ->
-            fail ("the facial " ++ label ++ " name `" ++ toString fname ++
+            fail ("the facial " ++ label' ++ " name `" ++ toString fname ++
                   "` is duplicated")
         Right set -> cont set
 
@@ -346,32 +346,32 @@ enumTypeDeclaration = do
 fieldsOrParameters :: forall a . (String, String)
                    -> (Name -> TypeExpression -> A.AnnotationSet -> a)
                    -> Parser [a]
-fieldsOrParameters (label, pluralLabel) make = do
-    annotationSet' <- annotationSet <?> (label ++ " annotations")
+fieldsOrParameters (label', pluralLabel) make = do
+    annotationSet' <- annotationSet <?> (label' ++ " annotations")
     spaces
-    type' <- typeExpression <?> (label ++ " type")
+    type' <- typeExpression <?> (label' ++ " type")
     spaces1
-    name' <- name <?> (label ++ " name")
+    name' <- name <?> (label' ++ " name")
     spaces
     let makeWithDocs = make name' type' . A.union annotationSet'
                                         . annotationsFromDocs
     followedByComma makeWithDocs <|> do
-        d <- optional docs' <?> (label ++ " docs")
+        d <- optional docs' <?> (label' ++ " docs")
         return [makeWithDocs d]
 
   where
     recur :: Parser [a]
-    recur = fieldsOrParameters (label, pluralLabel) make
+    recur = fieldsOrParameters (label', pluralLabel) make
     followedByComma :: (Maybe Docs -> a) -> Parser [a]
     followedByComma makeWithDocs = do
         char ','
         spaces
-        d <- optional docs' <?> (label ++ " docs")
+        d <- optional docs' <?> (label' ++ " docs")
         rest <- option [] recur <?> ("rest of " ++ pluralLabel)
         return $ makeWithDocs d : rest
     docs' :: Parser Docs
     docs' = do
-        d <- docs <?> (label ++ " docs")
+        d <- docs <?> (label' ++ " docs")
         spaces
         return d
     annotationsFromDocs :: Maybe Docs -> A.AnnotationSet
@@ -583,10 +583,9 @@ imports = do
     spaces
     char '('
     spaces
-    idents <- sepBy1 importName
-                     (spaces >> char ',' >> spaces)
-              <?> "names to import"
-    spaces
+    idents <- (importName >>= \i -> spaces >> return i)
+        `sepEndBy1` (char ',' >> spaces)
+        <?> "names to import"
     char ')'
     spaces
     char ';'
