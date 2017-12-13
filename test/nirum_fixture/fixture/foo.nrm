@@ -121,3 +121,8 @@ record product (
 union animal = cat
              | dog (text name, text? kind, int64 age, int64? weight)
              ;
+
+service sample-service (
+    sample-method (animal a, product b/bb, gender c, way d/dd,
+                   uuid e, binary f/ff, bigint g, text h/hh),
+);
