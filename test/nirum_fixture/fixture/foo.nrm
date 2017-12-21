@@ -129,3 +129,7 @@ service sample-service (
     sample-method (animal a, product b/bb, gender c, way d/dd,
                    uuid e, binary f/ff, bigint g, text h/hh),
 );
+
+record record-with-map (
+    {text: text} text-to-text,
+);

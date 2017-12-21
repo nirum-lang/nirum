@@ -5,14 +5,16 @@ from pytest import raises
 from nirum.service import Service
 from six import PY3
 
-from fixture.foo import (CultureAgnosticName, Dog,
+from fixture.foo import (Album, CultureAgnosticName, Dog,
                          EastAsianName, EvaChar,
                          FloatUnbox, Gender, ImportedTypeUnbox, Irum,
                          Line, MixedName, Mro, Music, NoMro, NullService,
+                         Person, People,
                          Point1, Point2, Point3d, Pop, PingService, Product,
-                         RecordWithOptionalRecordField,
+                         RecordWithMap, RecordWithOptionalRecordField,
                          ReservedKeywordEnum, ReservedKeywordUnion,
-                         Rnb, RpcError, Run, Status, Stop, Way, WesternName)
+                         Rnb, RpcError, Run, Song, Status, Stop, Way,
+                         WesternName)
 from fixture.foo.bar import PathUnbox, IntUnbox, Point
 from fixture.qux import Path, Name
 
@@ -350,4 +352,44 @@ def test_nirum_tag_classes():
     assert Status.__nirum_tag_classes__ == {
         Status.Tag.run: Run,
         Status.Tag.stop: Stop,
+    }
+
+
+def test_list_serializer():
+    album = Album(name=u'Album title', tracks=[Song(name=u'Song title')])
+    assert album.__nirum_serialize__() == {
+        '_type': 'album',
+        'name': u'Album title',
+        'tracks': [
+            {'_type': 'song', 'name': u'Song title'},
+        ],
+    }
+
+
+def test_set_serializer():
+    people = People(people={
+        Person(first_name=Name(u'First'), last_name=Name(u'Last')),
+    })
+    assert people.__nirum_serialize__() == {
+        '_type': 'people',
+        'people': [
+            {
+                '_type': 'person',
+                'first_name': u'First',
+                'last_name': u'Last',
+            },
+        ]
+    }
+
+
+def test_map_serializer():
+    record = RecordWithMap(text_to_text={u'key': u'value'})
+    assert record.__nirum_serialize__() == {
+        '_type': 'record_with_map',
+        'text_to_text': [
+            {
+                'key': u'key',
+                'value': u'value',
+            },
+        ],
     }

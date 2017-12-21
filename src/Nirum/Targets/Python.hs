@@ -258,6 +258,17 @@ renameMP Python { renames = table } = renameModulePath table
 thd3 :: (a, b, c) -> c
 thd3 (_, _, v) = v
 
+mangleVar :: Code -> T.Text -> Code
+mangleVar expr arbitrarySideName = T.concat
+    [ "__nirum_"
+    , (`T.map` expr) $ \ c -> if 'A' <= c && c <= 'Z' ||
+                                 'a' <= c && c <= 'z' || c == '_'
+                              then c else '_'
+    , "__"
+    , arbitrarySideName
+    , "__"
+    ]
+
 -- | The set of Python reserved keywords.
 -- See also: https://docs.python.org/3/reference/lexical_analysis.html#keywords
 keywords :: S.Set T.Text
@@ -648,14 +659,25 @@ compileSerializer' mod' (OptionModifier typeExpr) pythonVar =
 compileSerializer' mod' (SetModifier typeExpr) pythonVar =
     compileSerializer' mod' (ListModifier typeExpr) pythonVar
 compileSerializer' mod' (ListModifier typeExpr) pythonVar =
-    [qq|[($serializer) for __{pythonVar}__elem__ in ($pythonVar)]|]
+    [qq|list(($serializer) for $elemVar in ($pythonVar))|]
   where
+    elemVar :: Code
+    elemVar = mangleVar pythonVar "elem"
     serializer :: Code
-    serializer = compileSerializer' mod' typeExpr [qq|__{pythonVar}__elem__|]
+    serializer = compileSerializer' mod' typeExpr elemVar
 compileSerializer' mod' (MapModifier kt vt) pythonVar =
-    [qq|\{({compileSerializer' mod' kt $ T.concat ["__", pythonVar, "__k__"]}):
-          ({compileSerializer' mod' vt $ T.concat ["__", pythonVar, "__v__"]})
-         for __{pythonVar}__k__, __{pythonVar}__v__ in ($pythonVar).items()\}|]
+    [qq|list(
+        \{
+            'key': ({compileSerializer' mod' kt kVar}),
+            'value': ({compileSerializer' mod' vt vVar}),
+        \}
+        for $kVar, $vVar in ($pythonVar).items()
+    )|]
+  where
+    kVar :: Code
+    kVar = mangleVar pythonVar "key"
+    vVar :: Code
+    vVar = mangleVar pythonVar "value"
 compileSerializer' mod' (TypeIdentifier typeId) pythonVar =
     case lookupType typeId mod' of
         Missing -> "None"  -- must never happen
