@@ -643,7 +643,8 @@ compileSerializer Source { sourceModule = boundModule } =
 
 compileSerializer' :: BoundModule Python -> TypeExpression -> Code -> Code
 compileSerializer' mod' (OptionModifier typeExpr) pythonVar =
-    compileSerializer' mod' typeExpr pythonVar
+    [qq|(None if ($pythonVar) is None
+              else ({compileSerializer' mod' typeExpr pythonVar}))|]
 compileSerializer' mod' (SetModifier typeExpr) pythonVar =
     compileSerializer' mod' (ListModifier typeExpr) pythonVar
 compileSerializer' mod' (ListModifier typeExpr) pythonVar =
