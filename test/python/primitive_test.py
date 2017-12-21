@@ -10,6 +10,7 @@ from fixture.foo import (CultureAgnosticName, Dog,
                          FloatUnbox, Gender, ImportedTypeUnbox, Irum,
                          Line, MixedName, Mro, Music, NoMro, NullService,
                          Point1, Point2, Point3d, Pop, PingService, Product,
+                         RecordWithOptionalRecordField,
                          ReservedKeywordEnum, ReservedKeywordUnion,
                          Rnb, RpcError, Run, Status, Stop, Way, WesternName)
 from fixture.foo.bar import PathUnbox, IntUnbox, Point
@@ -150,6 +151,13 @@ def test_record():
     }
     assert point3d.__nirum_serialize__() == point3d_serialize
     assert Point3d.__nirum_deserialize__(point3d_serialize) == point3d
+
+    # Optional fields can be empty
+    r = RecordWithOptionalRecordField(f=None)
+    assert r.__nirum_serialize__() == {
+        '_type': 'record_with_optional_record_field',
+        'f': None,
+    }
 
 
 def test_record_with_one_field():

@@ -43,6 +43,9 @@ record point3d (
 record line (
     bigint length,
 );
+record record-with-optional-record-field (
+    point1? f,
+);
 
 record import-typing (
     // see also: https://github.com/spoqa/nirum/issues/93
