@@ -269,6 +269,10 @@ mangleVar expr arbitrarySideName = T.concat
     , "__"
     ]
 
+testOptionModifier :: TypeExpression -> Bool
+testOptionModifier (OptionModifier _) = True
+testOptionModifier _ = False
+
 -- | The set of Python reserved keywords.
 -- See also: https://docs.python.org/3/reference/lexical_analysis.html#keywords
 keywords :: S.Set T.Text
@@ -1137,7 +1141,11 @@ class {className}_Client($className):
     compileMethodParameter (Parameter pName pType _) = do
         pTypeExpr <- compileTypeExpression src (Just pType)
         arg <- parameterCompiler
-        return [qq|{arg (toAttributeName' pName) pTypeExpr}|]
+        let defaultVariable = if testOptionModifier pType
+                              then "=None"
+                              else ""
+            paramName = arg (toAttributeName' pName) pTypeExpr
+        return [qq|{paramName}{defaultVariable::T.Text}|]
     compileMethodMetadata :: Method -> CodeGen Code
     compileMethodMetadata Method { methodName = mName
                                  , parameters = params
@@ -1182,7 +1190,8 @@ class {className}_Client($className):
                                , errorType = etypeM
                                } = do
         let clientMethodName' = toAttributeName' mName
-        params' <- mapM compileMethodParameter $ toList params
+        params' <- mapM compileMethodParameter $
+            L.sortBy orderOptionParameters $ toList params
         rtypeExpr <- compileTypeExpression src rtype
         errorCode <- case etypeM of
              Just e -> do
@@ -1192,28 +1201,47 @@ class {className}_Client($className):
                 return "raise UnexpectedNirumResponseError(serialized)"
         payloadArguments <- mapM compileClientPayload $ toList params
         ret <- returnCompiler
-        return [qq|
-    def {clientMethodName'}(self, {commaNl params'}){ret rtypeExpr}:
-        successful, serialized = self.__nirum_transport__(
-            '{I.toSnakeCaseText $ N.behindName mName}',
-            payload=\{{commaNl payloadArguments}\},
-            # FIXME Give annotations.
-            service_annotations=\{\},
-            method_annotations=self.__nirum_method_annotations__,
-            parameter_annotations=\{\}
-        )
-        if successful:
-            result_type = $rtypeExpr
-        else:
-            $errorCode
-        if result_type is None:
-            result = None
-        else:
-            result = deserialize_meta(result_type, serialized)
-        if successful:
-            return result
-        raise result
+        pyVer <- getPythonVersion
+        let methodParameters = T.intercalate ", " params'
+            methodBody = [qq|
+            successful, serialized = self.__nirum_transport__(
+                '{I.toSnakeCaseText $ N.behindName mName}',
+                payload=\{{commaNl payloadArguments}\},
+                # FIXME Give annotations.
+                service_annotations=\{\},
+                method_annotations=self.__nirum_method_annotations__,
+                parameter_annotations=\{\}
+            )
+            if successful:
+                result_type = $rtypeExpr
+            else:
+                $errorCode
+            if result_type is None:
+                result = None
+            else:
+                result = deserialize_meta(result_type, serialized)
+            if successful:
+                return result
+            raise result
 |]
+        return $ case pyVer of
+                Python2 -> [qq|
+    def {clientMethodName'}(self, **kwargs):
+        def {clientMethodName'}($methodParameters):
+            {methodBody :: T.Text}
+        {clientMethodName'}(**kwargs)
+|]
+                Python3 -> [qq|
+    def {clientMethodName'}(self, *, $methodParameters){ret rtypeExpr}:
+        {methodBody :: T.Text}
+|]
+      where
+        orderOptionParameters :: Parameter -> Parameter -> Ordering
+        orderOptionParameters
+            (Parameter _ myExpr _) (Parameter _ otherExpr _) =
+                compare
+                    (testOptionModifier myExpr)
+                    (testOptionModifier otherExpr)
     toKeyItem :: I.Identifier -> T.Text -> T.Text
     toKeyItem ident v = [qq|'{toAttributeName ident}': {v}|]
     wrapMap :: T.Text -> T.Text
