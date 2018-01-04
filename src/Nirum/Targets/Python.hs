@@ -59,10 +59,13 @@ import qualified Data.Map.Strict as M
 import qualified Data.SemVer as SV
 import qualified Data.Set as S
 import qualified Data.Text as T
+import Data.Text.Lazy (toStrict)
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Data.Function (on)
 import System.FilePath (joinPath)
+import Text.Blaze.Renderer.Text
 import qualified Text.Email.Validate as E
+import Text.Heterocephalus (compileText)
 import Text.InterpolatedString.Perl6 (q, qq)
 
 import qualified Nirum.CodeGen as C
@@ -1340,117 +1343,117 @@ compileModule pythonVersion' source =
             ]
 
 compilePackageMetadata :: Package' -> InstallRequires -> Code
-compilePackageMetadata package@Package { metadata = metadata' }
+compilePackageMetadata Package
+                           { metadata = Metadata
+                                 { authors = authors'
+                                 , version = version'
+                                 , description = description'
+                                 , license = license'
+                                 , MD.keywords = keywords'
+                                 , target = target'@Python
+                                       { packageName = packageName'
+                                       , minimumRuntimeVersion = minRuntimeVer
+                                       }
+                                 }
+                           , modules = modules'
+                           }
                        (InstallRequires deps optDeps) =
-    [qq|# -*- coding: utf-8 -*-
+    toStrict $ renderMarkup [compileText|# -*- coding: utf-8 -*-
 import sys
 
 from setuptools import setup, __version__ as setuptools_version
 
-install_requires = [$pInstallRequires]
-polyfill_requires = \{$pPolyfillRequires}
+install_requires = [
+%{ forall p <- S.toList deps }
+%{ if (p == "nirum") }
+    'nirum >= #{SV.toText minRuntimeVer}',
+%{ else }
+    (#{stringLiteral p}),
+%{ endif }
+%{ endforall }
+]
+polyfill_requires = {
+%{ forall ((major, minor), deps') <- M.toList optDeps }
+    (#{major}, #{minor}): [
+%{ forall dep' <- S.toList deps' }
+        (#{stringLiteral dep'}),
+%{ endforall }
+    ],
+%{ endforall }
+}
 
-if polyfill_requires:
-    # '<' operator for environment markers are supported since setuptools 17.1.
-    # Read PEP 496 for details of environment markers.
-    setup_requires = ['setuptools >= 17.1']
-    if tuple(map(int, setuptools_version.split('.'))) < (17, 1):
-        extras_require = \{}
-        if 'bdist_wheel' not in sys.argv:
-            for (major, minor), deps in polyfill_requires.items():
-                if sys.version_info < (major, minor):
-                    install_requires.extend(deps)
-        envmarker = ":python_version=='\{0}.\{1}'"
-        python_versions = [(2, 6), (2, 7),
-                           (3, 3), (3, 4), (3, 5), (3, 6)]  # FIXME
-        for pyver in python_versions:
-            extras_require[envmarker.format(*pyver)] = list(\{
-                d
-                for v, vdeps in polyfill_requires.items()
-                if pyver < v
-                for d in vdeps
-            })
-    else:
-        extras_require = \{
-            ":python_version<'\{0}.\{1}'".format(*pyver): deps
-            for pyver, deps in polyfill_requires.items()
-        }
+%{ if (not $ M.null optDeps) }
+# '<' operator for environment markers are supported since setuptools 17.1.
+# Read PEP 496 for details of environment markers.
+setup_requires = ['setuptools >= 17.1']
+if tuple(map(int, setuptools_version.split('.'))) < (17, 1):
+    extras_require = {}
+    if 'bdist_wheel' not in sys.argv:
+        for (major, minor), deps in polyfill_requires.items():
+            if sys.version_info < (major, minor):
+                install_requires.extend(deps)
+    envmarker = ":python_version=='{0}.{1}'"
+    python_versions = [(2, 6), (2, 7),
+                       (3, 3), (3, 4), (3, 5), (3, 6)]  # FIXME
+    for pyver in python_versions:
+        extras_require[envmarker.format(*pyver)] = list({
+            d
+            for v, vdeps in polyfill_requires.items()
+            if pyver < v
+            for d in vdeps
+        })
 else:
-    setup_requires = []
-    extras_require = \{}
+    extras_require = {
+        ":python_version<'{0}.{1}'".format(*pyver): deps
+        for pyver, deps in polyfill_requires.items()
+    }
+%{ else }
+setup_requires = []
+extras_require = {}
+%{ endif }
 
 
-SOURCE_ROOT = '{sourceDirectory Python3}'
+SOURCE_ROOT = #{stringLiteral $ sourceDirectory Python3}
 
 if sys.version_info < (3, 0):
-    SOURCE_ROOT = '{sourceDirectory Python2}'
+    SOURCE_ROOT = #{stringLiteral $ sourceDirectory Python2}
 
 # TODO: long_description, url, classifiers
 setup(
-    name='{pName}',
-    version='{pVersion}',
-    description=$pDescription,
-    license=$pLicense,
-    keywords=$pKeywords,
-    author=$author,
-    author_email=$authorEmail,
-    package_dir=\{'': SOURCE_ROOT},
-    packages=[$pPackages],
-    provides=[$pPackages],
-    requires=[$pRequires],
+    name=#{stringLiteral packageName'},
+    version=#{stringLiteral $ SV.toText version'},
+    description=#{nStringLiteral description'},
+    license=#{nStringLiteral license'},
+    keywords=#{stringLiteral $ T.intercalate " " keywords'},
+    author=', '.join([
+%{ forall Author { name = name } <- authors' }
+    (#{stringLiteral name}),
+%{ endforall }
+    ]),
+    author_email=', '.join([
+%{ forall Author { email = email' } <- authors' }
+%{ case email' }
+%{ of Just authorEmail }
+    (#{stringLiteral $ decodeUtf8 $ E.toByteString authorEmail}),
+%{ of Nothing }
+%{ endcase }
+%{ endforall }
+    ]),
+    package_dir={'': SOURCE_ROOT},
+    packages=[#{strings $ toImportPaths target' $ MS.keysSet modules'}],
+    provides=[#{strings $ toImportPaths target' $ MS.keysSet modules'}],
+    requires=[#{strings $ S.toList deps}],
     setup_requires=setup_requires,
     install_requires=install_requires,
     extras_require=extras_require,
 )
 |]
   where
-    target' :: Python
-    target' = target metadata'
-    csStrings :: T.Text -> [T.Text] -> T.Text
-    csStrings _ [] = "None"
-    csStrings d s = stringLiteral $ T.intercalate d s
-    pName :: Code
-    pName = packageName $ target metadata'
-    pVersion :: Code
-    pVersion = SV.toText $ version metadata'
-    fromMaybeToMeta :: Maybe T.Text -> T.Text
-    fromMaybeToMeta s = case s of
-                          Just value -> stringLiteral value
-                          Nothing -> "None"
-    pDescription :: Code
-    pDescription = fromMaybeToMeta $ description metadata'
-    pLicense :: Code
-    pLicense = fromMaybeToMeta $ license metadata'
-    pKeywords :: Code
-    pKeywords = csStrings " " $ MD.keywords metadata'
+    nStringLiteral :: Maybe T.Text -> T.Text
+    nStringLiteral (Just value) = stringLiteral value
+    nStringLiteral Nothing = "None"
     strings :: [Code] -> Code
     strings values = T.intercalate ", " $ map stringLiteral (L.sort values)
-    author :: Code
-    author = csStrings ", " [aName
-                            | Author { name = aName } <- authors metadata'
-                            ]
-    authorEmail :: Code
-    authorEmail = csStrings ", " [ decodeUtf8 (E.toByteString e)
-                            | Author { email = Just e } <- authors metadata'
-                            ]
-    pPackages :: Code
-    pPackages = strings $ toImportPaths target' $ MS.keysSet $ modules package
-    runtimeVer :: SV.Version
-    runtimeVer = minimumRuntimeVersion $ target metadata'
-    pRequires :: Code
-    pRequires = strings $ S.toList deps
-    pInstallRequires :: Code
-    pInstallRequires = strings
-        [ case p of
-              "nirum" -> [qq|nirum >= {SV.toText runtimeVer}|]
-              p' -> p'
-        | p <- S.toList deps
-        ]
-    pPolyfillRequires :: Code
-    pPolyfillRequires = T.intercalate ", "
-        [ [qq|($major, $minor): [{strings $ S.toList deps'}]|]
-        | ((major, minor), deps') <- M.toList optDeps
-        ]
 
 manifestIn :: Code
 manifestIn = [q|recursive-include src *.py

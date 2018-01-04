@@ -57,6 +57,7 @@ library:
   - blaze-markup >=0.8.0.0 && <0.9
   - cmark >=0.5 && <0.6
   - fsnotify >=0.2.1 && <0.3.0
+  - heterocephalus >=1.0.5 && <1.1.0
   - optparse-applicative >=0.13.1 && <0.14
   - shakespeare >=2.0.12 && <2.1
   - stm >=2.4.4.1
