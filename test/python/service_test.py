@@ -1,6 +1,7 @@
 import uuid
 
 from nirum.transport import Transport
+from pytest import raises
 
 from fixture.foo import (Dog, Gender, PingService, Product, RpcError,
                          SampleService_Client, Way)
@@ -83,3 +84,14 @@ def test_service_client_payload_serialization():
         'g': 1234,
         'hh': 'text data',
     }
+
+
+def test_service_client_optional_parameter():
+    t = DumbTransport()
+    c = SampleService_Client(t)
+    c.optional_parameter_method(r=1, o=1)
+    c.optional_parameter_method(r=1)
+    with raises(TypeError):
+        c.optional_parameter_method(o=1)
+    with raises(TypeError):
+        c.optional_parameter_method()
