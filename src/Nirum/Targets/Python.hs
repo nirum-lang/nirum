@@ -743,52 +743,85 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
                                              } = do
     let className = toClassName' typename'
     itypeExpr <- compileTypeExpression src (Just itype)
-    insertThirdPartyImports [ ("nirum.validate", ["validate_boxed_type"])
-                            , ("nirum.deserialize", ["deserialize_boxed_type"])
-                            ]
-    arg <- parameterCompiler
-    typeRepr <- typeReprCompiler
-    ret <- returnCompiler
-    return [qq|
-class $className(object):
-{compileDocstring "    " d}
+    insertStandardImport "typing"
+    insertThirdPartyImports
+        [ ("nirum.validate", ["validate_unboxed_type"])
+        , ("nirum.deserialize", ["deserialize_unboxed_type"])
+        ]
+    pyVer <- getPythonVersion
+    return $ toStrict $ renderMarkup $ [compileText|
+class #{className}(object):
+#{compileDocstring "    " d}
 
     __nirum_type__ = 'unboxed'
 
     @staticmethod
+%{ case pyVer }
+%{ of Python2 }
     def __nirum_get_inner_type__():
-        return $itypeExpr
+%{ of Python3 }
+    def __nirum_get_inner_type__() -> typing.Type['#{itypeExpr}']:
+%{ endcase }
+        return #{itypeExpr}
 
-    def __init__(self, { arg "value" itypeExpr }){ ret "None" }:
-        validate_boxed_type(value, $itypeExpr)
-        self.value = value  # type: $itypeExpr
+%{ case pyVer }
+%{ of Python2 }
+    def __init__(self, value):
+%{ of Python3 }
+    def __init__(self, value: '#{itypeExpr}') -> None:
+%{ endcase }
+        validate_unboxed_type(value, #{itypeExpr})
+        self.value = value  # type: #{itypeExpr}
 
-    def __eq__(self, other){ ret "bool" }:
-        return (isinstance(other, $className) and
-                self.value == other.value)
-
-    def __ne__(self, other){ ret "bool" }:
+%{ case pyVer }
+%{ of Python2 }
+    def __ne__(self, other):
         return not self == other
 
-    def __hash__(self){ ret "int" }:
+    def __eq__(self, other):
+%{ of Python3 }
+    def __eq__(self, other) -> bool:
+%{ endcase }
+        return (isinstance(other, #{className}) and
+                self.value == other.value)
+
+%{ case pyVer }
+%{ of Python2 }
+    def __hash__(self):
+%{ of Python3 }
+    def __hash__(self) -> int:
+%{ endcase }
         return hash(self.value)
 
     def __nirum_serialize__(self):
-        return ({ compileSerializer src itype "self.value" })
+        return (#{compileSerializer src itype "self.value"})
 
     @classmethod
-    def __nirum_deserialize__(
-        {arg "cls" "type"},
-        {arg "value" "typing.Any"}
-    ){ ret className }:
-        return deserialize_boxed_type(cls, value)
+%{ case pyVer }
+%{ of Python2 }
+    def __nirum_deserialize__(cls, value):
+%{ of Python3 }
+    def __nirum_deserialize__(cls: type, value: typing.Any) -> '#{className}':
+%{ endcase }
+        return deserialize_unboxed_type(cls, value)
 
-    def __repr__(self){ ret "str" }:
-        return '\{0\}(\{1!r\})'.format(
-            {typeRepr "type(self)"}, self.value
+%{ case pyVer }
+%{ of Python2 }
+    def __repr__(self):
+        return '{0.__module__}.{0.__name__}({1!r})'.format(
+            type(self), self.value
         )
+%{ of Python3 }
+    def __repr__(self) -> str:
+        return '{0}({1!r})'.format(typing._type_repr(type(self)), self.value)
+%{ endcase }
 
-    def __hash__(self){ ret "int" }:
+%{ case pyVer }
+%{ of Python2 }
+    def __hash__(self):
+%{ of Python3 }
+    def __hash__(self) -> int:
+%{ endcase }
         return hash(self.value)
 |]
 compileTypeDeclaration _ d@TypeDeclaration { typename = typename'
