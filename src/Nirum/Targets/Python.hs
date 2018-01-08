@@ -1290,57 +1290,46 @@ unionInstallRequires a b =
 compileModule :: PythonVersion
               -> Source
               -> Either CompileError' (InstallRequires, Code)
-compileModule pythonVersion' source =
-    case runCodeGen code' $ empty pythonVersion' of
-        (Left errMsg, _) -> Left errMsg
-        (Right code, context) -> codeWithDeps context $
-            [qq|# -*- coding: utf-8 -*-
-{compileDocstring "" $ sourceModule source}
-{imports $ standardImports context}
+compileModule pythonVersion' source = do
+    let (result, context) = runCodeGen (compileModuleBody source)
+                                       (empty pythonVersion')
+    let deps = require "nirum" "nirum" $ M.keysSet $ thirdPartyImports context
+    let optDeps =
+            [ ((3, 4), require "enum34" "enum" $ standardImports context)
+            , ((3, 5), require "typing" "typing" $ standardImports context)
+            ]
+    let installRequires = InstallRequires deps optDeps
+    let fromImports = M.assocs (localImportsMap context) ++
+                      M.assocs (thirdPartyImports context)
+    code <- result
+    return $ (,) installRequires $ toStrict $ renderMarkup $
+        [compileText|# -*- coding: utf-8 -*-
+#{compileDocstring "" $ sourceModule source}
+%{ forall i <- S.elems (standardImports context) }
+import #{i}
+%{ endforall }
 
-{fromImports $ localImportsMap context}
+%{ forall (from, nameMap) <- fromImports }
+from #{from} import (
+%{ forall (alias, name) <- M.assocs nameMap }
+%{ if (alias == name) }
+    #{name},
+%{ else }
+    #{name} as #{alias},
+%{ endif }
+%{ endforall }
+)
+%{ endforall }
 
-{fromImports $ thirdPartyImports context}
-
-{code}
+#{code}
 |]
   where
-    code' :: CodeGen T.Text
-    code' = compileModuleBody source
-    imports :: S.Set T.Text -> T.Text
-    imports importSet =
-        if S.null importSet
-        then ""
-        else "import " `T.append` T.intercalate "," (S.elems importSet)
-    fromImports :: M.Map T.Text (M.Map T.Text T.Text) -> T.Text
-    fromImports importMap =
-        T.intercalate "\n"
-            [ [qq|from $from import {T.intercalate ", " $ map importString
-                                                        $ M.assocs objects}|]
-            | (from, objects) <- M.assocs importMap
-            ]
-    importString :: (T.Text, T.Text) -> T.Text
-    importString (alias, var)
-      | var == alias = alias
-      | otherwise = [qq|$var as $alias|]
     has :: S.Set T.Text -> T.Text -> Bool
     has set module' = module' `S.member` set ||
                       any (T.isPrefixOf $ module' `T.snoc` '.') set
     require :: T.Text -> T.Text -> S.Set T.Text -> S.Set T.Text
     require pkg module' set =
         if set `has` module' then S.singleton pkg else S.empty
-    codeWithDeps :: CodeGenContext
-                 -> Code
-                 -> Either CompileError' (InstallRequires, Code)
-    codeWithDeps context c = Right (InstallRequires deps optDeps, c)
-      where
-        deps :: S.Set T.Text
-        deps = require "nirum" "nirum" $ M.keysSet $ thirdPartyImports context
-        optDeps :: M.Map (Int, Int) (S.Set T.Text)
-        optDeps =
-            [ ((3, 4), require "enum34" "enum" $ standardImports context)
-            , ((3, 5), require "typing" "typing" $ standardImports context)
-            ]
 
 compilePackageMetadata :: Package' -> InstallRequires -> Code
 compilePackageMetadata Package
