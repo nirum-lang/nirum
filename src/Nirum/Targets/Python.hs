@@ -728,16 +728,14 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
                                              , type' = Alias ctype
                                              } = do
     ctypeExpr <- compileTypeExpression src (Just ctype)
-    return [qq|
-$docsComment
-{toClassName' typename'} = $ctypeExpr
+    return $ toStrict $ renderMarkup [compileText|
+%{ case compileDocs d }
+%{ of Just rst }
+#: #{rst}
+%{ of Nothing }
+%{ endcase }
+#{toClassName' typename'} = #{ctypeExpr}
     |]
-  where
-    docsComment :: Code
-    docsComment =
-        case compileDocs d of
-            Nothing -> ""
-            Just rst -> indent "#: " rst
 compileTypeDeclaration src d@TypeDeclaration { typename = typename'
                                              , type' = UnboxedType itype
                                              } = do
