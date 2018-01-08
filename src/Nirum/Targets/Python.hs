@@ -229,16 +229,12 @@ insertLocalImport module' object = ST.modify insert'
     insert' c@CodeGenContext { localImports = li } =
         c { localImports = M.insertWith S.union module' [object] li }
 
-
 importTypingForPython3 :: CodeGen ()
 importTypingForPython3 = do
     pyVer <- getPythonVersion
     case pyVer of
         Python2 -> return ()
         Python3 -> insertStandardImport "typing"
-
-insertEnumImport :: CodeGen ()
-insertEnumImport = insertStandardImport "enum"
 
 getPythonVersion :: CodeGen PythonVersion
 getPythonVersion = fmap pythonVersion ST.get
@@ -826,40 +822,38 @@ compileTypeDeclaration _ d@TypeDeclaration { typename = typename'
                                            , type' = EnumType members
                                            } = do
     let className = toClassName' typename'
-        memberNames = T.intercalate
-            "\n"
-            [ T.concat [ compileDocsComment "    " m
-                       , "\n    "
-                       , toEnumMemberName memberName
-                       , " = '"
-                       , I.toSnakeCaseText bn
-                       , "'"
-                       ]
-            | m@(EnumMember memberName@(Name _ bn) _) <- toList members
-            ]
-    insertEnumImport
-    arg <- parameterCompiler
-    ret <- returnCompiler
-    return [qq|
-class $className(enum.Enum):
-{compileDocstring "    " d}
+    insertStandardImport "enum"
+    pyVer <- getPythonVersion
+    return $ toStrict $ renderMarkup [compileText|
+class #{className}(enum.Enum):
+#{compileDocstring "    " d}
 
-$memberNames
+%{ forall member@(EnumMember memberName@(Name _ behind) _) <- toList members }
+#{compileDocsComment "    " member}
+    #{toEnumMemberName memberName} = '#{I.toSnakeCaseText behind}'
+%{ endforall }
 
-    def __nirum_serialize__(self){ ret "str" }:
+%{ case pyVer }
+%{ of Python2 }
+    def __nirum_serialize__(self):
+%{ of Python3 }
+    def __nirum_serialize__(self) -> str:
+%{ endcase }
         return self.value
 
     @classmethod
-    def __nirum_deserialize__(
-        {arg "cls" "type"},
-        {arg "value" "str"}
-    ){ ret className }:
+%{ case pyVer }
+%{ of Python2 }
+    def __nirum_deserialize__(cls, value):
+%{ of Python3 }
+    def __nirum_deserialize__(cls: type, value: str) -> '#{className}':
+%{ endcase }
         return cls(value.replace('-', '_'))  # FIXME: validate input
 
 
 # Since enum.Enum doesn't allow to define non-member when the class is defined,
 # __nirum_type__ should be defined after the class is defined.
-$className.__nirum_type__ = 'enum'
+#{className}.__nirum_type__ = 'enum'
 |]
 compileTypeDeclaration src d@TypeDeclaration { typename = typename'
                                              , type' = RecordType fields
@@ -993,7 +987,7 @@ compileTypeDeclaration src
         enumMembers = toIndentedCodes
             (\ (t, b) -> [qq|$t = '{b}'|]) enumMembers' "\n        "
     importTypingForPython3
-    insertEnumImport
+    insertStandardImport "enum"
     insertThirdPartyImports [ ("nirum.deserialize", ["deserialize_union_type"])
                             ]
     insertThirdPartyImportsA [ ( "nirum.constructs"
