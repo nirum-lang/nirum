@@ -229,16 +229,12 @@ insertLocalImport module' object = ST.modify insert'
     insert' c@CodeGenContext { localImports = li } =
         c { localImports = M.insertWith S.union module' [object] li }
 
-
 importTypingForPython3 :: CodeGen ()
 importTypingForPython3 = do
     pyVer <- getPythonVersion
     case pyVer of
         Python2 -> return ()
         Python3 -> insertStandardImport "typing"
-
-insertEnumImport :: CodeGen ()
-insertEnumImport = insertStandardImport "enum"
 
 getPythonVersion :: CodeGen PythonVersion
 getPythonVersion = fmap pythonVersion ST.get
@@ -728,107 +724,136 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
                                              , type' = Alias ctype
                                              } = do
     ctypeExpr <- compileTypeExpression src (Just ctype)
-    return [qq|
-$docsComment
-{toClassName' typename'} = $ctypeExpr
+    return $ toStrict $ renderMarkup [compileText|
+%{ case compileDocs d }
+%{ of Just rst }
+#: #{rst}
+%{ of Nothing }
+%{ endcase }
+#{toClassName' typename'} = #{ctypeExpr}
     |]
-  where
-    docsComment :: Code
-    docsComment =
-        case compileDocs d of
-            Nothing -> ""
-            Just rst -> indent "#: " rst
 compileTypeDeclaration src d@TypeDeclaration { typename = typename'
                                              , type' = UnboxedType itype
                                              } = do
     let className = toClassName' typename'
     itypeExpr <- compileTypeExpression src (Just itype)
-    insertThirdPartyImports [ ("nirum.validate", ["validate_boxed_type"])
-                            , ("nirum.deserialize", ["deserialize_boxed_type"])
-                            ]
-    arg <- parameterCompiler
-    typeRepr <- typeReprCompiler
-    ret <- returnCompiler
-    return [qq|
-class $className(object):
-{compileDocstring "    " d}
+    insertStandardImport "typing"
+    insertThirdPartyImports
+        [ ("nirum.validate", ["validate_unboxed_type"])
+        , ("nirum.deserialize", ["deserialize_unboxed_type"])
+        ]
+    pyVer <- getPythonVersion
+    return $ toStrict $ renderMarkup $ [compileText|
+class #{className}(object):
+#{compileDocstring "    " d}
 
     __nirum_type__ = 'unboxed'
 
     @staticmethod
+%{ case pyVer }
+%{ of Python2 }
     def __nirum_get_inner_type__():
-        return $itypeExpr
+%{ of Python3 }
+    def __nirum_get_inner_type__() -> typing.Type['#{itypeExpr}']:
+%{ endcase }
+        return #{itypeExpr}
 
-    def __init__(self, { arg "value" itypeExpr }){ ret "None" }:
-        validate_boxed_type(value, $itypeExpr)
-        self.value = value  # type: $itypeExpr
+%{ case pyVer }
+%{ of Python2 }
+    def __init__(self, value):
+%{ of Python3 }
+    def __init__(self, value: '#{itypeExpr}') -> None:
+%{ endcase }
+        validate_unboxed_type(value, #{itypeExpr})
+        self.value = value  # type: #{itypeExpr}
 
-    def __eq__(self, other){ ret "bool" }:
-        return (isinstance(other, $className) and
-                self.value == other.value)
-
-    def __ne__(self, other){ ret "bool" }:
+%{ case pyVer }
+%{ of Python2 }
+    def __ne__(self, other):
         return not self == other
 
-    def __hash__(self){ ret "int" }:
+    def __eq__(self, other):
+%{ of Python3 }
+    def __eq__(self, other) -> bool:
+%{ endcase }
+        return (isinstance(other, #{className}) and
+                self.value == other.value)
+
+%{ case pyVer }
+%{ of Python2 }
+    def __hash__(self):
+%{ of Python3 }
+    def __hash__(self) -> int:
+%{ endcase }
         return hash(self.value)
 
     def __nirum_serialize__(self):
-        return ({ compileSerializer src itype "self.value" })
+        return (#{compileSerializer src itype "self.value"})
 
     @classmethod
-    def __nirum_deserialize__(
-        {arg "cls" "type"},
-        {arg "value" "typing.Any"}
-    ){ ret className }:
-        return deserialize_boxed_type(cls, value)
+%{ case pyVer }
+%{ of Python2 }
+    def __nirum_deserialize__(cls, value):
+%{ of Python3 }
+    def __nirum_deserialize__(cls: type, value: typing.Any) -> '#{className}':
+%{ endcase }
+        return deserialize_unboxed_type(cls, value)
 
-    def __repr__(self){ ret "str" }:
-        return '\{0\}(\{1!r\})'.format(
-            {typeRepr "type(self)"}, self.value
+%{ case pyVer }
+%{ of Python2 }
+    def __repr__(self):
+        return '{0.__module__}.{0.__name__}({1!r})'.format(
+            type(self), self.value
         )
+%{ of Python3 }
+    def __repr__(self) -> str:
+        return '{0}({1!r})'.format(typing._type_repr(type(self)), self.value)
+%{ endcase }
 
-    def __hash__(self){ ret "int" }:
+%{ case pyVer }
+%{ of Python2 }
+    def __hash__(self):
+%{ of Python3 }
+    def __hash__(self) -> int:
+%{ endcase }
         return hash(self.value)
 |]
 compileTypeDeclaration _ d@TypeDeclaration { typename = typename'
                                            , type' = EnumType members
                                            } = do
     let className = toClassName' typename'
-        memberNames = T.intercalate
-            "\n"
-            [ T.concat [ compileDocsComment "    " m
-                       , "\n    "
-                       , toEnumMemberName memberName
-                       , " = '"
-                       , I.toSnakeCaseText bn
-                       , "'"
-                       ]
-            | m@(EnumMember memberName@(Name _ bn) _) <- toList members
-            ]
-    insertEnumImport
-    arg <- parameterCompiler
-    ret <- returnCompiler
-    return [qq|
-class $className(enum.Enum):
-{compileDocstring "    " d}
+    insertStandardImport "enum"
+    pyVer <- getPythonVersion
+    return $ toStrict $ renderMarkup [compileText|
+class #{className}(enum.Enum):
+#{compileDocstring "    " d}
 
-$memberNames
+%{ forall member@(EnumMember memberName@(Name _ behind) _) <- toList members }
+#{compileDocsComment "    " member}
+    #{toEnumMemberName memberName} = '#{I.toSnakeCaseText behind}'
+%{ endforall }
 
-    def __nirum_serialize__(self){ ret "str" }:
+%{ case pyVer }
+%{ of Python2 }
+    def __nirum_serialize__(self):
+%{ of Python3 }
+    def __nirum_serialize__(self) -> str:
+%{ endcase }
         return self.value
 
     @classmethod
-    def __nirum_deserialize__(
-        {arg "cls" "type"},
-        {arg "value" "str"}
-    ){ ret className }:
+%{ case pyVer }
+%{ of Python2 }
+    def __nirum_deserialize__(cls, value):
+%{ of Python3 }
+    def __nirum_deserialize__(cls: type, value: str) -> '#{className}':
+%{ endcase }
         return cls(value.replace('-', '_'))  # FIXME: validate input
 
 
 # Since enum.Enum doesn't allow to define non-member when the class is defined,
 # __nirum_type__ should be defined after the class is defined.
-$className.__nirum_type__ = 'enum'
+#{className}.__nirum_type__ = 'enum'
 |]
 compileTypeDeclaration src d@TypeDeclaration { typename = typename'
                                              , type' = RecordType fields
@@ -962,7 +987,7 @@ compileTypeDeclaration src
         enumMembers = toIndentedCodes
             (\ (t, b) -> [qq|$t = '{b}'|]) enumMembers' "\n        "
     importTypingForPython3
-    insertEnumImport
+    insertStandardImport "enum"
     insertThirdPartyImports [ ("nirum.deserialize", ["deserialize_union_type"])
                             ]
     insertThirdPartyImportsA [ ( "nirum.constructs"
@@ -1290,57 +1315,46 @@ unionInstallRequires a b =
 compileModule :: PythonVersion
               -> Source
               -> Either CompileError' (InstallRequires, Code)
-compileModule pythonVersion' source =
-    case runCodeGen code' $ empty pythonVersion' of
-        (Left errMsg, _) -> Left errMsg
-        (Right code, context) -> codeWithDeps context $
-            [qq|# -*- coding: utf-8 -*-
-{compileDocstring "" $ sourceModule source}
-{imports $ standardImports context}
+compileModule pythonVersion' source = do
+    let (result, context) = runCodeGen (compileModuleBody source)
+                                       (empty pythonVersion')
+    let deps = require "nirum" "nirum" $ M.keysSet $ thirdPartyImports context
+    let optDeps =
+            [ ((3, 4), require "enum34" "enum" $ standardImports context)
+            , ((3, 5), require "typing" "typing" $ standardImports context)
+            ]
+    let installRequires = InstallRequires deps optDeps
+    let fromImports = M.assocs (localImportsMap context) ++
+                      M.assocs (thirdPartyImports context)
+    code <- result
+    return $ (,) installRequires $ toStrict $ renderMarkup $
+        [compileText|# -*- coding: utf-8 -*-
+#{compileDocstring "" $ sourceModule source}
+%{ forall i <- S.elems (standardImports context) }
+import #{i}
+%{ endforall }
 
-{fromImports $ localImportsMap context}
+%{ forall (from, nameMap) <- fromImports }
+from #{from} import (
+%{ forall (alias, name) <- M.assocs nameMap }
+%{ if (alias == name) }
+    #{name},
+%{ else }
+    #{name} as #{alias},
+%{ endif }
+%{ endforall }
+)
+%{ endforall }
 
-{fromImports $ thirdPartyImports context}
-
-{code}
+#{code}
 |]
   where
-    code' :: CodeGen T.Text
-    code' = compileModuleBody source
-    imports :: S.Set T.Text -> T.Text
-    imports importSet =
-        if S.null importSet
-        then ""
-        else "import " `T.append` T.intercalate "," (S.elems importSet)
-    fromImports :: M.Map T.Text (M.Map T.Text T.Text) -> T.Text
-    fromImports importMap =
-        T.intercalate "\n"
-            [ [qq|from $from import {T.intercalate ", " $ map importString
-                                                        $ M.assocs objects}|]
-            | (from, objects) <- M.assocs importMap
-            ]
-    importString :: (T.Text, T.Text) -> T.Text
-    importString (alias, var)
-      | var == alias = alias
-      | otherwise = [qq|$var as $alias|]
     has :: S.Set T.Text -> T.Text -> Bool
     has set module' = module' `S.member` set ||
                       any (T.isPrefixOf $ module' `T.snoc` '.') set
     require :: T.Text -> T.Text -> S.Set T.Text -> S.Set T.Text
     require pkg module' set =
         if set `has` module' then S.singleton pkg else S.empty
-    codeWithDeps :: CodeGenContext
-                 -> Code
-                 -> Either CompileError' (InstallRequires, Code)
-    codeWithDeps context c = Right (InstallRequires deps optDeps, c)
-      where
-        deps :: S.Set T.Text
-        deps = require "nirum" "nirum" $ M.keysSet $ thirdPartyImports context
-        optDeps :: M.Map (Int, Int) (S.Set T.Text)
-        optDeps =
-            [ ((3, 4), require "enum34" "enum" $ standardImports context)
-            , ((3, 5), require "typing" "typing" $ standardImports context)
-            ]
 
 compilePackageMetadata :: Package' -> InstallRequires -> Code
 compilePackageMetadata Package
