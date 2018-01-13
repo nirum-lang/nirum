@@ -750,12 +750,7 @@ class #{className}(object):
     __nirum_type__ = 'unboxed'
 
     @staticmethod
-%{ case pyVer }
-%{ of Python2 }
     def __nirum_get_inner_type__():
-%{ of Python3 }
-    def __nirum_get_inner_type__() -> typing.Type['#{itypeExpr}']:
-%{ endcase }
         return #{itypeExpr}
 
 %{ case pyVer }
