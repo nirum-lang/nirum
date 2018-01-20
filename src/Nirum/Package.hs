@@ -1,6 +1,7 @@
 module Nirum.Package
     ( Package (..)
     , PackageError (..)
+    , ParseError
     , docs
     , resolveModule
     , scanModules

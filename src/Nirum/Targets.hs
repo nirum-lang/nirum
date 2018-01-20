@@ -1,14 +1,7 @@
 {-# LANGUAGE QuasiQuotes, ScopedTypeVariables, TemplateHaskell #-}
 module Nirum.Targets ( BuildError (CompileError, PackageError, TargetNameError)
                      , BuildResult
-                     , Target ( CompileError
-                              , CompileResult
-                              , compilePackage
-                              , parseTarget
-                              , showCompileError
-                              , targetName
-                              , toByteString
-                              )
+                     , Target (..)
                      , TargetName
                      , buildPackage
                      , targetNames

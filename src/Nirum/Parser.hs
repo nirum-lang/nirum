@@ -32,6 +32,7 @@ module Nirum.Parser ( Parser
                     ) where
 
 import Control.Monad (void)
+import Data.Void
 import qualified System.IO as SIO
 
 import Data.Map.Strict as Map hiding (foldl)
@@ -47,8 +48,7 @@ import Text.Megaparsec.Char ( char
                             , string'
                             )
 import qualified Text.Megaparsec.Error as E
-import Text.Megaparsec.Text (Parser)
-import Text.Megaparsec.Lexer (charLiteral)
+import Text.Megaparsec.Char.Lexer (charLiteral)
 
 import qualified Nirum.Constructs.Annotation as A
 import Nirum.Constructs.Declaration (Declaration)
@@ -90,7 +90,8 @@ import Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
                                                         )
                                        )
 
-type ParseError = E.ParseError (Token T.Text) E.Dec
+type Parser = Parsec Void T.Text
+type ParseError = E.ParseError Char Void
 
 comment :: Parser ()
 comment = string "//" >> void (many $ noneOf ("\n" :: String)) <?> "comment"
@@ -480,7 +481,7 @@ typeDeclaration = do
     let annotations = A.union annotationSet' $ typeAnnotations typeDecl
     return $ typeDecl { typeAnnotations = annotations }
   where
-    unless' :: [String] -> Parser a -> Parser a
+    unless' :: [T.Text] -> Parser a -> Parser a
     unless' [] _ = fail "no candidates"  -- Must never happen
     unless' [s] p = notFollowedBy (string s) >> p
     unless' (x : xs) p = notFollowedBy (string x) >> unless' xs p
