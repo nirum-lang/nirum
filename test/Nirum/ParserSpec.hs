@@ -17,9 +17,9 @@ import Text.Megaparsec (eof, runParser)
 import Text.Megaparsec.Char (string)
 import Text.Megaparsec.Error (errorPos, parseErrorPretty)
 import Text.Megaparsec.Pos (Pos, SourcePos (sourceColumn, sourceLine), mkPos)
-import Text.Megaparsec.Text (Parser)
 
 import qualified Nirum.Parser as P
+import Nirum.Parser (Parser, ParseError)
 import Nirum.Constructs (Construct (toCode))
 import Nirum.Constructs.Annotation as A
 import Nirum.Constructs.Docs (Docs (Docs))
@@ -45,16 +45,16 @@ import Util (singleDocs)
 shouldBeRight :: (Eq l, Eq r, Show l, Show r) => Either l r -> r -> Expectation
 shouldBeRight actual expected = actual `shouldBe` Right expected
 
-erroredPos :: Either P.ParseError a -> (Pos, Pos)
+erroredPos :: Either ParseError a -> (Pos, Pos)
 erroredPos left =
     (sourceLine pos, sourceColumn pos)
   where
-    error' = head $ lefts [left] :: P.ParseError
+    error' = head $ lefts [left] :: ParseError
     pos = NE.head (errorPos error') :: SourcePos
 
 helperFuncs :: (Show a)
             => Parser a
-            -> ( T.Text -> Either P.ParseError a
+            -> ( T.Text -> Either ParseError a
                , T.Text -> Int -> Int -> Expectation
                )
 helperFuncs parser =
@@ -66,9 +66,9 @@ helperFuncs parser =
         return r
     parse' = runParser parserAndEof ""
     expectError inputString line col = do
-        line' <- mkPos line
-        col' <- mkPos col
         let parseResult = parse' inputString
+            line' = mkPos line
+            col' = mkPos col
         parseResult `shouldSatisfy` isLeft
         let Left parseError = parseResult
             msg = parseErrorPretty parseError
@@ -1188,5 +1188,3 @@ service method-dups (
             parseFileResult <- P.parseFile filePath
             parseFileResult `shouldSatisfy` isRight
             parseFileResult `shouldBe` parseResult
-
-{-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}

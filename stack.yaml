@@ -1,4 +1,4 @@
-resolver: lts-9.10
+resolver: lts-10.7
 flags: {}
 packages:
 - '.'
@@ -6,3 +6,7 @@ extra-deps:
 - uri-0.1.6.4
 ## INSERT CODECOV HERE -- DO NOT REMOVE THIS COMMENT. SEE ALSO ISSUE #156. ##
 extra-package-dbs: []
+ghc-options:
+  "$locals": -fhide-source-paths
+# http://hsyl20.fr/home/posts/2018-01-15-ghc-hiding-source-and-object-paths.html
+require-stack-version: ">=1.6.5"
