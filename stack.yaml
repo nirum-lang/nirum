@@ -4,6 +4,7 @@ packages:
 - '.'
 extra-deps:
 - uri-0.1.6.4
+- Win32-2.6.2.0
 extra-package-dbs: []
 ghc-options:
   "$locals": -fhide-source-paths
