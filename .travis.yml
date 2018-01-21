@@ -100,7 +100,7 @@ notifications:
   webhooks:
     urls:
     - https://webhooks.gitter.im/e/29cc2477daa438db4e9d
-    - 'http://travis-auto-rebuilder.herokuapp.com/76caecf7-abe1-4122-9fcc-aa5226dc10f8/?jobs=1&retries=5'
+    - 'http://travis-auto-rebuilder.herokuapp.com/76caecf7-abe1-4122-9fcc-aa5226dc10f8/?jobs=1&subject-to=2&retries=5'
     on_success: change
     on_failure: always
     on_start: never
