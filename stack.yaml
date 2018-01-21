@@ -3,10 +3,18 @@ flags: {}
 packages:
 - '.'
 extra-deps:
+- turtle-1.5.4
+  # Until turtle-1.5.0 it requires Win32<2.4 while unix-compat-0.5.0.1 (which
+  # is the version pinned by the Stackage LTS 10.7) requires Win32>=2.5.0.0.
 - uri-0.1.6.4
+  # No in the Stackage LTS 10.7
 ## INSERT CODECOV HERE -- DO NOT REMOVE THIS COMMENT. SEE ALSO ISSUE #156. ##
 extra-package-dbs: []
 ghc-options:
   "$locals": -fhide-source-paths
 # http://hsyl20.fr/home/posts/2018-01-15-ghc-hiding-source-and-object-paths.html
-require-stack-version: ">=1.6.5"
+
+require-stack-version:
+  # CHECK: If we change the minimum version of Stack the download URLs in
+  # *appveyor.yml* file also should be updated.
+  ">=1.6.5"
