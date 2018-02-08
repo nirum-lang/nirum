@@ -73,6 +73,9 @@ For more infomration, use `--help` option:
       -t,--target TARGET       Target language name. Available: docs, python
       DIR                      Package directory
 
+There is a [step-by-step tutorial](./docs/tutorial.md) as well.
+
+
 Building
 --------
 
