@@ -89,6 +89,8 @@ You can run the test suite of Nirum:
     $ stack test  # unit test for compiler
     $ ./lint.sh   # style lint
 
+For details, please read the [contribution guide](./CONTRIBUTING.md).
+
 [5]: https://www.haskellstack.org/
 
 
