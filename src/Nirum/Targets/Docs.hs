@@ -143,10 +143,7 @@ blockToHtml b = preEscapedToMarkup $ render b
 typeDecl :: BoundModule Docs -> Identifier -> TD.TypeDeclaration -> Html
 typeDecl mod' ident
          tc@TD.TypeDeclaration { TD.type' = TD.Alias cname } = [shamlet|
-    <h2>
-        <span.type>type
-        <code>#{toNormalizedText ident}</code>
-        =
+    <h2><code>type</code> #{toNormalizedText ident} = #
         <code>#{typeExpression mod' cname}</code>
     $maybe d <- docsBlock tc
         #{blockToHtml d}
@@ -154,39 +151,35 @@ typeDecl mod' ident
 typeDecl mod' ident
          tc@TD.TypeDeclaration { TD.type' = TD.UnboxedType innerType } =
     [shamlet|
-        <h2>
-            <span.type>unboxed
-            <code>#{toNormalizedText ident} (#{typeExpression mod' innerType})
+        <h2><code>unboxed</code> #{toNormalizedText ident}
+            (<code>#{typeExpression mod' innerType}</code>)
         $maybe d <- docsBlock tc
             #{blockToHtml d}
     |]
 typeDecl _ ident
          tc@TD.TypeDeclaration { TD.type' = TD.EnumType members } = [shamlet|
-    <h2>
-        <span.type>enum
-        <code>#{toNormalizedText ident}
+    <h2><code>enum</code> #{toNormalizedText ident}
     $maybe d <- docsBlock tc
         #{blockToHtml d}
     <dl class="members">
         $forall decl <- DES.toList members
-            <dt class="member-name"><code>#{nameText $ DE.name decl}</code>
-                <dd class="member-doc">
-                    $maybe d <- docsBlock decl
-                        #{blockToHtml d}
+            <dt class="member-name">#{nameText $ DE.name decl}
+            <dd class="member-doc">
+                $maybe d <- docsBlock decl
+                    #{blockToHtml d}
 |]
 typeDecl mod' ident
          tc@TD.TypeDeclaration { TD.type' = TD.RecordType fields } = [shamlet|
-    <h2>
-        <span.type>record
-        <code>#{toNormalizedText ident}
+    <h2><code>record</code> #{toNormalizedText ident}
     $maybe d <- docsBlock tc
         #{blockToHtml d}
-    $forall fieldDecl@(TD.Field _ fieldType _) <- DES.toList fields
-        <h3>
-            <span.type>#{typeExpression mod' fieldType}
-            <code>#{nameText $ DE.name fieldDecl}
-        $maybe d <- docsBlock fieldDecl
-            #{blockToHtml d}
+    <dl.fields>
+        $forall fieldDecl@(TD.Field _ fieldType _) <- DES.toList fields
+            <dt>
+                <code>#{typeExpression mod' fieldType}
+                #{nameText $ DE.name fieldDecl}
+            $maybe d <- docsBlock fieldDecl
+                <dd>#{blockToHtml d}
 |]
 typeDecl mod' ident
          tc@TD.TypeDeclaration { TD.type' = TD.UnionType tags } = [shamlet|
@@ -211,33 +204,33 @@ typeDecl _ ident
 typeDecl mod' ident
          tc@TD.ServiceDeclaration { TD.service = S.Service methods } =
     [shamlet|
-        <h2>service <code>#{toNormalizedText ident}</code>
+        <h2><code>service</code> #{toNormalizedText ident}
         $maybe d <- docsBlock tc
             #{blockToHtml d}
         $forall md@(S.Method _ ps ret err _) <- DES.toList methods
-            <h3 class="method">
-                <code class="method-name">#{nameText $ DE.name md}</code>(
-                    $forall (i, pd@(S.Parameter _ pt _)) <- enumerateParams ps
-                        $if i > 0
-                            , #
-                        <code class="type">#{typeExpression mod' pt}</code> #
-                        <var>#{nameText $ DE.name pd}</var>#
-                    )
+            <h3.method>#{nameText $ DE.name md} (
+                $forall (i, pd@(S.Parameter _ pt _)) <- enumerateParams ps
+                    $if i > 0
+                        , #
+                    <code.type>#{typeExpression mod' pt}</code> #
+                    <var>#{nameText $ DE.name pd}</var>#
+                )
             $maybe d <- docsBlock md
                 #{blockToHtml d}
-            <dl class="result">
+            <dl.parameters>
+                $forall paramDecl@(S.Parameter _ paramType _) <- DES.toList ps
+                    $maybe d <- docsBlock paramDecl
+                        <dt>
+                            <code.type>#{typeExpression mod' paramType}
+                            <var>#{nameText $ DE.name paramDecl}</var>:
+                        <dd>#{blockToHtml d}
+            <dl.result>
                 $maybe retType <- ret
-                    <dt class="return-label">returns:
-                    <dd class="return-type">#{typeExpression mod' retType}
+                    <dt.return-label>returns:
+                    <dd.return-type><code>#{typeExpression mod' retType}</code>
                 $maybe errType <- err
-                    <dt class="raise-label">raises:
-                    <dd class="raise-type">#{typeExpression mod' errType}
-            $forall paramDecl@(S.Parameter _ paramType _) <- DES.toList ps
-                $maybe d <- docsBlock paramDecl
-                    <h4>
-                        <span.type>#{typeExpression mod' paramType}
-                        <code>#{nameText $ DE.name paramDecl}</code>:
-                    #{blockToHtml d}
+                    <dt.raise-label>raises:
+                    <dd.raise-type><code>#{typeExpression mod' errType}</code>
 |]
   where
     enumerate :: [a] -> [(Int, a)]
@@ -324,8 +317,11 @@ div
     border-top: 1px solid #{gray3}
 h1, h2, h3, h4, h5, h6
     code
-        font-weight: 400
         background-color: #{gray3}
+h1, h2, h3, h4, h5, h6, dt
+    font-weight: bold
+    code
+        font-weight: 400
 a
     text-decoration: none
 a:link
@@ -334,6 +330,9 @@ a:visited
     color: #{graph8}
 a:hover
     text-decoration: underline
+dd
+    p
+        margin-top: 0
 |] undefined)
   where
     -- from Open Color https://yeun.github.io/open-color/
