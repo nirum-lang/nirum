@@ -110,6 +110,14 @@ def test_record():
         Point1.__nirum_deserialize__({'x': 3, 'top': 14})
     with raises(ValueError):
         Point1.__nirum_deserialize__({'_type': 'foo'})
+    with raises(ValueError) as e:
+        Point1.__nirum_deserialize__({'_type': 'point1',
+                                      'left': 'a',
+                                      'top': 'b'})
+    assert str(e.value) == '''\
+left: invalid literal for int() with base 10: 'a'
+top: invalid literal for int() with base 10: 'b'\
+'''
     with raises(TypeError):
         Point1(left=1, top='a')
     with raises(TypeError):

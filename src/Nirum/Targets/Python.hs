@@ -872,7 +872,7 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
             (\ (n, t, _) -> [qq|'{n}': {t}|]) nameTypeTriples ",\n        "
     importTypingForPython3
     insertThirdPartyImports [ ("nirum.validate", ["validate_record_type"])
-                            , ("nirum.deserialize", ["deserialize_record_type"])
+                            , ("nirum.deserialize", ["deserialize_meta"])
                             ]
     insertThirdPartyImportsA [ ( "nirum.constructs"
                                , [("name_dict_type", "NameDict")]
@@ -943,7 +943,38 @@ class $className(object):
 
     @classmethod
     def __nirum_deserialize__($clsType, value){ ret className }:
-        return deserialize_record_type(cls, value)
+        if '_type' not in value:
+            raise ValueError('"_type" field is missing.')
+        if not cls.__nirum_record_behind_name__ == value['_type']:
+            raise ValueError(
+                '%s expect "_type" equal to "%s"'
+                ', but found %s.' % (
+                    typing._type_repr(cls),
+                    cls.__nirum_record_behind_name__,
+                    value['_type']
+                )
+            )
+        args = dict()
+        behind_names = cls.__nirum_field_names__.behind_names
+        field_types = cls.__nirum_field_types__
+        if callable(field_types):
+            field_types = field_types()
+            # old compiler could generate non-callable dictionary
+        errors = set()
+        for attribute_name, item in value.items():
+            if attribute_name == '_type':
+                continue
+            if attribute_name in behind_names:
+                name = behind_names[attribute_name]
+            else:
+                name = attribute_name
+            try:
+                args[name] = deserialize_meta(field_types[name], item)
+            except ValueError as e:
+                errors.add('%s: %s' % (attribute_name, str(e)))
+        if errors:
+            raise ValueError('\\n'.join(sorted(errors)))
+        return cls(**args)
 
     def __hash__(self){ret "int"}:
         return hash(($hashText,))
