@@ -740,7 +740,7 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
     insertStandardImport "typing"
     insertThirdPartyImports
         [ ("nirum.validate", ["validate_unboxed_type"])
-        , ("nirum.deserialize", ["deserialize_unboxed_type"])
+        , ("nirum.deserialize", ["deserialize_meta"])
         ]
     pyVer <- getPythonVersion
     return $ toStrict $ renderMarkup $ [compileText|
@@ -792,7 +792,18 @@ class #{className}(object):
 %{ of Python3 }
     def __nirum_deserialize__(cls: type, value: typing.Any) -> '#{className}':
 %{ endcase }
-        return deserialize_unboxed_type(cls, value)
+        try:
+            inner_type = cls.__nirum_get_inner_type__()
+        except AttributeError:
+            # FIXME: __nirum_inner_type__ is for backward compatibility;
+            #        remove __nirum_inner_type__ in the near future.
+            inner_type = cls.__nirum_inner_type__
+        deserializer = getattr(inner_type, '__nirum_deserialize__', None)
+        if deserializer:
+            value = deserializer(value)
+        else:
+            value = deserialize_meta(inner_type, value)
+        return cls(value=value)
 
 %{ case pyVer }
 %{ of Python2 }
