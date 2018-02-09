@@ -73,6 +73,9 @@ For more infomration, use `--help` option:
       -t,--target TARGET       Target language name. Available: docs, python
       DIR                      Package directory
 
+There is a [step-by-step tutorial](./docs/tutorial.md) as well.
+
+
 Building
 --------
 
@@ -85,6 +88,8 @@ You can run the test suite of Nirum:
 
     $ stack test  # unit test for compiler
     $ ./lint.sh   # style lint
+
+For details, please read the [contribution guide](./CONTRIBUTING.md).
 
 [5]: https://www.haskellstack.org/
 
