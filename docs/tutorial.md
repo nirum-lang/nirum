@@ -1,8 +1,7 @@
 Step-by-step tutorial
 =====================
 
-Estimated time to complete this tutorial (reading and exercising):
-*NEED TO BE MEASURED*.
+Estimated time to complete this tutorial (reading and exercising): an hour.
 
 FYI there's the Git repository which contains all example source codes
 from this tutorial: <https://github.com/spoqa/nirum-tutorial-examples>.
