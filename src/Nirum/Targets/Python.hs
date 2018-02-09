@@ -1025,7 +1025,7 @@ compileTypeDeclaration src
             (\ (t, b) -> [qq|$t = '{b}'|]) enumMembers' "\n        "
     importTypingForPython3
     insertStandardImport "enum"
-    insertThirdPartyImports [ ("nirum.deserialize", ["deserialize_union_type"])
+    insertThirdPartyImports [ ("nirum.deserialize", ["deserialize_meta"])
                             ]
     insertThirdPartyImportsA [ ( "nirum.constructs"
                                , [("name_dict_type", "NameDict")]
@@ -1067,7 +1067,54 @@ class $className({T.intercalate "," $ compileExtendClasses annotations}):
     def __nirum_deserialize__(
         {arg "cls" "type"}, value
     ){ ret className }:
-        return deserialize_union_type(cls, value)
+        if '_type' not in value:
+            raise ValueError('"_type" field is missing.')
+        if '_tag' not in value:
+            raise ValueError('"_tag" field is missing.')
+        if not hasattr(cls, '__nirum_tag__'):
+            for sub_cls in cls.__subclasses__():
+                if sub_cls.__nirum_tag__.value == value['_tag']:
+                    cls = sub_cls
+                    break
+            else:
+                raise ValueError(
+                    '%r is not deserialzable tag of `%s`.' % (
+                        value, typing._type_repr(cls)
+                    )
+                )
+        if not cls.__nirum_union_behind_name__ == value['_type']:
+            raise ValueError('%s expect "_type" equal to'
+                             ' "%s"'
+                             ', but found %s.' % (
+                                typing._type_repr(cls),
+                                cls.__nirum_union_behind_name__,
+                                value['_type']))
+        if not cls.__nirum_tag__.value == value['_tag']:
+            raise ValueError('%s expect "_tag" equal to'
+                             ' "%s"'
+                             ', but found %s.' % (typing._type_repr(cls),
+                                                  cls.__nirum_tag__.value,
+                                                  cls))
+        args = dict()
+        behind_names = cls.__nirum_tag_names__.behind_names
+        errors = set()
+        for attribute_name, item in value.items():
+            if attribute_name in ('_type', '_tag'):
+                continue
+            if attribute_name in behind_names:
+                name = behind_names[attribute_name]
+            else:
+                name = attribute_name
+            tag_types = cls.__nirum_tag_types__
+            if callable(tag_types):  # old compiler could generate non-callable map
+                tag_types = dict(tag_types())
+            try:
+                args[name] = deserialize_meta(tag_types[name], item)
+            except ValueError as e:
+                errors.add('%s: %s' % (attribute_name, str(e)))
+        if errors:
+            raise ValueError('\\n'.join(sorted(errors)))
+        return cls(**args)
 
 
 $tagCodes'

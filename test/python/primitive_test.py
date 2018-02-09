@@ -258,6 +258,24 @@ def test_union():
     assert agnostic_name != CultureAgnosticName(fullname=u'wrong')
     with raises(TypeError):
         CultureAgnosticName(fullname=1)
+    name = MixedName.__nirum_deserialize__({
+        '_type': 'mixed_name',
+        '_tag': 'east_asian_name',
+        'family_name': u'foo',
+        'given_name': u'bar',
+    })
+    assert isinstance(name, MixedName.EastAsianName)
+    with raises(ValueError) as e:
+        MixedName.__nirum_deserialize__({
+            '_type': 'mixed_name',
+            '_tag': 'east_asian_name',
+            'family_name': 404,
+            'given_name': 503,
+        })
+    assert str(e.value) == '''\
+family_name: '404' is not a string.
+given_name: '503' is not a string.\
+'''
 
 
 def test_union_with_special_case():
