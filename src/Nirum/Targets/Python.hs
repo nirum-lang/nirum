@@ -792,12 +792,7 @@ class #{className}(object):
 %{ of Python3 }
     def __nirum_deserialize__(cls: type, value: typing.Any) -> '#{className}':
 %{ endcase }
-        try:
-            inner_type = cls.__nirum_get_inner_type__()
-        except AttributeError:
-            # FIXME: __nirum_inner_type__ is for backward compatibility;
-            #        remove __nirum_inner_type__ in the near future.
-            inner_type = cls.__nirum_inner_type__
+        inner_type = cls.__nirum_get_inner_type__()
         deserializer = getattr(inner_type, '__nirum_deserialize__', None)
         if deserializer:
             value = deserializer(value)
@@ -1078,23 +1073,26 @@ class $className({T.intercalate "," $ compileExtendClasses annotations}):
                     break
             else:
                 raise ValueError(
-                    '%r is not deserialzable tag of `%s`.' % (
+                    '%r is not deserialzable tag of `%s`' % (
                         value, typing._type_repr(cls)
                     )
                 )
         if not cls.__nirum_union_behind_name__ == value['_type']:
-            raise ValueError('%s expect "_type" equal to'
-                             ' "%s"'
-                             ', but found %s.' % (
-                                typing._type_repr(cls),
-                                cls.__nirum_union_behind_name__,
-                                value['_type']))
+            raise ValueError(
+                '%s expect "_type" equal to "%s", but found %s' % (
+                    typing._type_repr(cls),
+                    cls.__nirum_union_behind_name__,
+                    value['_type']
+                )
+            )
         if not cls.__nirum_tag__.value == value['_tag']:
-            raise ValueError('%s expect "_tag" equal to'
-                             ' "%s"'
-                             ', but found %s.' % (typing._type_repr(cls),
-                                                  cls.__nirum_tag__.value,
-                                                  cls))
+            raise ValueError(
+                '%s expect "_tag" equal to "%s", but found %s' % (
+                    typing._type_repr(cls),
+                    cls.__nirum_tag__.value,
+                    cls
+                )
+            )
         args = dict()
         behind_names = cls.__nirum_tag_names__.behind_names
         errors = set()
