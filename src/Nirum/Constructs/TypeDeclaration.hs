@@ -34,6 +34,7 @@ module Nirum.Constructs.TypeDeclaration ( EnumMember (EnumMember)
                                                , UnboxedType
                                                , UnionType
                                                , canonicalType
+                                               , defaultTag
                                                , fields
                                                , innerType
                                                , jsonType
@@ -55,7 +56,7 @@ module Nirum.Constructs.TypeDeclaration ( EnumMember (EnumMember)
                                                           )
                                         ) where
 
-import Data.Maybe (isJust)
+import Data.Maybe (isJust, maybeToList)
 import Data.String (IsString (fromString))
 
 import qualified Data.Text as T
@@ -81,7 +82,9 @@ data Type
     | UnboxedType { innerType :: TypeExpression }
     | EnumType { members :: DeclarationSet EnumMember }
     | RecordType { fields :: DeclarationSet Field }
-    | UnionType { tags :: DeclarationSet Tag }
+    | UnionType { tags :: DeclarationSet Tag
+                , defaultTag :: Maybe Tag
+                }
     | PrimitiveType { primitiveTypeIdentifier :: PrimitiveTypeIdentifier
                     , jsonType :: JsonType
                     }
@@ -204,7 +207,7 @@ instance Construct TypeDeclaration where
       where
         fieldsCode = T.intercalate "\n" $ map toCode $ toList fields'
         docs' = A.lookupDocs annotationSet'
-    toCode (TypeDeclaration name' (UnionType tags') annotationSet') =
+    toCode (TypeDeclaration name' (UnionType tags' defaultTag') annotationSet') =
         T.concat [ toCode annotationSet'
                  , "union ", nameCode
                  , toCodeWithPrefix "\n    " (A.lookupDocs annotationSet')
@@ -216,8 +219,11 @@ instance Construct TypeDeclaration where
         nameCode = toCode name'
         tagsCode :: T.Text
         tagsCode = T.intercalate "\n    | "
-                                 [ T.replace "\n" "\n    " (toCode t)
-                                 | t <- toList tags'
+                                 [ T.replace "\n" "\n    " $
+                                             if defaultTag' == Just t
+                                             then T.append "default " (toCode t)
+                                             else toCode t
+                                 | t <- maybeToList defaultTag' ++ toList tags'
                                  ]
     toCode (TypeDeclaration name'
                             (PrimitiveType typename' jsonType')

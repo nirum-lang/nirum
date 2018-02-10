@@ -49,7 +49,7 @@ module Nirum.Targets.Python ( Code
 import Control.Monad (forM)
 import qualified Control.Monad.State as ST
 import qualified Data.List as L
-import Data.Maybe (catMaybes, fromMaybe)
+import Data.Maybe (catMaybes, fromMaybe, maybeToList)
 import Data.Typeable (Typeable)
 import GHC.Exts (IsList (toList))
 import Text.Printf (printf)
@@ -95,7 +95,7 @@ import Nirum.Constructs.Service ( Method ( Method
 import Nirum.Constructs.TypeDeclaration ( EnumMember (EnumMember)
                                         , Field (Field, fieldName)
                                         , PrimitiveTypeIdentifier (..)
-                                        , Tag (Tag)
+                                        , Tag (Tag, tagName)
                                         , Type ( Alias
                                                , EnumType
                                                , PrimitiveType
@@ -1009,14 +1009,13 @@ class $className(object):
         ]
 compileTypeDeclaration src
                        d@TypeDeclaration { typename = typename'
-                                         , type' = UnionType tags
+                                         , type' = UnionType tags defaultTag
                                          , typeAnnotations = annotations
                                          } = do
-    tagCodes <- mapM (compileUnionTag src typename') $ toList tags
-    let className = toClassName' typename'
-        tagCodes' = T.intercalate "\n\n" tagCodes
-        tagClasses = T.intercalate ", " [ toClassName' tagName
-                                        | Tag tagName _ _ <- toList tags
+    tagCodes <- mapM (compileUnionTag src typename') $ toList tags ++ maybeToList defaultTag
+    let tagCodes' = T.intercalate "\n\n" tagCodes
+        tagClasses = T.intercalate ", " [ toClassName' tagName'
+                                        | Tag tagName' _ _ <- toList tags ++ maybeToList defaultTag
                                         ]
         enumMembers = toIndentedCodes
             (\ (t, b) -> [qq|$t = '{b}'|]) enumMembers' "\n        "
@@ -1035,6 +1034,9 @@ compileTypeDeclaration src
     typeRepr <- typeReprCompiler
     ret <- returnCompiler
     arg <- parameterCompiler
+    let defaultTagBehindName = case defaultTag of
+            Just dt -> stringLiteral $ I.toSnakeCaseText $ N.behindName $ tagName dt
+            Nothing -> "None"
     return [qq|
 class $className({T.intercalate "," $ compileExtendClasses annotations}):
 {compileDocstring "    " d}
@@ -1042,6 +1044,7 @@ class $className({T.intercalate "," $ compileExtendClasses annotations}):
     __nirum_type__ = 'union'
     __nirum_union_behind_name__ = '{I.toSnakeCaseText $ N.behindName typename'}'
     __nirum_field_names__ = name_dict_type([$nameMaps])
+    __nirum_default_tag_behind_name__ = {defaultTagBehindName}
 
     class Tag(enum.Enum):
         $enumMembers
@@ -1064,6 +1067,10 @@ class $className({T.intercalate "," $ compileExtendClasses annotations}):
     def __nirum_deserialize__(
         {arg "cls" "type"}, value
     ){ ret className }:
+        if ($className.__nirum_default_tag_behind_name__ is not None and
+            isinstance(value, dict) and '_tag' not in value):
+            value = dict(value)
+            value['_tag'] = $className.__nirum_default_tag_behind_name__
         if '_type' not in value:
             raise ValueError('"_type" field is missing.')
         if '_tag' not in value:
@@ -1114,7 +1121,6 @@ class $className({T.intercalate "," $ compileExtendClasses annotations}):
             raise ValueError('\\n'.join(sorted(errors)))
         return cls(**args)
 
-
 $tagCodes'
 
 $className.__nirum_tag_classes__ = map_type(
@@ -1123,16 +1129,18 @@ $className.__nirum_tag_classes__ = map_type(
 )
             |]
   where
+    className :: T.Text
+    className = toClassName' typename'
     enumMembers' :: [(T.Text, T.Text)]
-    enumMembers' = [ ( toEnumMemberName tagName
-                     , I.toSnakeCaseText $ N.behindName tagName
+    enumMembers' = [ ( toEnumMemberName tagName'
+                     , I.toSnakeCaseText $ N.behindName tagName'
                      )
-                   | (Tag tagName _ _) <- toList tags
+                   | (Tag tagName' _ _) <- toList tags ++ maybeToList defaultTag
                    ]
     nameMaps :: T.Text
     nameMaps = toIndentedCodes
         toNamePair
-        [name' | Tag name' _ _ <- toList tags]
+        [name' | Tag name' _ _ <- toList tags ++ maybeToList defaultTag]
         ",\n        "
     compileExtendClasses :: A.AnnotationSet -> [Code]
     compileExtendClasses annotations' =
@@ -1185,7 +1193,7 @@ class $className(service_type):
         $methodNameMap
     ])
     __nirum_method_annotations__ = $methodAnnotations'
-
+    __valerie__ = True
     @staticmethod
     def __nirum_method_error_types__(k, d=None):
         return dict([

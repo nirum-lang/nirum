@@ -127,7 +127,7 @@ record person (
                         , Tag "rectangle" rectangleFields empty
                         , Tag "none" [] empty
                         ]
-                union' = UnionType tags'
+                union' = UnionType tags' Nothing
                 a = TypeDeclaration { typename = "shape"
                                     , type' = union'
                                     , typeAnnotations = empty

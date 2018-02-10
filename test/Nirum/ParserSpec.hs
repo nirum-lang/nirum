@@ -656,6 +656,23 @@ record dup (
 
     descTypeDecl "unionTypeDeclaration" P.unionTypeDeclaration $ \ helpers -> do
         let (parse', expectError) = helpers
+        it "has defaultTag" $ do
+            let cOriginF = Field "origin" "point" empty
+                cRadiusF = Field "radius" "offset" empty
+                circleFields = [cOriginF, cRadiusF]
+                rUpperLeftF = Field "upper-left" "point" empty
+                rLowerRightF = Field "lower-right" "point" empty
+                rectangleFields = [rUpperLeftF, rLowerRightF]
+                circleTag = Tag "circle" circleFields empty
+                rectTag = Tag "rectangle" rectangleFields empty
+                tags' = [circleTag]
+                union' = UnionType tags' $ Just rectTag
+                a = TypeDeclaration "shape" union' empty
+            parse' [s|
+union shape
+    = circle (point origin, offset radius,)
+    | default rectangle (point upper-left, point lower-right,)
+    ;|] `shouldBeRight` a
         it "emits (TypeDeclaration (UnionType ...)) if succeeded to parse" $ do
             let cOriginF = Field "origin" "point" empty
                 cRadiusF = Field "radius" "offset" empty
@@ -667,7 +684,7 @@ record dup (
                 rectTag = Tag "rectangle" rectangleFields empty
                 noneTag = Tag "none" [] empty
                 tags' = [circleTag, rectTag, noneTag]
-                union' = UnionType tags'
+                union' = UnionType tags' Nothing
                 a = TypeDeclaration "shape" union' empty
                 b = a { typeAnnotations = singleDocs "shape type" }
             parse' [s|

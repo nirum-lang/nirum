@@ -34,6 +34,7 @@ module Nirum.Parser ( Parser
 import Control.Monad (void)
 import qualified System.IO as SIO
 
+import qualified Data.List as L
 import Data.Map.Strict as Map hiding (foldl)
 import Data.Set hiding (empty, foldl, fromList, map)
 import qualified Data.Text as T
@@ -407,9 +408,11 @@ recordTypeDeclaration = do
     annotationSet'' <- annotationsWithDocs annotationSet' docs'
     return $ TypeDeclaration typename (RecordType fields') annotationSet''
 
-tag :: Parser Tag
+tag :: Parser (Tag, Bool)
 tag = do
     annotationSet' <- annotationSet <?> "union tag annotations"
+    spaces
+    default' <- optional (string "default" <?> "default tag")
     spaces
     tagName <- name <?> "union tag name"
     spaces
@@ -435,7 +438,11 @@ tag = do
             spaces
             return d
     annotationSet'' <- annotationsWithDocs annotationSet' docs'
-    return $ Tag tagName fields' annotationSet''
+    return ( Tag tagName fields' annotationSet''
+           , case default' of
+                 Just _ -> True
+                 Nothing -> False
+           )
 
 unionTypeDeclaration :: Parser TypeDeclaration
 unionTypeDeclaration = do
@@ -452,11 +459,18 @@ unionTypeDeclaration = do
     spaces
     tags' <- (tag `sepBy1` try (spaces >> char '|' >> spaces))
              <?> "union tags"
+    let tags'' = [t | (t, _) <- tags']
+    let defaultTag = do
+            (t''', _) <- L.find snd tags'
+            return t'''
     spaces
     char ';'
     annotationSet'' <- annotationsWithDocs annotationSet' docs'
-    handleNameDuplication "tag" tags' $ \ tagSet ->
-        return $ TypeDeclaration typename (UnionType tagSet) annotationSet''
+    handleNameDuplication "tag" tags'' $ \ tagSet -> do
+        let remainTagSet = case defaultTag of
+                               Just t -> DeclarationSet.delete t tagSet
+                               Nothing -> tagSet
+        return $ TypeDeclaration typename (UnionType remainTagSet defaultTag) annotationSet''
 
 typeDeclaration :: Parser TypeDeclaration
 typeDeclaration = do
