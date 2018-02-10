@@ -102,6 +102,7 @@ import Nirum.Constructs.TypeDeclaration ( EnumMember (EnumMember)
                                                , RecordType
                                                , UnboxedType
                                                , UnionType
+                                               , defaultTag
                                                , primitiveTypeIdentifier
                                                )
                                         , TypeDeclaration (..)
@@ -177,6 +178,11 @@ data CodeGenContext
                      , pythonVersion :: PythonVersion
                      }
     deriving (Eq, Ord, Show)
+
+findTags :: Type -> [Tag]
+findTags t = case t of
+    (UnionType tags' d) -> toList tags' ++ maybeToList d
+    _ -> []
 
 localImportsMap :: CodeGenContext -> M.Map T.Text (M.Map T.Text T.Text)
 localImportsMap CodeGenContext { localImports = imports } =
@@ -1009,13 +1015,13 @@ class $className(object):
         ]
 compileTypeDeclaration src
                        d@TypeDeclaration { typename = typename'
-                                         , type' = UnionType tags defaultTag
+                                         , type' = u
                                          , typeAnnotations = annotations
                                          } = do
-    tagCodes <- mapM (compileUnionTag src typename') $ toList tags ++ maybeToList defaultTag
+    tagCodes <- mapM (compileUnionTag src typename') tags
     let tagCodes' = T.intercalate "\n\n" tagCodes
         tagClasses = T.intercalate ", " [ toClassName' tagName'
-                                        | Tag tagName' _ _ <- toList tags ++ maybeToList defaultTag
+                                        | Tag tagName' _ _ <- tags
                                         ]
         enumMembers = toIndentedCodes
             (\ (t, b) -> [qq|$t = '{b}'|]) enumMembers' "\n        "
@@ -1034,15 +1040,15 @@ compileTypeDeclaration src
     typeRepr <- typeReprCompiler
     ret <- returnCompiler
     arg <- parameterCompiler
-    let defaultTagBehindName = case defaultTag of
-            Just dt -> stringLiteral $ I.toSnakeCaseText $ N.behindName $ tagName dt
+    let defaultTagBehindName = case defaultTag u of
+            Just dt -> toBehindStringLiteral $ tagName dt
             Nothing -> "None"
     return [qq|
 class $className({T.intercalate "," $ compileExtendClasses annotations}):
 {compileDocstring "    " d}
 
     __nirum_type__ = 'union'
-    __nirum_union_behind_name__ = '{I.toSnakeCaseText $ N.behindName typename'}'
+    __nirum_union_behind_name__ = {toBehindStringLiteral typename'}
     __nirum_field_names__ = name_dict_type([$nameMaps])
     __nirum_default_tag_behind_name__ = {defaultTagBehindName}
 
@@ -1129,18 +1135,20 @@ $className.__nirum_tag_classes__ = map_type(
 )
             |]
   where
+    tags :: [Tag]
+    tags = findTags u
     className :: T.Text
     className = toClassName' typename'
     enumMembers' :: [(T.Text, T.Text)]
     enumMembers' = [ ( toEnumMemberName tagName'
                      , I.toSnakeCaseText $ N.behindName tagName'
                      )
-                   | (Tag tagName' _ _) <- toList tags ++ maybeToList defaultTag
+                   | (Tag tagName' _ _) <- tags
                    ]
     nameMaps :: T.Text
     nameMaps = toIndentedCodes
         toNamePair
-        [name' | Tag name' _ _ <- toList tags ++ maybeToList defaultTag]
+        [name' | Tag name' _ _ <- tags]
         ",\n        "
     compileExtendClasses :: A.AnnotationSet -> [Code]
     compileExtendClasses annotations' =
@@ -1193,7 +1201,7 @@ class $className(service_type):
         $methodNameMap
     ])
     __nirum_method_annotations__ = $methodAnnotations'
-    __valerie__ = True
+
     @staticmethod
     def __nirum_method_error_types__(k, d=None):
         return dict([
