@@ -1,9 +1,10 @@
 import uuid
 
 from nirum.transport import Transport
+from six import PY2
 
 from fixture.foo import (Dog, Gender, PingService, Product, RpcError,
-                         SampleService_Client, Way)
+                         SampleService, SampleService_Client, Way)
 
 
 def test_throws_error():
@@ -48,7 +49,8 @@ class DumbTransport(Transport):
 
 def test_service_client_payload_serialization():
     t = DumbTransport()
-    c = SampleService_Client(t)
+    c = SampleService.Client(t)
+    assert SampleService_Client is SampleService.Client
     c.sample_method(
         a=Dog(name=u'Dog.name', age=3),
         b=Product(name=u'Product.name', sale=False),
@@ -83,3 +85,11 @@ def test_service_client_payload_serialization():
         'g': 1234,
         'hh': 'text data',
     }
+
+
+def test_service_client_representation():
+    if PY2:
+        assert repr(SampleService.Client) == "<class 'fixture.foo.Client'>"
+    else:
+        assert repr(SampleService.Client) == \
+            "<class 'fixture.foo.SampleService.Client'>"

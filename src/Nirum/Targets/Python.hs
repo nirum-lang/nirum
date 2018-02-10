@@ -1123,6 +1123,11 @@ class {className}_Client($className):
         self.__nirum_transport__ = transport  # type: transport_type
 
     {clientMethods'}
+
+{className}.Client = {className}_Client
+{className}.Client.__name__ = 'Client'
+if hasattr({className}.Client, '__qualname__'):
+    {className}.Client.__qualname__ = '{className}.Client'
 |]
   where
     nirumMapName :: T.Text
