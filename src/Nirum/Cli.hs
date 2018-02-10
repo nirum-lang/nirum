@@ -18,11 +18,7 @@ import System.Exit (die)
 import System.FilePath (takeDirectory, takeExtension, (</>))
 import System.FSNotify
 import Text.InterpolatedString.Perl6 (qq)
-import Text.Megaparsec (Token)
-import Text.Megaparsec.Error ( Dec
-                             , ParseError (errorPos)
-                             , parseErrorPretty
-                             )
+import Text.Megaparsec.Error (errorPos, parseErrorPretty)
 import Text.Megaparsec.Pos (SourcePos (sourceLine, sourceColumn), unPos)
 
 import Nirum.Constructs (Construct (toCode))
@@ -33,6 +29,7 @@ import Nirum.Package ( PackageError ( ImportError
                                     , ParseError
                                     , ScanError
                                     )
+                     , ParseError
                      , scanModules
                      )
 import Nirum.Package.ModuleSet ( ImportError ( CircularImportError
@@ -67,9 +64,7 @@ data AppOptions = AppOptions { outputPath :: FilePath
 debounceDelay :: Nanosecond
 debounceDelay = 1 * 1000 * 1000
 
-parseErrortoPrettyMessage :: ParseError (Token T.Text) Dec
-                          -> FilePath
-                          -> IO String
+parseErrortoPrettyMessage :: ParseError -> FilePath -> IO String
 parseErrortoPrettyMessage parseError' filePath' = do
     sourceCode <- readFile filePath'
     let sourceLines = lines sourceCode
