@@ -3,6 +3,7 @@ module Nirum.Constructs.DeclarationSet ( DeclarationSet ()
                                        , NameDuplication ( BehindNameDuplication
                                                          , FacialNameDuplication
                                                          )
+                                       , delete
                                        , empty
                                        , fromList
                                        , lookup
@@ -15,6 +16,7 @@ module Nirum.Constructs.DeclarationSet ( DeclarationSet ()
                                        , (!)
                                        ) where
 
+import qualified Data.List as List
 import Data.Maybe (fromJust)
 import qualified GHC.Exts as L
 import Prelude hiding (lookup, null)
@@ -96,6 +98,19 @@ union :: Declaration a
       -> DeclarationSet a
       -> Either NameDuplication (DeclarationSet a)
 union a b = fromList $ toList a ++ toList b
+
+delete :: Declaration a
+       => a
+       -> DeclarationSet a
+       -> DeclarationSet a
+delete d DeclarationSet { declarations = ds, index = ix } =
+    DeclarationSet
+        { declarations = M.delete identifier ds
+        , index = List.delete identifier ix
+        }
+  where
+    identifier :: Identifier
+    identifier = facialName $ name d
 
 instance (Declaration a) => L.IsList (DeclarationSet a) where
     type Item (DeclarationSet a) = a

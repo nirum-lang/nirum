@@ -12,6 +12,7 @@ import Nirum.Constructs.Annotation (AnnotationSet)
 import Nirum.Constructs.Declaration (Declaration (..), Documented)
 import Nirum.Constructs.DeclarationSet ( DeclarationSet
                                        , NameDuplication (..)
+                                       , delete
                                        , empty
                                        , fromList
                                        , lookup'
@@ -102,3 +103,5 @@ spec =
             it "returns Left BehindNameDuplication if behind names are dup" $
                 union dset [sd "xyz" "foo"] `shouldBe`
                     Left (BehindNameDuplication $ Name "xyz" "foo")
+        specify "delete" $
+            delete "bar" dset `shouldBe` ["foo", sd "baz" "asdf"]
