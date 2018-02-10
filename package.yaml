@@ -59,14 +59,16 @@ library:
   - fsnotify >=0.2.1 && <0.3.0
   - heterocephalus >=1.0.5 && <1.1.0
   - optparse-applicative >=0.13.1 && <0.14
+  - process >=1.4.3.0 && < 1.7
   - shakespeare >=2.0.12 && <2.1
   - stm >=2.4.4.1
+  - time >=1.6.0.1 && <1.7.0
   - template-haskell >=2.11 && <3
   - uri >=0.1 && <1.0
+  - vector >= 0.12.0.1 && < 0.13
 executables:
   nirum:
-    main: nirum.hs
-    source-dirs: app
+    main: app/nirum.hs
     ghc-options:
     - -fwarn-incomplete-uni-patterns
     - -threaded
@@ -74,8 +76,7 @@ executables:
     dependencies:
     - nirum
   nirum-static:
-    main: nirum.hs
-    source-dirs: app
+    main: app/nirum.hs
     ghc-options:
     - -fwarn-incomplete-uni-patterns
     - -threaded
@@ -83,6 +84,14 @@ executables:
     - -static
     dependencies:
     - base >=4.7 && <5
+    - nirum
+  nirum-quickstart:
+    main: app/nirum-quickstart.hs
+    ghc-options:
+    - -fwarn-incomplete-uni-patterns
+    - -threaded
+    - -with-rtsopts=-N
+    dependencies:
     - nirum
 tests:
   hlint:
