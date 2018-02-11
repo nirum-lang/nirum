@@ -1,15 +1,21 @@
 @error
 @http-status(code="400")
-record block-validation-error (text reason);
-record transaction-validation-error (text reason);
+union blockchain-error
+    = block-validation-error (text reason)
+    | transaction-validation-error (text reason)
+    ;
 
 service blockchain-service (
+    # This is a [blockchain] service example.
+    # It can create basic transactions & blocks, and mine.
+    #
+    # [blockchain]: https://en.wikipedia.org/wiki/Blockchain
 
-    @http-resource(method="POST", path="/blocks")
+    @http-resource(method="POST", path="/blocks/")
     block create-new-block (
         # Create a new block and add it to the chain.
         hash hash,
-    ) throws block-validation-error,
+    ) throws blockchain-error,
 
     @http-resource(method="GET", path="/blocks/{hash}/")
     block get-block-by-hash (
@@ -23,11 +29,11 @@ service blockchain-service (
         bigint number,
     ),
 
-    @http-resource(method="POST", path="/transactions")
+    @http-resource(method="POST", path="/transactions/")
     bool create-new-transaction (
         # Create a new transaction
         transaction transaction,
-    ) throws transaction-validation-error,
+    ) throws blockchain-error,
 
     @http-resource(method="GET", path="/transactions/{txid}/")
     block get-transaction (
@@ -35,7 +41,7 @@ service blockchain-service (
         txid txid,
     ),
 
-    @http-resource(method="GET", path="/hash")
+    @http-resource(method="GET", path="/hash/")
     block mine-hash (
         # Mine a valid new block hash based on current transactions.
     ),
