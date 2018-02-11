@@ -740,7 +740,7 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
     insertStandardImport "typing"
     insertThirdPartyImports
         [ ("nirum.validate", ["validate_unboxed_type"])
-        , ("nirum.deserialize", ["deserialize_unboxed_type"])
+        , ("nirum.deserialize", ["deserialize_meta"])
         ]
     pyVer <- getPythonVersion
     return $ toStrict $ renderMarkup $ [compileText|
@@ -792,7 +792,13 @@ class #{className}(object):
 %{ of Python3 }
     def __nirum_deserialize__(cls: type, value: typing.Any) -> '#{className}':
 %{ endcase }
-        return deserialize_unboxed_type(cls, value)
+        inner_type = cls.__nirum_get_inner_type__()
+        deserializer = getattr(inner_type, '__nirum_deserialize__', None)
+        if deserializer:
+            value = deserializer(value)
+        else:
+            value = deserialize_meta(inner_type, value)
+        return cls(value=value)
 
 %{ case pyVer }
 %{ of Python2 }
@@ -861,7 +867,7 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
             (\ (n, t, _) -> [qq|'{n}': {t}|]) nameTypeTriples ",\n        "
     importTypingForPython3
     insertThirdPartyImports [ ("nirum.validate", ["validate_record_type"])
-                            , ("nirum.deserialize", ["deserialize_record_type"])
+                            , ("nirum.deserialize", ["deserialize_meta"])
                             ]
     insertThirdPartyImportsA [ ( "nirum.constructs"
                                , [("name_dict_type", "NameDict")]
@@ -932,7 +938,38 @@ class $className(object):
 
     @classmethod
     def __nirum_deserialize__($clsType, value){ ret className }:
-        return deserialize_record_type(cls, value)
+        if '_type' not in value:
+            raise ValueError('"_type" field is missing.')
+        if not cls.__nirum_record_behind_name__ == value['_type']:
+            raise ValueError(
+                '%s expect "_type" equal to "%s"'
+                ', but found %s.' % (
+                    typing._type_repr(cls),
+                    cls.__nirum_record_behind_name__,
+                    value['_type']
+                )
+            )
+        args = dict()
+        behind_names = cls.__nirum_field_names__.behind_names
+        field_types = cls.__nirum_field_types__
+        if callable(field_types):
+            field_types = field_types()
+            # old compiler could generate non-callable dictionary
+        errors = set()
+        for attribute_name, item in value.items():
+            if attribute_name == '_type':
+                continue
+            if attribute_name in behind_names:
+                name = behind_names[attribute_name]
+            else:
+                name = attribute_name
+            try:
+                args[name] = deserialize_meta(field_types[name], item)
+            except ValueError as e:
+                errors.add('%s: %s' % (attribute_name, str(e)))
+        if errors:
+            raise ValueError('\\n'.join(sorted(errors)))
+        return cls(**args)
 
     def __hash__(self){ret "int"}:
         return hash(($hashText,))
@@ -983,7 +1020,7 @@ compileTypeDeclaration src
             (\ (t, b) -> [qq|$t = '{b}'|]) enumMembers' "\n        "
     importTypingForPython3
     insertStandardImport "enum"
-    insertThirdPartyImports [ ("nirum.deserialize", ["deserialize_union_type"])
+    insertThirdPartyImports [ ("nirum.deserialize", ["deserialize_meta"])
                             ]
     insertThirdPartyImportsA [ ( "nirum.constructs"
                                , [("name_dict_type", "NameDict")]
@@ -1025,7 +1062,57 @@ class $className({T.intercalate "," $ compileExtendClasses annotations}):
     def __nirum_deserialize__(
         {arg "cls" "type"}, value
     ){ ret className }:
-        return deserialize_union_type(cls, value)
+        if '_type' not in value:
+            raise ValueError('"_type" field is missing.')
+        if '_tag' not in value:
+            raise ValueError('"_tag" field is missing.')
+        if not hasattr(cls, '__nirum_tag__'):
+            for sub_cls in cls.__subclasses__():
+                if sub_cls.__nirum_tag__.value == value['_tag']:
+                    cls = sub_cls
+                    break
+            else:
+                raise ValueError(
+                    '%r is not deserialzable tag of `%s`' % (
+                        value, typing._type_repr(cls)
+                    )
+                )
+        if not cls.__nirum_union_behind_name__ == value['_type']:
+            raise ValueError(
+                '%s expect "_type" equal to "%s", but found %s' % (
+                    typing._type_repr(cls),
+                    cls.__nirum_union_behind_name__,
+                    value['_type']
+                )
+            )
+        if not cls.__nirum_tag__.value == value['_tag']:
+            raise ValueError(
+                '%s expect "_tag" equal to "%s", but found %s' % (
+                    typing._type_repr(cls),
+                    cls.__nirum_tag__.value,
+                    cls
+                )
+            )
+        args = dict()
+        behind_names = cls.__nirum_tag_names__.behind_names
+        errors = set()
+        for attribute_name, item in value.items():
+            if attribute_name in ('_type', '_tag'):
+                continue
+            if attribute_name in behind_names:
+                name = behind_names[attribute_name]
+            else:
+                name = attribute_name
+            tag_types = cls.__nirum_tag_types__
+            if callable(tag_types):  # old compiler could generate non-callable map
+                tag_types = dict(tag_types())
+            try:
+                args[name] = deserialize_meta(tag_types[name], item)
+            except ValueError as e:
+                errors.add('%s: %s' % (attribute_name, str(e)))
+        if errors:
+            raise ValueError('\\n'.join(sorted(errors)))
+        return cls(**args)
 
 
 $tagCodes'

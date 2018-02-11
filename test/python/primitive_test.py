@@ -110,6 +110,14 @@ def test_record():
         Point1.__nirum_deserialize__({'x': 3, 'top': 14})
     with raises(ValueError):
         Point1.__nirum_deserialize__({'_type': 'foo'})
+    with raises(ValueError) as e:
+        Point1.__nirum_deserialize__({'_type': 'point1',
+                                      'left': 'a',
+                                      'top': 'b'})
+    assert str(e.value) == '''\
+left: invalid literal for int() with base 10: 'a'
+top: invalid literal for int() with base 10: 'b'\
+'''
     with raises(TypeError):
         Point1(left=1, top='a')
     with raises(TypeError):
@@ -250,6 +258,24 @@ def test_union():
     assert agnostic_name != CultureAgnosticName(fullname=u'wrong')
     with raises(TypeError):
         CultureAgnosticName(fullname=1)
+    name = MixedName.__nirum_deserialize__({
+        '_type': 'mixed_name',
+        '_tag': 'east_asian_name',
+        'family_name': u'foo',
+        'given_name': u'bar',
+    })
+    assert isinstance(name, MixedName.EastAsianName)
+    with raises(ValueError) as e:
+        MixedName.__nirum_deserialize__({
+            '_type': 'mixed_name',
+            '_tag': 'east_asian_name',
+            'family_name': 404,
+            'given_name': 503,
+        })
+    assert str(e.value) == '''\
+family_name: '404' is not a string.
+given_name: '503' is not a string.\
+'''
 
 
 def test_union_with_special_case():
