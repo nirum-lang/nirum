@@ -1,0 +1,66 @@
+@error
+@http-status(code="400")
+record block-validation-error (text reason);
+record transaction-validation-error (text reason);
+
+service blockchain-service (
+
+    @http-resource(method="POST", path="/blocks")
+    block create-new-block (
+        # Create a new block and add it to the chain.
+        hash hash,
+    ) throws block-validation-error,
+
+    @http-resource(method="GET", path="/blocks/{hash}/")
+    block get-block-by-hash (
+        # Get block by hash.
+        hash hash,
+    ),
+
+    @http-resource(method="GET", path="/blocks/{number}/")
+    block get-block-by-number (
+        # Get block by block number.
+        bigint number,
+    ),
+
+    @http-resource(method="POST", path="/transactions")
+    bool create-new-transaction (
+        # Create a new transaction
+        transaction transaction,
+    ) throws transaction-validation-error,
+
+    @http-resource(method="GET", path="/transactions/{txid}/")
+    block get-transaction (
+        # Get transaction by txid.
+        txid txid,
+    ),
+
+    @http-resource(method="GET", path="/hash")
+    block mine-hash (
+        # Mine a valid new block hash based on current transactions.
+    ),
+);
+
+type hash = text;
+
+record block (
+    bigint number,
+    hash hash,
+    int32 nonce,
+    int32 difficulty,
+    hash? previous_hash,
+    [transaction] transactions,
+);
+
+type txid = uuid;
+type wallet-address = text;
+type signature = text;
+
+record transaction (
+    txid txid,
+    wallet-address sender,
+    wallet-address receiver,
+    float64 amount,
+    datetime sent_at,
+    signature signature,
+);
