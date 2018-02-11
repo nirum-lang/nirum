@@ -74,13 +74,15 @@ testPackage target' = do
                 package' <- scanPackage' path
                 package' `shouldSatisfy` isRight
                 let Right package = package'
+                Right blockchainM <- parseFile (path </> "blockchain.nrm")
                 Right builtinsM <- parseFile (path </> "builtins.nrm")
                 Right productM <- parseFile (path </> "product.nrm")
                 Right shapesM <- parseFile (path </> "shapes.nrm")
                 Right countriesM <- parseFile (path </> "countries.nrm")
                 Right addressM <- parseFile (path </> "address.nrm")
                 Right pdfServiceM <- parseFile (path </> "pdf-service.nrm")
-                let modules = [ (["builtins"], builtinsM)
+                let modules = [ (["blockchain"], blockchainM)
+                              , (["builtins"], builtinsM)
                               , (["product"], productM)
                               , (["shapes"], shapesM)
                               , (["countries"], countriesM)
@@ -117,7 +119,8 @@ testPackage target' = do
         specify "scanModules" $ do
             let path = "." </> "examples"
             mods' <- scanModules path
-            mods' `shouldBe` [ (["builtins"], path </> "builtins.nrm")
+            mods' `shouldBe` [ (["blockchain"], path </> "blockchain.nrm")
+                             , (["builtins"], path </> "builtins.nrm")
                              , (["product"], path </> "product.nrm")
                              , (["shapes"], path </> "shapes.nrm")
                              , (["countries"], path </> "countries.nrm")
