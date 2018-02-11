@@ -25,6 +25,8 @@ cache:
   - "$HOME/.ghc"
   - "$HOME/Library/Caches/Homebrew"
 before_install:
+- grep 2016–`date +%Y` package.yaml  # Check copyright year
+
 - mkdir -p "$HOME/.local/bin"
 - export PATH="$HOME/.local/bin:$PATH"
 - |
