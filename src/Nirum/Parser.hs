@@ -473,7 +473,10 @@ unionTypeDeclaration = do
         let remainTagSet = case defaultTag of
                                Just t -> DeclarationSet.delete t tagSet
                                Nothing -> tagSet
-        return $ TypeDeclaration typename (UnionType remainTagSet defaultTag) annotationSet''
+
+        if length (L.filter snd tags') > 1
+            then fail "`union` have to has only 1 default tag."
+            else return $ TypeDeclaration typename (UnionType remainTagSet defaultTag) annotationSet''
 
 typeDeclaration :: Parser TypeDeclaration
 typeDeclaration = do

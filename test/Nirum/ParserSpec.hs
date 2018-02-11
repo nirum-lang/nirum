@@ -823,7 +823,13 @@ union dup
             expectErr "unboxed a (text);\nunion b = x | y\nunboxed c (text);"
                       3 1
             expectErr "union a = x | y;\nunboxed b (text)\nunion c = x | y;" 3 1
-
+        it "failed to parse union with more than 1 default keyword." $ do
+            let (_, expectErr) = helperFuncs P.module'
+            expectErr [s|
+union shape
+    = default circle (point origin, offset radius,)
+    | default rectangle (point upper-left, point lower-right,)
+    ;|] 4 6
     describe "method" $ do
         let (parse', expectError) = helperFuncs P.method
             httpGetAnnotation = singleton $ Annotation "http"
@@ -836,14 +842,14 @@ union dup
             parse' "text get-name (person user)" `shouldBeRight`
                 Method "get-name" [Parameter "user" "person" empty]
                        (Just "text") Nothing empty
-            parse' "text get-name  ( person user,text default )" `shouldBeRight`
+            parse' "text get-name  ( person user,text `default` )" `shouldBeRight`
                 Method "get-name"
                        [ Parameter "user" "person" empty
                        , Parameter "default" "text" empty
                        ]
                        (Just "text") Nothing empty
             parse' "@http(method = \"GET\", path = \"/get-name/\") \
-                   \text get-name  ( person user,text default )" `shouldBeRight`
+                   \text get-name  ( person user,text `default` )" `shouldBeRight`
                 Method "get-name"
                        [ Parameter "user" "person" empty
                        , Parameter "default" "text" empty
@@ -852,7 +858,7 @@ union dup
             parse' "text get-name() throws name-error" `shouldBeRight`
                 Method "get-name" [] (Just "text") (Just "name-error") empty
             parse' [s|
-text get-name  ( person user,text default )
+text get-name  ( person user,text `default` )
                throws get-name-error|] `shouldBeRight`
                 Method "get-name"
                        [ Parameter "user" "person" empty
@@ -861,7 +867,7 @@ text get-name  ( person user,text default )
                        (Just "text") (Just "get-name-error") empty
             parse' [s|
 @http(method = "GET", path = "/get-name/")
-text get-name  ( person user,text default )
+text get-name  ( person user,text `default` )
                throws get-name-error|] `shouldBeRight`
                 Method "get-name"
                        [ Parameter "user" "person" empty
@@ -925,7 +931,7 @@ text get-name (
   # Gets the name of the user.
   person user,
   # The person to find their name.
-  text default
+  text `default`
   # The default name used when the user has no name.
 )|] `shouldBeRight` expectedMethod
         it "fails to parse if there are parameters of the same facial name" $ do
