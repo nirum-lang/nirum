@@ -27,6 +27,26 @@ cache:
 before_install:
 - grep 2016–`date +%Y` package.yaml  # Check copyright year
 
+# Check version
+- |
+  if [[ "$TRAVIS_TAG" != "" ]]; then
+    [[ "$(stack query locals nirum version)" == "'$TRAVIS_TAG'" ]]
+    grep "$TRAVIS_TAG" README.md  # Check output example of -h/--help
+  fi
+
+# Check changelog
+- |
+  if git show --format=%B --quiet "${TRAVIS_PULL_REQUEST_SHA:-${TRAVIS_TAG:-${TRAVIS_COMMIT}}}" \
+     | grep '\[changelog skip\]' > /dev/null; then
+    echo "Skip changelog checker..."
+  elif [[ "$TRAVIS_TAG" != "" ]]; then
+    ! grep -i "to be released" CHANGES.md
+  else
+    [[ "$TRAVIS_COMMIT_RANGE" = "" ]] || \
+    [[ "$(git diff --name-only "$TRAVIS_COMMIT_RANGE" | grep CHANGES\.md)" != "" ]]
+  fi
+
+# Install things
 - mkdir -p "$HOME/.local/bin"
 - export PATH="$HOME/.local/bin:$PATH"
 - |
