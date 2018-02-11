@@ -1,7 +1,7 @@
 version: "{build}"
 platform:
-- x86
 - x64
+- x86
 environment:
   STACK_ROOT: C:\sr
   TOX: C:\Python36\Scripts\tox.exe
@@ -9,6 +9,10 @@ cache:
 - '%STACK_ROOT% -> appveyor.yml'
 - '%LOCALAPPDATA%\Programs\stack -> appveyor.yml'
 install:
+# Debug prints
+- dir C:\
+- set
+
 - ps: Invoke-WebRequest -OutFile C:\upx391w.zip http://upx.sourceforge.net/download/upx391w.zip
 - 7z x -oC:\ C:\upx391w.zip
 - ps: set LANG=en_US
@@ -30,6 +34,20 @@ install:
     }
     $env:PATH = $env:STACK_ROOT + ';C:\msys64\usr\bin;' + $env:PATH;
 - if not exist "%LOCALAPPDATA%\Programs\stack" ( stack --no-terminal --skip-msys setup )
+
+# https://github.com/spoqa/nirum/issues/226
+# https://github.com/tox-dev/tox/issues/114#issuecomment-349712050
+# https://tox.readthedocs.io/en/2.9.1/developers.html#id1
+- ps: |
+    if($env:PLATFORM -eq 'x64') {
+      Copy-Item C:\Python27-x64\python.exe -Destination C:\Python27-x64\python2.7.exe
+      $env:PATH = 'C:\Python27-x64;' + $env:PATH;
+    }
+
+# Debug prints
+- dir C:\
+- set
+
 - C:\Python36\python -m pip install --upgrade tox pip setuptools
 - stack --no-terminal install -j4 --only-dependencies
 build_script:
