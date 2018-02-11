@@ -61,6 +61,7 @@ reservedKeywords = [ "enum"
                    , "type"
                    , "unboxed"
                    , "union"
+                   , "default"
                    ]
 
 identifierRule :: Parser Identifier
