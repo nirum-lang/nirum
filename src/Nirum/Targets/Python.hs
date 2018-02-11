@@ -63,6 +63,7 @@ import Data.Text.Lazy (toStrict)
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Data.Function (on)
 import System.FilePath (joinPath)
+import qualified Text.Blaze.Internal as BI
 import Text.Blaze.Renderer.Text
 import qualified Text.Email.Validate as E
 import Text.Heterocephalus (compileText)
@@ -205,6 +206,9 @@ runCodeGen :: CodeGen a
            -> CodeGenContext
            -> (Either CompileError' a, CodeGenContext)
 runCodeGen = C.runCodeGen
+
+renderCompileText :: BI.Markup -> T.Text
+renderCompileText = toStrict . renderMarkup
 
 insertStandardImport :: T.Text -> CodeGen ()
 insertStandardImport module' = ST.modify insert'
@@ -732,7 +736,7 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
                                              , type' = Alias ctype
                                              } = do
     ctypeExpr <- compileTypeExpression src (Just ctype)
-    return $ toStrict $ renderMarkup [compileText|
+    return $ renderCompileText $ [compileText|
 %{ case compileDocs d }
 %{ of Just rst }
 #: #{rst}
@@ -1019,12 +1023,6 @@ compileTypeDeclaration src
                                          , typeAnnotations = annotations
                                          } = do
     tagCodes <- mapM (compileUnionTag src typename') tags
-    let tagCodes' = T.intercalate "\n\n" tagCodes
-        tagClasses = T.intercalate ", " [ toClassName' tagName'
-                                        | Tag tagName' _ _ <- tags
-                                        ]
-        enumMembers = toIndentedCodes
-            (\ (t, b) -> [qq|$t = '{b}'|]) enumMembers' "\n        "
     importTypingForPython3
     insertStandardImport "enum"
     insertThirdPartyImports [ ("nirum.deserialize", ["deserialize_meta"])
@@ -1040,43 +1038,49 @@ compileTypeDeclaration src
     typeRepr <- typeReprCompiler
     ret <- returnCompiler
     arg <- parameterCompiler
-    let defaultTagBehindName = case defaultTag u of
-            Just dt -> toBehindStringLiteral $ tagName dt
-            Nothing -> "None"
-    return [qq|
-class $className({T.intercalate "," $ compileExtendClasses annotations}):
-{compileDocstring "    " d}
+    return $ renderCompileText $ [compileText|
+class #{className}(#{T.intercalate "," $ compileExtendClasses annotations}):
+#{compileDocstring "    " d}
 
     __nirum_type__ = 'union'
-    __nirum_union_behind_name__ = {toBehindStringLiteral typename'}
-    __nirum_field_names__ = name_dict_type([$nameMaps])
-    __nirum_default_tag_behind_name__ = {defaultTagBehindName}
+    __nirum_union_behind_name__ = '#{toBehindSnakeCaseText typename'}'
+    __nirum_field_names__ = name_dict_type([
+%{ forall (Tag (Name f b) _ _) <- tags }
+        ('#{toAttributeName f}', '#{I.toSnakeCaseText b}'),
+%{ endforall }
+    ])
 
     class Tag(enum.Enum):
-        $enumMembers
+%{ forall (Tag tn _ _) <- tags }
+        #{toEnumMemberName tn} = '#{toBehindSnakeCaseText tn}'
+%{ endforall }
 
     def __init__(self, *args, **kwargs):
         raise NotImplementedError(
-            "\{0\} cannot be instantiated "
+            "{0} cannot be instantiated "
             "since it is an abstract class.  Instantiate a concrete subtype "
-            "of it instead.".format({typeRepr "type(self)"})
+            "of it instead.".format(#{typeRepr "type(self)"})
         )
 
     def __nirum_serialize__(self):
         raise NotImplementedError(
-            "\{0\} cannot be instantiated "
+            "{0} cannot be instantiated "
             "since it is an abstract class.  Instantiate a concrete subtype "
-            "of it instead.".format({typeRepr "type(self)"})
+            "of it instead.".format(#{typeRepr "type(self)"})
         )
 
     @classmethod
     def __nirum_deserialize__(
-        {arg "cls" "type"}, value
-    ){ ret className }:
-        if ($className.__nirum_default_tag_behind_name__ is not None and
-            isinstance(value, dict) and '_tag' not in value):
+        #{arg "cls" "type"}, value
+    )#{ ret className }:
+%{ case defaultTag u }
+%{ of Just dt }
+        if isinstance(value, dict) and '_tag' not in value:
             value = dict(value)
-            value['_tag'] = $className.__nirum_default_tag_behind_name__
+            value['_tag'] = '#{toBehindSnakeCaseText $ tagName dt}'
+            value['_type'] = '#{toAttributeName' typename'}'
+%{ of Nothing }
+%{ endcase }
         if '_type' not in value:
             raise ValueError('"_type" field is missing.')
         if '_tag' not in value:
@@ -1124,32 +1128,25 @@ class $className({T.intercalate "," $ compileExtendClasses annotations}):
             except ValueError as e:
                 errors.add('%s: %s' % (attribute_name, str(e)))
         if errors:
-            raise ValueError('\\n'.join(sorted(errors)))
+            raise ValueError('\n'.join(sorted(errors)))
         return cls(**args)
 
-$tagCodes'
+%{ forall tagCode <- tagCodes }
+#{tagCode}
 
-$className.__nirum_tag_classes__ = map_type(
-    (tcls.__nirum_tag__, tcls)
-    for tcls in [$tagClasses]
-)
+%{ endforall }
+
+#{className}.__nirum_tag_classes__ = map_type({
+%{ forall (Tag tn _ _) <- tags }
+    #{className}.Tag.#{toEnumMemberName tn}: #{toClassName' tn},
+%{ endforall }
+})
             |]
   where
     tags :: [Tag]
     tags = findTags u
     className :: T.Text
     className = toClassName' typename'
-    enumMembers' :: [(T.Text, T.Text)]
-    enumMembers' = [ ( toEnumMemberName tagName'
-                     , I.toSnakeCaseText $ N.behindName tagName'
-                     )
-                   | (Tag tagName' _ _) <- tags
-                   ]
-    nameMaps :: T.Text
-    nameMaps = toIndentedCodes
-        toNamePair
-        [name' | Tag name' _ _ <- tags]
-        ",\n        "
     compileExtendClasses :: A.AnnotationSet -> [Code]
     compileExtendClasses annotations' =
         if null extendClasses
@@ -1163,6 +1160,9 @@ $className.__nirum_tag_classes__ = map_type(
             [ M.lookup annotationName extendsClassMap
             | (A.Annotation annotationName _) <- A.toList annotations'
             ]
+    toBehindSnakeCaseText :: Name -> T.Text
+    toBehindSnakeCaseText = I.toSnakeCaseText . N.behindName
+
 compileTypeDeclaration
     src@Source { sourcePackage = Package { metadata = metadata' } }
     d@ServiceDeclaration { serviceName = name'
@@ -1430,7 +1430,7 @@ compileModule pythonVersion' source = do
     let fromImports = M.assocs (localImportsMap context) ++
                       M.assocs (thirdPartyImports context)
     code <- result
-    return $ (,) installRequires $ toStrict $ renderMarkup $
+    return $ (,) installRequires $ renderCompileText $
         [compileText|# -*- coding: utf-8 -*-
 #{compileDocstring "" $ sourceModule source}
 %{ forall i <- S.elems (standardImports context) }
@@ -1475,7 +1475,7 @@ compilePackageMetadata Package
                            , modules = modules'
                            }
                        (InstallRequires deps optDeps) =
-    toStrict $ renderMarkup [compileText|# -*- coding: utf-8 -*-
+    renderCompileText [compileText|# -*- coding: utf-8 -*-
 import sys
 
 from setuptools import setup, __version__ as setuptools_version
