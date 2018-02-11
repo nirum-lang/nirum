@@ -203,3 +203,73 @@ its lack of order if necessary.
 When a JSON array serialized from a list field is deserialized to a set,
 the same values shown more than once are collapsed to unique values.
 Also, its order is not preserved.
+
+
+Interchangeability of union type and record type
+------------------------------------------------
+
+Sometimes we need to evolve an existing record type to be extended.
+
+But when we change a record type to a union type, it breaks backward
+compatibility.  Suppose we have a record type named `name` that looks like:
+
+~~~~~~~~ nirum
+record name (text fullname);
+~~~~~~~~
+
+An example of JSON serialized one would look like:
+
+~~~~~~~~ json
+{
+    "_type": "name",
+    "fullname": "John Doe"
+}
+~~~~~~~~
+
+What if we need to be more sensible to culture-specific names?  Now we decide
+to change it to a union:
+
+~~~~~~~~ nirum
+union name
+    = wastern-name (text first-name, text? middle-name, text last-name)
+    | east-asian-name (text family-name, text given-name)
+    | culture-agnostice-name (text fullname)
+    ;
+~~~~~~~~
+
+Since union types requires `"_tag"` field besides `"_type"` field when
+they are deserialized, data sent from the older programs becomes to break
+compatibility.
+
+In order to make union types possible to deserialize existing record data
+(which lacks `"_tag"` field), we need to choose `default` tag for data lacking
+`"_tag"` field:
+
+~~~~~~~~ nirum
+union name
+    = wastern-name (text first-name, text? middle-name, text last-name)
+    | east-asian-name (text family-name, text given-name)
+    | default culture-agnostice-name (text fullname)
+    ;
+~~~~~~~~
+
+With a `default` tag, union types become possible to deserialize data lacking
+`"_tag"` field, and they are treated as an instance of the `default` tag.
+For example, where we have a payload data like:
+
+~~~~~~~~ json
+{
+    "_type": "name",
+    "fullname": "John Doe"
+}
+~~~~~~~~
+
+It's treated as equivalent to the following one:
+
+~~~~~~~~ json
+{
+    "_type": "name",
+    "_tag": "culture_agnostic_name",
+    "fullname": "John Doe"
+}
+~~~~~~~~
