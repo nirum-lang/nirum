@@ -31,7 +31,7 @@ For example, the following code is allowed:
 ~~~~~~~~ nirum
 @foo
 @bar(baz = "qux")
-boxed filename (text);
+unboxed filename (text);
 ~~~~~~~~
 
 Whereas the following code is disallowed:
@@ -39,7 +39,7 @@ Whereas the following code is disallowed:
 ~~~~~~~~ nirum
 @foo
 @foo(baz = "qux")  // `foo` is duplicated
-boxed filename (text);
+unboxed filename (text);
 ~~~~~~~~
 
 
@@ -56,7 +56,7 @@ by a comma, and an optional trailing comma is also allowed.  E.g.:
 @foo()
 @bar(baz = "qux")
 @quux(corge = "grault", garply = "waldo", fred = "plugh",)
-boxed filename (text);
+unboxed filename (text);
 ~~~~~~~~
 
 Currently, argument values are only allowed to be a text (which is wrapped by
@@ -65,7 +65,7 @@ Note that C-style escape sequences work between double quotes, e.g.:
 
 ~~~~~~~~ nirum
 @foo(bar = "Escape double quotes (\") with backslashes (\\).")
-boxed filename (text);
+unboxed filename (text);
 ~~~~~~~~
 
 
@@ -83,12 +83,12 @@ examples are equivalent, and the former is internally transformed to the latter:
 
 ~~~~~~~~ nirum
 # Docs comments are transformed to `@docs` annotations.
-boxed filename (text);
+unboxed filename (text);
 ~~~~~~~~
 
 ~~~~~~~~ nirum
 @docs(docs = "Docs comments are transformed to `@docs` annotations.\n")
-boxed filename (text);
+unboxed filename (text);
 ~~~~~~~~
 
 It is primarily for simplifying internal syntax tree, but can be used at runtime
