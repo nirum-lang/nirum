@@ -842,14 +842,14 @@ union shape
             parse' "text get-name (person user)" `shouldBeRight`
                 Method "get-name" [Parameter "user" "person" empty]
                        (Just "text") Nothing empty
-            parse' "text get-name  ( person user,text `default` )" `shouldBeRight`
+            parse' "text get-name (person user,text `default`)" `shouldBeRight`
                 Method "get-name"
                        [ Parameter "user" "person" empty
                        , Parameter "default" "text" empty
                        ]
                        (Just "text") Nothing empty
             parse' "@http(method = \"GET\", path = \"/get-name/\") \
-                   \text get-name  ( person user,text `default` )" `shouldBeRight`
+                   \text get-name (person user,text `default`)" `shouldBeRight`
                 Method "get-name"
                        [ Parameter "user" "person" empty
                        , Parameter "default" "text" empty

@@ -1078,7 +1078,6 @@ class #{className}(#{T.intercalate "," $ compileExtendClasses annotations}):
         if isinstance(value, dict) and '_tag' not in value:
             value = dict(value)
             value['_tag'] = '#{toBehindSnakeCaseText $ tagName dt}'
-            value['_type'] = '#{toAttributeName' typename'}'
 %{ of Nothing }
 %{ endcase }
         if '_type' not in value:

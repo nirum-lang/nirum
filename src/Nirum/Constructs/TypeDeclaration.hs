@@ -207,10 +207,10 @@ instance Construct TypeDeclaration where
       where
         fieldsCode = T.intercalate "\n" $ map toCode $ toList fields'
         docs' = A.lookupDocs annotationSet'
-    toCode (TypeDeclaration name' (UnionType tags' defaultTag') annotationSet') =
-        T.concat [ toCode annotationSet'
+    toCode (TypeDeclaration name' (UnionType tags' defaultTag') as') =
+        T.concat [ toCode as'
                  , "union ", nameCode
-                 , toCodeWithPrefix "\n    " (A.lookupDocs annotationSet')
+                 , toCodeWithPrefix "\n    " (A.lookupDocs as')
                  , "\n    = " , tagsCode
                  , "\n    ;"
                  ]
@@ -227,12 +227,12 @@ instance Construct TypeDeclaration where
                                  ]
     toCode (TypeDeclaration name'
                             (PrimitiveType typename' jsonType')
-                            annotationSet') =
-        T.concat [ toCode annotationSet'
+                            as') =
+        T.concat [ toCode as'
                  , "// primitive type `", toCode name', "`\n"
                  , "//     internal type identifier: ", showT typename', "\n"
                  , "//     coded to json ", showT jsonType', " type\n"
-                 , docString (A.lookupDocs annotationSet')
+                 , docString (A.lookupDocs as')
                  ]
       where
         showT :: Show a => a -> T.Text

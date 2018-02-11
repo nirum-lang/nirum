@@ -476,7 +476,10 @@ unionTypeDeclaration = do
 
         if length (L.filter snd tags') > 1
             then fail "`union` have to has only 1 default tag."
-            else return $ TypeDeclaration typename (UnionType remainTagSet defaultTag) annotationSet''
+            else return $ TypeDeclaration
+                              typename
+                              (UnionType remainTagSet defaultTag)
+                              annotationSet''
 
 typeDeclaration :: Parser TypeDeclaration
 typeDeclaration = do
