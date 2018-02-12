@@ -1,25 +1,28 @@
 Nirum
 =====
 
-[![Build Status (Travis CI)][ci-svg]][ci]
-[![Build Status (AppVeyor)][ciw-svg]][ciw]
-[![Docker Automated Build][docker-svg]][docker]
+[![The latest release on GitHub][release-svg]][release]
+[![Docker automated build][docker-svg]][docker]
+[![Build status on Linux and macOS (Travis CI)][ci-svg]][ci]
+[![Build status on Windows (AppVeyor)][ciw-svg]][ciw]
+[![Test coverage (codecov)][cov-svg]][cov]
 [![Total lines of code][loc]][repo]
 [![Gitter][chat-svg]][chat]
-[![codecov][cov-svg]][cov]
 
+[release-svg]: https://img.shields.io/github/release/spoqa/nirum/all.svg
+[release]: https://github.com/spoqa/nirum/releases
+[docker]: https://hub.docker.com/r/spoqa/nirum/
+[docker-svg]: https://img.shields.io/docker/automated/spoqa/nirum.svg
 [ci-svg]: https://travis-ci.org/spoqa/nirum.svg?branch=master
 [ci]: https://travis-ci.org/spoqa/nirum
 [ciw-svg]: https://ci.appveyor.com/api/projects/status/jf9bsrnalcb1xrp0?svg=true
 [ciw]: https://ci.appveyor.com/project/dahlia/nirum-k5n5y
-[docker]: https://hub.docker.com/r/spoqa/nirum/
-[docker-svg]: https://img.shields.io/docker/automated/spoqa/nirum.svg
+[cov-svg]: https://codecov.io/gh/spoqa/nirum/branch/master/graph/badge.svg
+[cov]: https://codecov.io/gh/spoqa/nirum
 [loc]: https://tokei.rs/b1/github/spoqa/nirum
 [repo]: https://github.com/spoqa/nirum
 [chat-svg]: https://badges.gitter.im/spoqa/nirum.svg
 [chat]: https://gitter.im/spoqa/nirum?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge
-[cov-svg]: https://codecov.io/gh/spoqa/nirum/branch/master/graph/badge.svg
-[cov]: https://codecov.io/gh/spoqa/nirum
 
 Nirum is an [IDL][1] compiler and [RPC][2]/[distributed object][3] framework
 for [microservices][4], built on top of the modern Web server technologies
