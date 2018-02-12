@@ -117,7 +117,7 @@ after_script:
 - find . -name '*.tix'
 - find . -name '*.mix'
 - |
-  codecov-haskell \
+  stack exec -- codecov-haskell \
     --tix-dir ./.stack-work/install/x86_64-*/lts-*/*/hpc/nirum/ \
     --mix-dir ./.stack-work/dist/x86_64-*/Cabal-*/hpc/ \
     spec
