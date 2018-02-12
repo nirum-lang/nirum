@@ -113,13 +113,15 @@ script:
 - ./lint.sh
 
 after_script:
-- stack build --install-ghc --no-terminal --copy-bins
+- stack build --install-ghc --no-terminal --copy-bins codecov-haskell
 - find . -name '*.tix'
 - find . -name '*.mix'
 - |
   stack exec -- codecov-haskell \
     --tix-dir ./.stack-work/install/x86_64-*/lts-*/*/hpc/nirum/ \
     --mix-dir ./.stack-work/dist/x86_64-*/Cabal-*/hpc/ \
+    --print-response \
+    --display-report \
     spec
 
 notifications:
