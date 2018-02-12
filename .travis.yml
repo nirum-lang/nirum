@@ -140,6 +140,7 @@ notifications:
     on_start: never
 
 before_deploy:
+- stack clean
 - stack build --no-terminal --copy-bins
 - mkdir -p /tmp/nirum-build
 - export NIGHTLY_BINARY_PATH="/tmp/nirum-build/nirum-$(uname -s | tr '[A-Z]' '[a-z]')-$(uname -m)"
