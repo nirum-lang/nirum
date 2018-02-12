@@ -117,11 +117,13 @@ after_script:
 - find . -name '*.tix'
 - find . -name '*.mix'
 - |
+  token_encoded='NTBjYmQ4ZTgtN2Y4Ni00Mzg4LWIyN2EtMzMzMzhiNjUwZjc3'
   stack exec -- codecov-haskell \
     --tix-dir ./.stack-work/install/x86_64-*/lts-*/*/hpc/nirum/ \
     --mix-dir ./.stack-work/dist/x86_64-*/Cabal-*/hpc/ \
     --print-response \
     --display-report \
+    --token="$(echo $token_encoded | python -m base64 -d)" \
     spec
 
 notifications:
