@@ -4,6 +4,5 @@ packages:
 - '.'
 extra-deps:
 - uri-0.1.6.4
-- git: https://github.com/spoqa/codecov-haskell.git
-  commit: 8448801f8d01624e4cd60420beb3fdc85c099576
+## INSERT CODECOV HERE -- DO NOT REMOTE THIS COMMENT. SEE ALSO ISSUE #156. ##
 extra-package-dbs: []

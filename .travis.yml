@@ -113,6 +113,10 @@ script:
 - ./lint.sh
 
 after_script:
+- |
+  # Since codecov-haskell doesn't work on Windows,
+  # it should be added to extra-deps during only Travis CI build.
+  sed -i 's|^## *INSERT CODECOV HERE.*$|- {"git": "https://github.com/spoqa/codecov-haskell.git", "commit": "8448801f8d01624e4cd60420beb3fdc85c099576"}|' stack.yaml
 - stack build --install-ghc --no-terminal --copy-bins codecov-haskell
 - find . -name '*.tix'
 - find . -name '*.mix'
