@@ -502,7 +502,7 @@ method = do
         spaces1
         notFollowedBy $ char '('
         return rt
-    
+
     methodName <- name <?> "method name"
     spaces
     char '('
@@ -583,7 +583,7 @@ imports = do
     spaces
     char '('
     spaces
-    idents <- (importName >>= \i -> spaces >> return i)
+    idents <- (importName >>= \ i -> spaces >> return i)
         `sepEndBy1` (char ',' >> spaces)
         <?> "names to import"
     char ')'

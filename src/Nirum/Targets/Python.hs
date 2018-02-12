@@ -571,7 +571,9 @@ if hasattr($parentClass, '__qualname__'):
     fieldList :: [Field]
     fieldList = toList fields
     nameMaps :: Code
-    nameMaps = toIndentedCodes toNamePair (map fieldName fieldList) ",\n        "
+    nameMaps = toIndentedCodes toNamePair
+                               (map fieldName fieldList)
+                               ",\n        "
     parentClass :: T.Text
     parentClass = toClassName' parentname
     fieldSerializers :: Code
@@ -1103,9 +1105,7 @@ class $className({T.intercalate "," $ compileExtendClasses annotations}):
                 name = behind_names[attribute_name]
             else:
                 name = attribute_name
-            tag_types = cls.__nirum_tag_types__
-            if callable(tag_types):  # old compiler could generate non-callable map
-                tag_types = dict(tag_types())
+            tag_types = dict(cls.__nirum_tag_types__())
             try:
                 args[name] = deserialize_meta(tag_types[name], item)
             except ValueError as e:
