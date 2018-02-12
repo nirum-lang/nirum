@@ -159,7 +159,8 @@ union shape
                 nullDecl' =
                     ServiceDeclaration "null-service" nullService
                                        (singleDocs "Null service declaration.")
-                pingService = Service [ Method "ping" [] (Just "bool") Nothing empty ]
+                pingService = Service
+                    [Method "ping" [] (Just "bool") Nothing empty]
                 pingDecl = ServiceDeclaration "ping-service" pingService empty
                 pingDecl' =
                     ServiceDeclaration "ping-service" pingService

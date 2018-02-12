@@ -26,10 +26,10 @@ scan=(stack exec scan --)
 # Haskell style scanner doesn't provide proper exit code ---
 # it always exists with zero even if it found errors.
 scanout="$(mktemp)"
-find src test -name '*.hs' -and -not -exec grep -q TemplateHaskell {} \; \
+(find src test -name '*.hs' -and -not -exec grep -q TemplateHaskell {} \; \
     -print0 | \
         xargs -0 "${scan[@]}" -t -j false -c false | \
-        grep -v 'back slash at line end .may disturb cpp.' || true > "$scanout"
+        grep -v 'back slash at line end .may disturb cpp.' || true) > "$scanout"
 cat "$scanout"
 if [[ "$(cat "$scanout")" != "" ]]; then
   exit 1

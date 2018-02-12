@@ -234,7 +234,7 @@ typeDecl mod' ident
 |]
   where
     enumerate :: [a] -> [(Int, a)]
-    enumerate = zip [0..]
+    enumerate = zip [0 ..]
     enumerateParams :: DES.DeclarationSet S.Parameter -> [(Int, S.Parameter)]
     enumerateParams = enumerate . DES.toList
 typeDecl _ _ TD.Import {} =
@@ -300,7 +300,7 @@ moduleTitle Module { docs = docs' } = do
 
 stylesheet :: TL.Text
 stylesheet = renderCss ([cassius|
-@import url("https://fonts.googleapis.com/css?family=Source+Code+Pro:300,400|Source+Sans+Pro")
+@import url(#{fontUrl})
 body
     font-family: Source Sans Pro
     color: #{gray8}
@@ -335,6 +335,11 @@ dd
         margin-top: 0
 |] undefined)
   where
+    fontUrl :: T.Text
+    fontUrl = T.concat
+        [ "https://fonts.googleapis.com/css"
+        , "?family=Source+Code+Pro:300,400|Source+Sans+Pro"
+        ]
     -- from Open Color https://yeun.github.io/open-color/
     gray1 :: T.Text
     gray1 = "#f1f3f5"
