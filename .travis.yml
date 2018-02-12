@@ -1,6 +1,7 @@
 dist: trusty
 sudo: false
 language: c
+
 matrix:
   include:
   - os: osx
@@ -16,14 +17,17 @@ matrix:
         - python3.6
         - libgmp10
         - upx-ucl
+
 env:
 - PIP_MINVER=9.0.1 SETUPTOOLS_MINVER=36.6.0
+
 cache:
   directories:
   - "$HOME/.cabal"
   - "$HOME/.stack"
   - "$HOME/.ghc"
   - "$HOME/Library/Caches/Homebrew"
+
 before_install:
 - grep 2016–`date +%Y` package.yaml  # Check copyright year
 
@@ -81,6 +85,7 @@ before_install:
   fi
 - curl -o "$HOME/.local/bin/travis_long" -L https://raw.githubusercontent.com/futurice/fum2github/master/travis_long
 - chmod +x "$HOME/.local/bin/travis_long"
+
 install:
 - |
   if python3 -c "import pip"; then
@@ -102,14 +107,30 @@ install:
 - travis_long stack --no-terminal setup
 - travis_long stack --no-terminal install scan -j4
 - travis_long stack --no-terminal install -j4 --only-dependencies
+
 script:
 - 'TOX="$(which tox)" stack --no-terminal test -j4 --coverage'
 - ./lint.sh
+
 after_script:
 - stack build --install-ghc --no-terminal --copy-bins
 - find . -name '*.tix'
 - find . -name '*.mix'
-- codecov-haskell --tix-dir ./.stack-work/install/x86_64-*/lts-*/*/hpc/nirum/ --mix-dir ./.stack-work/dist/x86_64-*/Cabal-*/hpc/ spec
+- |
+  codecov-haskell \
+    --tix-dir ./.stack-work/install/x86_64-*/lts-*/*/hpc/nirum/ \
+    --mix-dir ./.stack-work/dist/x86_64-*/Cabal-*/hpc/ \
+    spec
+
+notifications:
+  webhooks:
+    urls:
+    - https://webhooks.gitter.im/e/29cc2477daa438db4e9d
+    - 'http://travis-auto-rebuilder.herokuapp.com/76caecf7-abe1-4122-9fcc-aa5226dc10f8/?jobs=1&subject-to=2&retries=5'
+    on_success: change
+    on_failure: always
+    on_start: never
+
 before_deploy:
 - stack build --no-terminal --copy-bins
 - mkdir -p /tmp/nirum-build
@@ -120,23 +141,16 @@ before_deploy:
   then
     upx-ucl -9 "$NIGHTLY_BINARY_PATH"
   fi
-notifications:
-  webhooks:
-    urls:
-    - https://webhooks.gitter.im/e/29cc2477daa438db4e9d
-    - 'http://travis-auto-rebuilder.herokuapp.com/76caecf7-abe1-4122-9fcc-aa5226dc10f8/?jobs=1&subject-to=2&retries=5'
-    on_success: change
-    on_failure: always
-    on_start: never
+
 deploy:
-  - provider: s3
-    local_dir: /tmp/nirum-build
-    on:
-      branch: master
-    upload-dir: travis-builds
-    acl: public_read
-    bucket: nightly-builds.nirum.org
-    access_key_id:
-      secure: "lqNHSWpskIWHBZdeUsT1LpUBnDv88vEdSwCX2vY+3hbspB2dEoeyxrQ3ObyHBvxizuxHC+wBKdCfpEUj9CuZTSZDuS0gbuks46IH5az5SmFFDRk/pq+5sSBte070YQfrJCEgFTiEww8LZCVjjySEqez0f1pQV4ZSmy8u8ME2PzF1jQdGZIUB/e3v7JAjhK3nKh2kt2YnEdscHngbmRaDkcpEmbia8fP9a9sRc9n4dG5m0/3vtuZJcUqrJzdqMfluwz9lOSWIjSCE3iClSrH0xrS1b4wIgEa2j5iHgayRwQ2MZN41+nhs+jG18FkSyHqdtZwLGZu8UdW7dQqIaPkk26yFBpHvKESJghh4HGKiijcVw4RNJmgJDpdmCrPU1awAvGdT8CXcbwr/9sqPfKgr1F79xn/7PDe6Nd3GXVRJRkV+g7GhSOCFcjBvEzbq4jmRI8Oo4GnyU0H3Kmgk2OyU0Yhq413cLEVcswyDBSjK+ItQQ/wQZgWL1+Vjh/MQbkESRpkRJK6Oq2y0nYhG/ajIXDuva623MNSaLU42/wku8r//bdbsguNEyncNzWcDwtfGBdyOD8GTLKtJD1tCSTH68b7isDjI/MDmCIay9hgCk/l8pBZgn89jLUDfiqH/ZgQduwKPYUUPUuBUv4YQg7bHeZk2NQSWWGsAfpZ5v9L1qUw="
-    secret_access_key:
-      secure: "HUxq2kPTnu3rSq+T7lZoUY4LsvIHjMcapxi5R50gE6pKUIJqJ6ekwB0fP6ge6S6ea3chpAi06oy7tGB4IiTtjUX6L+gOkrFACrWQqVsOvbyMh79oRTVPLY7RTXcDhSmSesChP06oxG2k17u7Agdf5jNfaVH8aOH4xAuBaAYWPTqkIwerGqQHj7oHUGImtu0FDS1ZxL28XiGjONoT2cpoaYT5pzV8KlETe5+ZAr/mxQYHgxt8wzev0pJY6UeBPARiPa1+txEK36AMrHEQHMInZcqgds05T0qX+UF326xlLuFP7soYGRh+mfnvCEx3+hcneX8wJYbaUwpmDrbcCcm91+TUlEWWV3xIXmGHedi0pIvgzH7vapOdzox6MpHGoLJsrRXpHEhMwLMcq0tMbyjcTQjOba2VKRg8hqUBT57oI9Hgpp8wdFnH5EV5GPSOhZ5s4w+PglifEqtqmYHA7PNc5I5iHLXC85UKee+FMQF7hp4heLVQZx541FL7eMYZo2bTOyxTEGMjoxemwN5yHPQ33k7VOKvYLHNX0SxasQme8DwOZbj1ozsWdSPqyArisW0CqXyjFpIm5hPx+gBH1gRXp0hJoyYRBKTrfTxPzFsO5Sf0VfDJC/1UZmzgNULjFdZUdv9/x7O4+Euo1wy/kcngmYbOqqBD3zKm8XcDqwkoAA4="
+- provider: s3
+  local_dir: /tmp/nirum-build
+  on:
+    branch: master
+  upload-dir: travis-builds
+  acl: public_read
+  bucket: nightly-builds.nirum.org
+  access_key_id:
+    secure: "lqNHSWpskIWHBZdeUsT1LpUBnDv88vEdSwCX2vY+3hbspB2dEoeyxrQ3ObyHBvxizuxHC+wBKdCfpEUj9CuZTSZDuS0gbuks46IH5az5SmFFDRk/pq+5sSBte070YQfrJCEgFTiEww8LZCVjjySEqez0f1pQV4ZSmy8u8ME2PzF1jQdGZIUB/e3v7JAjhK3nKh2kt2YnEdscHngbmRaDkcpEmbia8fP9a9sRc9n4dG5m0/3vtuZJcUqrJzdqMfluwz9lOSWIjSCE3iClSrH0xrS1b4wIgEa2j5iHgayRwQ2MZN41+nhs+jG18FkSyHqdtZwLGZu8UdW7dQqIaPkk26yFBpHvKESJghh4HGKiijcVw4RNJmgJDpdmCrPU1awAvGdT8CXcbwr/9sqPfKgr1F79xn/7PDe6Nd3GXVRJRkV+g7GhSOCFcjBvEzbq4jmRI8Oo4GnyU0H3Kmgk2OyU0Yhq413cLEVcswyDBSjK+ItQQ/wQZgWL1+Vjh/MQbkESRpkRJK6Oq2y0nYhG/ajIXDuva623MNSaLU42/wku8r//bdbsguNEyncNzWcDwtfGBdyOD8GTLKtJD1tCSTH68b7isDjI/MDmCIay9hgCk/l8pBZgn89jLUDfiqH/ZgQduwKPYUUPUuBUv4YQg7bHeZk2NQSWWGsAfpZ5v9L1qUw="
+  secret_access_key:
+    secure: "HUxq2kPTnu3rSq+T7lZoUY4LsvIHjMcapxi5R50gE6pKUIJqJ6ekwB0fP6ge6S6ea3chpAi06oy7tGB4IiTtjUX6L+gOkrFACrWQqVsOvbyMh79oRTVPLY7RTXcDhSmSesChP06oxG2k17u7Agdf5jNfaVH8aOH4xAuBaAYWPTqkIwerGqQHj7oHUGImtu0FDS1ZxL28XiGjONoT2cpoaYT5pzV8KlETe5+ZAr/mxQYHgxt8wzev0pJY6UeBPARiPa1+txEK36AMrHEQHMInZcqgds05T0qX+UF326xlLuFP7soYGRh+mfnvCEx3+hcneX8wJYbaUwpmDrbcCcm91+TUlEWWV3xIXmGHedi0pIvgzH7vapOdzox6MpHGoLJsrRXpHEhMwLMcq0tMbyjcTQjOba2VKRg8hqUBT57oI9Hgpp8wdFnH5EV5GPSOhZ5s4w+PglifEqtqmYHA7PNc5I5iHLXC85UKee+FMQF7hp4heLVQZx541FL7eMYZo2bTOyxTEGMjoxemwN5yHPQ33k7VOKvYLHNX0SxasQme8DwOZbj1ozsWdSPqyArisW0CqXyjFpIm5hPx+gBH1gRXp0hJoyYRBKTrfTxPzFsO5Sf0VfDJC/1UZmzgNULjFdZUdv9/x7O4+Euo1wy/kcngmYbOqqBD3zKm8XcDqwkoAA4="
