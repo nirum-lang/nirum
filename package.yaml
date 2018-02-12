@@ -23,6 +23,7 @@ license: GPL-3
 homepage: https://github.com/spoqa/nirum
 bug-reports: https://github.com/spoqa/nirum/issues
 extra-source-files:
+- CHANGES.md
 - README.md
 default-extensions:
 - OverloadedStrings
