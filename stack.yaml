@@ -4,4 +4,5 @@ packages:
 - '.'
 extra-deps:
 - uri-0.1.6.4
+## INSERT CODECOV HERE -- DO NOT REMOTE THIS COMMENT. SEE ALSO ISSUE #156. ##
 extra-package-dbs: []
