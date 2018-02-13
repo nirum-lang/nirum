@@ -28,7 +28,7 @@ Nirum is an [IDL][1] compiler and [RPC][2]/[distributed object][3] framework
 for [microservices][4], built on top of the modern Web server technologies
 such as RESTful HTTP and JSON.
 
-You can find how its IDL looks like from source codes in the `examples/`
+You can find how the language looks like from source codes in the `examples/`
 directory.
 
 **Note that its design is highly unstable and could be changed.**

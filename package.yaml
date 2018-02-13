@@ -11,7 +11,7 @@ description: ! >
   framework for microservices, built on top of the modern
   Web server technologies such as RESTful HTTP and JSON.
 
-  You can find how its IDL looks like from source codes in
+  You can find how the language looks like from source codes in
   the examples/ directory.
 
   See also README.md for more details.
@@ -20,7 +20,8 @@ author: Nirum team
 maintainer: Nirum team
 copyright: (c) 2016–2018 Nirum team
 license: GPL-3
-homepage: https://github.com/spoqa/nirum
+homepage: http://nirum.org/
+git: git@github.com/spoqa/nirum.git
 bug-reports: https://github.com/spoqa/nirum/issues
 extra-source-files:
 - CHANGES.md
