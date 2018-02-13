@@ -28,6 +28,11 @@ extra-source-files:
 - README.md
 default-extensions:
 - OverloadedStrings
+flags:
+  static:
+    description: Static link
+    manual: true
+    default: false
 ghc-options:
 - -Wall
 - -Werror
@@ -69,23 +74,26 @@ executables:
   nirum:
     main: nirum.hs
     source-dirs: app
-    ghc-options:
-    - -fwarn-incomplete-uni-patterns
-    - -threaded
-    - -with-rtsopts=-N
     dependencies:
     - nirum
-  nirum-static:
-    main: nirum.hs
-    source-dirs: app
-    ghc-options:
-    - -fwarn-incomplete-uni-patterns
-    - -threaded
-    - -with-rtsopts=-N
-    - -static
-    dependencies:
-    - base >=4.7 && <5
-    - nirum
+    when:
+    - condition: flag(static)
+      then:
+        ghc-options:
+        - -fwarn-incomplete-uni-patterns
+        - -threaded
+        - -with-rtsopts=-N
+        # Static link
+        - -static
+        - -optl-static
+        - -optl-pthread
+        - -optc-Os
+        - -fPIC
+      else:
+        ghc-options:
+        - -fwarn-incomplete-uni-patterns
+        - -threaded
+        - -with-rtsopts=-N
 tests:
   hlint:
     main: HLint.hs

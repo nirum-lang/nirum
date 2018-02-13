@@ -96,7 +96,9 @@ To be released.
 
 ### Et cetera
 
- -  The Docker image now has `docker` command in `PATH`.  [[#155]]
+ -  The Docker image now has `nirum` command in `PATH`.  [[#155]]
+ -  The Docker image became based and built on [Alpine Linux][] so that
+    the image is now much lighter.
 
 [#10]: https://github.com/spoqa/nirum/issues/10
 [#38]: https://github.com/spoqa/nirum/issues/38
@@ -174,6 +176,7 @@ To be released.
 [python-exception]: https://docs.python.org/3/library/exceptions.html#Exception
 [targets.python]: ./target/python.md
 [python-name-error]: https://docs.python.org/3/library/exceptions.html#NameError
+[Alpine Linux]: https://alpinelinux.org/
 
 
 Version 0.2.0
