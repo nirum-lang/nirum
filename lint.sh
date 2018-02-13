@@ -34,3 +34,19 @@ cat "$scanout"
 if [[ "$(cat "$scanout")" != "" ]]; then
   exit 1
 fi
+
+if which shellcheck > /dev/null; then
+  shellcheck ./*.sh
+else
+  echo "Seems shellcheck is not installed; skipped linting shell scripts..."
+  echo "Recommend to install shellcheck:"
+  if which apt-get > /dev/null; then
+    echo "  apt-get install shellcheck"
+  elif which pacman > /dev/null; then
+    echo "  pacman -S shellcheck"
+  elif which brew > /dev/null; then
+    echo "  brew install shellcheck"
+  else
+    echo "  https://github.com/koalaman/shellcheck"
+  fi
+fi
