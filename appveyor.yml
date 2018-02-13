@@ -51,11 +51,11 @@ install:
 - C:\Python36\python -m pip install --upgrade tox pip setuptools
 - stack --no-terminal install -j4 --only-dependencies
 build_script:
-- stack --no-terminal build -j4 --copy-bins
+- stack --no-terminal build -j4 --copy-bins --flag nirum:static
 after_build:
 - stack --skip-msys --no-terminal path --local-bin
 - ps: ls $(stack path --skip-msys --no-terminal --local-bin)
-- ps: 'copy "$(stack --skip-msys --no-terminal path --local-bin)\nirum-static.exe" nirum-win-${env:PLATFORM}.exe'
+- ps: 'copy "$(stack --skip-msys --no-terminal path --local-bin)\nirum.exe" nirum-win-${env:PLATFORM}.exe'
 - ps: ls
 - ps: upx.exe -9 nirum-win-${env:PLATFORM}.exe
 test_script:

@@ -79,16 +79,27 @@ executables:
     when:
     - condition: flag(static)
       then:
-        ghc-options:
-        - -fwarn-incomplete-uni-patterns
-        - -threaded
-        - -with-rtsopts=-N
-        # Static link
-        - -static
-        - -optl-static
-        - -optl-pthread
-        - -optc-Os
-        - -fPIC
+        when:
+        - condition: os(darwin) || os(windows)
+          then:
+            ghc-options:
+            - -fwarn-incomplete-uni-patterns
+            - -threaded
+            - -with-rtsopts=-N
+            # Static link
+            - -static
+            - -optc-Os
+          else:
+            ghc-options:
+            - -fwarn-incomplete-uni-patterns
+            - -threaded
+            - -with-rtsopts=-N
+            # Static link
+            - -static
+            - -optl-static
+            - -optl-pthread
+            - -optc-Os
+            - -fPIC
       else:
         ghc-options:
         - -fwarn-incomplete-uni-patterns

@@ -96,6 +96,8 @@ To be released.
 
 ### Et cetera
 
+ -  The officialy distributed executable binaries for Linux became
+    independent from [glibc]; instead statically linked to [musl].  [#216]
  -  The Docker image now has `nirum` command in `PATH`.  [[#155]]
  -  The Docker image became based and built on [Alpine Linux][] so that
     the image is now much lighter.
@@ -163,6 +165,8 @@ To be released.
 [#202]: https://github.com/spoqa/nirum/pull/202
 [#203]: https://github.com/spoqa/nirum/pull/203
 [#204]: https://github.com/spoqa/nirum/pull/204
+[#216]: https://github.com/spoqa/nirum/issues/216
+[#222]: https://github.com/spoqa/nirum/pull/222
 [#218]: https://github.com/spoqa/nirum/issues/218
 [#222]: https://github.com/spoqa/nirum/pull/222
 [#223]: https://github.com/spoqa/nirum/pull/223
@@ -176,6 +180,8 @@ To be released.
 [python-exception]: https://docs.python.org/3/library/exceptions.html#Exception
 [targets.python]: ./target/python.md
 [python-name-error]: https://docs.python.org/3/library/exceptions.html#NameError
+[glibc]: https://www.gnu.org/software/libc/
+[musl]: https://www.musl-libc.org/
 [Alpine Linux]: https://alpinelinux.org/
 
 
