@@ -50,3 +50,17 @@ else
     echo "  https://github.com/koalaman/shellcheck"
   fi
 fi
+
+if which hadolint > /dev/null; then
+  hadolint Dockerfile
+else
+  echo "Seems hadolint is not installed; skipped linting Dockerfile..."
+  echo "Recommend to install hadolint:"
+  if which pacman > /dev/null; then
+    echo "  pacman -S hadolint-git"
+  elif which brew > /dev/null; then
+    echo "  brew install hadolint"
+  else
+    echo "  https://github.com/hadolint/hadolint"
+  fi
+fi

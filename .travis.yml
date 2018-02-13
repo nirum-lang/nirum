@@ -105,9 +105,17 @@ install:
     python3 -m easy_install --user -U "pip>=$PIP_MINVER"
   fi
 - python3 -m pip install --user --upgrade tox
+
 - travis_long stack --no-terminal setup
 - travis_long stack --no-terminal install scan -j4
 - travis_long stack --no-terminal install -j4 --only-dependencies
+
+- |
+  if [[ "$TRAVIS_OS_NAME" = "linux" ]]; then
+    curl -L -o "$HOME/.local/bin/hadolint" \
+      https://github.com/hadolint/hadolint/releases/download/v1.4.0/hadolint-Linux-x86_64
+    chmod +x "$HOME/.local/bin/hadolint"
+  fi
 
 script:
 - 'TOX="$(which tox)" stack --no-terminal test -j4 --coverage'
