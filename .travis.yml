@@ -134,8 +134,6 @@ after_script:
   stack exec -- codecov-haskell \
     --tix-dir ./.stack-work/install/x86_64-*/lts-*/*/hpc/nirum/ \
     --mix-dir ./.stack-work/dist/x86_64-*/Cabal-*/hpc/ \
-    --print-response \
-    --display-report \
     --token="$(echo $token_encoded | python -m base64 -d)" \
     spec
 
