@@ -63,3 +63,11 @@ test_script:
 artifacts:
 - path: nirum-win-x86.exe
 - path: nirum-win-x64.exe
+deploy:
+  provider: GitHub
+  on: { appveyor_repo_tag: true }
+  auth_token:
+    secure: FsK3lwqFkPdtwzbjZ8a4gLn1GOT74D9TqBvKveEwFB7hL6pEp/d7cNUTpy91JGGt
+  release: "$(appveyor_repo_tag_name)"
+  description: "$(appveyor_repo_tag_name)"
+  artifact: /.*\.exe/
