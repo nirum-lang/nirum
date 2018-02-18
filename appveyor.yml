@@ -71,3 +71,4 @@ deploy:
   release: "$(appveyor_repo_tag_name)"
   description: "$(appveyor_repo_tag_name)"
   artifact: /.*\.exe/
+  prerelease: true

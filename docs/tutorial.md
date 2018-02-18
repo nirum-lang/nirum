@@ -119,9 +119,9 @@ Installing compiler
 -------------------
 
 The Nirum compiler works on the most major platforms like Linux, macOS, and
-Windows.  The [official website][] provides the prebuilt executable binaries
-for these three platforms.  Note that there is no stable version as of
-February 2018.
+Windows.  The [official releases page][] provides the prebuilt executable
+binaries for these three platforms.  Note that there is no stable version
+(i.e., v1.0.0 or higher) as of February 2018.
 
 This tutorial assumes that you have:
 
@@ -138,7 +138,7 @@ $ nirum -v
 0.3.0
 ~~~~~~~~
 
-[official website]: http://nirum.org/
+[official releases page]: https://github.com/spoqa/nirum/releases
 
 
 Service interface

@@ -185,6 +185,7 @@ deploy:
   file_glob: yes
   file: /tmp/nirum-build/*
   name: "$TRAVIS_TAG"
+  prerelease: yes
 
 after_deploy: |
   [[ "$TRAVIS_TAG" != "" && "$TRAVIS_OS_NAME" = "linux" ]] || exit 0
