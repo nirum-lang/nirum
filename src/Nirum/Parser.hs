@@ -93,6 +93,10 @@ import Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
 
 type ParseError = E.ParseError (Token T.Text) E.Dec
 
+-- CHECK: If a new reserved keyword is introduced, it has to be also
+-- added to `reservedKeywords` set in the `Nirum.Constructs.Identifier`
+-- module.
+
 comment :: Parser ()
 comment = string "//" >> void (many $ noneOf ("\n" :: String)) <?> "comment"
 
@@ -412,9 +416,6 @@ tag :: Parser (Tag, Bool)
 tag = do
     annotationSet' <- annotationSet <?> "union tag annotations"
     spaces
-    -- CHECK: If a new reserved keyword is introduced, it has to be also
-    -- added to `reservedKeywords` set in the `Nirum.Constructs.Identifier`
-    -- module.
     default' <- optional (string "default" <?> "default tag")
     spaces
     tagName <- name <?> "union tag name"
