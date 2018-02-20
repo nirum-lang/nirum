@@ -63,7 +63,6 @@ import Data.Text.Lazy (toStrict)
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Data.Function (on)
 import System.FilePath (joinPath)
-import qualified Text.Blaze.Internal as BI
 import Text.Blaze.Renderer.Text
 import qualified Text.Email.Validate as E
 import Text.Heterocephalus (compileText)
@@ -206,9 +205,6 @@ runCodeGen :: CodeGen a
            -> CodeGenContext
            -> (Either CompileError' a, CodeGenContext)
 runCodeGen = C.runCodeGen
-
-renderCompileText :: BI.Markup -> T.Text
-renderCompileText = toStrict . renderMarkup
 
 insertStandardImport :: T.Text -> CodeGen ()
 insertStandardImport module' = ST.modify insert'
@@ -736,7 +732,7 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
                                              , type' = Alias ctype
                                              } = do
     ctypeExpr <- compileTypeExpression src (Just ctype)
-    return $ renderCompileText $ [compileText|
+    return $ toStrict $ renderMarkup $ [compileText|
 %{ case compileDocs d }
 %{ of Just rst }
 #: #{rst}
@@ -1035,7 +1031,7 @@ compileTypeDeclaration src
     typeRepr <- typeReprCompiler
     ret <- returnCompiler
     arg <- parameterCompiler
-    return $ renderCompileText $ [compileText|
+    return $ toStrict $ renderMarkup $ [compileText|
 class #{className}(#{T.intercalate "," $ compileExtendClasses annotations}):
 #{compileDocstring "    " d}
 
@@ -1426,7 +1422,7 @@ compileModule pythonVersion' source = do
     let fromImports = M.assocs (localImportsMap context) ++
                       M.assocs (thirdPartyImports context)
     code <- result
-    return $ (,) installRequires $ renderCompileText $
+    return $ (,) installRequires $ toStrict $ renderMarkup $
         [compileText|# -*- coding: utf-8 -*-
 #{compileDocstring "" $ sourceModule source}
 %{ forall i <- S.elems (standardImports context) }
@@ -1471,7 +1467,7 @@ compilePackageMetadata Package
                            , modules = modules'
                            }
                        (InstallRequires deps optDeps) =
-    renderCompileText [compileText|# -*- coding: utf-8 -*-
+    toStrict $ renderMarkup [compileText|# -*- coding: utf-8 -*-
 import sys
 
 from setuptools import setup, __version__ as setuptools_version
