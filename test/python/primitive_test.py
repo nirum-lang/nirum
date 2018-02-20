@@ -138,10 +138,18 @@ top: invalid literal for int() with base 10: 'b'\
     point2_serialize = {'_type': 'point2', 'left': 3, 'top': 14}
     assert point2.__nirum_serialize__() == point2_serialize
     assert Point2.__nirum_deserialize__(point2_serialize) == point2
-    with raises(ValueError):
+    with raises(ValueError):  # no "_type" -- FIXME: "_type" is unnecessary
         Point2.__nirum_deserialize__({'left': 3, 'top': 14})
-    with raises(ValueError):
+    with raises(ValueError):  # no "left" and "top" fields
         Point2.__nirum_deserialize__({'_type': 'foo'})
+    p = Point2.__nirum_deserialize__({
+        # extra field does not matter; just ignored
+        '_type': 'point2',
+        'left': 3,
+        'top': 14,
+        'extra': 'it does not matter',
+    })
+    assert p == Point2(left=IntUnbox(3), top=IntUnbox(14))
     with raises(TypeError):
         Point2(left=IntUnbox(1), top='a')
     with raises(TypeError):
@@ -266,16 +274,24 @@ def test_union():
     })
     assert isinstance(name, MixedName.EastAsianName)
     with raises(ValueError) as e:
-        MixedName.__nirum_deserialize__({
+        MixedName.__nirum_deserialize__({  # invalid field types
             '_type': 'mixed_name',
             '_tag': 'east_asian_name',
-            'family_name': 404,
-            'given_name': 503,
+            'family_name': 404,  # not a text
+            'given_name': 503,  # not a text
         })
     assert str(e.value) == '''\
 family_name: '404' is not a string.
 given_name: '503' is not a string.\
-'''
+'''  # message can contain multiple errors
+    n = MixedName.__nirum_deserialize__({  # invalid field types
+        '_type': 'mixed_name',
+        '_tag': 'east_asian_name',
+        'family_name': u'John',
+        'given_name': u'Doe',
+        'extra': u'it does not matter',
+    })
+    assert n == EastAsianName(family_name=u'John', given_name=u'Doe')
 
 
 def test_union_with_special_case():

@@ -966,7 +966,11 @@ class $className(object):
             else:
                 name = attribute_name
             try:
-                args[name] = deserialize_meta(field_types[name], item)
+                field_type = field_types[name]
+            except KeyError:
+                continue
+            try:
+                args[name] = deserialize_meta(field_type, item)
             except ValueError as e:
                 errors.add('%s: %s' % (attribute_name, str(e)))
         if errors:
@@ -1107,7 +1111,11 @@ class $className({T.intercalate "," $ compileExtendClasses annotations}):
                 name = attribute_name
             tag_types = dict(cls.__nirum_tag_types__())
             try:
-                args[name] = deserialize_meta(tag_types[name], item)
+                field_type = tag_types[name]
+            except KeyError:
+                continue
+            try:
+                args[name] = deserialize_meta(field_type, item)
             except ValueError as e:
                 errors.add('%s: %s' % (attribute_name, str(e)))
         if errors:
