@@ -963,10 +963,7 @@ class $className(object):
             )
         args = dict()
         behind_names = cls.__nirum_field_names__.behind_names
-        field_types = cls.__nirum_field_types__
-        if callable(field_types):
-            field_types = field_types()
-            # old compiler could generate non-callable dictionary
+        field_types = cls.__nirum_field_types__()
         errors = set()
         for attribute_name, item in value.items():
             if attribute_name == '_type':
