@@ -201,6 +201,10 @@ It's represented in JSON to:
         "uri": null
     }
 
+When a payload is deserialized, undefined fields are just ignored.
+It can be used to drop an existing field without breaking
+backward compatibility.
+
 
 Union type
 ----------
@@ -242,6 +246,9 @@ It's represented in JSON to:
         "gender": "male",
         "uri": null
     }
+
+In a similar way to a recrod type, undefined fields in a payload are ignored
+by deserializer.
 
 
 Option type
