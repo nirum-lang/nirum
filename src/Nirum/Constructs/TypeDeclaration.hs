@@ -40,7 +40,6 @@ module Nirum.Constructs.TypeDeclaration ( EnumMember (EnumMember)
                                                , jsonType
                                                , members
                                                , primitiveTypeIdentifier
-                                               , tags
                                                )
                                         , TypeDeclaration ( Import
                                                           , ServiceDeclaration
@@ -54,6 +53,8 @@ module Nirum.Constructs.TypeDeclaration ( EnumMember (EnumMember)
                                                           , typeAnnotations
                                                           , typename
                                                           )
+                                        , unionType
+                                        , tags
                                         ) where
 
 import Data.Maybe (isJust, maybeToList)
@@ -67,7 +68,7 @@ import Nirum.Constructs.Declaration ( Declaration (annotations, name)
                                     , Documented (docs)
                                     )
 import Nirum.Constructs.Docs (Docs (Docs), toCodeWithPrefix)
-import Nirum.Constructs.DeclarationSet (DeclarationSet, null', toList)
+import Nirum.Constructs.DeclarationSet as DS
 import Nirum.Constructs.Identifier (Identifier)
 import Nirum.Constructs.ModulePath (ModulePath)
 import Nirum.Constructs.Name (Name (Name))
@@ -82,13 +83,21 @@ data Type
     | UnboxedType { innerType :: TypeExpression }
     | EnumType { members :: DeclarationSet EnumMember }
     | RecordType { fields :: DeclarationSet Field }
-    | UnionType { tags :: DeclarationSet Tag
-                , defaultTag :: Maybe Tag
-                }
+    | UnionType -- | Use 'unionType' instaed.
+        { nondefaultTags :: DeclarationSet Tag -- This should not be exported.
+        , defaultTag :: Maybe Tag
+        }
     | PrimitiveType { primitiveTypeIdentifier :: PrimitiveTypeIdentifier
                     , jsonType :: JsonType
                     }
     deriving (Eq, Ord, Show)
+
+tags :: Type -> DeclarationSet Tag
+tags UnionType { nondefaultTags = tags', defaultTag = defTag } =
+    case fromList $ toList tags' ++ maybeToList defTag of
+        Right ts -> ts
+        Left _ -> DS.empty -- must never happen!
+tags _ = DS.empty
 
 -- | Member of 'EnumType'.
 data EnumMember = EnumMember Name AnnotationSet deriving (Eq, Ord, Show)
@@ -133,6 +142,15 @@ data Tag = Tag { tagName :: Name
                , tagFields :: DeclarationSet Field
                , tagAnnotations :: AnnotationSet
                } deriving (Eq, Ord, Show)
+
+-- | Create a 'UnionType'.
+unionType :: [Tag] -> Maybe Tag -> Either NameDuplication Type
+unionType t dt = case fromList t of
+                     Right ts -> Right $
+                         case dt of
+                             Nothing -> UnionType ts Nothing
+                             Just dt' -> UnionType (delete dt' ts) dt
+                     Left a -> Left a
 
 instance Construct Tag where
     toCode tag@(Tag name' fields' _) =

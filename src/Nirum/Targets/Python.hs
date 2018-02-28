@@ -49,7 +49,7 @@ module Nirum.Targets.Python ( Code
 import Control.Monad (forM)
 import qualified Control.Monad.State as ST
 import qualified Data.List as L
-import Data.Maybe (catMaybes, fromMaybe, maybeToList)
+import Data.Maybe (catMaybes, fromMaybe)
 import Data.Typeable (Typeable)
 import GHC.Exts (IsList (toList))
 import Text.Printf (printf)
@@ -92,21 +92,7 @@ import Nirum.Constructs.Service ( Method ( Method
                                 , Parameter (Parameter)
                                 , Service (Service)
                                 )
-import Nirum.Constructs.TypeDeclaration ( EnumMember (EnumMember)
-                                        , Field (Field, fieldName)
-                                        , PrimitiveTypeIdentifier (..)
-                                        , Tag (Tag, tagName)
-                                        , Type ( Alias
-                                               , EnumType
-                                               , PrimitiveType
-                                               , RecordType
-                                               , UnboxedType
-                                               , UnionType
-                                               , defaultTag
-                                               , primitiveTypeIdentifier
-                                               )
-                                        , TypeDeclaration (..)
-                                        )
+import Nirum.Constructs.TypeDeclaration as TD
 import Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
                                                         , MapModifier
                                                         , OptionModifier
@@ -117,8 +103,7 @@ import Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
 import Nirum.Docs.ReStructuredText (ReStructuredText, render)
 import Nirum.Package hiding (target)
 import Nirum.Package.Metadata ( Author (Author, name, email)
-                              , Metadata ( Metadata
-                                         , authors
+                              , Metadata ( authors
                                          , target
                                          , version
                                          , description
@@ -137,7 +122,6 @@ import Nirum.Package.Metadata ( Author (Author, name, email)
                                        , targetName
                                        , toByteString
                                        )
-                              , fieldType
                               , stringField
                               , tableField
                               , versionField
@@ -178,11 +162,6 @@ data CodeGenContext
                      , pythonVersion :: PythonVersion
                      }
     deriving (Eq, Ord, Show)
-
-findTags :: Type -> [Tag]
-findTags t = case t of
-    (UnionType tags' d) -> toList tags' ++ maybeToList d
-    _ -> []
 
 localImportsMap :: CodeGenContext -> M.Map T.Text (M.Map T.Text T.Text)
 localImportsMap CodeGenContext { localImports = imports } =
@@ -362,8 +341,8 @@ compileParameters gen nameTypeTriples =
         nameTypeTriples ", "
 
 compileFieldInitializers :: DS.DeclarationSet Field -> Int -> CodeGen Code
-compileFieldInitializers fields depth = do
-    initializers <- forM (toList fields) compileFieldInitializer
+compileFieldInitializers fields' depth = do
+    initializers <- forM (toList fields') compileFieldInitializer
     return $ T.intercalate indentSpaces initializers
   where
     indentSpaces :: T.Text
@@ -403,7 +382,7 @@ compileDocstring indentSpace d = compileDocstring' indentSpace d []
 
 compileDocstringWithFields :: Documented a
                            => Code -> a -> DS.DeclarationSet Field -> Code
-compileDocstringWithFields indentSpace decl fields =
+compileDocstringWithFields indentSpace decl fields' =
     compileDocstring' indentSpace decl extra
   where
     extra :: [ReStructuredText]
@@ -418,7 +397,7 @@ compileDocstringWithFields indentSpace decl fields =
                                      , "\n\n"
                                      , indent "   " docs'
                                      ]
-        | f@(Field n _ _) <- toList fields
+        | f@(Field n _ _) <- toList fields'
         ]
 
 compileDocsComment :: Documented a => Code -> a -> Code
@@ -467,9 +446,9 @@ returnCompiler = do
 
 
 compileUnionTag :: Source -> Name -> Tag -> CodeGen Code
-compileUnionTag source parentname d@(Tag typename' fields _) = do
+compileUnionTag source parentname d@(Tag typename' fields' _) = do
     typeExprCodes <- mapM (compileTypeExpression source)
-        [Just typeExpr | (Field _ typeExpr _) <- toList fields]
+        [Just typeExpr | (Field _ typeExpr _) <- toList fields']
     let nameTypeTriples = L.sortBy (compare `on` thd3)
                                    (zip3 tagNames typeExprCodes optionFlags)
         slotTypes = toIndentedCodes
@@ -481,7 +460,7 @@ compileUnionTag source parentname d@(Tag typename' fields _) = do
     arg <- parameterCompiler
     ret <- returnCompiler
     pyVer <- getPythonVersion
-    initializers <- compileFieldInitializers fields $ case pyVer of
+    initializers <- compileFieldInitializers fields' $ case pyVer of
         Python3 -> 2
         Python2 -> 3
     let initParams = compileParameters arg nameTypeTriples
@@ -503,7 +482,7 @@ compileUnionTag source parentname d@(Tag typename' fields _) = do
             |]
     return [qq|
 class $className($parentClass):
-{compileDocstringWithFields "    " d fields}
+{compileDocstringWithFields "    " d fields'}
     __slots__ = (
         $slots
     )
@@ -556,14 +535,14 @@ if hasattr($parentClass, '__qualname__'):
     optionFlags = [ case typeExpr of
                         OptionModifier _ -> True
                         _ -> False
-                  | (Field _ typeExpr _) <- toList fields
+                  | (Field _ typeExpr _) <- toList fields'
                   ]
     className :: T.Text
     className = toClassName' typename'
     behindParentTypename :: T.Text
     behindParentTypename = I.toSnakeCaseText $ N.behindName parentname
     tagNames :: [T.Text]
-    tagNames = map (toAttributeName' . fieldName) (toList fields)
+    tagNames = map (toAttributeName' . fieldName) (toList fields')
     behindTagName :: T.Text
     behindTagName = I.toSnakeCaseText $ N.behindName typename'
     slots :: Code
@@ -575,7 +554,7 @@ if hasattr($parentClass, '__qualname__'):
         then "self.__nirum_tag__"
         else [qq|({toIndentedCodes (T.append "self.") tagNames ", "},)|]
     fieldList :: [Field]
-    fieldList = toList fields
+    fieldList = toList fields'
     nameMaps :: Code
     nameMaps = toIndentedCodes toNamePair
                                (map fieldName fieldList)
@@ -828,7 +807,7 @@ class #{className}(object):
         return hash(self.value)
 |]
 compileTypeDeclaration _ d@TypeDeclaration { typename = typename'
-                                           , type' = EnumType members
+                                           , type' = EnumType members'
                                            } = do
     let className = toClassName' typename'
     insertStandardImport "enum"
@@ -837,7 +816,7 @@ compileTypeDeclaration _ d@TypeDeclaration { typename = typename'
 class #{className}(enum.Enum):
 #{compileDocstring "    " d}
 
-%{ forall member@(EnumMember memberName@(Name _ behind) _) <- toList members }
+%{ forall member@(EnumMember memberName@(Name _ behind) _) <- toList members' }
 #{compileDocsComment "    " member}
     #{toEnumMemberName memberName} = '#{I.toSnakeCaseText behind}'
 %{ endforall }
@@ -865,7 +844,7 @@ class #{className}(enum.Enum):
 #{className}.__nirum_type__ = 'enum'
 |]
 compileTypeDeclaration src d@TypeDeclaration { typename = typename'
-                                             , type' = RecordType fields
+                                             , type' = RecordType fields'
                                              } = do
     typeExprCodes <- mapM (compileTypeExpression src)
         [Just typeExpr | (Field _ typeExpr _) <- fieldList]
@@ -885,7 +864,7 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
     ret <- returnCompiler
     typeRepr <- typeReprCompiler
     pyVer <- getPythonVersion
-    initializers <- compileFieldInitializers fields $ case pyVer of
+    initializers <- compileFieldInitializers fields' $ case pyVer of
         Python3 -> 2
         Python2 -> 3
     let initParams = compileParameters arg nameTypeTriples
@@ -908,7 +887,7 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
     let clsType = arg "cls" "type"
     return [qq|
 class $className(object):
-{compileDocstringWithFields "    " d fields}
+{compileDocstringWithFields "    " d fields'}
     __slots__ = (
         $slots,
     )
@@ -983,7 +962,7 @@ class $className(object):
     className :: T.Text
     className = toClassName' typename'
     fieldList :: [Field]
-    fieldList = toList fields
+    fieldList = toList fields'
     behindTypename :: T.Text
     behindTypename = I.toSnakeCaseText $ N.behindName typename'
     optionFlags :: [Bool]
@@ -999,7 +978,7 @@ class $className(object):
     nameMaps :: Code
     nameMaps = toIndentedCodes
         toNamePair
-        (map fieldName $ toList fields)
+        (map fieldName $ toList fields')
         ",\n        "
     hashText :: Code
     hashText = toIndentedCodes (\ n -> [qq|self.{n}|]) fieldNames ", "
@@ -1012,10 +991,10 @@ class $className(object):
         ]
 compileTypeDeclaration src
                        d@TypeDeclaration { typename = typename'
-                                         , type' = u
+                                         , type' = union
                                          , typeAnnotations = annotations
                                          } = do
-    tagCodes <- mapM (compileUnionTag src typename') tags
+    tagCodes <- mapM (compileUnionTag src typename') tags'
     importTypingForPython3
     insertStandardImport "enum"
     insertThirdPartyImports [ ("nirum.deserialize", ["deserialize_meta"])
@@ -1029,8 +1008,7 @@ compileTypeDeclaration src
                                )
                              ]
     typeRepr <- typeReprCompiler
-    ret <- returnCompiler
-    arg <- parameterCompiler
+    pyVer <- getPythonVersion
     return $ toStrict $ renderMarkup $ [compileText|
 class #{className}(#{T.intercalate "," $ compileExtendClasses annotations}):
 #{compileDocstring "    " d}
@@ -1038,13 +1016,13 @@ class #{className}(#{T.intercalate "," $ compileExtendClasses annotations}):
     __nirum_type__ = 'union'
     __nirum_union_behind_name__ = '#{toBehindSnakeCaseText typename'}'
     __nirum_field_names__ = name_dict_type([
-%{ forall (Tag (Name f b) _ _) <- tags }
+%{ forall (Tag (Name f b) _ _) <- tags' }
         ('#{toAttributeName f}', '#{I.toSnakeCaseText b}'),
 %{ endforall }
     ])
 
     class Tag(enum.Enum):
-%{ forall (Tag tn _ _) <- tags }
+%{ forall (Tag tn _ _) <- tags' }
         #{toEnumMemberName tn} = '#{toBehindSnakeCaseText tn}'
 %{ endforall }
 
@@ -1063,10 +1041,13 @@ class #{className}(#{T.intercalate "," $ compileExtendClasses annotations}):
         )
 
     @classmethod
-    def __nirum_deserialize__(
-        #{arg "cls" "type"}, value
-    )#{ ret className }:
-%{ case defaultTag u }
+%{ case pyVer }
+%{ of Python2 }
+    def __nirum_deserialize__(cls, value):
+%{ of Python3 }
+    def __nirum_deserialize__(cls: '#{className}', value) -> '#{className}':
+%{ endcase }
+%{ case defaultTag union }
 %{ of Just dt }
         if isinstance(value, dict) and '_tag' not in value:
             value = dict(value)
@@ -1129,14 +1110,14 @@ class #{className}(#{T.intercalate "," $ compileExtendClasses annotations}):
 %{ endforall }
 
 #{className}.__nirum_tag_classes__ = map_type({
-%{ forall (Tag tn _ _) <- tags }
+%{ forall (Tag tn _ _) <- tags' }
     #{className}.Tag.#{toEnumMemberName tn}: #{toClassName' tn},
 %{ endforall }
 })
             |]
   where
-    tags :: [Tag]
-    tags = findTags u
+    tags' :: [Tag]
+    tags' = DS.toList $ tags union
     className :: T.Text
     className = toClassName' typename'
     compileExtendClasses :: A.AnnotationSet -> [Code]
@@ -1453,7 +1434,7 @@ from #{from} import (
 
 compilePackageMetadata :: Package' -> InstallRequires -> Code
 compilePackageMetadata Package
-                           { metadata = Metadata
+                           { metadata = MD.Metadata
                                  { authors = authors'
                                  , version = version'
                                  , description = description'
@@ -1571,7 +1552,8 @@ recursive-include src-py2 *.py
 
 compilePackage' :: Package'
                 -> M.Map FilePath (Either CompileError' Code)
-compilePackage' package@Package { metadata = Metadata { target = target' } } =
+compilePackage' package@Package { metadata = MD.Metadata { target = target' }
+                                } =
     M.fromList $
         initFiles ++
         [ ( f
@@ -1643,7 +1625,7 @@ instance Target Python where
                   (Nothing, _) -> Left $ FieldValueError [qq|renams.$k|]
                       [qq|expected a module path as a key, not "$k"|]
                   _ -> Left $ FieldTypeError [qq|renames.$k|] "string" $
-                                             fieldType v
+                                             MD.fieldType v
             | (k, v) <- HM.toList renameTable
             ]
         return Python { packageName = name'

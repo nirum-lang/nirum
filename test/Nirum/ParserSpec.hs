@@ -32,12 +32,7 @@ import Nirum.Constructs.Service ( Method (Method)
                                 , Parameter (Parameter)
                                 , Service (Service)
                                 )
-import Nirum.Constructs.TypeDeclaration ( EnumMember (EnumMember)
-                                        , Field (Field, fieldAnnotations)
-                                        , Tag (Tag, tagAnnotations, tagFields)
-                                        , Type (..)
-                                        , TypeDeclaration (..)
-                                        )
+import Nirum.Constructs.TypeDeclaration as TD hiding (tags)
 import Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
                                                         , MapModifier
                                                         , OptionModifier
@@ -666,7 +661,7 @@ record dup (
                 circleTag = Tag "circle" circleFields empty
                 rectTag = Tag "rectangle" rectangleFields empty
                 tags' = [circleTag]
-                union' = UnionType tags' $ Just rectTag
+                Right union' = unionType tags' $ Just rectTag
                 a = TypeDeclaration "shape" union' empty
             parse' [s|
 union shape
@@ -684,7 +679,7 @@ union shape
                 rectTag = Tag "rectangle" rectangleFields empty
                 noneTag = Tag "none" [] empty
                 tags' = [circleTag, rectTag, noneTag]
-                union' = UnionType tags' Nothing
+                Right union' = unionType tags' Nothing
                 a = TypeDeclaration "shape" union' empty
                 b = a { typeAnnotations = singleDocs "shape type" }
             parse' [s|
@@ -719,18 +714,21 @@ union shape
     | rectangle (point upper-left, point lower-right,)
     | none
     ;|] `shouldBeRight` b
+            let Right union3 = unionType
+                    [circleTag, rectTag, Tag "none" [] fooAnnotationSet]
+                    Nothing
             parse' [s|
 union shape
     = circle (point origin, offset radius,)
     | rectangle (point upper-left, point lower-right,)
     | @foo (v = "bar") none
-    ;|] `shouldBeRight`
-                    a { type' = union' { tags = [ circleTag
-                                                , rectTag
-                                                , Tag "none" [] fooAnnotationSet
-                                                ]
-                                       }
-                      }
+    ;|] `shouldBeRight` a { type' = union3 }
+            let Right union4 = unionType
+                    [ circleTag { tagAnnotations = singleDocs "tag docs" }
+                    , rectTag { tagAnnotations = singleDocs "front docs" }
+                    , noneTag
+                    ]
+                    Nothing
             parse' [s|
 union shape
     = circle (point origin, offset radius,)
@@ -740,59 +738,42 @@ union shape
           point upper-left, point lower-right,
       )
     | none
-    ;|] `shouldBeRight`
-                    a { type' = union'
-                            { tags = [ circleTag
-                                        { tagAnnotations = singleDocs "tag docs"
-                                        }
-                                     , rectTag
-                                        { tagAnnotations =
-                                              singleDocs "front docs"
-                                        }
-                                     , noneTag
-                                     ]
-                            }
-                      }
+    ;|] `shouldBeRight` a { type' = union4 }
+            let Right union5 = unionType
+                    [ circleTag, rectTag
+                    , noneTag { tagAnnotations = singleDocs "tag docs" }
+                    ]
+                    Nothing
             parse' [s|
 union shape
     = circle (point origin, offset radius,)
     | rectangle (point upper-left, point lower-right,)
     | none  # tag docs
-    ;|] `shouldBeRight`
-                    a { type' = union'
-                            { tags = [ circleTag, rectTag
-                                     , noneTag
-                                        { tagAnnotations = singleDocs "tag docs"
-                                        }
-                                     ]
-                            }
-                      }
+    ;|] `shouldBeRight` a { type' = union5 }
+            let Right union6 = unionType
+                    [ circleTag
+                          { tagFields =
+                                 [ cOriginF
+                                 , cRadiusF
+                                       { fieldAnnotations = bazAnnotationSet }
+                                 ]
+                          }
+                    , rectTag
+                          { tagFields =
+                                [ rUpperLeftF
+                                , rLowerRightF
+                                      { fieldAnnotations = fooAnnotationSet }
+                                ]
+                          }
+                    , noneTag
+                    ]
+                    Nothing
             parse' [s|
 union shape
     = circle (point origin, @baz offset radius,)
     | rectangle (point upper-left, @foo (v = "bar") point lower-right,)
     | none
-    ;|] `shouldBeRight`
-                    a { type' = union'
-                            { tags = [ circleTag
-                                           { tagFields =
-                                                 [ cOriginF
-                                                 , cRadiusF { fieldAnnotations =
-                                                              bazAnnotationSet }
-                                                 ]
-                                           }
-                                     , rectTag
-                                           { tagFields =
-                                                 [ rUpperLeftF
-                                                 , rLowerRightF
-                                                       { fieldAnnotations =
-                                                         fooAnnotationSet }
-                                                 ]
-                                           }
-                                     , noneTag
-                                     ]
-                             }
-                      }
+    ;|] `shouldBeRight` a { type' = union6 }
         it "fails to parse if there are duplicated facial names" $ do
             expectError [s|
 union dup

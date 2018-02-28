@@ -18,6 +18,7 @@ import Nirum.Constructs.TypeDeclaration ( EnumMember (EnumMember)
                                         , Tag (Tag)
                                         , Type (..)
                                         , TypeDeclaration (..)
+                                        , unionType
                                         )
 import Util (singleDocs)
 
@@ -127,7 +128,7 @@ record person (
                         , Tag "rectangle" rectangleFields empty
                         , Tag "none" [] empty
                         ]
-                union' = UnionType tags' Nothing
+            let Right union' = unionType tags' Nothing
                 a = TypeDeclaration { typename = "shape"
                                     , type' = union'
                                     , typeAnnotations = empty
