@@ -59,7 +59,7 @@ union mixed-name = western-name ( text first-name
                  | east-asian-name ( text family-name
                                    , text given-name
                                    )
-                 | culture-agnostic-name (text fullname)
+                 | default culture-agnostic-name (text fullname)
                  ;
 union music
     # Union docs.

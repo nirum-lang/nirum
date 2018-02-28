@@ -278,6 +278,15 @@ given_name: '503' is not a string.\
 '''
 
 
+def test_union_default_tag():
+    n = CultureAgnosticName(fullname=u'foobar')
+    serialized = n.__nirum_serialize__()
+    print(serialized)
+    del serialized['_tag']
+    n2 = MixedName.__nirum_deserialize__(serialized)
+    assert n2 == n
+
+
 def test_union_with_special_case():
     kr_pop = Pop(country=u'KR')
     assert kr_pop.country == u'KR'

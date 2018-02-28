@@ -9,6 +9,7 @@ module Nirum.Parser ( Parser
                     , enumTypeDeclaration
                     , file
                     , handleNameDuplication
+                    , handleNameDuplicationError
                     , identifier
                     , imports
                     , listModifier
@@ -34,6 +35,7 @@ module Nirum.Parser ( Parser
 import Control.Monad (void)
 import qualified System.IO as SIO
 
+import qualified Data.List as L
 import Data.Map.Strict as Map hiding (foldl)
 import Data.Set hiding (empty, foldl, fromList, map)
 import qualified Data.Text as T
@@ -66,22 +68,10 @@ import Nirum.Constructs.Service ( Method (Method)
                                 , Parameter (Parameter)
                                 , Service (Service)
                                 )
-import Nirum.Constructs.TypeDeclaration ( EnumMember (EnumMember)
-                                        , Field (Field)
-                                        , Tag (Tag)
-                                        , Type ( Alias
-                                               , EnumType
-                                               , RecordType
-                                               , UnboxedType
-                                               , UnionType
-                                               )
-                                        , TypeDeclaration ( Import
-                                                          , ServiceDeclaration
-                                                          , TypeDeclaration
-                                                          , serviceAnnotations
-                                                          , typeAnnotations
-                                                          )
-                                        )
+import Nirum.Constructs.TypeDeclaration as TD hiding ( fields
+                                                     , modulePath
+                                                     , importName
+                                                     )
 import Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
                                                         , MapModifier
                                                         , OptionModifier
@@ -91,6 +81,10 @@ import Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
                                        )
 
 type ParseError = E.ParseError (Token T.Text) E.Dec
+
+-- CHECK: If a new reserved keyword is introduced, it has to be also
+-- added to `reservedKeywords` set in the `Nirum.Constructs.Identifier`
+-- module.
 
 comment :: Parser ()
 comment = string "//" >> void (many $ noneOf ("\n" :: String)) <?> "comment"
@@ -249,17 +243,17 @@ aliasTypeDeclaration = do
     annotationSet' <- annotationSet <?> "type alias annotations"
     string' "type" <?> "type alias keyword"
     spaces
-    typename <- identifier <?> "alias type name"
-    let name' = Name typename typename
+    typeName <- identifier <?> "alias type name"
+    let name' = Name typeName typeName
     spaces
     char '='
     spaces
-    canonicalType <- typeExpression <?> "canonical type of alias"
+    canonicalType' <- typeExpression <?> "canonical type of alias"
     spaces
     char ';'
     docs' <- optional $ try $ spaces >> (docs <?> "type alias docs")
     annotationSet'' <- annotationsWithDocs annotationSet' docs'
-    return $ TypeDeclaration name' (Alias canonicalType) annotationSet''
+    return $ TypeDeclaration name' (Alias canonicalType') annotationSet''
 
 
 unboxedTypeDeclaration :: Parser TypeDeclaration
@@ -267,19 +261,19 @@ unboxedTypeDeclaration = do
     annotationSet' <- annotationSet <?> "unboxed type annotations"
     string' "unboxed" <?> "unboxed type keyword"
     spaces
-    typename <- identifier <?> "unboxed type name"
-    let name' = Name typename typename
+    typeName <- identifier <?> "unboxed type name"
+    let name' = Name typeName typeName
     spaces
     char '('
     spaces
-    innerType <- typeExpression <?> "inner type of unboxed type"
+    innerType' <- typeExpression <?> "inner type of unboxed type"
     spaces
     char ')'
     spaces
     char ';'
     docs' <- optional $ try $ spaces >> (docs <?> "unboxed type docs")
     annotationSet'' <- annotationsWithDocs annotationSet' docs'
-    return $ TypeDeclaration name' (UnboxedType innerType) annotationSet''
+    return $ TypeDeclaration name' (UnboxedType innerType') annotationSet''
 
 enumMember :: Parser EnumMember
 enumMember = do
@@ -295,25 +289,31 @@ enumMember = do
     return $ EnumMember memberName annotationSet''
 
 handleNameDuplication :: Declaration a
-                      => String -> [a]
+                      => String
+                      -> [a]
                       -> (DeclarationSet a -> Parser b)
                       -> Parser b
-handleNameDuplication label' declarations cont =
-    case DeclarationSet.fromList declarations of
-        Left (BehindNameDuplication (Name _ bname)) ->
-            fail ("the behind " ++ label' ++ " name `" ++ toString bname ++
-                  "` is duplicated")
-        Left (FacialNameDuplication (Name fname _)) ->
-            fail ("the facial " ++ label' ++ " name `" ++ toString fname ++
-                  "` is duplicated")
-        Right set -> cont set
+handleNameDuplication label' declarations cont = do
+    set <- handleNameDuplicationError label' $
+        DeclarationSet.fromList declarations
+    cont set
+
+handleNameDuplicationError :: String -> Either NameDuplication a -> Parser a
+handleNameDuplicationError _ (Right v) = return v
+handleNameDuplicationError label' (Left dup) =
+    fail ("the " ++ nameType ++ " " ++ label' ++ " name `" ++
+          toString name' ++ "` is duplicated")
+  where
+    (nameType, name') = case dup of
+        BehindNameDuplication (Name _ bname) -> ("behind", bname)
+        FacialNameDuplication (Name fname _) -> ("facial", fname)
 
 enumTypeDeclaration :: Parser TypeDeclaration
 enumTypeDeclaration = do
     annotationSet' <- annotationSet <?> "enum type annotations"
     string "enum" <?> "enum keyword"
     spaces
-    typename <- name <?> "enum type name"
+    typeName <- name <?> "enum type name"
     spaces
     frontDocs <- optional $ do
         d <- docs <?> "enum type docs"
@@ -328,9 +328,9 @@ enumTypeDeclaration = do
             spaces
             return d
     annotationSet'' <- annotationsWithDocs annotationSet' docs'
-    members <- (enumMember `sepBy1` (spaces >> char '|' >> spaces))
-                   <?> "enum members"
-    case DeclarationSet.fromList members of
+    members' <- (enumMember `sepBy1` (spaces >> char '|' >> spaces))
+        <?> "enum members"
+    case DeclarationSet.fromList members' of
         Left (BehindNameDuplication (Name _ bname)) ->
             fail ("the behind member name `" ++ toString bname ++
                   "` is duplicated")
@@ -340,7 +340,7 @@ enumTypeDeclaration = do
         Right memberSet -> do
             spaces
             char ';'
-            return $ TypeDeclaration typename (EnumType memberSet)
+            return $ TypeDeclaration typeName (EnumType memberSet)
                                      annotationSet''
 
 fieldsOrParameters :: forall a . (String, String)
@@ -349,12 +349,12 @@ fieldsOrParameters :: forall a . (String, String)
 fieldsOrParameters (label', pluralLabel) make = do
     annotationSet' <- annotationSet <?> (label' ++ " annotations")
     spaces
-    type' <- typeExpression <?> (label' ++ " type")
+    typeExpr <- typeExpression <?> (label' ++ " type")
     spaces1
     name' <- name <?> (label' ++ " name")
     spaces
-    let makeWithDocs = make name' type' . A.union annotationSet'
-                                        . annotationsFromDocs
+    let makeWithDocs = make name' typeExpr . A.union annotationSet'
+                                           . annotationsFromDocs
     followedByComma makeWithDocs <|> do
         d <- optional docs' <?> (label' ++ " docs")
         return [makeWithDocs d]
@@ -391,7 +391,7 @@ recordTypeDeclaration = do
     annotationSet' <- annotationSet <?> "record type annotations"
     string "record" <?> "record keyword"
     spaces
-    typename <- name <?> "record type name"
+    typeName <- name <?> "record type name"
     spaces
     char '('
     spaces
@@ -405,13 +405,15 @@ recordTypeDeclaration = do
     spaces
     char ';'
     annotationSet'' <- annotationsWithDocs annotationSet' docs'
-    return $ TypeDeclaration typename (RecordType fields') annotationSet''
+    return $ TypeDeclaration typeName (RecordType fields') annotationSet''
 
-tag :: Parser Tag
+tag :: Parser (Tag, Bool)
 tag = do
     annotationSet' <- annotationSet <?> "union tag annotations"
     spaces
-    tagName <- name <?> "union tag name"
+    default' <- optional (string "default" <?> "default tag")
+    spaces
+    tagName' <- name <?> "union tag name"
     spaces
     paren <- optional $ char '('
     spaces
@@ -435,14 +437,18 @@ tag = do
             spaces
             return d
     annotationSet'' <- annotationsWithDocs annotationSet' docs'
-    return $ Tag tagName fields' annotationSet''
+    return ( Tag tagName' fields' annotationSet''
+           , case default' of
+                 Just _ -> True
+                 Nothing -> False
+           )
 
 unionTypeDeclaration :: Parser TypeDeclaration
 unionTypeDeclaration = do
     annotationSet' <- annotationSet <?> "union type annotations"
     string "union" <?> "union keyword"
     spaces
-    typename <- name <?> "union type name"
+    typeName <- name <?> "union type name"
     spaces
     docs' <- optional $ do
         d <- docs <?> "union type docs"
@@ -452,11 +458,19 @@ unionTypeDeclaration = do
     spaces
     tags' <- (tag `sepBy1` try (spaces >> char '|' >> spaces))
              <?> "union tags"
+    let tags'' = [t | (t, _) <- tags']
+    let defaultTag' = do
+            (t''', _) <- L.find snd tags'
+            return t'''
     spaces
     char ';'
     annotationSet'' <- annotationsWithDocs annotationSet' docs'
-    handleNameDuplication "tag" tags' $ \ tagSet ->
-        return $ TypeDeclaration typename (UnionType tagSet) annotationSet''
+    if length (L.filter snd tags') > 1
+        then fail "A union type cannot have more than a default tag."
+        else do
+            ut <- handleNameDuplicationError "tag" $
+                unionType tags'' defaultTag'
+            return $ TypeDeclaration typeName ut annotationSet''
 
 typeDeclaration :: Parser TypeDeclaration
 typeDeclaration = do
@@ -537,7 +551,7 @@ serviceDeclaration = do
     annotationSet' <- annotationSet <?> "service annotation"
     string "service" <?> "service keyword"
     spaces
-    serviceName <- name <?> "service name"
+    serviceName' <- name <?> "service name"
     spaces
     char '('
     spaces
@@ -551,7 +565,7 @@ serviceDeclaration = do
     spaces
     char ';'
     annotationSet'' <- annotationsWithDocs annotationSet' docs'
-    return $ ServiceDeclaration serviceName (Service methods') annotationSet''
+    return $ ServiceDeclaration serviceName' (Service methods') annotationSet''
 
 modulePath :: Parser ModulePath
 modulePath = do

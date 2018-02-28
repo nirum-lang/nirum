@@ -182,7 +182,7 @@ typeDecl mod' ident
                 <dd>#{blockToHtml d}
 |]
 typeDecl mod' ident
-         tc@TD.TypeDeclaration { TD.type' = TD.UnionType tags } = [shamlet|
+         tc@TD.TypeDeclaration { TD.type' = TD.UnionType tags _} = [shamlet|
     <h2>union <code>#{toNormalizedText ident}</code>
     $maybe d <- docsBlock tc
         #{blockToHtml d}

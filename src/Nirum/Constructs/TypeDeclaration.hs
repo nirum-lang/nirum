@@ -34,12 +34,12 @@ module Nirum.Constructs.TypeDeclaration ( EnumMember (EnumMember)
                                                , UnboxedType
                                                , UnionType
                                                , canonicalType
+                                               , defaultTag
                                                , fields
                                                , innerType
                                                , jsonType
                                                , members
                                                , primitiveTypeIdentifier
-                                               , tags
                                                )
                                         , TypeDeclaration ( Import
                                                           , ServiceDeclaration
@@ -53,9 +53,11 @@ module Nirum.Constructs.TypeDeclaration ( EnumMember (EnumMember)
                                                           , typeAnnotations
                                                           , typename
                                                           )
+                                        , unionType
+                                        , tags
                                         ) where
 
-import Data.Maybe (isJust)
+import Data.Maybe (isJust, maybeToList)
 import Data.String (IsString (fromString))
 
 import qualified Data.Text as T
@@ -66,7 +68,7 @@ import Nirum.Constructs.Declaration ( Declaration (annotations, name)
                                     , Documented (docs)
                                     )
 import Nirum.Constructs.Docs (Docs (Docs), toCodeWithPrefix)
-import Nirum.Constructs.DeclarationSet (DeclarationSet, null', toList)
+import Nirum.Constructs.DeclarationSet as DS
 import Nirum.Constructs.Identifier (Identifier)
 import Nirum.Constructs.ModulePath (ModulePath)
 import Nirum.Constructs.Name (Name (Name))
@@ -81,11 +83,21 @@ data Type
     | UnboxedType { innerType :: TypeExpression }
     | EnumType { members :: DeclarationSet EnumMember }
     | RecordType { fields :: DeclarationSet Field }
-    | UnionType { tags :: DeclarationSet Tag }
+    | UnionType -- | Use 'unionType' instaed.
+        { nondefaultTags :: DeclarationSet Tag -- This should not be exported.
+        , defaultTag :: Maybe Tag
+        }
     | PrimitiveType { primitiveTypeIdentifier :: PrimitiveTypeIdentifier
                     , jsonType :: JsonType
                     }
     deriving (Eq, Ord, Show)
+
+tags :: Type -> DeclarationSet Tag
+tags UnionType { nondefaultTags = tags', defaultTag = defTag } =
+    case fromList $ toList tags' ++ maybeToList defTag of
+        Right ts -> ts
+        Left _ -> DS.empty -- must never happen!
+tags _ = DS.empty
 
 -- | Member of 'EnumType'.
 data EnumMember = EnumMember Name AnnotationSet deriving (Eq, Ord, Show)
@@ -130,6 +142,15 @@ data Tag = Tag { tagName :: Name
                , tagFields :: DeclarationSet Field
                , tagAnnotations :: AnnotationSet
                } deriving (Eq, Ord, Show)
+
+-- | Create a 'UnionType'.
+unionType :: [Tag] -> Maybe Tag -> Either NameDuplication Type
+unionType t dt = case fromList t of
+                     Right ts -> Right $
+                         case dt of
+                             Nothing -> UnionType ts Nothing
+                             Just dt' -> UnionType (delete dt' ts) dt
+                     Left a -> Left a
 
 instance Construct Tag where
     toCode tag@(Tag name' fields' _) =
@@ -204,10 +225,10 @@ instance Construct TypeDeclaration where
       where
         fieldsCode = T.intercalate "\n" $ map toCode $ toList fields'
         docs' = A.lookupDocs annotationSet'
-    toCode (TypeDeclaration name' (UnionType tags') annotationSet') =
-        T.concat [ toCode annotationSet'
+    toCode (TypeDeclaration name' (UnionType tags' defaultTag') as') =
+        T.concat [ toCode as'
                  , "union ", nameCode
-                 , toCodeWithPrefix "\n    " (A.lookupDocs annotationSet')
+                 , toCodeWithPrefix "\n    " (A.lookupDocs as')
                  , "\n    = " , tagsCode
                  , "\n    ;"
                  ]
@@ -216,17 +237,20 @@ instance Construct TypeDeclaration where
         nameCode = toCode name'
         tagsCode :: T.Text
         tagsCode = T.intercalate "\n    | "
-                                 [ T.replace "\n" "\n    " (toCode t)
-                                 | t <- toList tags'
+                                 [ T.replace "\n" "\n    " $
+                                             if defaultTag' == Just t
+                                             then T.append "default " (toCode t)
+                                             else toCode t
+                                 | t <- maybeToList defaultTag' ++ toList tags'
                                  ]
     toCode (TypeDeclaration name'
                             (PrimitiveType typename' jsonType')
-                            annotationSet') =
-        T.concat [ toCode annotationSet'
+                            as') =
+        T.concat [ toCode as'
                  , "// primitive type `", toCode name', "`\n"
                  , "//     internal type identifier: ", showT typename', "\n"
                  , "//     coded to json ", showT jsonType', " type\n"
-                 , docString (A.lookupDocs annotationSet')
+                 , docString (A.lookupDocs as')
                  ]
       where
         showT :: Show a => a -> T.Text

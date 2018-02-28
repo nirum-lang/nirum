@@ -6,6 +6,14 @@ Version 0.4.0
 
 To be released.
 
+### Language
+
+ -  Union tags became possible to have `default` keyword.  It's useful
+    for migrating a record type to a union type.  [[#13], [#227]]
+
+[#13]: https://github.com/spoqa/nirum/issues/13
+[#227]: https://github.com/spoqa/nirum/pull/227
+
 
 Version 0.3.0
 -------------
@@ -102,7 +110,7 @@ Released on February 18, 2018.
 
 ### Et cetera
 
- -  The officialy distributed executable binaries for Linux became
+ -  The officially distributed executable binaries for Linux became
     independent from [glibc]; instead statically linked to [musl].  [#216]
  -  The Docker image now has `nirum` command in `PATH`.  [[#155]]
  -  The Docker image became based and built on [Alpine Linux][] so that

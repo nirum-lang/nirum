@@ -32,7 +32,7 @@ record point (
 union shape
     # Type constructors in a sum type become translated to subtypes in OO
     # languages, and datatypes in functional languages.
-    = rectangle (
+    = default rectangle (
           # Each tag can have zero or more fields like record types.
           point upper-left,
           point lower-right

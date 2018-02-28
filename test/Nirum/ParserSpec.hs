@@ -32,12 +32,7 @@ import Nirum.Constructs.Service ( Method (Method)
                                 , Parameter (Parameter)
                                 , Service (Service)
                                 )
-import Nirum.Constructs.TypeDeclaration ( EnumMember (EnumMember)
-                                        , Field (Field, fieldAnnotations)
-                                        , Tag (Tag, tagAnnotations, tagFields)
-                                        , Type (..)
-                                        , TypeDeclaration (..)
-                                        )
+import Nirum.Constructs.TypeDeclaration as TD hiding (tags)
 import Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
                                                         , MapModifier
                                                         , OptionModifier
@@ -656,6 +651,23 @@ record dup (
 
     descTypeDecl "unionTypeDeclaration" P.unionTypeDeclaration $ \ helpers -> do
         let (parse', expectError) = helpers
+        it "has defaultTag" $ do
+            let cOriginF = Field "origin" "point" empty
+                cRadiusF = Field "radius" "offset" empty
+                circleFields = [cOriginF, cRadiusF]
+                rUpperLeftF = Field "upper-left" "point" empty
+                rLowerRightF = Field "lower-right" "point" empty
+                rectangleFields = [rUpperLeftF, rLowerRightF]
+                circleTag = Tag "circle" circleFields empty
+                rectTag = Tag "rectangle" rectangleFields empty
+                tags' = [circleTag]
+                Right union' = unionType tags' $ Just rectTag
+                a = TypeDeclaration "shape" union' empty
+            parse' [s|
+union shape
+    = circle (point origin, offset radius,)
+    | default rectangle (point upper-left, point lower-right,)
+    ;|] `shouldBeRight` a
         it "emits (TypeDeclaration (UnionType ...)) if succeeded to parse" $ do
             let cOriginF = Field "origin" "point" empty
                 cRadiusF = Field "radius" "offset" empty
@@ -667,7 +679,7 @@ record dup (
                 rectTag = Tag "rectangle" rectangleFields empty
                 noneTag = Tag "none" [] empty
                 tags' = [circleTag, rectTag, noneTag]
-                union' = UnionType tags'
+                Right union' = unionType tags' Nothing
                 a = TypeDeclaration "shape" union' empty
                 b = a { typeAnnotations = singleDocs "shape type" }
             parse' [s|
@@ -702,18 +714,21 @@ union shape
     | rectangle (point upper-left, point lower-right,)
     | none
     ;|] `shouldBeRight` b
+            let Right union3 = unionType
+                    [circleTag, rectTag, Tag "none" [] fooAnnotationSet]
+                    Nothing
             parse' [s|
 union shape
     = circle (point origin, offset radius,)
     | rectangle (point upper-left, point lower-right,)
     | @foo (v = "bar") none
-    ;|] `shouldBeRight`
-                    a { type' = union' { tags = [ circleTag
-                                                , rectTag
-                                                , Tag "none" [] fooAnnotationSet
-                                                ]
-                                       }
-                      }
+    ;|] `shouldBeRight` a { type' = union3 }
+            let Right union4 = unionType
+                    [ circleTag { tagAnnotations = singleDocs "tag docs" }
+                    , rectTag { tagAnnotations = singleDocs "front docs" }
+                    , noneTag
+                    ]
+                    Nothing
             parse' [s|
 union shape
     = circle (point origin, offset radius,)
@@ -723,59 +738,42 @@ union shape
           point upper-left, point lower-right,
       )
     | none
-    ;|] `shouldBeRight`
-                    a { type' = union'
-                            { tags = [ circleTag
-                                        { tagAnnotations = singleDocs "tag docs"
-                                        }
-                                     , rectTag
-                                        { tagAnnotations =
-                                              singleDocs "front docs"
-                                        }
-                                     , noneTag
-                                     ]
-                            }
-                      }
+    ;|] `shouldBeRight` a { type' = union4 }
+            let Right union5 = unionType
+                    [ circleTag, rectTag
+                    , noneTag { tagAnnotations = singleDocs "tag docs" }
+                    ]
+                    Nothing
             parse' [s|
 union shape
     = circle (point origin, offset radius,)
     | rectangle (point upper-left, point lower-right,)
     | none  # tag docs
-    ;|] `shouldBeRight`
-                    a { type' = union'
-                            { tags = [ circleTag, rectTag
-                                     , noneTag
-                                        { tagAnnotations = singleDocs "tag docs"
-                                        }
-                                     ]
-                            }
-                      }
+    ;|] `shouldBeRight` a { type' = union5 }
+            let Right union6 = unionType
+                    [ circleTag
+                          { tagFields =
+                                 [ cOriginF
+                                 , cRadiusF
+                                       { fieldAnnotations = bazAnnotationSet }
+                                 ]
+                          }
+                    , rectTag
+                          { tagFields =
+                                [ rUpperLeftF
+                                , rLowerRightF
+                                      { fieldAnnotations = fooAnnotationSet }
+                                ]
+                          }
+                    , noneTag
+                    ]
+                    Nothing
             parse' [s|
 union shape
     = circle (point origin, @baz offset radius,)
     | rectangle (point upper-left, @foo (v = "bar") point lower-right,)
     | none
-    ;|] `shouldBeRight`
-                    a { type' = union'
-                            { tags = [ circleTag
-                                           { tagFields =
-                                                 [ cOriginF
-                                                 , cRadiusF { fieldAnnotations =
-                                                              bazAnnotationSet }
-                                                 ]
-                                           }
-                                     , rectTag
-                                           { tagFields =
-                                                 [ rUpperLeftF
-                                                 , rLowerRightF
-                                                       { fieldAnnotations =
-                                                         fooAnnotationSet }
-                                                 ]
-                                           }
-                                     , noneTag
-                                     ]
-                             }
-                      }
+    ;|] `shouldBeRight` a { type' = union6 }
         it "fails to parse if there are duplicated facial names" $ do
             expectError [s|
 union dup
@@ -806,7 +804,13 @@ union dup
             expectErr "unboxed a (text);\nunion b = x | y\nunboxed c (text);"
                       3 1
             expectErr "union a = x | y;\nunboxed b (text)\nunion c = x | y;" 3 1
-
+        it "failed to parse union with more than 1 default keyword." $ do
+            let (_, expectErr) = helperFuncs P.module'
+            expectErr [s|
+union shape
+    = default circle (point origin, offset radius,)
+    | default rectangle (point upper-left, point lower-right,)
+    ;|] 4 6
     describe "method" $ do
         let (parse', expectError) = helperFuncs P.method
             httpGetAnnotation = singleton $ Annotation "http"
@@ -819,14 +823,14 @@ union dup
             parse' "text get-name (person user)" `shouldBeRight`
                 Method "get-name" [Parameter "user" "person" empty]
                        (Just "text") Nothing empty
-            parse' "text get-name  ( person user,text default )" `shouldBeRight`
+            parse' "text get-name (person user,text `default`)" `shouldBeRight`
                 Method "get-name"
                        [ Parameter "user" "person" empty
                        , Parameter "default" "text" empty
                        ]
                        (Just "text") Nothing empty
             parse' "@http(method = \"GET\", path = \"/get-name/\") \
-                   \text get-name  ( person user,text default )" `shouldBeRight`
+                   \text get-name (person user,text `default`)" `shouldBeRight`
                 Method "get-name"
                        [ Parameter "user" "person" empty
                        , Parameter "default" "text" empty
@@ -835,7 +839,7 @@ union dup
             parse' "text get-name() throws name-error" `shouldBeRight`
                 Method "get-name" [] (Just "text") (Just "name-error") empty
             parse' [s|
-text get-name  ( person user,text default )
+text get-name  ( person user,text `default` )
                throws get-name-error|] `shouldBeRight`
                 Method "get-name"
                        [ Parameter "user" "person" empty
@@ -844,7 +848,7 @@ text get-name  ( person user,text default )
                        (Just "text") (Just "get-name-error") empty
             parse' [s|
 @http(method = "GET", path = "/get-name/")
-text get-name  ( person user,text default )
+text get-name  ( person user,text `default` )
                throws get-name-error|] `shouldBeRight`
                 Method "get-name"
                        [ Parameter "user" "person" empty
@@ -908,7 +912,7 @@ text get-name (
   # Gets the name of the user.
   person user,
   # The person to find their name.
-  text default
+  text `default`
   # The default name used when the user has no name.
 )|] `shouldBeRight` expectedMethod
         it "fails to parse if there are parameters of the same facial name" $ do
