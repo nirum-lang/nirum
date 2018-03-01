@@ -129,6 +129,15 @@ returns, but in program codes we become able to deal with distance using `meter`
 type rather than primitive `bigint` type.
 
 
+Removing a field
+----------------
+
+Any fields in payload that are unlisted in an interface definition are ignored
+by a deserializer.  If you are going to remove an existing field you should
+deploy the newer version to a payload consumer first, and then a payload
+provider last.
+
+
 Interchangeability of enum type and `text`
 ------------------------------------------
 

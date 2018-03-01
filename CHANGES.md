@@ -15,6 +15,19 @@ To be released.
 [#227]: https://github.com/spoqa/nirum/pull/227
 
 
+Version 0.3.1
+-------------
+
+Released on March 1, 2018.
+
+### Python target
+
+ -  Fixed record/union deserializers to ignore unknown fields in data payload.
+    Deserializers had raised `KeyError` before.  [[#232]]
+
+[#232]: https://github.com/spoqa/nirum/issues/232
+
+
 Version 0.3.0
 -------------
 
@@ -180,7 +193,6 @@ Released on February 18, 2018.
 [#203]: https://github.com/spoqa/nirum/pull/203
 [#204]: https://github.com/spoqa/nirum/pull/204
 [#216]: https://github.com/spoqa/nirum/issues/216
-[#222]: https://github.com/spoqa/nirum/pull/222
 [#218]: https://github.com/spoqa/nirum/issues/218
 [#222]: https://github.com/spoqa/nirum/pull/222
 [#223]: https://github.com/spoqa/nirum/pull/223
