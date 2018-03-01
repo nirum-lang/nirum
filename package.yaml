@@ -2,7 +2,7 @@ name: nirum
 version:
   # CHECK: When the version is bumped, update the docs and README.md file as
   # well.  Check using `git grep -E '[0-9]+\.[0-9]+\.[0-9]+' '*.md'` command.
-  '0.3.1'
+  '0.3.2'
 synopsis: ! >
   IDL compiler and RPC/distributed object framework for
   microservices
