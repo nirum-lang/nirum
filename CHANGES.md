@@ -4,7 +4,7 @@ Nirum changelog
 Version 0.3.1
 -------------
 
-To be released.
+Released on March 1, 2018.
 
 ### Python target
 
