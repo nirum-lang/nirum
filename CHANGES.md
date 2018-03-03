@@ -11,8 +11,21 @@ To be released.
  -  Union tags became possible to have `default` keyword.  It's useful
     for migrating a record type to a union type.  [[#13], [#227]]
 
+### Python target
+
+ -  Generated Python packages became to have two [entry points] (a feature
+    provided by *setuptools*):
+     -  `nirum.modules`: It maps Nirum modules to Python modules.
+        Nirum module paths are normalized to avoid underscores and upper letters
+        and use hyphens and lower letters instead, e.g., `foo-bar.baz`.
+        The table works well with `renames` settings as well.
+     -  `nirum.classes`: It maps Nirum types (including services) to Python
+        classes.  Nirum type names are qualified and their leading module paths
+        are also normalized (the same rule to `nirum.modules` applies here).
+
 [#13]: https://github.com/spoqa/nirum/issues/13
 [#227]: https://github.com/spoqa/nirum/pull/227
+[entry points]: https://setuptools.readthedocs.io/en/latest/pkg_resources.html#entry-points
 
 
 Version 0.3.1
