@@ -33,11 +33,12 @@ module Nirum.Parser ( Parser
                     ) where
 
 import Control.Monad (void)
+import Data.Void
 import qualified System.IO as SIO
 
 import qualified Data.List as L
 import Data.Map.Strict as Map hiding (foldl)
-import Data.Set hiding (empty, foldl, fromList, map)
+import Data.Set hiding (foldl)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import Text.Megaparsec hiding (ParseError, parse)
@@ -49,8 +50,7 @@ import Text.Megaparsec.Char ( char
                             , string'
                             )
 import qualified Text.Megaparsec.Error as E
-import Text.Megaparsec.Text (Parser)
-import Text.Megaparsec.Lexer (charLiteral)
+import Text.Megaparsec.Char.Lexer (charLiteral)
 
 import qualified Nirum.Constructs.Annotation as A
 import Nirum.Constructs.Declaration (Declaration)
@@ -80,7 +80,8 @@ import Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
                                                         )
                                        )
 
-type ParseError = E.ParseError (Token T.Text) E.Dec
+type Parser = Parsec Void T.Text
+type ParseError = E.ParseError Char Void
 
 -- CHECK: If a new reserved keyword is introduced, it has to be also
 -- added to `reservedKeywords` set in the `Nirum.Constructs.Identifier`
@@ -494,7 +495,7 @@ typeDeclaration = do
     let annotations = A.union annotationSet' $ typeAnnotations typeDecl
     return $ typeDecl { typeAnnotations = annotations }
   where
-    unless' :: [String] -> Parser a -> Parser a
+    unless' :: [T.Text] -> Parser a -> Parser a
     unless' [] _ = fail "no candidates"  -- Must never happen
     unless' [s] p = notFollowedBy (string s) >> p
     unless' (x : xs) p = notFollowedBy (string x) >> unless' xs p
@@ -662,5 +663,3 @@ parseFile path = do
         SIO.hSetEncoding h SIO.utf8_bom
         TIO.hGetContents h
     return $ runParser file path code
-
-{-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}

@@ -22,12 +22,12 @@ module Nirum.Constructs.Identifier ( Identifier
 import Data.Char (toLower, toUpper)
 import Data.Maybe (fromMaybe)
 import Data.String (IsString (fromString))
+import Data.Void
 
 import qualified Data.Text as T
 import qualified Data.Set as S
 import qualified Text.Megaparsec as P
 import Text.Megaparsec.Char (oneOf, satisfy)
-import Text.Megaparsec.Text (Parser)
 
 import Nirum.Constructs (Construct (toCode))
 
@@ -64,7 +64,7 @@ reservedKeywords = [ "enum"
                    , "default"
                    ]
 
-identifierRule :: Parser Identifier
+identifierRule :: P.Parsec Void T.Text Identifier
 identifierRule = do
     firstChar <- satisfy isAlpha
     restChars <- P.many $ satisfy isAlnum
@@ -89,7 +89,7 @@ fromText text =
         Right ident -> Just ident
         Left _ -> Nothing
   where
-    rule :: Parser Identifier
+    rule :: P.Parsec Void T.Text Identifier
     rule = do
         identifier' <- identifierRule
         _ <- P.eof

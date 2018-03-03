@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, QuasiQuotes, RankNTypes, ScopedTypeVariables,
+{-# LANGUAGE GADTs, LambdaCase, QuasiQuotes, RankNTypes, ScopedTypeVariables,
              StandaloneDeriving, TypeFamilies #-}
 module Nirum.Package.Metadata ( Author (Author, email, name, uri)
                               , Metadata ( Metadata
@@ -261,14 +261,14 @@ optional (Left (FieldError _)) = Right Nothing
 optional (Left error') = Left error'
 
 tableField :: MetadataField -> Table -> Either MetadataError Table
-tableField = typedField "table" $ \ n -> case n of
-                                              VTable t -> Just t
-                                              _ -> Nothing
+tableField = typedField "table" $ \ case
+    VTable t -> Just t
+    _ -> Nothing
 
 stringField :: MetadataField -> Table -> Either MetadataError Text
-stringField = typedField "string" $ \ n -> case n of
-                                                VString s -> Just s
-                                                _ -> Nothing
+stringField = typedField "string" $ \ case
+    VString s -> Just s
+    _ -> Nothing
 
 arrayField :: MetadataField -> Table -> Either MetadataError VArray
 arrayField f t =
@@ -278,10 +278,9 @@ arrayField f t =
         Left error' -> Left error'
   where
     arrayF :: MetadataField -> Table -> Either MetadataError VArray
-    arrayF = typedField "array" $ \ node ->
-        case node of
-            VArray array -> Just array
-            _ -> Nothing
+    arrayF = typedField "array" $ \ case
+        VArray array -> Just array
+        _ -> Nothing
 
 
 tableArrayField :: MetadataField -> Table -> Either MetadataError VTArray
@@ -292,10 +291,9 @@ tableArrayField f t =
         Left error' -> Left error'
   where
     arrayF :: MetadataField -> Table -> Either MetadataError VTArray
-    arrayF = typedField "array of tables" $ \ node ->
-        case node of
-            VTArray array -> Just array
-            _ -> Nothing
+    arrayF = typedField "array of tables" $ \ case
+        VTArray array -> Just array
+        _ -> Nothing
 
 uriField :: MetadataField -> Table -> Either MetadataError URI
 uriField field' table = do

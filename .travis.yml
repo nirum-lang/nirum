@@ -118,7 +118,8 @@ install:
   fi
 
 script:
-- 'TOX="$(which tox)" stack --no-terminal test -j4 --coverage'
+- ls -al "$(python3 -m site --user-base)/bin/tox"
+- 'TOX="$(python3 -m site --user-base)/bin/tox" stack --no-terminal test -j4 --coverage'
 - ./lint.sh
 
 after_script:

@@ -22,10 +22,10 @@ install:
 - ps: >
     if((Test-Path $env:STACK_ROOT) -ne $true) {
       if($env:PLATFORM -eq 'x86') {
-        $stackUrl = 'https://www.stackage.org/stack/windows-i386';
+        $stackUrl = 'https://github.com/commercialhaskell/stack/releases/download/v1.6.5/stack-1.6.5-windows-i386.zip';
       }
       elseif($env:PLATFORM -eq 'x64') {
-        $stackUrl = 'https://www.stackage.org/stack/windows-x86_64';
+        $stackUrl = 'https://github.com/commercialhaskell/stack/releases/download/v1.6.5/stack-1.6.5-windows-x86_64.zip';
       }
       Invoke-WebRequest -OutFile C:\stack.zip $stackUrl;
       Add-Type -AssemblyName System.IO.Compression.FileSystem;
@@ -49,6 +49,7 @@ install:
 - set
 
 - C:\Python36\python -m pip install --upgrade tox pip setuptools
+- stack --no-terminal install -j4 happy  # haskell-src-exts requires happy
 - stack --no-terminal install -j4 --only-dependencies
 build_script:
 - stack --no-terminal build -j4 --copy-bins --flag nirum:static
