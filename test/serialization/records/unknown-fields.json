@@ -1,0 +1,15 @@
+{
+    "description": "Unknown fields should be ignored.",
+    "type": "fixture.foo.person",
+    "input": {
+        "_type": "person",
+        "first_name": "John",
+        "last_name": "Doe",
+        "full_name": "John Doe (unknown field)"
+    },
+    "normal": {
+        "_type": "person",
+        "first_name": "John",
+        "last_name": "Doe"
+    }
+}

@@ -1,0 +1,22 @@
+{
+    "description": "Although UUID strings can have various forms, its normalization form is lowercase hex digits in standard form (e.g., 118fe23b-0380-4d15-8f2d-9f8c6f55e5a5).",
+    "type": "fixture.types.uuid-list",
+    "input": {
+        "_type": "uuid_list",
+        "values": [
+            "118fe23b-0380-4d15-8f2d-9f8c6f55e5a5",
+            "118FE23B-0380-4D15-8F2D-9F8C6F55E5A5",
+            "118fe23b03804d158f2d-9f8c6f55e5a5",
+            "118FE23B03804D158F2D9F8C6F55E5A5"
+        ]
+    },
+    "normal": {
+        "_type": "uuid_list",
+        "values": [
+            "118fe23b-0380-4d15-8f2d-9f8c6f55e5a5",
+            "118fe23b-0380-4d15-8f2d-9f8c6f55e5a5",
+            "118fe23b-0380-4d15-8f2d-9f8c6f55e5a5",
+            "118fe23b-0380-4d15-8f2d-9f8c6f55e5a5"
+        ]
+    }
+}

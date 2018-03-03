@@ -702,7 +702,7 @@ compilePrimitiveTypeSerializer Binary var =
 compilePrimitiveTypeSerializer Date var = [qq|($var).isoformat()|]
 compilePrimitiveTypeSerializer Datetime var = [qq|($var).isoformat()|]
 compilePrimitiveTypeSerializer Bool var = var
-compilePrimitiveTypeSerializer Uuid var = [qq|str($var)|]
+compilePrimitiveTypeSerializer Uuid var = [qq|str($var).lower()|]
 compilePrimitiveTypeSerializer Uri var = var
 
 compileTypeDeclaration :: Source -> TypeDeclaration -> CodeGen Code
