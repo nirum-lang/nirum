@@ -1,5 +1,8 @@
 import pkg_resources
 
+from fixture.foo import FloatUnbox, Irum
+from renamed.foo import FooTest
+
 
 def parse_pkg_info(pkg_name):
     d = pkg_resources.get_distribution(pkg_name)
@@ -18,8 +21,31 @@ def test_setup_metadata():
     assert ['nirum'] == pkg['Requires']
     assert set(pkg['Provides']) == {
         'fixture', 'fixture.foo', 'fixture.foo.bar', 'fixture.qux',
+        'fixture.types',
         'renamed', 'renamed.foo', 'renamed.foo.bar',
     }
     assert ['0.3.0'] == pkg['Version']
     assert ['Package description'] == pkg['Summary']
     assert ['MIT'] == pkg['License']
+
+
+def test_module_entry_points():
+    map_ = pkg_resources.get_entry_map('nirum_fixture', group='nirum.modules')
+    assert frozenset(map_) == {
+        'fixture.foo', 'fixture.foo.bar', 'fixture.qux',
+        'fixture.types',
+        'renames.test.foo', 'renames.test.foo.bar',
+    }
+    import fixture.foo
+    assert map_['fixture.foo'].resolve() is fixture.foo
+    import fixture.foo.bar
+    assert map_['fixture.foo.bar'].resolve() is fixture.foo.bar
+    import renamed.foo
+    assert map_['renames.test.foo'].resolve() is renamed.foo
+
+
+def test_class_entry_points():
+    map_ = pkg_resources.get_entry_map('nirum_fixture', group='nirum.classes')
+    assert map_['fixture.foo.float-unbox'].resolve() is FloatUnbox
+    assert map_['fixture.foo.irum'].resolve() is Irum
+    assert map_['renames.test.foo.foo-test'].resolve() is FooTest

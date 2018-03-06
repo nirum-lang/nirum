@@ -1,0 +1,13 @@
+{
+    "description": "If a value of union type lacks \"_tag\" field, it should be treated as a default tag.",
+    "type": "fixture.foo.mixed-name",
+    "input": {
+        "_type": "mixed_name",
+        "fullname": "John Doe"
+    },
+    "normal": {
+        "_type": "mixed_name",
+        "_tag": "culture_agnostic_name",
+        "fullname": "John Doe"
+    }
+}

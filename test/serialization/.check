@@ -1,0 +1,3 @@
+- If any serialization rule is added or changed it should be also updated to
+  docs as well.  See also *docs/serialization.md*, *docs/refactoring.md*,
+  and so on.

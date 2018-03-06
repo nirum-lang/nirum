@@ -74,6 +74,7 @@ import qualified Nirum.Constructs.Annotation as A
 import qualified Nirum.Constructs.DeclarationSet as DS
 import qualified Nirum.Constructs.Identifier as I
 import Nirum.Constructs.Declaration (Documented (docsBlock))
+import Nirum.Constructs.Module hiding (imports)
 import Nirum.Constructs.ModulePath ( ModulePath
                                    , fromIdentifiers
                                    , hierarchy
@@ -701,7 +702,7 @@ compilePrimitiveTypeSerializer Binary var =
 compilePrimitiveTypeSerializer Date var = [qq|($var).isoformat()|]
 compilePrimitiveTypeSerializer Datetime var = [qq|($var).isoformat()|]
 compilePrimitiveTypeSerializer Bool var = var
-compilePrimitiveTypeSerializer Uuid var = [qq|str($var)|]
+compilePrimitiveTypeSerializer Uuid var = [qq|str($var).lower()|]
 compilePrimitiveTypeSerializer Uri var = var
 
 compileTypeDeclaration :: Source -> TypeDeclaration -> CodeGen Code
@@ -1122,7 +1123,7 @@ class #{className}(#{T.intercalate "," $ compileExtendClasses annotations}):
     #{className}.Tag.#{toEnumMemberName tn}: #{toClassName' tn},
 %{ endforall }
 })
-            |]
+|]
   where
     tags' :: [Tag]
     tags' = DS.toList $ tags union
@@ -1544,9 +1545,34 @@ setup(
     setup_requires=setup_requires,
     install_requires=install_requires,
     extras_require=extras_require,
+    entry_points={
+        'nirum.modules': [
+%{ forall modPath <- MS.keys modules' }
+            '#{normalizeModulePath modPath} = #{toImportPath target' modPath}',
+%{ endforall }
+        ],
+        'nirum.classes': [
+%{ forall (modPath, Module types' _) <- MS.toList modules' }
+%{ forall typeName <- catMaybes (typeNames types') }
+            '#{normalizeModulePath modPath}.#{I.toNormalizedText typeName} = '
+            '#{toImportPath target' modPath}:#{toClassName typeName}',
+%{ endforall }
+%{ endforall }
+        ],
+    },
 )
 |]
   where
+    normalizeModulePath :: ModulePath -> T.Text
+    normalizeModulePath = T.intercalate "." . map I.toNormalizedText . toList
+    typeNames :: DS.DeclarationSet TD.TypeDeclaration -> [Maybe I.Identifier]
+    typeNames types' =
+        [ case td of
+              TD.TypeDeclaration { TD.typename = (Name n _) } -> Just n
+              TD.ServiceDeclaration { TD.serviceName = (Name n _) } -> Just n
+              TD.Import {} -> Nothing
+        | td <- DS.toList types'
+        ]
     nStringLiteral :: Maybe T.Text -> T.Text
     nStringLiteral (Just value) = stringLiteral value
     nStringLiteral Nothing = "None"

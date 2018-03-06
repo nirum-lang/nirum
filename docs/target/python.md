@@ -89,3 +89,56 @@ renames `foo.bar.baz` to `new-name.baz`:
 [targets.python.renames]
 "foo.bar" = "new-name"  # Note that the key is quoted.
 ~~~~~~~~
+
+
+Entry points
+------------
+
+All generated Python modules and classes are registered as setuptools'
+[entry points] so that an application can discover them at runtime.
+There are two groups:
+
+`nirum.modules`
+:   It maps Nirum modules to Python modules.  Nirum module paths are normalized
+    to avoid underscores and upper letters and use hyphens and lower letters
+    instead, e.g., `foo-bar.baz`.   The table works well with `renames`
+    settings as well.
+
+`nirum.classes`
+:   It maps Nirum types (including services) to Python classes.  Nirum type
+    names are qualified and their leading module paths are also normalized
+    (the same rule to `nirum.modules` applies here).
+
+Here's an example to discover Python modules generated from Nirum modules.
+
+~~~~~~~~ python
+>>> import pkg_resources  # provided by setuptools
+>>> module_entry_points = list(pkg_resources.iter_entry_points('nirum.modules'))
+>>> module_entry_points
+[EntryPoint.parse('foo = foo'),
+ EntryPoint.parse('foo.bar = foo.bar'),
+ EntryPoint.parse('qux = qux'),
+ ...]
+>>> module_entry_points[1]
+EntryPoint.parse('foo.bar = foo.bar')
+>>> module_entry_points[0].resolve()
+<module 'foo.bar' from '~/foo/bar/__init__.py'>
+~~~~~~~~
+
+Note that you need to call `.resolve()` method as well.
+
+Finding a Python class generated from a Nirum type can be in a similar way:
+
+~~~~~~~~ python
+>>> list(pkg_resources.iter_entry_points('nirum.classes', 'foo.NoSuchName'))
+[]
+>>> list(pkg_resources.iter_entry_points('nirum.classes', 'foo.bar.some-type'))
+[EntryPoint.parse('foo.bar.some-type = foo.bar:SomeType')]
+>>> _[0].resolve()
+<class 'foo.bar.SomeType'>
+~~~~~~~~
+
+As you can see, the second parameter of `pkg_resources.iter_entry_points()`
+purposes to filter entry points by the given name.
+
+[entry points]: https://setuptools.readthedocs.io/en/latest/pkg_resources.html#entry-points

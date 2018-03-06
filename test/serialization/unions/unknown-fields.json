@@ -1,0 +1,16 @@
+{
+    "description": "Unknown fields should be ignored.",
+    "type": "fixture.foo.mixed-name",
+    "input": {
+        "_type": "mixed_name",
+        "_tag": "culture_agnostic_name",
+        "fullname": "John Doe",
+        "first": "John (unknown field)",
+        "last": "Doe (unknown field)"
+    },
+    "normal": {
+        "_type": "mixed_name",
+        "_tag": "culture_agnostic_name",
+        "fullname": "John Doe"
+    }
+}

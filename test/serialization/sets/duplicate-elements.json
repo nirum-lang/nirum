@@ -1,0 +1,29 @@
+{
+    "description": "If a set contains duplicate values they should be ignored except for any one.",
+    "type": "fixture.foo.people",
+    "input": {
+        "_type": "people",
+        "people": [
+            {
+                "_type": "person",
+                "first_name": "John",
+                "last_name": "Doe"
+            },
+            {
+                "_type": "person",
+                "first_name": "John",
+                "last_name": "Doe"
+            }
+        ]
+    },
+    "normal": {
+        "_type": "people",
+        "people": [
+            {
+                "_type": "person",
+                "first_name": "John",
+                "last_name": "Doe"
+            }
+        ]
+    }
+}
