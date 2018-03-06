@@ -1,56 +1,27 @@
-{-# LANGUAGE DeriveDataTypeable, ExtendedDefaultRules, OverloadedLists,
-             QuasiQuotes, TypeFamilies, TypeSynonymInstances,
-             MultiParamTypeClasses #-}
-module Nirum.Targets.Python ( Code
-                            , CodeGen
-                            , CodeGenContext ( localImports
-                                             , standardImports
-                                             , thirdPartyImports
-                                             )
-                            , CompileError
-                            , InstallRequires ( InstallRequires
-                                              , dependencies
-                                              , optionalDependencies
-                                              )
-                            , Source ( Source
-                                     , sourceModule
-                                     , sourcePackage
-                                     )
-                            , Python (Python)
-                            , PythonVersion ( Python2
-                                            , Python3
-                                            )
-                            , RenameMap
-                            , addDependency
-                            , addOptionalDependency
-                            , compileModule
-                            , compilePrimitiveType
-                            , compileTypeDeclaration
-                            , compileTypeExpression
-                            , empty
-                            , insertLocalImport
-                            , insertStandardImport
-                            , insertThirdPartyImports
-                            , insertThirdPartyImportsA
-                            , localImportsMap
-                            , minimumRuntime
-                            , parseModulePath
-                            , renameModulePath
-                            , runCodeGen
-                            , stringLiteral
-                            , toAttributeName
-                            , toClassName
-                            , toImportPath
-                            , toImportPaths
-                            , toNamePair
-                            , unionInstallRequires
-                            ) where
+{-# OPTIONS_GHC -Wno-orphans #-}
+{-# LANGUAGE ExtendedDefaultRules #-}
+{-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+module Nirum.Targets.Python
+    ( InstallRequires (..)
+    , Python (..)
+    , Source (..)
+    , addDependency
+    , addOptionalDependency
+    , compileModule
+    , compileTypeDeclaration
+    , parseModulePath
+    , stringLiteral
+    , toNamePair
+    , unionInstallRequires
+    ) where
 
 import Control.Monad (forM)
-import qualified Control.Monad.State as ST
 import qualified Data.List as L
 import Data.Maybe (catMaybes, fromMaybe)
-import Data.Typeable (Typeable)
 import GHC.Exts (IsList (toList))
 import Text.Printf (printf)
 
@@ -68,8 +39,6 @@ import qualified Text.Email.Validate as E
 import Text.Heterocephalus (compileText)
 import Text.InterpolatedString.Perl6 (q, qq)
 
-import qualified Nirum.CodeGen as C
-import Nirum.CodeGen (Failure)
 import qualified Nirum.Constructs.Annotation as A
 import qualified Nirum.Constructs.DeclarationSet as DS
 import qualified Nirum.Constructs.Identifier as I
@@ -78,8 +47,6 @@ import Nirum.Constructs.Module hiding (imports)
 import Nirum.Constructs.ModulePath ( ModulePath
                                    , fromIdentifiers
                                    , hierarchy
-                                   , hierarchies
-                                   , replacePrefix
                                    )
 import Nirum.Constructs.Name (Name (Name))
 import qualified Nirum.Constructs.Name as N
@@ -129,161 +96,23 @@ import Nirum.Package.Metadata ( Author (Author, name, email)
                               )
 import qualified Nirum.Package.ModuleSet as MS
 import qualified Nirum.Package.Metadata as MD
+import Nirum.Targets.Python.CodeGen
+import Nirum.Targets.Python.TypeExpression
 import Nirum.TypeInstance.BoundModule
 
-minimumRuntime :: SV.Version
-minimumRuntime = SV.version 0 6 0 [] []
-
-data Python = Python { packageName :: T.Text
-                     , minimumRuntimeVersion :: SV.Version
-                     , renames :: RenameMap
-                     } deriving (Eq, Ord, Show, Typeable)
-
-type RenameMap = M.Map ModulePath ModulePath
 type Package' = Package Python
-type CompileError' = T.Text
-
-data PythonVersion = Python2
-                   | Python3
-                   deriving (Eq, Ord, Show)
+type CompileError' = Nirum.Targets.Python.CodeGen.CompileError
 
 data Source = Source { sourcePackage :: Package'
                      , sourceModule :: BoundModule Python
                      } deriving (Eq, Ord, Show)
 
-type Code = T.Text
-
-instance Failure CodeGenContext CompileError' where
-    fromString = return . T.pack
-
-data CodeGenContext
-    = CodeGenContext { standardImports :: S.Set T.Text
-                     , thirdPartyImports :: M.Map T.Text (M.Map T.Text T.Text)
-                     , localImports :: M.Map T.Text (S.Set T.Text)
-                     , pythonVersion :: PythonVersion
-                     }
-    deriving (Eq, Ord, Show)
-
-localImportsMap :: CodeGenContext -> M.Map T.Text (M.Map T.Text T.Text)
-localImportsMap CodeGenContext { localImports = imports } =
-    M.map (M.fromSet id) imports
-
 sourceDirectory :: PythonVersion -> T.Text
 sourceDirectory Python2 = "src-py2"
 sourceDirectory Python3 = "src"
 
-empty :: PythonVersion -> CodeGenContext
-empty pythonVersion' = CodeGenContext { standardImports = []
-                                      , thirdPartyImports = []
-                                      , localImports = []
-                                      , pythonVersion = pythonVersion'
-                                      }
-
-type CodeGen = C.CodeGen CodeGenContext CompileError'
-
-runCodeGen :: CodeGen a
-           -> CodeGenContext
-           -> (Either CompileError' a, CodeGenContext)
-runCodeGen = C.runCodeGen
-
-insertStandardImport :: T.Text -> CodeGen ()
-insertStandardImport module' = ST.modify insert'
-  where
-    insert' c@CodeGenContext { standardImports = si } =
-        c { standardImports = S.insert module' si }
-
-insertThirdPartyImports :: [(T.Text, S.Set T.Text)] -> CodeGen ()
-insertThirdPartyImports imports =
-    insertThirdPartyImportsA [ (from, M.fromSet id objects)
-                             | (from, objects) <- imports
-                             ]
-
-insertThirdPartyImportsA :: [(T.Text, M.Map T.Text T.Text)] -> CodeGen ()
-insertThirdPartyImportsA imports =
-    ST.modify insert'
-  where
-    insert' c@CodeGenContext { thirdPartyImports = ti } =
-        c { thirdPartyImports = L.foldl (M.unionWith M.union) ti importList }
-    importList :: [M.Map T.Text (M.Map T.Text T.Text)]
-    importList = [ M.singleton from objects
-                 | (from, objects) <- imports
-                 ]
-
-insertLocalImport :: T.Text -> T.Text -> CodeGen ()
-insertLocalImport module' object = ST.modify insert'
-  where
-    insert' c@CodeGenContext { localImports = li } =
-        c { localImports = M.insertWith S.union module' [object] li }
-
-importTypingForPython3 :: CodeGen ()
-importTypingForPython3 = do
-    pyVer <- getPythonVersion
-    case pyVer of
-        Python2 -> return ()
-        Python3 -> insertStandardImport "typing"
-
-getPythonVersion :: CodeGen PythonVersion
-getPythonVersion = fmap pythonVersion ST.get
-
-renameModulePath :: RenameMap -> ModulePath -> ModulePath
-renameModulePath renameMap path' =
-    rename (M.toDescList renameMap)
-    -- longest paths should be processed first
-  where
-    rename :: [(ModulePath, ModulePath)] -> ModulePath
-    rename ((from, to) : xs) = let r = replacePrefix from to path'
-                               in if r == path'
-                                  then rename xs
-                                  else r
-    rename [] = path'
-
-renameMP :: Python -> ModulePath -> ModulePath
-renameMP Python { renames = table } = renameModulePath table
-
 thd3 :: (a, b, c) -> c
 thd3 (_, _, v) = v
-
-mangleVar :: Code -> T.Text -> Code
-mangleVar expr arbitrarySideName = T.concat
-    [ "__nirum_"
-    , (`T.map` expr) $ \ c -> if 'A' <= c && c <= 'Z' ||
-                                 'a' <= c && c <= 'z' || c == '_'
-                              then c else '_'
-    , "__"
-    , arbitrarySideName
-    , "__"
-    ]
-
--- | The set of Python reserved keywords.
--- See also: https://docs.python.org/3/reference/lexical_analysis.html#keywords
-keywords :: S.Set T.Text
-keywords = [ "False", "None", "True"
-           , "and", "as", "assert", "break", "class", "continue"
-           , "def", "del" , "elif", "else", "except", "finally"
-           , "for", "from", "global", "if", "import", "in", "is"
-           , "lambda", "nonlocal", "not", "or", "pass", "raise"
-           , "return", "try", "while", "with", "yield"
-           ]
-
-toClassName :: I.Identifier -> T.Text
-toClassName identifier =
-    if className `S.member` keywords then className `T.snoc` '_' else className
-  where
-    className :: T.Text
-    className = I.toPascalCaseText identifier
-
-toClassName' :: Name -> T.Text
-toClassName' = toClassName . N.facialName
-
-toAttributeName :: I.Identifier -> T.Text
-toAttributeName identifier =
-    if attrName `S.member` keywords then attrName `T.snoc` '_' else attrName
-  where
-    attrName :: T.Text
-    attrName = I.toSnakeCaseText identifier
-
-toAttributeName' :: Name -> T.Text
-toAttributeName' = toAttributeName . N.facialName
 
 toEnumMemberName :: Name -> T.Text
 toEnumMemberName name'
@@ -294,19 +123,6 @@ toEnumMemberName name'
     memberKeywords = ["mro"]
     attributeName :: T.Text
     attributeName = toAttributeName' name'
-
-toImportPath' :: ModulePath -> T.Text
-toImportPath' = T.intercalate "." . map toAttributeName . toList
-
-toImportPath :: Python -> ModulePath -> T.Text
-toImportPath target' = toImportPath' . renameMP target'
-
-toImportPaths :: Python -> S.Set ModulePath -> [T.Text]
-toImportPaths target' paths =
-    S.toAscList $ S.map toImportPath' $ hierarchies renamedPaths
-  where
-    renamedPaths :: S.Set ModulePath
-    renamedPaths = S.map (renameMP target') paths
 
 toNamePair :: Name -> T.Text
 toNamePair (Name f b) = [qq|('{toAttributeName f}', '{I.toSnakeCaseText b}')|]
@@ -448,7 +264,7 @@ returnCompiler = do
 
 compileUnionTag :: Source -> Name -> Tag -> CodeGen Code
 compileUnionTag source parentname d@(Tag typename' fields' _) = do
-    typeExprCodes <- mapM (compileTypeExpression source)
+    typeExprCodes <- mapM (compileTypeExpression' source)
         [Just typeExpr | (Field _ typeExpr _) <- toList fields']
     let nameTypeTriples = L.sortBy (compare `on` thd3)
                                    (zip3 tagNames typeExprCodes optionFlags)
@@ -462,6 +278,7 @@ compileUnionTag source parentname d@(Tag typename' fields' _) = do
     ret <- returnCompiler
     pyVer <- getPythonVersion
     initializers <- compileFieldInitializers fields' $ case pyVer of
+        -- These numbers don't mean version but indentation depth
         Python3 -> 2
         Python2 -> 3
     let initParams = compileParameters arg nameTypeTriples
@@ -570,70 +387,10 @@ if hasattr($parentClass, '__qualname__'):
                    ]
         | Field fn ft _ <- fieldList
         ]
-compilePrimitiveType :: PrimitiveTypeIdentifier -> CodeGen Code
-compilePrimitiveType primitiveTypeIdentifier' = do
-    pyVer <- getPythonVersion
-    case (primitiveTypeIdentifier', pyVer) of
-        (Bool, _) -> return "bool"
-        (Bigint, _) -> return "int"
-        (Decimal, _) -> do
-            insertStandardImport "decimal"
-            return "decimal.Decimal"
-        (Int32, _) -> return "int"
-        (Int64, Python2) -> do
-            insertStandardImport "numbers"
-            return "numbers.Integral"
-        (Int64, Python3) -> return "int"
-        (Float32, _) -> return "float"
-        (Float64, _) -> return "float"
-        (Text, Python2) -> return "unicode"
-        (Text, Python3) -> return "str"
-        (Binary, _) -> return "bytes"
-        (Date, _) -> do
-            insertStandardImport "datetime"
-            return "datetime.date"
-        (Datetime, _) -> do
-            insertStandardImport "datetime"
-            return "datetime.datetime"
-        (Uuid, _) -> insertStandardImport "uuid" >> return "uuid.UUID"
-        (Uri, Python2) -> return "unicode"
-        (Uri, Python3) -> return "str"
 
-compileTypeExpression :: Source -> Maybe TypeExpression -> CodeGen Code
-compileTypeExpression Source { sourcePackage = Package { metadata = meta }
-                             , sourceModule = boundModule
-                             }
-                      (Just (TypeIdentifier i)) =
-    case lookupType i boundModule of
-        Missing -> fail $ "undefined identifier: " ++ I.toString i
-        Imported _ (PrimitiveType p _) -> compilePrimitiveType p
-        Imported m _ -> do
-            insertThirdPartyImports [(toImportPath target' m, [toClassName i])]
-            return $ toClassName i
-        Local _ -> return $ toClassName i
-  where
-    target' :: Python
-    target' = target meta
-compileTypeExpression source (Just (MapModifier k v)) = do
-    kExpr <- compileTypeExpression source (Just k)
-    vExpr <- compileTypeExpression source (Just v)
-    insertStandardImport "typing"
-    return [qq|typing.Mapping[$kExpr, $vExpr]|]
-compileTypeExpression source (Just modifier) = do
-    expr <- compileTypeExpression source (Just typeExpr)
-    insertStandardImport "typing"
-    return [qq|typing.$className[$expr]|]
-  where
-    typeExpr :: TypeExpression
-    className :: T.Text
-    (typeExpr, className) = case modifier of
-        OptionModifier t' -> (t', "Optional")
-        SetModifier t' -> (t', "AbstractSet")
-        ListModifier t' -> (t', "Sequence")
-        TypeIdentifier _ -> undefined  -- never happen!
-        MapModifier _ _ -> undefined  -- never happen!
-compileTypeExpression _ Nothing =
-    return "None"
+compileTypeExpression' :: Source -> Maybe TypeExpression -> CodeGen Code
+compileTypeExpression' Source { sourceModule = boundModule } =
+    compileTypeExpression boundModule
 
 compileSerializer :: Source -> TypeExpression -> Code -> Code
 compileSerializer Source { sourceModule = boundModule } =
@@ -711,7 +468,7 @@ compileTypeDeclaration _ TypeDeclaration { type' = PrimitiveType {} } =
 compileTypeDeclaration src d@TypeDeclaration { typename = typename'
                                              , type' = Alias ctype
                                              } = do
-    ctypeExpr <- compileTypeExpression src (Just ctype)
+    ctypeExpr <- compileTypeExpression' src (Just ctype)
     return $ toStrict $ renderMarkup $ [compileText|
 %{ case compileDocs d }
 %{ of Just rst }
@@ -724,7 +481,7 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
                                              , type' = UnboxedType itype
                                              } = do
     let className = toClassName' typename'
-    itypeExpr <- compileTypeExpression src (Just itype)
+    itypeExpr <- compileTypeExpression' src (Just itype)
     insertStandardImport "typing"
     insertThirdPartyImports
         [ ("nirum.validate", ["validate_unboxed_type"])
@@ -847,7 +604,7 @@ class #{className}(enum.Enum):
 compileTypeDeclaration src d@TypeDeclaration { typename = typename'
                                              , type' = RecordType fields'
                                              } = do
-    typeExprCodes <- mapM (compileTypeExpression src)
+    typeExprCodes <- mapM (compileTypeExpression' src)
         [Just typeExpr | (Field _ typeExpr _) <- fieldList]
     let nameTypeTriples = L.sortBy (compare `on` thd3)
                                    (zip3 fieldNames typeExprCodes optionFlags)
@@ -866,6 +623,7 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
     typeRepr <- typeReprCompiler
     pyVer <- getPythonVersion
     initializers <- compileFieldInitializers fields' $ case pyVer of
+        -- These numbers don't mean version but indentation depth
         Python3 -> 2
         Python2 -> 3
     let initParams = compileParameters arg nameTypeTriples
@@ -1225,7 +983,7 @@ if hasattr({className}.Client, '__qualname__'):
     compileErrorType (Method mn _ _ me _) =
         case me of
             Just errorTypeExpression -> do
-                et <- compileTypeExpression src (Just errorTypeExpression)
+                et <- compileTypeExpression' src (Just errorTypeExpression)
                 return $ Just [qq|('{toAttributeName' mn}', $et)|]
             Nothing -> return Nothing
     compileMethod :: Method -> CodeGen Code
@@ -1239,7 +997,7 @@ if hasattr({className}.Client, '__qualname__'):
                                    ]
                         | p@(Parameter pName _ _) <- toList params
                         ]
-        rtypeExpr <- compileTypeExpression src rtype
+        rtypeExpr <- compileTypeExpression' src rtype
         ret <- returnCompiler
         return [qq|
     def {mName'}(self, {commaNl params'}){ ret rtypeExpr }:
@@ -1248,7 +1006,7 @@ if hasattr({className}.Client, '__qualname__'):
 |]
     compileMethodParameter :: Parameter -> CodeGen Code
     compileMethodParameter (Parameter pName pType _) = do
-        pTypeExpr <- compileTypeExpression src (Just pType)
+        pTypeExpr <- compileTypeExpression' src (Just pType)
         arg <- parameterCompiler
         return [qq|{arg (toAttributeName' pName) pTypeExpr}|]
     compileMethodMetadata :: Method -> CodeGen Code
@@ -1257,7 +1015,7 @@ if hasattr({className}.Client, '__qualname__'):
                                  , returnType = rtype
                                  } = do
         let params' = toList params :: [Parameter]
-        rtypeExpr <- compileTypeExpression src rtype
+        rtypeExpr <- compileTypeExpression' src rtype
         paramMetadata <- mapM compileParameterMetadata params'
         let paramMetadata' = commaNl paramMetadata
         insertThirdPartyImportsA
@@ -1273,7 +1031,7 @@ if hasattr({className}.Client, '__qualname__'):
     compileParameterMetadata :: Parameter -> CodeGen Code
     compileParameterMetadata (Parameter pName pType _) = do
         let pName' = toAttributeName' pName
-        pTypeExpr <- compileTypeExpression src (Just pType)
+        pTypeExpr <- compileTypeExpression' src (Just pType)
         return [qq|'{pName'}': lambda: $pTypeExpr|]
     methodNameMap :: T.Text
     methodNameMap = toIndentedCodes
@@ -1296,10 +1054,10 @@ if hasattr({className}.Client, '__qualname__'):
                                } = do
         let clientMethodName' = toAttributeName' mName
         params' <- mapM compileMethodParameter $ toList params
-        rtypeExpr <- compileTypeExpression src rtype
+        rtypeExpr <- compileTypeExpression' src rtype
         errorCode <- case etypeM of
              Just e -> do
-                e' <- compileTypeExpression src (Just e)
+                e' <- compileTypeExpression' src (Just e)
                 return $ "result_type = " `T.append` e'
              Nothing ->
                 return "raise UnexpectedNirumResponseError(serialized)"
@@ -1603,7 +1361,7 @@ compilePackage' package@Package { metadata = MD.Metadata { target = target' }
   where
     toPythonFilename :: ModulePath -> [FilePath]
     toPythonFilename mp = [ T.unpack (toAttributeName i)
-                          | i <- toList $ renameMP target' mp
+                          | i <- toList $ renameModulePath' target' mp
                           ] ++ ["__init__.py"]
     versions :: [PythonVersion]
     versions = [Python2, Python3]
