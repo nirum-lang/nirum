@@ -15,7 +15,8 @@ import Nirum.Constructs.TypeDeclaration hiding (modulePath)
 import Nirum.Package.Metadata
 import Nirum.Package.MetadataSpec
 import Nirum.PackageSpec (createValidPackage)
-import Nirum.Targets.Python (Python (Python), minimumRuntime)
+import Nirum.Targets.Python (Python (Python))
+import Nirum.Targets.Python.CodeGen (minimumRuntime)
 import Nirum.TypeInstance.BoundModule
 
 spec :: Spec

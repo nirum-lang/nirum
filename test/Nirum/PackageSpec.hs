@@ -33,7 +33,8 @@ import Nirum.Package.ModuleSet ( ImportError (MissingModulePathError)
                                )
 import Nirum.Package.ModuleSetSpec (validModules)
 import Nirum.Parser (parseFile)
-import Nirum.Targets.Python (Python (Python), minimumRuntime)
+import Nirum.Targets.Python (Python (Python))
+import Nirum.Targets.Python.CodeGen (minimumRuntime)
 
 createPackage :: Metadata t -> [(ModulePath, Module)] -> Package t
 createPackage metadata' modules' =
