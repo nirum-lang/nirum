@@ -61,13 +61,7 @@ import Nirum.Constructs.Service ( Method ( Method
                                 , Service (Service)
                                 )
 import Nirum.Constructs.TypeDeclaration as TD
-import Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
-                                                        , MapModifier
-                                                        , OptionModifier
-                                                        , SetModifier
-                                                        , TypeIdentifier
-                                                        )
-                                       )
+import Nirum.Constructs.TypeExpression hiding (type')
 import Nirum.Docs.ReStructuredText (ReStructuredText, render)
 import Nirum.Package hiding (target)
 import Nirum.Package.Metadata ( Author (Author, name, email)
@@ -97,6 +91,7 @@ import Nirum.Package.Metadata ( Author (Author, name, email)
 import qualified Nirum.Package.ModuleSet as MS
 import qualified Nirum.Package.Metadata as MD
 import Nirum.Targets.Python.CodeGen
+import Nirum.Targets.Python.Serializers
 import Nirum.Targets.Python.TypeExpression
 import Nirum.TypeInstance.BoundModule
 
@@ -382,8 +377,8 @@ if hasattr($parentClass, '__qualname__'):
     fieldSerializers :: Code
     fieldSerializers = T.intercalate ",\n"
         [ T.concat [ "'", I.toSnakeCaseText (N.behindName fn), "': "
-                   , compileSerializer source ft
-                                       [qq|self.{toAttributeName' fn}|]
+                   , compileSerializer' source ft
+                                        [qq|self.{toAttributeName' fn}|]
                    ]
         | Field fn ft _ <- fieldList
         ]
@@ -392,75 +387,9 @@ compileTypeExpression' :: Source -> Maybe TypeExpression -> CodeGen Code
 compileTypeExpression' Source { sourceModule = boundModule } =
     compileTypeExpression boundModule
 
-compileSerializer :: Source -> TypeExpression -> Code -> Code
-compileSerializer Source { sourceModule = boundModule } =
-    compileSerializer' boundModule
-
-compileSerializer' :: BoundModule Python -> TypeExpression -> Code -> Code
-compileSerializer' mod' (OptionModifier typeExpr) pythonVar =
-    [qq|(None if ($pythonVar) is None
-              else ({compileSerializer' mod' typeExpr pythonVar}))|]
-compileSerializer' mod' (SetModifier typeExpr) pythonVar =
-    compileSerializer' mod' (ListModifier typeExpr) pythonVar
-compileSerializer' mod' (ListModifier typeExpr) pythonVar =
-    [qq|list(($serializer) for $elemVar in ($pythonVar))|]
-  where
-    elemVar :: Code
-    elemVar = mangleVar pythonVar "elem"
-    serializer :: Code
-    serializer = compileSerializer' mod' typeExpr elemVar
-compileSerializer' mod' (MapModifier kt vt) pythonVar =
-    [qq|list(
-        \{
-            'key': ({compileSerializer' mod' kt kVar}),
-            'value': ({compileSerializer' mod' vt vVar}),
-        \}
-        for $kVar, $vVar in ($pythonVar).items()
-    )|]
-  where
-    kVar :: Code
-    kVar = mangleVar pythonVar "key"
-    vVar :: Code
-    vVar = mangleVar pythonVar "value"
-compileSerializer' mod' (TypeIdentifier typeId) pythonVar =
-    case lookupType typeId mod' of
-        Missing -> "None"  -- must never happen
-        Local (Alias t) -> compileSerializer' mod' t pythonVar
-        Imported modulePath' (Alias t) ->
-            case resolveBoundModule modulePath' (boundPackage mod') of
-                Nothing -> "None"  -- must never happen
-                Just foundMod -> compileSerializer' foundMod t pythonVar
-        Local PrimitiveType { primitiveTypeIdentifier = p } ->
-            compilePrimitiveTypeSerializer p pythonVar
-        Imported _ PrimitiveType { primitiveTypeIdentifier = p } ->
-            compilePrimitiveTypeSerializer p pythonVar
-        Local EnumType {} -> serializerCall
-        Imported _ EnumType {} -> serializerCall
-        Local RecordType {} -> serializerCall
-        Imported _ RecordType {} -> serializerCall
-        Local UnboxedType {} -> serializerCall
-        Imported _ UnboxedType {} -> serializerCall
-        Local UnionType {} -> serializerCall
-        Imported _ UnionType {} -> serializerCall
-  where
-    serializerCall :: Code
-    serializerCall = [qq|$pythonVar.__nirum_serialize__()|]
-
-compilePrimitiveTypeSerializer :: PrimitiveTypeIdentifier -> Code -> Code
-compilePrimitiveTypeSerializer Bigint var = var
-compilePrimitiveTypeSerializer Decimal var = [qq|str($var)|]
-compilePrimitiveTypeSerializer Int32 var = var
-compilePrimitiveTypeSerializer Int64 var = var
-compilePrimitiveTypeSerializer Float32 var = var
-compilePrimitiveTypeSerializer Float64 var = var
-compilePrimitiveTypeSerializer Text var = var
-compilePrimitiveTypeSerializer Binary var =
-    [qq|__import__('base64').b64encode($var).decode('ascii')|]
-compilePrimitiveTypeSerializer Date var = [qq|($var).isoformat()|]
-compilePrimitiveTypeSerializer Datetime var = [qq|($var).isoformat()|]
-compilePrimitiveTypeSerializer Bool var = var
-compilePrimitiveTypeSerializer Uuid var = [qq|str($var).lower()|]
-compilePrimitiveTypeSerializer Uri var = var
+compileSerializer' :: Source -> TypeExpression -> Code -> Code
+compileSerializer' Source { sourceModule = boundModule } =
+    compileSerializer boundModule
 
 compileTypeDeclaration :: Source -> TypeDeclaration -> CodeGen Code
 compileTypeDeclaration _ TypeDeclaration { type' = PrimitiveType {} } =
@@ -528,7 +457,7 @@ class #{className}(object):
         return hash(self.value)
 
     def __nirum_serialize__(self):
-        return (#{compileSerializer src itype "self.value"})
+        return (#{compileSerializer' src itype "self.value"})
 
     @classmethod
 %{ case pyVer }
@@ -748,7 +677,7 @@ class $className(object):
     fieldSerializers :: Code
     fieldSerializers = T.intercalate ",\n"
         [ T.concat [ "'", I.toSnakeCaseText (N.behindName fn), "': "
-                   , compileSerializer src ft [qq|self.{ toAttributeName' fn}|]
+                   , compileSerializer' src ft [qq|self.{ toAttributeName' fn}|]
                    ]
         | Field fn ft _ <- fieldList
         ]
@@ -1045,7 +974,7 @@ if hasattr({className}.Client, '__qualname__'):
     compileClientPayload (Parameter pName pt _) = do
         let pName' = toAttributeName' pName
         return [qq|'{I.toSnakeCaseText $ N.behindName pName}':
-                   ({compileSerializer src pt pName'})|]
+                   ({compileSerializer' src pt pName'})|]
     compileClientMethod :: Method -> CodeGen Code
     compileClientMethod Method { methodName = mName
                                , parameters = params
