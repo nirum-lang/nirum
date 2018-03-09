@@ -93,7 +93,7 @@ import qualified Nirum.Package.Metadata as MD
 import Nirum.Targets.Python.CodeGen
 import Nirum.Targets.Python.Serializers
 import Nirum.Targets.Python.TypeExpression
-import Nirum.TypeInstance.BoundModule
+import Nirum.TypeInstance.BoundModule as BM
 
 type Package' = Package Python
 type CompileError' = Nirum.Targets.Python.CodeGen.CompileError
@@ -102,12 +102,19 @@ data Source = Source { sourcePackage :: Package'
                      , sourceModule :: BoundModule Python
                      } deriving (Eq, Ord, Show)
 
+sourceImportPath :: Source -> T.Text
+sourceImportPath (Source (Package MD.Metadata { MD.target = t } _) bm) =
+    toImportPath t (BM.modulePath bm)
+
 sourceDirectory :: PythonVersion -> T.Text
 sourceDirectory Python2 = "src-py2"
 sourceDirectory Python3 = "src"
 
 thd3 :: (a, b, c) -> c
 thd3 (_, _, v) = v
+
+enumerate :: [a] -> [(Int, a)]
+enumerate = zip [0 ..]
 
 toEnumMemberName :: Name -> T.Text
 toEnumMemberName name'
@@ -152,13 +159,10 @@ compileParameters gen nameTypeTriples =
         (\ (n, t, o) -> gen n t `T.append` if o then "=None" else "")
         nameTypeTriples ", "
 
-compileFieldInitializers :: DS.DeclarationSet Field -> Int -> CodeGen Code
-compileFieldInitializers fields' depth = do
-    initializers <- forM (toList fields') compileFieldInitializer
-    return $ T.intercalate indentSpaces initializers
+compileFieldInitializers :: DS.DeclarationSet Field -> CodeGen [Code]
+compileFieldInitializers fields' =
+    forM (toList fields') compileFieldInitializer
   where
-    indentSpaces :: T.Text
-    indentSpaces = "\n" `T.append` T.replicate depth "    "
     compileFieldInitializer :: Field -> CodeGen Code
     compileFieldInitializer (Field fieldName' fieldType' _) =
         case fieldType' of
@@ -227,15 +231,6 @@ indent space =
       | T.null line = T.empty
       | otherwise = space `T.append` line
 
-typeReprCompiler :: CodeGen (Code -> Code)
-typeReprCompiler = do
-    ver <- getPythonVersion
-    case ver of
-        Python2 -> return $ \ t -> [qq|($t.__module__ + '.' + $t.__name__)|]
-        Python3 -> do
-            insertStandardImport "typing"
-            return $ \ t -> [qq|typing._type_repr($t)|]
-
 type ParameterName = Code
 type ParameterType = Code
 type ReturnType = Code
@@ -263,85 +258,133 @@ compileUnionTag source parentname d@(Tag typename' fields' _) = do
         [Just typeExpr | (Field _ typeExpr _) <- toList fields']
     let nameTypeTriples = L.sortBy (compare `on` thd3)
                                    (zip3 tagNames typeExprCodes optionFlags)
-        slotTypes = toIndentedCodes
-            (\ (n, t, _) -> [qq|('{n}', {t})|]) nameTypeTriples ",\n        "
     insertThirdPartyImportsA
         [ ("nirum.validate", [("validate_union_type", "validate_union_type")])
         , ("nirum.constructs", [("name_dict_type", "NameDict")])
         ]
     arg <- parameterCompiler
-    ret <- returnCompiler
     pyVer <- getPythonVersion
-    initializers <- compileFieldInitializers fields' $ case pyVer of
-        -- These numbers don't mean version but indentation depth
-        Python3 -> 2
-        Python2 -> 3
-    let initParams = compileParameters arg nameTypeTriples
-        inits = case pyVer of
-            Python2 -> [qq|
-    def __init__(self, **kwargs):
-        def __init__($initParams):
-            $initializers
-            pass
-        __init__(**kwargs)
-        validate_union_type(self)
-            |]
-            Python3 -> [qq|
-    def __init__(self{ if null nameTypeTriples
-                         then T.empty
-                         else ", *, " `T.append` initParams }) -> None:
-        $initializers
-        validate_union_type(self)
-            |]
-    return [qq|
-class $className($parentClass):
-{compileDocstringWithFields "    " d fields'}
+    initializers <- compileFieldInitializers fields'
+    return $ toStrict $ renderMarkup $ [compileText|
+class #{className}(#{parentClass}):
+#{compileDocstringWithFields "    " d fields'}
     __slots__ = (
-        $slots
+%{ forall Field fName _ _ <- fieldList }
+        '#{toAttributeName' fName}',
+%{ endforall }
     )
     __nirum_type__ = 'union'
-    __nirum_tag__ = $parentClass.Tag.{toEnumMemberName typename'}
+    __nirum_tag__ = #{parentClass}.Tag.#{toEnumMemberName typename'}
+
+    # FIXME: __nirum_tag_names__ becomes unnecessary when deserializers
+    # become independent from the nirum-python runtime library.
+    # https://github.com/spoqa/nirum/issues/160
     __nirum_tag_names__ = name_dict_type([
-        $nameMaps
+%{ forall Field (Name fFacial fBehind) _ _ <- fieldList }
+        ('#{toAttributeName fFacial}', '#{I.toSnakeCaseText fBehind}'),
+%{ endforall }
     ])
 
     @staticmethod
     def __nirum_tag_types__():
-        return [$slotTypes]
+        return [
+%{ forall (n, t, _) <- nameTypeTriples }
+            ('#{n}', #{t}),
+%{ endforall }
+        ]
 
-    { inits :: T.Text }
+%{ case pyVer }
+%{ of Python2 }
+    def __init__(self, **kwargs):
+%{ of Python3 }
+    def __init__(
+%{ if null nameTypeTriples }
+        self
+%{ else }
+        self, *, #{compileParameters arg nameTypeTriples}
+%{ endif }
+    ) -> None:
+%{ endcase }
+        def __init__(#{compileParameters arg nameTypeTriples}):
+%{ forall initializer <- initializers }
+            #{initializer}
+%{ endforall }
+            pass  # it's necessary when there are no parameters at all
+%{ case pyVer }
+%{ of Python2 }
+        __init__(**kwargs)
+%{ of Python3 }
+        __init__(
+%{ forall Field fName _ _ <- fieldList }
+            #{toAttributeName' fName}=#{toAttributeName' fName},
+%{ endforall }
+        )
+%{ endcase }
+        validate_union_type(self)
 
     def __nirum_serialize__(self):
-        return \{
-            '_type': '{behindParentTypename}',
-            '_tag': '{behindTagName}',
-            $fieldSerializers
-        \}
+        return {
+            '_type': '#{behindParentTypename}',
+            '_tag': '#{behindTagName}',
+%{ forall Field fName@(Name _ fBehind) fType _ <- fieldList }
+            '#{ I.toSnakeCaseText fBehind}':
+#{compileSerializer' source fType $ T.append "self." $ toAttributeName' fName},
+%{ endforall }
+        }
 
-    def __repr__(self){ ret "str" }:
-        return (
-            $parentClass.__module__ + '.$parentClass.$className(' +
-            ', '.join('\{0\}=\{1!r\}'.format(attr, getattr(self, attr))
-                      for attr in self.__slots__) +
-            ')'
-        )
-
-    def __eq__(self, other){ ret "bool" }:
-        return isinstance(other, $className) and all(
+%{ case pyVer }
+%{ of Python2 }
+    def __eq__(self, other):
+%{ of Python3 }
+    def __eq__(self, other: '#{parentClass}') -> bool:
+%{ endcase }
+        return isinstance(other, #{className}) and all(
             getattr(self, attr) == getattr(other, attr)
             for attr in self.__slots__
         )
 
-    def __ne__(self, other){ ret "bool" }:
+%{ case pyVer }
+%{ of Python2 }
+    def __ne__(self, other):
+%{ of Python3 }
+    def __ne__(self, other: '#{parentClass}') -> bool:
+%{ endcase }
         return not self == other
 
-    def __hash__(self){ ret "int" }:
-        return hash($hashTuple)
+%{ case pyVer }
+%{ of Python2 }
+    def __hash__(self):
+%{ of Python3 }
+    def __hash__(self) -> int:
+%{ endcase }
+        return hash((
+%{ forall Field fName _ _ <- fieldList }
+            self.#{toAttributeName' fName},
+%{ endforall }
+        ))
+
+%{ case pyVer }
+%{ of Python2 }
+    def __repr__(self):
+%{ of Python3 }
+    def __repr__(self) -> bool:
+%{ endcase }
+        return ''.join([
+            '#{sourceImportPath source}.#{parentClass}.#{className}(',
+%{ forall (i, Field fName _ _) <- enumerate fieldList }
+%{ if i > 0 }
+            ', ',
+%{ endif }
+            '#{toAttributeName' fName}=',
+            repr(self.#{toAttributeName' fName }),
+%{ endforall }
+            ')'
+        ])
 
 
-$parentClass.$className = $className
-if hasattr($parentClass, '__qualname__'):
-    $className.__qualname__ = $parentClass.__qualname__ + '.{className}'
+#{parentClass}.#{className} = #{className}
+if hasattr(#{parentClass}, '__qualname__'):
+    (#{className}).__qualname__ = '#{parentClass}.#{className}'
 |]
   where
     optionFlags :: [Bool]
@@ -355,33 +398,13 @@ if hasattr($parentClass, '__qualname__'):
     behindParentTypename :: T.Text
     behindParentTypename = I.toSnakeCaseText $ N.behindName parentname
     tagNames :: [T.Text]
-    tagNames = map (toAttributeName' . fieldName) (toList fields')
+    tagNames = map (toAttributeName' . fieldName) fieldList
     behindTagName :: T.Text
     behindTagName = I.toSnakeCaseText $ N.behindName typename'
-    slots :: Code
-    slots = if length tagNames == 1
-            then [qq|'{head tagNames}'|] `T.snoc` ','
-            else toIndentedCodes (\ n -> [qq|'{n}'|]) tagNames ",\n        "
-    hashTuple :: Code
-    hashTuple = if null tagNames
-        then "self.__nirum_tag__"
-        else [qq|({toIndentedCodes (T.append "self.") tagNames ", "},)|]
     fieldList :: [Field]
     fieldList = toList fields'
-    nameMaps :: Code
-    nameMaps = toIndentedCodes toNamePair
-                               (map fieldName fieldList)
-                               ",\n        "
     parentClass :: T.Text
     parentClass = toClassName' parentname
-    fieldSerializers :: Code
-    fieldSerializers = T.intercalate ",\n"
-        [ T.concat [ "'", I.toSnakeCaseText (N.behindName fn), "': "
-                   , compileSerializer' source ft
-                                        [qq|self.{toAttributeName' fn}|]
-                   ]
-        | Field fn ft _ <- fieldList
-        ]
 
 compileTypeExpression' :: Source -> Maybe TypeExpression -> CodeGen Code
 compileTypeExpression' Source { sourceModule = boundModule } =
@@ -535,84 +558,134 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
                                              } = do
     typeExprCodes <- mapM (compileTypeExpression' src)
         [Just typeExpr | (Field _ typeExpr _) <- fieldList]
-    let nameTypeTriples = L.sortBy (compare `on` thd3)
-                                   (zip3 fieldNames typeExprCodes optionFlags)
-        slotTypes = toIndentedCodes
-            (\ (n, t, _) -> [qq|'{n}': {t}|]) nameTypeTriples ",\n        "
-    importTypingForPython3
+    let nameTypeTriples = L.sortBy
+            (compare `on` thd3)
+            (zip3 [toAttributeName' name' | Field name' _ _ <- fieldList]
+                  typeExprCodes optionFlags)
+    insertStandardImport "typing"
     insertThirdPartyImports [ ("nirum.validate", ["validate_record_type"])
                             , ("nirum.deserialize", ["deserialize_meta"])
                             ]
-    insertThirdPartyImportsA [ ( "nirum.constructs"
-                               , [("name_dict_type", "NameDict")]
-                               )
-                             ]
+    insertThirdPartyImportsA
+        [("nirum.constructs", [("name_dict_type", "NameDict")])]
     arg <- parameterCompiler
-    ret <- returnCompiler
-    typeRepr <- typeReprCompiler
     pyVer <- getPythonVersion
-    initializers <- compileFieldInitializers fields' $ case pyVer of
-        -- These numbers don't mean version but indentation depth
-        Python3 -> 2
-        Python2 -> 3
-    let initParams = compileParameters arg nameTypeTriples
-        inits = case pyVer of
-            Python2 -> [qq|
-    def __init__(self, **kwargs):
-        def __init__($initParams):
-            $initializers
-            pass
-        __init__(**kwargs)
-        validate_record_type(self)
-            |]
-            Python3 -> [qq|
-    def __init__(self{ if null nameTypeTriples
-                         then T.empty
-                         else ", *, " `T.append` initParams }) -> None:
-        $initializers
-        validate_record_type(self)
-            |]
-    let clsType = arg "cls" "type"
-    return [qq|
-class $className(object):
-{compileDocstringWithFields "    " d fields'}
+    initializers <- compileFieldInitializers fields'
+    return $ toStrict $ renderMarkup $ [compileText|
+class #{className}(object):
+#{compileDocstringWithFields "    " d fields'}
     __slots__ = (
-        $slots,
+%{ forall Field fName _ _ <- fieldList }
+        '#{toAttributeName' fName}',
+%{ endforall }
     )
     __nirum_type__ = 'record'
-    __nirum_record_behind_name__ = '{behindTypename}'
-    __nirum_field_names__ = name_dict_type([$nameMaps])
+    __nirum_record_behind_name__ = '#{I.toSnakeCaseText tnBehind}'
+
+    # FIXME: __nirum_field_names__ becomes unnecessary when deserializers
+    # become independent from the nirum-python runtime library.
+    # https://github.com/spoqa/nirum/issues/160
+    __nirum_field_names__ = name_dict_type([
+%{ forall Field (Name fFacial fBehind) _ _ <- fieldList }
+        ('#{toAttributeName fFacial}', '#{I.toSnakeCaseText fBehind}'),
+%{ endforall }
+    ])
 
     @staticmethod
+%{ case pyVer }
+%{ of Python2 }
     def __nirum_field_types__():
-        return \{$slotTypes\}
+%{ of Python3 }
+    def __nirum_field_types__() -> typing.Mapping[str, typing.Any]:
+%{ endcase }
+        return {
+%{ forall (n, t, _) <- nameTypeTriples }
+            '#{n}': #{t},
+%{ endforall }
+        }
 
-    {inits :: T.Text}
-
-    def __repr__(self){ret "bool"}:
-        return '\{0\}(\{1\})'.format(
-            {typeRepr "type(self)"},
-            ', '.join('\{\}=\{\}'.format(attr, getattr(self, attr))
-                      for attr in self.__slots__)
+%{ case pyVer }
+%{ of Python2 }
+    def __init__(self, **kwargs):
+%{ of Python3 }
+    def __init__(
+%{ if null nameTypeTriples }
+        self
+%{ else }
+        self, *, #{compileParameters arg nameTypeTriples}
+%{ endif }
+    ) -> None:
+%{ endcase }
+        def __init__(#{compileParameters arg nameTypeTriples}):
+%{ forall initializer <- initializers }
+            #{initializer}
+%{ endforall }
+            pass  # it's necessary when there are no parameters at all
+%{ case pyVer }
+%{ of Python2 }
+        __init__(**kwargs)
+%{ of Python3 }
+        __init__(
+%{ forall Field fName _ _ <- fieldList }
+            #{toAttributeName' fName}=#{toAttributeName' fName},
+%{ endforall }
         )
+%{ endcase }
+        validate_record_type(self)
 
-    def __eq__(self, other){ret "bool"}:
-        return isinstance(other, $className) and all(
+%{ case pyVer }
+%{ of Python2 }
+    def __repr__(self):
+%{ of Python3 }
+    def __repr__(self) -> bool:
+%{ endcase }
+        return ''.join([
+            '#{sourceImportPath src}.#{className}(',
+%{ forall (i, Field fName _ _) <- enumerate fieldList }
+%{ if i > 0 }
+            ', ',
+%{ endif }
+            '#{toAttributeName' fName}=',
+            repr(self.#{toAttributeName' fName }),
+%{ endforall }
+            ')'
+        ])
+
+%{ case pyVer }
+%{ of Python2 }
+    def __eq__(self, other):
+%{ of Python3 }
+    def __eq__(self, other: '#{className}') -> bool:
+%{ endcase }
+        return isinstance(other, #{className}) and all(
             getattr(self, attr) == getattr(other, attr)
             for attr in self.__slots__
         )
 
-    def __ne__(self, other){ ret "bool" }:
+%{ case pyVer }
+%{ of Python2 }
+    def __ne__(self, other):
+%{ of Python3 }
+    def __ne__(self, other: '#{className}') -> bool:
+%{ endcase }
         return not self == other
 
     def __nirum_serialize__(self):
-        return \{
-            '_type': '{behindTypename}',
-            $fieldSerializers
-        \}
+        return {
+            '_type': '#{I.toSnakeCaseText tnBehind}',
+%{ forall Field fName@(Name _ fBehind) fType _ <- fieldList }
+            '#{ I.toSnakeCaseText fBehind}':
+#{compileSerializer' src fType $ T.append "self." $ toAttributeName' fName},
+%{ endforall }
+        }
 
     @classmethod
-    def __nirum_deserialize__($clsType, value){ ret className }:
+%{ case pyVer }
+%{ of Python2 }
+    def __nirum_deserialize__(cls, value):
+%{ of Python3 }
+    def __nirum_deserialize__(cls, value) -> '#{className}':
+%{ endcase }
         if '_type' not in value:
             raise ValueError('"_type" field is missing.')
         if not cls.__nirum_record_behind_name__ == value['_type']:
@@ -644,51 +717,39 @@ class $className(object):
             except ValueError as e:
                 errors.add('%s: %s' % (attribute_name, str(e)))
         if errors:
-            raise ValueError('\\n'.join(sorted(errors)))
+            raise ValueError('\n'.join(sorted(errors)))
         return cls(**args)
 
-    def __hash__(self){ret "int"}:
-        return hash(($hashText,))
+%{ case pyVer }
+%{ of Python2 }
+    def __hash__(self):
+%{ of Python3 }
+    def __hash__(self) -> int:
+%{ endcase }
+        return hash((
+%{ forall Field fName _ _ <- fieldList }
+            self.#{toAttributeName' fName},
+%{ endforall }
+        ))
 |]
   where
-    className :: T.Text
-    className = toClassName' typename'
+    className = toClassName tnFacial
     fieldList :: [Field]
     fieldList = toList fields'
-    behindTypename :: T.Text
-    behindTypename = I.toSnakeCaseText $ N.behindName typename'
     optionFlags :: [Bool]
     optionFlags = [ case typeExpr of
                         OptionModifier _ -> True
                         _ -> False
                   | (Field _ typeExpr _) <- fieldList
                   ]
-    fieldNames :: [T.Text]
-    fieldNames = [toAttributeName' name' | Field name' _ _ <- fieldList]
-    slots :: Code
-    slots = toIndentedCodes (\ n -> [qq|'{n}'|]) fieldNames ",\n        "
-    nameMaps :: Code
-    nameMaps = toIndentedCodes
-        toNamePair
-        (map fieldName $ toList fields')
-        ",\n        "
-    hashText :: Code
-    hashText = toIndentedCodes (\ n -> [qq|self.{n}|]) fieldNames ", "
-    fieldSerializers :: Code
-    fieldSerializers = T.intercalate ",\n"
-        [ T.concat [ "'", I.toSnakeCaseText (N.behindName fn), "': "
-                   , compileSerializer' src ft [qq|self.{ toAttributeName' fn}|]
-                   ]
-        | Field fn ft _ <- fieldList
-        ]
 compileTypeDeclaration src
                        d@TypeDeclaration { typename = typename'
                                          , type' = union
                                          , typeAnnotations = annotations
                                          } = do
     tagCodes <- mapM (compileUnionTag src typename') tags'
-    importTypingForPython3
     insertStandardImport "enum"
+    insertStandardImport "typing"
     insertThirdPartyImports [ ("nirum.deserialize", ["deserialize_meta"])
                             ]
     insertThirdPartyImportsA [ ( "nirum.constructs"
@@ -699,7 +760,6 @@ compileTypeDeclaration src
                                , [("map_type", "Map")]
                                )
                              ]
-    typeRepr <- typeReprCompiler
     pyVer <- getPythonVersion
     return $ toStrict $ renderMarkup $ [compileText|
 class #{className}(#{T.intercalate "," $ compileExtendClasses annotations}):
@@ -718,18 +778,28 @@ class #{className}(#{T.intercalate "," $ compileExtendClasses annotations}):
         #{toEnumMemberName tn} = '#{toBehindSnakeCaseText tn}'
 %{ endforall }
 
+%{ case pyVer }
+%{ of Python2 }
     def __init__(self, *args, **kwargs):
+%{ of Python3 }
+    def __init__(self, *args, **kwargs) -> None:
+%{ endcase }
         raise NotImplementedError(
             "{0} cannot be instantiated "
             "since it is an abstract class.  Instantiate a concrete subtype "
-            "of it instead.".format(#{typeRepr "type(self)"})
+            "of it instead.".format(typing._type_repr(self))
         )
 
+%{ case pyVer }
+%{ of Python2 }
     def __nirum_serialize__(self):
+%{ of Python3 }
+    def __nirum_serialize__(self) -> typing.Mapping[str, object]:
+%{ endcase }
         raise NotImplementedError(
             "{0} cannot be instantiated "
             "since it is an abstract class.  Instantiate a concrete subtype "
-            "of it instead.".format(#{typeRepr "type(self)"})
+            "of it instead.".format(typing._type_repr(self))
         )
 
     @classmethod

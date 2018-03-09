@@ -126,6 +126,7 @@ top: invalid literal for int() with base 10: 'b'\
         Point1(left='a', top=1)
     with raises(TypeError):
         Point1(left='a', top='b')
+    assert repr(point) == 'fixture.foo.Point1(left=3, top=14)'
     assert isinstance(Point2, type)
     int_three = IntUnbox(3)
     int_four_teen = IntUnbox(14)
@@ -159,6 +160,10 @@ top: invalid literal for int() with base 10: 'b'\
         Point2(left=IntUnbox(1), top='a')
     with raises(TypeError):
         Point2(left=IntUnbox(1), top=2)
+    assert repr(point2) == (
+        'fixture.foo.Point2(left=fixture.foo.bar.IntUnbox(3), '
+        'top=fixture.foo.bar.IntUnbox(14))'
+    )
     assert isinstance(Point3d, type)
     point3d = Point3d(xy=Point(x=1, y=2), z=3)
     assert point3d.xy == Point(x=1, y=2)
@@ -174,6 +179,8 @@ top: invalid literal for int() with base 10: 'b'\
     }
     assert point3d.__nirum_serialize__() == point3d_serialize
     assert Point3d.__nirum_deserialize__(point3d_serialize) == point3d
+    assert (repr(point3d) ==
+            'fixture.foo.Point3d(xy=fixture.foo.bar.Point(x=1, y=2), z=3)')
 
     # Optional fields can be empty
     r = RecordWithOptionalRecordField(f=None)
