@@ -1120,21 +1120,50 @@ if hasattr({className}.Client, '__qualname__'):
              Nothing ->
                 return "raise UnexpectedNirumResponseError(serialized)"
         payloadArguments <- mapM compileClientPayload $ toList params
+        validators <- sequence
+            [ do
+                  v <- compileValidator' src pTypeExpr $ toAttributeName' pName
+                  pTypeExprCode <- compileTypeExpression' src $ Just pTypeExpr
+                  return (pName, pTypeExprCode, v)
+            | Parameter pName pTypeExpr _ <- toList params
+            ]
         ret <- returnCompiler
-        return [qq|
-    def {clientMethodName'}(self, {commaNl params'}){ret rtypeExpr}:
+        return $ toStrict $ renderMarkup $ [compileText|
+    def #{clientMethodName'}(self, #{commaNl params'})#{ret rtypeExpr}:
+        _type_repr = __import__('typing')._type_repr
+        # typing module can be masked by parameter of the same name, e.g.:
+        #     service foo-service ( bar (text typing) );
+        # As Nirum identifier disallows to begin with dash/underscore,
+        # we can avoid such name overwrapping by defining _type_repr,
+        # an underscore-leaded alias of typing._type_repr and using it
+        # in the below.
+%{ forall (pName, pType, (Validator pTypePred pValueValidators)) <- validators }
+        if not (#{pTypePred}):
+            raise TypeError(
+                '#{toAttributeName' pName} must be a value of ' +
+                _type_repr(#{pType}) + ', not ' +
+                repr(#{toAttributeName' pName})
+            )
+%{ forall ValueValidator pValuePredCode pValueErrorMsg <- pValueValidators }
+        elif not (#{pValuePredCode}):
+            raise ValueError(
+                'invalid #{toAttributeName' pName}: '
+                #{stringLiteral pValueErrorMsg}
+            )
+%{ endforall }
+%{ endforall }
         successful, serialized = self.__nirum_transport__(
-            '{I.toSnakeCaseText $ N.behindName mName}',
-            payload=\{{commaNl payloadArguments}\},
+            '#{I.toSnakeCaseText $ N.behindName mName}',
+            payload={#{commaNl payloadArguments}},
             # FIXME Give annotations.
-            service_annotations=\{\},
+            service_annotations={},
             method_annotations=self.__nirum_method_annotations__,
-            parameter_annotations=\{\}
+            parameter_annotations={}
         )
         if successful:
-            result_type = $rtypeExpr
+            result_type = #{rtypeExpr}
         else:
-            $errorCode
+            #{errorCode}
         if result_type is None:
             result = None
         else:

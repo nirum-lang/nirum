@@ -34,7 +34,11 @@ To be released.
     (``tzinfo``) awareness check for `datetime`, and basic format check for
     `uri`.
 
+ -  Fixed a bug that generated service methods hadn't checked its arguments
+    before its transport sends a payload.  [[#220]]
+
 [#13]: https://github.com/spoqa/nirum/issues/13
+[#220]: https://github.com/spoqa/nirum/issues/220
 [#227]: https://github.com/spoqa/nirum/pull/227
 [entry points]: https://setuptools.readthedocs.io/en/latest/pkg_resources.html#entry-points
 [python-basestring]: https://docs.python.org/2/library/functions.html#basestring
