@@ -78,6 +78,7 @@ before_install:
     brew update || true
     brew upgrade || true
     brew update || true
+    brew install --with-default-names gnu-sed
     brew tap dahlia/homebrew-deadsnakes
     brew install python34 python35 python3 || \
       brew upgrade python34 python35 python3 || \
