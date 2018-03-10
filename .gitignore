@@ -1,6 +1,7 @@
 
 __pycache__
 .cache
+.pytest_cache
 .stack-work
 *.tix
 *.pyc

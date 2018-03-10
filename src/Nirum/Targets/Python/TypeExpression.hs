@@ -77,5 +77,5 @@ compilePrimitiveType primitiveTypeIdentifier' = do
             insertStandardImport "datetime"
             return "datetime.datetime"
         (Uuid, _) -> insertStandardImport "uuid" >> return "uuid.UUID"
-        (Uri, Python2) -> return "unicode"
+        (Uri, Python2) -> return "basestring"
         (Uri, Python3) -> return "str"

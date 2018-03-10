@@ -93,6 +93,7 @@ import qualified Nirum.Package.Metadata as MD
 import Nirum.Targets.Python.CodeGen
 import Nirum.Targets.Python.Serializers
 import Nirum.Targets.Python.TypeExpression
+import Nirum.Targets.Python.Validators
 import Nirum.TypeInstance.BoundModule as BM
 
 type Package' = Package Python
@@ -255,15 +256,19 @@ returnCompiler = do
 compileUnionTag :: Source -> Name -> Tag -> CodeGen Code
 compileUnionTag source parentname d@(Tag typename' fields' _) = do
     typeExprCodes <- mapM (compileTypeExpression' source)
-        [Just typeExpr | (Field _ typeExpr _) <- toList fields']
+        [Just typeExpr | (Field _ typeExpr _) <- fieldList]
     let nameTypeTriples = L.sortBy (compare `on` thd3)
                                    (zip3 tagNames typeExprCodes optionFlags)
     insertThirdPartyImportsA
-        [ ("nirum.validate", [("validate_union_type", "validate_union_type")])
-        , ("nirum.constructs", [("name_dict_type", "NameDict")])
-        ]
+        [("nirum.constructs", [("name_dict_type", "NameDict")])]
     arg <- parameterCompiler
     pyVer <- getPythonVersion
+    validators <- sequence
+        [ do
+              v <- compileValidator' source typeExpr $ toAttributeName' fName
+              return (fName, typeExprCode, v)
+        | (typeExprCode, Field fName typeExpr _) <- zip typeExprCodes fieldList
+        ]
     initializers <- compileFieldInitializers fields'
     return $ toStrict $ renderMarkup $ [compileText|
 class #{className}(#{parentClass}):
@@ -305,7 +310,29 @@ class #{className}(#{parentClass}):
 %{ endif }
     ) -> None:
 %{ endcase }
+        _type_repr = __import__('typing')._type_repr
+        # typing module can be masked by field name of the same name, e.g.:
+        #     union foo = bar ( text typing );
+        # As Nirum identifier disallows to begin with dash/underscore,
+        # we can avoid such name overwrapping by defining _type_repr,
+        # an underscore-leaded alias of typing._type_repr and using it
+        # in the below __init__() inner function.
         def __init__(#{compileParameters arg nameTypeTriples}):
+%{ forall (fName, fType, (Validator fTypePred fValueValidators)) <- validators }
+            if not (#{fTypePred}):
+                raise TypeError(
+                    '#{toAttributeName' fName} must be a value of ' +
+                    _type_repr(#{fType}) + ', not ' +
+                    repr(#{toAttributeName' fName})
+                )
+%{ forall ValueValidator fValuePredCode fValueErrorMsg <- fValueValidators }
+            elif not (#{fValuePredCode}):
+                raise ValueError(
+                    'invalid #{toAttributeName' fName}: '
+                    #{stringLiteral fValueErrorMsg}
+                )
+%{ endforall }
+%{ endforall }
 %{ forall initializer <- initializers }
             #{initializer}
 %{ endforall }
@@ -320,7 +347,6 @@ class #{className}(#{parentClass}):
 %{ endforall }
         )
 %{ endcase }
-        validate_union_type(self)
 
     def __nirum_serialize__(self):
         return {
@@ -414,6 +440,10 @@ compileSerializer' :: Source -> TypeExpression -> Code -> Code
 compileSerializer' Source { sourceModule = boundModule } =
     compileSerializer boundModule
 
+compileValidator' :: Source -> TypeExpression -> Code -> CodeGen Validator
+compileValidator' Source { sourceModule = boundModule } =
+    compileValidator boundModule
+
 compileTypeDeclaration :: Source -> TypeDeclaration -> CodeGen Code
 compileTypeDeclaration _ TypeDeclaration { type' = PrimitiveType {} } =
     return ""  -- never used
@@ -435,11 +465,9 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
     let className = toClassName' typename'
     itypeExpr <- compileTypeExpression' src (Just itype)
     insertStandardImport "typing"
-    insertThirdPartyImports
-        [ ("nirum.validate", ["validate_unboxed_type"])
-        , ("nirum.deserialize", ["deserialize_meta"])
-        ]
+    insertThirdPartyImports [("nirum.deserialize", ["deserialize_meta"])]
     pyVer <- getPythonVersion
+    Validator typePred valueValidators' <- compileValidator' src itype "value"
     return $ toStrict $ renderMarkup $ [compileText|
 class #{className}(object):
 #{compileDocstring "    " d}
@@ -456,7 +484,17 @@ class #{className}(object):
 %{ of Python3 }
     def __init__(self, value: '#{itypeExpr}') -> None:
 %{ endcase }
-        validate_unboxed_type(value, #{itypeExpr})
+        if not (#{typePred}):
+            raise TypeError(
+                'expected {0}, not {1!r}'.format(
+                    typing._type_repr(#{itypeExpr}),
+                    value
+                )
+            )
+%{ forall ValueValidator predCode msg <- valueValidators' }
+        if not (#{predCode}):
+            raise ValueError(#{stringLiteral msg})
+%{ endforall }
         self.value = value  # type: #{itypeExpr}
 
 %{ case pyVer }
@@ -553,7 +591,7 @@ class #{className}(enum.Enum):
 # __nirum_type__ should be defined after the class is defined.
 #{className}.__nirum_type__ = 'enum'
 |]
-compileTypeDeclaration src d@TypeDeclaration { typename = typename'
+compileTypeDeclaration src d@TypeDeclaration { typename = Name tnFacial tnBehind
                                              , type' = RecordType fields'
                                              } = do
     typeExprCodes <- mapM (compileTypeExpression' src)
@@ -563,13 +601,18 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
             (zip3 [toAttributeName' name' | Field name' _ _ <- fieldList]
                   typeExprCodes optionFlags)
     insertStandardImport "typing"
-    insertThirdPartyImports [ ("nirum.validate", ["validate_record_type"])
-                            , ("nirum.deserialize", ["deserialize_meta"])
-                            ]
     insertThirdPartyImportsA
-        [("nirum.constructs", [("name_dict_type", "NameDict")])]
+        [ ("nirum.constructs", [("name_dict_type", "NameDict")])
+        , ("nirum.deserialize", [("deserialize_meta", "deserialize_meta")])
+        ]
     arg <- parameterCompiler
     pyVer <- getPythonVersion
+    validators <- sequence
+        [ do
+              v <- compileValidator' src typeExpr $ toAttributeName' fName
+              return (fName, typeExprCode, v)
+        | (typeExprCode, Field fName typeExpr _) <- zip typeExprCodes fieldList
+        ]
     initializers <- compileFieldInitializers fields'
     return $ toStrict $ renderMarkup $ [compileText|
 class #{className}(object):
@@ -616,7 +659,29 @@ class #{className}(object):
 %{ endif }
     ) -> None:
 %{ endcase }
+        _type_repr = __import__('typing')._type_repr
+        # typing module can be masked by field name of the same name, e.g.:
+        #     record foo ( text typing );
+        # As Nirum identifier disallows to begin with dash/underscore,
+        # we can avoid such name overwrapping by defining _type_repr,
+        # an underscore-leaded alias of typing._type_repr and using it
+        # in the below __init__() inner function.
         def __init__(#{compileParameters arg nameTypeTriples}):
+%{ forall (fName, fType, (Validator fTypePred fValueValidators)) <- validators }
+            if not (#{fTypePred}):
+                raise TypeError(
+                    '#{toAttributeName' fName} must be a value of ' +
+                    _type_repr(#{fType}) + ', not ' +
+                    repr(#{toAttributeName' fName})
+                )
+%{ forall ValueValidator fValuePredCode fValueErrorMsg <- fValueValidators }
+            elif not (#{fValuePredCode}):
+                raise ValueError(
+                    'invalid #{toAttributeName' fName}: '
+                    #{stringLiteral fValueErrorMsg}
+                )
+%{ endforall }
+%{ endforall }
 %{ forall initializer <- initializers }
             #{initializer}
 %{ endforall }
@@ -631,7 +696,6 @@ class #{className}(object):
 %{ endforall }
         )
 %{ endcase }
-        validate_record_type(self)
 
 %{ case pyVer }
 %{ of Python2 }
@@ -744,22 +808,17 @@ class #{className}(object):
                   ]
 compileTypeDeclaration src
                        d@TypeDeclaration { typename = typename'
-                                         , type' = union
+                                         , type' = union@UnionType {}
                                          , typeAnnotations = annotations
                                          } = do
     tagCodes <- mapM (compileUnionTag src typename') tags'
-    insertStandardImport "enum"
     insertStandardImport "typing"
-    insertThirdPartyImports [ ("nirum.deserialize", ["deserialize_meta"])
-                            ]
-    insertThirdPartyImportsA [ ( "nirum.constructs"
-                               , [("name_dict_type", "NameDict")]
-                               )
-                             ]
-    insertThirdPartyImportsA [ ( "nirum.datastructures"
-                               , [("map_type", "Map")]
-                               )
-                             ]
+    insertStandardImport "enum"
+    insertThirdPartyImports [("nirum.deserialize", ["deserialize_meta"])]
+    insertThirdPartyImportsA
+        [ ("nirum.constructs", [("name_dict_type", "NameDict")])
+        , ("nirum.datastructures", [("map_type", "Map")])
+        ]
     pyVer <- getPythonVersion
     return $ toStrict $ renderMarkup $ [compileText|
 class #{className}(#{T.intercalate "," $ compileExtendClasses annotations}):

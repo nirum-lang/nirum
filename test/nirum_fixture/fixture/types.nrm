@@ -1,1 +1,5 @@
-record uuid-list ([uuid] values);
+unboxed uuid-list ([uuid]);
+
+unboxed int32-unboxed (int32);
+
+unboxed datetime-unboxed (datetime);

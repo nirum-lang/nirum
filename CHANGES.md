@@ -23,9 +23,22 @@ To be released.
         classes.  Nirum type names are qualified and their leading module paths
         are also normalized (the same rule to `nirum.modules` applies here).
 
+ -  The `uri` type became represented as [`basestring`][python-basestring]
+    instead of [`unicode`][python-unicode] in Python 2, since URI (unlike IRI)
+    is limited to a subset of ASCII character set.
+
+    There's no change to Python 3.
+
+ -  Generated type constructors became to validate field value's range or format
+    besides class checks: range checks for `int32`/`int64`, time zone
+    (``tzinfo``) awareness check for `datetime`, and basic format check for
+    `uri`.
+
 [#13]: https://github.com/spoqa/nirum/issues/13
 [#227]: https://github.com/spoqa/nirum/pull/227
 [entry points]: https://setuptools.readthedocs.io/en/latest/pkg_resources.html#entry-points
+[python-basestring]: https://docs.python.org/2/library/functions.html#basestring
+[python-unicode]: https://docs.python.org/2/library/functions.html#unicode
 
 
 Version 0.3.1

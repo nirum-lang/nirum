@@ -51,7 +51,7 @@ spec = pythonVersionSpecs $ \ ver -> do
         standardImports uuidContext `shouldBe` ["uuid"]
         code (compilePrimitiveType Uri) `shouldBe`
             case ver of
-                Python2 -> "unicode"
+                Python2 -> "basestring"
                 Python3 -> "str"
 
     describe [qq|compileTypeExpression ($ver)|] $ do

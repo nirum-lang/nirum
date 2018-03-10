@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import enum
+import uuid
 
 from pytest import raises
 from nirum.service import Service
@@ -17,6 +18,7 @@ from fixture.foo import (Album, CultureAgnosticName, Dog,
                          WesternName)
 from fixture.foo.bar import PathUnbox, IntUnbox, Point
 from fixture.qux import Path, Name
+from fixture.types import UuidList
 
 
 def test_float_unbox():
@@ -67,6 +69,20 @@ def test_boxed_alias():
     assert Irum(u'khj').__nirum_serialize__() == u'khj'
     assert Irum.__nirum_deserialize__(u'khj') == Name(u'khj')
     assert Irum.__nirum_deserialize__(u'khj') == Irum(u'khj')
+
+
+def test_unboxed_list():
+    assert list(UuidList([]).value) == []
+    uuids = [uuid.uuid1() for _ in range(3)]
+    assert list(UuidList(uuids).value) == uuids
+    with raises(TypeError) as ei:
+        UuidList(['not uuid'])
+    assert (str(ei.value) ==
+            "expected typing.Sequence[uuid.UUID], not ['not uuid']")
+    with raises(TypeError) as ei:
+        UuidList(uuids + ['not uuid'])
+    assert str(ei.value) == \
+        "expected typing.Sequence[uuid.UUID], not %r" % (uuids + ['not uuid'])
 
 
 def test_enum():
