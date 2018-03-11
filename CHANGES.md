@@ -37,6 +37,11 @@ To be released.
  -  Fixed a bug that generated service methods hadn't checked its arguments
     before its transport sends a payload.  [[#220]]
 
+ -  Fixed a bug that field/parameter names that use a module name of the Python
+    standard library cause runtime `TypeError`s (due to name shadowing).
+    Under the hood, all generated `import`s are now aliased with a name prefixed
+    an underscore.
+
 [#13]: https://github.com/spoqa/nirum/issues/13
 [#220]: https://github.com/spoqa/nirum/issues/220
 [#227]: https://github.com/spoqa/nirum/pull/227

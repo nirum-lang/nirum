@@ -103,7 +103,7 @@ spec' = pythonVersionSpecs $ \ ver -> do
                     insertLocalImport ".." "Path"
             let (e, ctx) = runCodeGen c empty'
             e `shouldSatisfy` isRight
-            standardImports ctx `shouldBe` ["os", "sys"]
+            standardImports ctx `shouldBe` [("os", "os"), ("sys", "sys")]
             thirdPartyImports ctx `shouldBe`
                 [ ( "nirum"
                   , [ ("serialize_unboxed_type", "serialize_unboxed_type")
@@ -122,18 +122,83 @@ spec' = pythonVersionSpecs $ \ ver -> do
                     ]
                   )
                 ]
+        specify "importStandardLibrary" $ do
+            let codeGen1 = importStandardLibrary "io"
+            let (e1, ctx1) = runCodeGen codeGen1 empty'
+            e1 `shouldBe` Right "_io"
+            standardImports ctx1 `shouldBe` [("_io", "io")]
+            standardImportSet ctx1 `shouldBe` ["io"]
+            thirdPartyImports ctx1 `shouldBe` []
+            localImports ctx1 `shouldBe` []
+            compileError codeGen1 `shouldBe` Nothing
+            -- importing a nested module, i.e., import path that contains "."
+            let codeGen2 = codeGen1 >> importStandardLibrary "os.path"
+            let (e2, ctx2) = runCodeGen codeGen2 empty'
+            e2 `shouldBe` Right "_os_path"
+            standardImports ctx2 `shouldBe`
+                [("_os_path", "os.path"), ("_io", "io")]
+            standardImportSet ctx2 `shouldBe` ["os.path", "io"]
+            thirdPartyImports ctx2 `shouldBe` []
+            localImports ctx2 `shouldBe` []
+            compileError codeGen2 `shouldBe` Nothing
+            -- importing a module that begins with "_"
+            let codeGen3 = codeGen2 >> importStandardLibrary "__builtin__"
+            let (e3, ctx3) = runCodeGen codeGen3 empty'
+            e3 `shouldBe` Right "__builtin__"
+            standardImports ctx3 `shouldBe`
+                [ ("__builtin__", "__builtin__")
+                , ("_os_path", "os.path")
+                , ("_io", "io")
+                ]
+            standardImportSet ctx3 `shouldBe` ["__builtin__", "os.path", "io"]
+            thirdPartyImports ctx3 `shouldBe` []
+            localImports ctx3 `shouldBe` []
+            compileError codeGen3 `shouldBe` Nothing
+        specify "importBuiltins" $ do
+            let codeGen1 = importBuiltins
+            let (e1, ctx1) = runCodeGen codeGen1 empty'
+            e1 `shouldSatisfy` isRight
+            standardImports ctx1 `shouldBe`
+                [ if ver == Python2
+                  then ("__builtin__", "__builtin__")
+                  else ("__builtin__", "builtins")
+                ]
+            standardImportSet ctx1 `shouldBe`
+                [if ver == Python2 then "__builtin__" else "builtins"]
+            thirdPartyImports ctx1 `shouldBe` []
+            localImports ctx1 `shouldBe` []
+            compileError codeGen1 `shouldBe` Nothing
         specify "insertStandardImport" $ do
             let codeGen1 = insertStandardImport "sys"
             let (e1, ctx1) = runCodeGen codeGen1 empty'
             e1 `shouldSatisfy` isRight
-            standardImports ctx1 `shouldBe` ["sys"]
+            standardImports ctx1 `shouldBe` [("sys", "sys")]
+            standardImportSet ctx1 `shouldBe` ["sys"]
             thirdPartyImports ctx1 `shouldBe` []
             localImports ctx1 `shouldBe` []
             compileError codeGen1 `shouldBe` Nothing
             let codeGen2 = codeGen1 >> insertStandardImport "os"
             let (e2, ctx2) = runCodeGen codeGen2 empty'
             e2 `shouldSatisfy` isRight
-            standardImports ctx2 `shouldBe` ["os", "sys"]
+            standardImports ctx2 `shouldBe` [("os", "os"), ("sys", "sys")]
+            standardImportSet ctx2 `shouldBe` ["os", "sys"]
+            thirdPartyImports ctx2 `shouldBe` []
+            localImports ctx2 `shouldBe` []
+            compileError codeGen2 `shouldBe` Nothing
+        specify "insertStandardImportA" $ do
+            let codeGen1 = insertStandardImportA "_csv" "csv"
+            let (e1, ctx1) = runCodeGen codeGen1 empty'
+            e1 `shouldSatisfy` isRight
+            standardImports ctx1 `shouldBe` [("_csv", "csv")]
+            standardImportSet ctx1 `shouldBe` ["csv"]
+            thirdPartyImports ctx1 `shouldBe` []
+            localImports ctx1 `shouldBe` []
+            compileError codeGen1 `shouldBe` Nothing
+            let codeGen2 = codeGen1 >> insertStandardImportA "_gc" "gc"
+            let (e2, ctx2) = runCodeGen codeGen2 empty'
+            e2 `shouldSatisfy` isRight
+            standardImports ctx2 `shouldBe` [("_gc", "gc"), ("_csv", "csv")]
+            standardImportSet ctx2 `shouldBe` ["gc", "csv"]
             thirdPartyImports ctx2 `shouldBe` []
             localImports ctx2 `shouldBe` []
             compileError codeGen2 `shouldBe` Nothing

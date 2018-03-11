@@ -11,11 +11,14 @@ module Nirum.Targets.Python.CodeGen
     , RenameMap
     , empty
     , getPythonVersion
+    , importBuiltins
+    , importStandardLibrary
+    , importTypingForPython3
     , insertLocalImport
     , insertStandardImport
+    , insertStandardImportA
     , insertThirdPartyImports
     , insertThirdPartyImportsA
-    , importTypingForPython3
     , keywords
     , localImportsMap
     , mangleVar
@@ -75,7 +78,8 @@ type CompileError = Text
 type Code = Text
 
 data CodeGenContext
-    = CodeGenContext { standardImports :: Set Text
+    = CodeGenContext { standardImports :: Map Text Text
+                     , standardImportSet :: Set Text
                      , thirdPartyImports :: Map Text (Map Text Text)
                      , localImports :: Map Text (Set Text)
                      , pythonVersion :: PythonVersion
@@ -88,6 +92,7 @@ instance Nirum.CodeGen.Failure CodeGenContext CompileError where
 empty :: PythonVersion -> CodeGenContext
 empty pythonVer = CodeGenContext
     { standardImports = []
+    , standardImportSet = []
     , thirdPartyImports = []
     , localImports = []
     , pythonVersion = pythonVer
@@ -104,11 +109,36 @@ runCodeGen :: CodeGen a
            -> (Either CompileError a, CodeGenContext)
 runCodeGen = Nirum.CodeGen.runCodeGen
 
-insertStandardImport :: Text -> CodeGen ()
-insertStandardImport module' = modify insert'
+importStandardLibrary :: Text -> CodeGen Code
+importStandardLibrary module' = do
+    insertStandardImportA alias module'
+    return alias
   where
-    insert' c@CodeGenContext { standardImports = si } =
-        c { standardImports = Data.Set.insert module' si }
+    alias :: Code
+    alias
+      | "_" `isPrefixOf` module' = module'
+      | otherwise = '_' `cons` Data.Text.replace "." "_" module'
+
+importBuiltins :: CodeGen Code
+importBuiltins = do
+    pyVer <- getPythonVersion
+    case pyVer of
+        Python3 -> do
+            insertStandardImportA "__builtin__" "builtins"
+            return "__builtin__"
+        Python2 -> importStandardLibrary "__builtin__"
+
+insertStandardImport :: Text -> CodeGen ()
+insertStandardImport module' =
+    insertStandardImportA module' module'
+
+insertStandardImportA :: Code -> Text -> CodeGen ()
+insertStandardImportA alias module' = modify insert'
+  where
+    insert' c@CodeGenContext { standardImports = si, standardImportSet = ss } =
+        c { standardImports = Data.Map.Strict.insert alias module' si
+          , standardImportSet = Data.Set.insert module' ss
+          }
 
 insertThirdPartyImports :: [(Text, Set Text)] -> CodeGen ()
 insertThirdPartyImports imports =

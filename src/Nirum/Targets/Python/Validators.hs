@@ -116,11 +116,9 @@ compileInstanceValidator mod' typeId pythonVar = do
 collectionsAbc :: CodeGen Code
 collectionsAbc = do
     ver <- getPythonVersion
-    let abc = case ver of
-                  Python2 -> "collections"
-                  Python3 -> "collections.abc"
-    insertStandardImport abc
-    return abc
+    importStandardLibrary $ case ver of
+        Python2 -> "collections"
+        Python3 -> "collections.abc"
 
 multiplexValidators :: BoundModule Python
                     -> Code

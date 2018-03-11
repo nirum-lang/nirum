@@ -9,7 +9,8 @@ from six import PY3
 from fixture.foo import (Album, CultureAgnosticName, Dog,
                          EastAsianName, EvaChar,
                          FloatUnbox, Gender, ImportedTypeUnbox, Irum,
-                         Line, MixedName, Mro, Music, NoMro, NullService,
+                         Line, MixedName, Mro, Music, NoMro,
+                         NameShadowingFieldRecord, NullService,
                          Person, People,
                          Point1, Point2, Point3d, Pop, PingService, Product,
                          RecordWithMap, RecordWithOptionalRecordField,
@@ -481,3 +482,61 @@ def test_map_serializer():
             },
         ],
     }
+
+
+def test_name_shadowing_field():
+    NameShadowingFieldRecord(
+        typing={u'a': [u'b', u'c']},
+        collections={u'a': {u'b', u'c'}},
+        numbers=1234,
+        uuid=uuid.uuid4(),
+        bytes=b'binary',
+    )
+    with raises(TypeError) as ei:
+        NameShadowingFieldRecord(
+            typing={u'invalid'},
+            collections={u'a': {u'b', u'c'}},
+            numbers=1234,
+            uuid=uuid.uuid4(),
+            bytes=b'binary',
+        )
+    assert str(ei.value).startswith('typing must be a value of typing.Mapping')
+    with raises(TypeError) as ei:
+        NameShadowingFieldRecord(
+            typing={u'a': [u'b', u'c']},
+            collections={u'invalid'},
+            numbers=1234,
+            uuid=uuid.uuid4(),
+            bytes=b'binary',
+        )
+    assert str(ei.value).startswith(
+        'collections must be a value of typing.Mapping['
+    )
+    with raises(TypeError):
+        NameShadowingFieldRecord(
+            typing={u'a': [u'b', u'c']},
+            collections={u'a': {u'b', u'c'}},
+            numbers='invalid',
+            uuid=uuid.uuid4(),
+            bytes=b'binary',
+        )
+    with raises(TypeError) as ei:
+        NameShadowingFieldRecord(
+            typing={u'a': [u'b', u'c']},
+            collections={u'a': {u'b', u'c'}},
+            numbers=1234,
+            uuid='invalid',
+            bytes=b'binary',
+        )
+    assert str(ei.value) == "uuid must be a value of uuid.UUID, not 'invalid'"
+    with raises(TypeError) as ei:
+        NameShadowingFieldRecord(
+            typing={u'a': [u'b', u'c']},
+            collections={u'a': {u'b', u'c'}},
+            numbers=1234,
+            uuid=uuid.uuid4(),
+            bytes=['invalid'],
+        )
+    assert "bytes must be a value of {0}, not ['invalid']".format(
+        'bytes' if PY3 else 'str'
+    ) == str(ei.value)

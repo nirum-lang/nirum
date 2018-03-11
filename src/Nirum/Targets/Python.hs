@@ -1249,9 +1249,10 @@ compileModule pythonVersion' source = do
     let (result, context) = runCodeGen (compileModuleBody source)
                                        (empty pythonVersion')
     let deps = require "nirum" "nirum" $ M.keysSet $ thirdPartyImports context
+    let standardImportSet' = standardImportSet context
     let optDeps =
-            [ ((3, 4), require "enum34" "enum" $ standardImports context)
-            , ((3, 5), require "typing" "typing" $ standardImports context)
+            [ ((3, 4), require "enum34" "enum" standardImportSet')
+            , ((3, 5), require "typing" "typing" standardImportSet')
             ]
     let installRequires = InstallRequires deps optDeps
     let fromImports = M.assocs (localImportsMap context) ++
@@ -1260,8 +1261,12 @@ compileModule pythonVersion' source = do
     return $ (,) installRequires $ toStrict $ renderMarkup $
         [compileText|# -*- coding: utf-8 -*-
 #{compileDocstring "" $ sourceModule source}
-%{ forall i <- S.elems (standardImports context) }
-import #{i}
+%{ forall (alias, import') <- M.assocs (standardImports context) }
+%{ if import' == alias }
+import #{import'}
+%{ else }
+import #{import'} as #{alias}
+%{ endif }
 %{ endforall }
 
 %{ forall (from, nameMap) <- fromImports }
