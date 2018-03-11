@@ -14,3 +14,6 @@ name = "nirum_fixture"
 
 [targets.docs]
 title = "Fixtures for Nirum tests"
+
+[targets.rust]
+name = "nirum_fixture"

@@ -4,15 +4,20 @@
 module Nirum.Targets.Rust ( Rust
                           , Code
                           , CompileError
+                          , childModules
                           ) where
 
 import qualified Data.Map.Strict as M
+import Data.Maybe
 import qualified Data.SemVer as SV
+import Data.Semigroup
+import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import Data.Text.Encoding (encodeUtf8)
 import Data.Text.Lazy (toStrict)
 import Data.Typeable (Typeable)
+import System.FilePath
 
 import GHC.Exts (IsList (toList))
 
@@ -20,7 +25,7 @@ import Text.Blaze.Renderer.Text
 import Text.Heterocephalus (compileText)
 
 import qualified Nirum.Constructs.Identifier as I
-import Nirum.Constructs.ModulePath (ModulePath)
+import Nirum.Constructs.ModulePath
 import Nirum.Constructs.TypeDeclaration
 import Nirum.Package.Metadata
 import qualified Nirum.Package.ModuleSet as MS
@@ -70,7 +75,7 @@ compilePackage' package =
           , Right $
             toStrict $
             TL.append (buildPrologue mod')
-                      (buildBody (mp >>= resolveWithModulePath))
+                      (buildBody (resolveWithModulePath mp))
           )
         | mod'@RustModule { filePath = fileName
                           , modPath = mp
@@ -81,7 +86,27 @@ compilePackage' package =
     resolveWithModulePath :: ModulePath -> Maybe (BoundModule Rust)
     resolveWithModulePath mp = resolveBoundModule mp package
     modules' :: [RustModule]
-    modules' = buildRustModuleList [mp | (mp, _) <- MS.toAscList $ modules package]
+    modules' = libModule : [ RustModule { filePath = toFilePath $ toList mp
+                                        , modPath = mp
+                                        , children = childModules expanded' mp
+                                        }
+                           | mp <- toList expanded' ]
+    expanded' = hierarchies $ S.fromList $ MS.keys $ modules package
+    libModule = RustModule { filePath = toFilePath []
+                           , modPath = ["lib"]
+                           , children = S.map root expanded'
+                           }
+
+childModules :: Foldable f => f ModulePath -> ModulePath -> S.Set I.Identifier
+childModules modPaths base = fromMaybe mempty $ getOption $ foldMap f modPaths
+  where
+    f = Option . fmap (S.singleton . root) . stripPrefix base
+
+toFilePath :: [I.Identifier] -> FilePath
+toFilePath [] = joinPath ["src", "lib.rs"]
+toFilePath p = joinPath (["src"] ++ convert p ++ ["mod.rs"])
+  where
+    convert = map (T.unpack . toRustIdentifier I.toSnakeCaseText)
 
 instance Target Rust where
     type CompileResult Rust = Code
