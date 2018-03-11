@@ -148,6 +148,8 @@ Have you kicked off a new project related to Nirum?  Please add *nirum*
      Vim/Neovim.
  -   [sublime-nirum](https://github.com/spoqa/sublime-nirum): Nirum package for
      Sublime Text 3.
+ -   [nirum-syntax-highlighting](https://marketplace.visualstudio.com/items?itemName=Nirum.nirum-syntax-highlighting)
+     for VS Code: Nirum syntax highlighter for VS Code.
 
 [related-projects]: https://github.com/search?q=topic:nirum+fork:false
 [github-topic]: https://github.com/blog/2309-introducing-topics
