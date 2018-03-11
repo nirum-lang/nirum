@@ -6,7 +6,7 @@ enum country
     | ax  # Åland Islands
     | al  # Albania
     | dz  # Algeria
-    | as  # American Samoa
+    | `as`  # American Samoa
     | ad  # Andorra
     | ao  # Angola
     | ai  # Anguilla

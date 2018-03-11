@@ -1,8 +1,9 @@
 import countries (country);
+import types (coordinate as coord);
 
 record address (
-    float32 lat,
-    float32 lng,
+    coord lat,
+    coord lng,
     text street,
     text town,
     country country,

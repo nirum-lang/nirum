@@ -23,7 +23,9 @@ import qualified Nirum.Constructs.DeclarationSet as DS
 import Nirum.Constructs.Identifier (Identifier)
 import Nirum.Constructs.Module (Module (Module), imports)
 import Nirum.Constructs.ModulePath (ModulePath)
-import Nirum.Constructs.TypeDeclaration ( TypeDeclaration ( Import
+import Nirum.Constructs.TypeDeclaration ( ImportName (impName)
+                                        , importScopeName
+                                        , TypeDeclaration ( Import
                                                           , ServiceDeclaration
                                                           , TypeDeclaration
                                                           )
@@ -85,17 +87,25 @@ detectMissingImports moduleSet =
     detect :: ModulePath -> Module -> [ImportError]
     detect path module' =
         [ e
-        | (path', idents) <- M.toList (imports module')
+        | (path', importNames') <- M.toList (imports module')
         , e <- case lookup path' moduleSet of
                 Nothing -> [MissingModulePathError path path']
                 Just (Module decls _) ->
                     [ e
-                    | i <- S.toList idents
-                    , e <- case DS.lookup i decls of
+                    | i <- S.toList importNames'
+                    , e <- case DS.lookup (impName i) decls of
                         Just TypeDeclaration {} -> []
                         Just ServiceDeclaration {} -> []
-                        Just Import {} -> [MissingImportError path path' i]
-                        Nothing -> [MissingImportError path path' i]
+                        Just Import {} -> [ MissingImportError
+                                                path
+                                                path'
+                                                (importScopeName i)
+                                          ]
+                        Nothing -> [ MissingImportError
+                                         path
+                                         path'
+                                         (importScopeName i)
+                                   ]
                     ]
         ]
 

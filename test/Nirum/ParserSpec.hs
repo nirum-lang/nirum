@@ -45,6 +45,9 @@ import Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
                                        )
 import Util (singleDocs)
 
+ine :: Identifier -> ImportName
+ine i = ImportName i Nothing
+
 shouldBeRight :: (Eq l, Eq r, Show l, Show r) => Either l r -> r -> Expectation
 shouldBeRight actual expected = actual `shouldBe` Right expected
 
@@ -1148,36 +1151,36 @@ service method-dups (
         let (parse', expectError) = helperFuncs P.imports
         it "emits Import values if succeeded to parse" $
             parse' "import foo.bar (a, b);" `shouldBeRight`
-                [ Import ["foo", "bar"] "a" empty
-                , Import ["foo", "bar"] "b" empty
+                [ Import ["foo", "bar"] (ine "a") empty
+                , Import ["foo", "bar"] (ine "b") empty
                 ]
         it "can be annotated" $ do
             parse' "import foo.bar (@foo (v = \"bar\") a, @baz b);"
                 `shouldBeRight`
-                    [ Import ["foo", "bar"] "a" fooAnnotationSet
-                    , Import ["foo", "bar"] "b" bazAnnotationSet
+                    [ Import ["foo", "bar"] (ine "a") fooAnnotationSet
+                    , Import ["foo", "bar"] (ine "b") bazAnnotationSet
                     ]
             parse' "import foo.bar (@foo (v = \"bar\") @baz a, b);"
                 `shouldBeRight`
-                    [ Import ["foo", "bar"] "a" $
+                    [ Import ["foo", "bar"] (ine "a") $
                              union fooAnnotationSet bazAnnotationSet
-                    , Import ["foo", "bar"] "b" empty
+                    , Import ["foo", "bar"] (ine "b") empty
                     ]
         specify "import names can have a trailing comma" $
             parse' "import foo.bar (a, b,);" `shouldBeRight`
-                [ Import ["foo", "bar"] "a" empty
-                , Import ["foo", "bar"] "b" empty
+                [ Import ["foo", "bar"] (ine "a") empty
+                , Import ["foo", "bar"] (ine "b") empty
                 ]
         specify "import names in parentheses can be multiline" $ do
             -- without a trailing comma
             parse' "import foo.bar (\n  a,\n  b\n);" `shouldBeRight`
-                [ Import ["foo", "bar"] "a" empty
-                , Import ["foo", "bar"] "b" empty
+                [ Import ["foo", "bar"] (ine "a") empty
+                , Import ["foo", "bar"] (ine "b") empty
                 ]
             -- with a trailing comma
             parse' "import foo.bar (\n  c,\n  d,\n);" `shouldBeRight`
-                [ Import ["foo", "bar"] "c" empty
-                , Import ["foo", "bar"] "d" empty
+                [ Import ["foo", "bar"] (ine "c") empty
+                , Import ["foo", "bar"] (ine "d") empty
                 ]
         it "errors if parentheses have nothing" $
             expectError "import foo.bar ();" 1 17

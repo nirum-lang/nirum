@@ -22,14 +22,23 @@ compileTypeExpression :: BoundModule Python
 compileTypeExpression mod' (Just (TypeIdentifier i)) =
     case lookupType i mod' of
         Missing -> fail $ "undefined identifier: " ++ toString i
-        Imported _ (PrimitiveType p _) -> compilePrimitiveType p
-        Imported m _ -> do
-            insertThirdPartyImports [(toImportPath target' m, [toClassName i])]
+        Imported _ _ (PrimitiveType p _) -> compilePrimitiveType p
+        Imported m importNameIdentifier _ -> do
+            insertThirdPartyImportsA
+                [
+                   ( toImportPath target' m
+                   , [ ( toClassName i
+                       , toClassName importNameIdentifier
+                       )
+                     ]
+                   )
+                ]
             return $ toClassName i
         Local _ -> return $ toClassName i
   where
     target' :: Python
     target' = target $ metadata $ boundPackage mod'
+
 compileTypeExpression mod' (Just (MapModifier k v)) = do
     kExpr <- compileTypeExpression mod' (Just k)
     vExpr <- compileTypeExpression mod' (Just v)

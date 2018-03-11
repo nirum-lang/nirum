@@ -11,6 +11,7 @@ module Nirum.Parser ( Parser
                     , handleNameDuplication
                     , handleNameDuplicationError
                     , identifier
+                    , importName
                     , imports
                     , listModifier
                     , mapModifier
@@ -71,7 +72,6 @@ import Nirum.Constructs.Service ( Method (Method)
                                 )
 import Nirum.Constructs.TypeDeclaration as TD hiding ( fields
                                                      , modulePath
-                                                     , importName
                                                      )
 import Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
                                                         , MapModifier
@@ -627,12 +627,18 @@ modulePath = do
     f Nothing i = Just $ ModuleName i
     f (Just p) i = Just $ ModulePath p i
 
-importName :: Parser (Identifier, A.AnnotationSet)
+importName :: Parser (Identifier, Maybe Identifier, A.AnnotationSet)
 importName = do
     aSet <- annotationSet <?> "import annotations"
     spaces
     iName <- identifier <?> "name to import"
-    return (iName, aSet)
+    aName <- optional $ do
+      spaces
+      string' "as"
+      spaces
+      n <- identifier <?> "alias name to import"
+      return n
+    return (iName, aName, aSet)
 
 imports :: Parser [TypeDeclaration]
 imports = do
@@ -648,7 +654,9 @@ imports = do
     char ')'
     spaces
     char ';'
-    return [Import path ident aSet | (ident, aSet) <- idents]
+    return [ Import path (ImportName impName' asName') aSet
+           | (impName', asName', aSet) <- idents
+           ]
 
 
 module' :: Parser Module

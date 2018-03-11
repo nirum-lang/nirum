@@ -1,4 +1,6 @@
-{-# LANGUAGE OverloadedLists, TypeFamilies #-}
+{-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeFamilies #-}
 module Nirum.Package.ModuleSetSpec where
 
 import Data.List (sort, sortOn)
@@ -10,13 +12,16 @@ import qualified Data.Set as S
 import Test.Hspec.Meta
 
 import Nirum.Constructs.Annotation (empty)
+import Nirum.Constructs.Identifier
 import Nirum.Constructs.ModulePath (ModulePath)
 import Nirum.Constructs.Module (Module (Module))
-import Nirum.Constructs.TypeDeclaration ( Type (Alias)
-                                        , TypeDeclaration ( Import
-                                                          , TypeDeclaration
-                                                          )
-                                        )
+import Nirum.Constructs.TypeDeclaration as TD
+    ( Type (Alias)
+    , TypeDeclaration ( Import
+                      , TypeDeclaration
+                      )
+    , ImportName ( ImportName )
+    )
 import Nirum.Package.ModuleSet ( ImportError ( CircularImportError
                                              , MissingImportError
                                              , MissingModulePathError
@@ -33,6 +38,9 @@ import Nirum.Package.ModuleSet ( ImportError ( CircularImportError
                                , toMap
                                )
 
+ine :: Identifier -> ImportName
+ine n = ImportName n Nothing
+
 fooBarModule :: Module
 fooBarModule = Module [] $ Just "foo.bar"
 
@@ -47,7 +55,7 @@ validModules =
     , (["foo", "baz"], Module [] $ Just "foo.baz")
     , (["qux"], Module [] $ Just "qux")
     , ( ["xyz"]
-      , Module [ Import ["abc"] "a" empty
+      , Module [ Import ["abc"] (ine "a") empty
                , TypeDeclaration "x" (Alias "text") empty
                ] Nothing
       )
@@ -56,33 +64,33 @@ validModules =
 missingImportsModules :: [(ModulePath, Module)]
 missingImportsModules =
     [ ( ["foo"]
-      , Module [ Import ["foo", "bar"] "xyz" empty -- MissingModulePathError
-               , Import ["foo", "bar"] "zzz" empty -- MissingModulePathError
-               , Import ["baz"] "qux" empty
+      , Module [ Import ["foo", "bar"] (ine "xyz") empty -- MissingModulePathError
+               , Import ["foo", "bar"] (ine "zzz") empty -- MissingModulePathError
+               , Import ["baz"] (ine "qux") empty
                ] Nothing
       )
     , ( ["baz"]
       , Module [ TypeDeclaration "qux" (Alias "text") empty ] Nothing
       )
-    , (["qux"], Module [ Import ["foo"] "abc" empty -- MissingImportError
-                       , Import ["foo"] "def" empty -- MissingImportError
+    , (["qux"], Module [ Import ["foo"] (ine "abc") empty -- MissingImportError
+                       , Import ["foo"] (ine "def") empty -- MissingImportError
                        ] Nothing)
     ]
 
 circularImportsModules :: [(ModulePath, Module)]
 circularImportsModules =
-    [ (["asdf"], Module [ Import ["asdf"] "foo" empty
+    [ (["asdf"], Module [ Import ["asdf"] (ine "foo") empty
                         , TypeDeclaration "bar" (Alias "text") empty
                         ] Nothing)
-    , (["abc", "def"], Module [ Import ["abc", "ghi"] "bar" empty
+    , (["abc", "def"], Module [ Import ["abc", "ghi"] (ine "bar") empty
                               , TypeDeclaration
                                     "foo" (Alias "text") empty
                               ] Nothing)
-    , (["abc", "ghi"], Module [ Import ["abc", "xyz"] "baz" empty
+    , (["abc", "ghi"], Module [ Import ["abc", "xyz"] (ine "baz") empty
                               , TypeDeclaration
                                     "bar" (Alias "text") empty
                               ] Nothing)
-    , (["abc", "xyz"], Module [ Import ["abc", "def"] "foo" empty
+    , (["abc", "xyz"], Module [ Import ["abc", "def"] (ine "foo") empty
                               , TypeDeclaration
                                     "baz" (Alias "text") empty
                               ] Nothing)

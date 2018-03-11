@@ -45,17 +45,17 @@ testPackage target' = do
             boundTypes bm `shouldBe` []
             boundTypes abc `shouldBe` [TypeDeclaration "a" (Alias "text") empty]
             boundTypes xyz `shouldBe`
-                [ Import ["abc"] "a" empty
+                [ Import ["abc"] (ImportName "a" Nothing) empty
                 , TypeDeclaration "x" (Alias "text") empty
                 ]
         specify "lookupType" $ do
             lookupType "a" bm `shouldBe` Missing
             lookupType "a" abc `shouldBe` Local (Alias "text")
-            lookupType "a" xyz `shouldBe` Imported ["abc"] (Alias "text")
+            lookupType "a" xyz `shouldBe` Imported ["abc"] "abc" (Alias "text")
             lookupType "x" bm `shouldBe` Missing
             lookupType "x" abc `shouldBe` Missing
             lookupType "x" xyz `shouldBe` Local (Alias "text")
             lookupType "text" bm `shouldBe`
-                Imported coreModulePath (PrimitiveType Text String)
+                Imported coreModulePath "core" (PrimitiveType Text String)
             lookupType "text" abc `shouldBe` lookupType "text" bm
             lookupType "text" xyz `shouldBe` lookupType "text" bm
