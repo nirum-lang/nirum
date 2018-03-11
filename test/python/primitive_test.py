@@ -29,8 +29,8 @@ def test_float_unbox():
     assert {float_unbox, float_unbox, float1} == {float_unbox, float1}
     assert float_unbox.__nirum_serialize__() == 3.14
     assert FloatUnbox.__nirum_deserialize__(3.14) == float_unbox
-    assert hash(float_unbox)
-    assert hash(float_unbox) != 3.14
+    assert hash(float_unbox) == hash(FloatUnbox(3.14))
+    assert hash(float_unbox) != hash(float1)
     with raises(ValueError):
         FloatUnbox.__nirum_deserialize__('a')
     with raises(TypeError):
@@ -102,7 +102,9 @@ def test_record():
     assert point != Point1(left=4, top=14)
     assert point != Point1(left=4, top=15)
     assert point != 'foo'
-    assert hash(Point1(left=3, top=14))
+    assert hash(point) == hash(Point1(left=3, top=14))
+    assert hash(point) != hash(Point1(left=0, top=14))
+    assert hash(point) != hash(Point1(left=3, top=0))
     point_serialized = {'_type': 'point1', 'x': 3, 'top': 14}
     assert point.__nirum_serialize__() == point_serialized
     assert Point1.__nirum_deserialize__(point_serialized) == point
@@ -135,6 +137,9 @@ top: invalid literal for int() with base 10: 'b'\
     assert point2 != Point2(left=IntUnbox(4), top=IntUnbox(14))
     assert point2 != Point2(left=IntUnbox(4), top=IntUnbox(15))
     assert point2 != 'foo'
+    assert hash(point2) == hash(Point2(left=IntUnbox(3), top=IntUnbox(14)))
+    assert hash(point2) != hash(Point2(left=IntUnbox(0), top=IntUnbox(14)))
+    assert hash(point2) != hash(Point2(left=IntUnbox(3), top=IntUnbox(0)))
     point2_serialize = {'_type': 'point2', 'left': 3, 'top': 14}
     assert point2.__nirum_serialize__() == point2_serialize
     assert Point2.__nirum_deserialize__(point2_serialize) == point2
@@ -228,7 +233,16 @@ def test_union():
                                        middle_name=u'wrong',
                                        last_name=u'wrong')
     assert hash(WesternName(first_name=u'foo', middle_name=u'bar',
-                            last_name=u'baz'))
+                            last_name=u'baz')) == hash(western_name)
+    assert hash(western_name) != hash(
+        WesternName(first_name=u'', middle_name=u'bar', last_name=u'baz')
+    )
+    assert hash(western_name) != hash(
+        WesternName(first_name=u'foo', middle_name=u'', last_name=u'baz')
+    )
+    assert hash(western_name) != hash(
+        WesternName(first_name=u'foo', middle_name=u'bar', last_name=u'')
+    )
     if PY3:
         assert repr(western_name) == (
             "fixture.foo.MixedName.WesternName(first_name='foo', "

@@ -78,6 +78,7 @@ before_install:
     brew update || true
     brew upgrade || true
     brew update || true
+    brew install --with-default-names gnu-sed
     brew tap dahlia/homebrew-deadsnakes
     brew install python34 python35 python3 || \
       brew upgrade python34 python35 python3 || \
@@ -118,7 +119,8 @@ install:
   fi
 
 script:
-- 'TOX="$(which tox)" stack --no-terminal test -j4 --coverage'
+- ls -al "$(python3 -m site --user-base)/bin/tox"
+- 'TOX="$(python3 -m site --user-base)/bin/tox" stack --no-terminal test -j4 --coverage'
 - ./lint.sh
 
 after_script:
