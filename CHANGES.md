@@ -23,8 +23,14 @@ To be released.
         classes.  Nirum type names are qualified and their leading module paths
         are also normalized (the same rule to `nirum.modules` applies here).
 
- -  The `uri` type became represented as [`basestring`][python-basestring]
-    instead of [`unicode`][python-unicode] in Python 2, since URI (unlike IRI)
+ -  All integral types (`int32`, `int64`, and `bigint`) became represented
+    as [`numbers.Integral`][python2-numbers-integral] instead of
+    [`int`][python2-int].
+
+    There's no change to Python 3.
+
+ -  The `uri` type became represented as [`basestring`][python2-basestring]
+    instead of [`unicode`][python2-unicode] in Python 2, since URI (unlike IRI)
     is limited to a subset of ASCII character set.
 
     There's no change to Python 3.
@@ -46,8 +52,9 @@ To be released.
 [#220]: https://github.com/spoqa/nirum/issues/220
 [#227]: https://github.com/spoqa/nirum/pull/227
 [entry points]: https://setuptools.readthedocs.io/en/latest/pkg_resources.html#entry-points
-[python-basestring]: https://docs.python.org/2/library/functions.html#basestring
-[python-unicode]: https://docs.python.org/2/library/functions.html#unicode
+[python2-numbers-integral]: https://docs.python.org/2/library/numbers.html#numbers.Integral
+[python2-basestring]: https://docs.python.org/2/library/functions.html#basestring
+[python2-unicode]: https://docs.python.org/2/library/functions.html#unicode
 
 
 Version 0.3.1

@@ -29,17 +29,17 @@ spec = pythonVersionSpecs $ \ ver -> do
 
     specify [qq|compilePrimitiveType ($ver)|] $ do
         let (boolCode, boolContext) = run' $ compilePrimitiveType Bool
+        let intTypeCode = case ver of
+                Python2 -> "_numbers.Integral"
+                Python3 -> "__builtin__.int"
         boolCode `shouldBe` Right "__builtin__.bool"
         standardImports boolContext `shouldBe` [builtinsPair]
-        code (compilePrimitiveType Bigint) `shouldBe` "__builtin__.int"
+        code (compilePrimitiveType Bigint) `shouldBe` intTypeCode
         let (decimalCode, decimalContext) = run' (compilePrimitiveType Decimal)
         decimalCode `shouldBe` Right "_decimal.Decimal"
         standardImports decimalContext `shouldBe` [("_decimal", "decimal")]
-        code (compilePrimitiveType Int32) `shouldBe` "__builtin__.int"
-        code (compilePrimitiveType Int64) `shouldBe`
-            case ver of
-                Python2 -> "_numbers.Integral"
-                Python3 -> "__builtin__.int"
+        code (compilePrimitiveType Int32) `shouldBe` intTypeCode
+        code (compilePrimitiveType Int64) `shouldBe` intTypeCode
         code (compilePrimitiveType Float32) `shouldBe` "__builtin__.float"
         code (compilePrimitiveType Float64) `shouldBe` "__builtin__.float"
         code (compilePrimitiveType Text) `shouldBe`
@@ -66,10 +66,10 @@ spec = pythonVersionSpecs $ \ ver -> do
         let Source { sourceModule = bm } = makeDummySource $ Module [] Nothing
         specify "TypeIdentifier" $ do
             let (c, ctx) = run' $
-                    compileTypeExpression bm (Just $ TypeIdentifier "bigint")
+                    compileTypeExpression bm (Just $ TypeIdentifier "binary")
             standardImports ctx `shouldBe` [builtinsPair]
             localImports ctx `shouldBe` []
-            c `shouldBe` Right "__builtin__.int"
+            c `shouldBe` Right "__builtin__.bytes"
         specify "OptionModifier" $ do
             let (c', ctx') = run' $
                     compileTypeExpression bm (Just $ OptionModifier "binary")
@@ -79,23 +79,23 @@ spec = pythonVersionSpecs $ \ ver -> do
             c' `shouldBe` Right "_typing.Optional[__builtin__.bytes]"
         specify "SetModifier" $ do
             let (c'', ctx'') = run' $
-                    compileTypeExpression bm (Just $ SetModifier "int32")
+                    compileTypeExpression bm (Just $ SetModifier "float32")
             standardImports ctx'' `shouldBe`
                 [builtinsPair, ("_typing", "typing")]
             localImports ctx'' `shouldBe` []
-            c'' `shouldBe` Right "_typing.AbstractSet[__builtin__.int]"
+            c'' `shouldBe` Right "_typing.AbstractSet[__builtin__.float]"
         specify "ListModifier" $ do
             let (c''', ctx''') = run' $
-                    compileTypeExpression bm (Just $ ListModifier "int32")
+                    compileTypeExpression bm (Just $ ListModifier "float64")
             standardImports ctx''' `shouldBe`
                 [builtinsPair, ("_typing", "typing")]
             localImports ctx''' `shouldBe` []
-            c''' `shouldBe` Right "_typing.Sequence[__builtin__.int]"
+            c''' `shouldBe` Right "_typing.Sequence[__builtin__.float]"
         specify "MapModifier" $ do
-            let (c'''', ctx'''') = run' $
-                    compileTypeExpression bm (Just $ MapModifier "uuid" "int32")
+            let (c'''', ctx'''') = run' $ compileTypeExpression bm $
+                    Just $ MapModifier "uuid" "binary"
             standardImports ctx'''' `shouldBe`
                 [builtinsPair, ("_typing", "typing"), ("_uuid", "uuid")]
             localImports ctx'''' `shouldBe` []
             c'''' `shouldBe`
-                Right "_typing.Mapping[_uuid.UUID, __builtin__.int]"
+                Right "_typing.Mapping[_uuid.UUID, __builtin__.bytes]"

@@ -776,6 +776,23 @@ class #{className}(object):
                 field_type = field_types[name]
             except KeyError:
                 continue
+            if (field_type.__module__ == 'numbers' and
+                field_type.__name__ == 'Integral'):
+                # FIXME: deserialize_meta() cannot determine the Nirum type
+                # from the given Python class, since there are 1:N relationships
+                # between Nirum types and Python classes.  A Python class can
+                # have more than one corresponds and numbers.Integral is
+                # the case: bigint, int32, and int64 all corresponds to
+                # numbers.Integral (on Python 2).
+                # It's the essential reason why we should be free from
+                # deserialize_meta() and generate actual deserializer code
+                # for each field instead.
+                # See also: https://github.com/spoqa/nirum/issues/160
+                try:
+                    args[name] = int(item)
+                except ValueError as e:
+                    errors.add('%s: %s' % (attribute_name, e))
+                continue
             try:
                 args[name] = deserialize_meta(field_type, item)
             except ValueError as e:

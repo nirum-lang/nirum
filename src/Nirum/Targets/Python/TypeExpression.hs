@@ -56,15 +56,15 @@ compilePrimitiveType primitiveTypeIdentifier' = do
     pyVer <- getPythonVersion
     case (primitiveTypeIdentifier', pyVer) of
         (Bool, _) -> builtins "bool"
-        (Bigint, _) -> builtins "int"
+        (Bigint, Python2) -> do
+            numbers <- importStandardLibrary "numbers"
+            return [qq|$numbers.Integral|]
+        (Bigint, Python3) -> builtins "int"
         (Decimal, _) -> do
             decimal <- importStandardLibrary "decimal"
             return [qq|$decimal.Decimal|]
-        (Int32, _) -> builtins "int"
-        (Int64, Python2) -> do
-            numbers <- importStandardLibrary "numbers"
-            return [qq|$numbers.Integral|]
-        (Int64, Python3) -> builtins "int"
+        (Int32, _) -> compilePrimitiveType Bigint
+        (Int64, _) -> compilePrimitiveType Bigint
         (Float32, _) -> builtins "float"
         (Float64, _) -> builtins "float"
         (Text, Python2) -> builtins "unicode"
