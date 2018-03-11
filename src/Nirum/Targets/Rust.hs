@@ -86,13 +86,9 @@ compilePackage' package =
     resolveWithModulePath :: ModulePath -> Maybe (BoundModule Rust)
     resolveWithModulePath mp = resolveBoundModule mp package
     modules' :: [RustModule]
-    modules' = libModule : [ RustModule { filePath = toFilePath $ toList mp
-                                        , modPath = mp
-                                        , children = childModules expanded' mp
-                                        }
-                           | mp <- toList expanded' ]
+    modules' = libModule : map (toRustModule expanded') (toList expanded')
     expanded' = hierarchies $ S.fromList $ MS.keys $ modules package
-    libModule = RustModule { filePath = toFilePath []
+    libModule = RustModule { filePath = toFilePath True ["lib"]
                            , modPath = ["lib"]
                            , children = S.map root expanded'
                            }
@@ -102,11 +98,21 @@ childModules modPaths base = fromMaybe mempty $ getOption $ foldMap f modPaths
   where
     f = Option . fmap (S.singleton . root) . stripPrefix base
 
-toFilePath :: [I.Identifier] -> FilePath
-toFilePath [] = joinPath ["src", "lib.rs"]
-toFilePath p = joinPath (["src"] ++ convert p ++ ["mod.rs"])
+toFilePath :: Bool -> ModulePath -> FilePath
+toFilePath isLeaf p  = joinPath ("src" : converted) ++ ".rs"
   where
-    convert = map (T.unpack . toRustIdentifier I.toSnakeCaseText)
+    convert = map (toRustIdentifier I.toSnakeCaseText) . toList
+    converted = map T.unpack $ convert p ++ (if isLeaf then [] else ["mod"])
+
+toRustModule :: Foldable f => f ModulePath -> ModulePath -> RustModule
+toRustModule modPaths mp = RustModule { filePath = filePath'
+                                      , modPath = mp
+                                      , children = children'
+                                      }
+  where
+    children' = childModules modPaths mp
+    isLeaf = S.null children'
+    filePath' = toFilePath isLeaf mp
 
 instance Target Rust where
     type CompileResult Rust = Code
