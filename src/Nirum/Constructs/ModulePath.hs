@@ -8,10 +8,14 @@ module Nirum.Constructs.ModulePath ( ModulePath ( ModuleName
                                    , fromIdentifiers
                                    , hierarchy
                                    , hierarchies
+                                   , isPrefixOf
                                    , replacePrefix
+                                   , root
+                                   , stripPrefix
                                    ) where
 
 import Data.Char (toLower)
+import qualified Data.List as L
 import Data.Maybe (fromMaybe, mapMaybe)
 import GHC.Exts (IsList (Item, fromList, toList))
 
@@ -64,6 +68,9 @@ hierarchy m@(ModulePath parent _) = m `S.insert` hierarchy parent
 hierarchies :: S.Set ModulePath -> S.Set ModulePath
 hierarchies modulePaths = S.unions $ toList $ S.map hierarchy modulePaths
 
+isPrefixOf :: ModulePath -> ModulePath -> Bool
+a `isPrefixOf` b = toList a `L.isPrefixOf` toList b
+
 replacePrefix :: ModulePath -> ModulePath -> ModulePath -> ModulePath
 replacePrefix from to path'
  | path' == from = to
@@ -71,11 +78,22 @@ replacePrefix from to path'
                    ModuleName {} -> path'
                    ModulePath p n -> ModulePath (replacePrefix from to p) n
 
+root :: ModulePath -> Identifier
+root = head . toList
+
+stripPrefix :: ModulePath -> ModulePath -> Maybe ModulePath
+stripPrefix a b = do
+    stripped <- L.stripPrefix (toList a) (toList b)
+    case stripped of
+        [] -> Nothing
+        xs -> Just $ fromList xs
 
 instance IsList ModulePath where
     type Item ModulePath = Identifier
     fromList identifiers =
         fromMaybe (error "ModulePath cannot be empty")
                   (fromIdentifiers identifiers)
-    toList (ModuleName identifier) = [identifier]
-    toList (ModulePath path' identifier) = toList path' ++ [identifier]
+    toList mp = toList' mp []
+      where
+        toList' (ModuleName identifier) xs = identifier:xs
+        toList' (ModulePath path' identifier) xs = toList' path' (identifier:xs)
