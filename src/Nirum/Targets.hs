@@ -38,6 +38,7 @@ import Nirum.Targets.List (targetProxyMapQ)
 -- CHECK: When a new target `Nirum.Targets.X` is added, write docs for it in
 -- docs/target/x.md file too.
 import Nirum.Targets.Docs ()
+import Nirum.Targets.Elm ()
 import Nirum.Targets.Python ()
 
 data BuildError = TargetNameError TargetName

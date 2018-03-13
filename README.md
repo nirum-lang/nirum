@@ -92,14 +92,16 @@ For more infomration, use `--help` option:
     $ nirum --help
     Nirum: The IDL compiler and RPC/distributed object framework
 
-    Usage: nirum [-v|--version] (-o|--output-dir DIR) (-t|--target TARGET) DIR
+    Usage: nirum [-v|--version] (-o|--output-dir DIR) (-t|--target TARGET)
+                 [-w|--watch] DIR
       Nirum compiler 0.4.0
 
     Available options:
       -h,--help                Show this help text
       -v,--version             Show version
       -o,--output-dir DIR      Output directory
-      -t,--target TARGET       Target language name. Available: docs, python
+      -t,--target TARGET       Target language name. Available: docs, elm, python
+      -w,--watch               Watch files for change and rebuild
       DIR                      Package directory
 
 There is a [step-by-step tutorial](./docs/tutorial.md) as well.
