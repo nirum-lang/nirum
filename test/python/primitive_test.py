@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import enum
+import uuid
 
 from pytest import raises
 from nirum.service import Service
@@ -8,7 +9,8 @@ from six import PY3
 from fixture.foo import (Album, CultureAgnosticName, Dog,
                          EastAsianName, EvaChar,
                          FloatUnbox, Gender, ImportedTypeUnbox, Irum,
-                         Line, MixedName, Mro, Music, NoMro, NullService,
+                         Line, MixedName, Mro, Music, NoMro,
+                         NameShadowingFieldRecord, NullService,
                          Person, People,
                          Point1, Point2, Point3d, Pop, PingService, Product,
                          RecordWithMap, RecordWithOptionalRecordField,
@@ -17,6 +19,7 @@ from fixture.foo import (Album, CultureAgnosticName, Dog,
                          WesternName)
 from fixture.foo.bar import PathUnbox, IntUnbox, Point
 from fixture.qux import Path, Name
+from fixture.types import UuidList
 
 
 def test_float_unbox():
@@ -29,8 +32,8 @@ def test_float_unbox():
     assert {float_unbox, float_unbox, float1} == {float_unbox, float1}
     assert float_unbox.__nirum_serialize__() == 3.14
     assert FloatUnbox.__nirum_deserialize__(3.14) == float_unbox
-    assert hash(float_unbox)
-    assert hash(float_unbox) != 3.14
+    assert hash(float_unbox) == hash(FloatUnbox(3.14))
+    assert hash(float_unbox) != hash(float1)
     with raises(ValueError):
         FloatUnbox.__nirum_deserialize__('a')
     with raises(TypeError):
@@ -69,6 +72,20 @@ def test_boxed_alias():
     assert Irum.__nirum_deserialize__(u'khj') == Irum(u'khj')
 
 
+def test_unboxed_list():
+    assert list(UuidList([]).value) == []
+    uuids = [uuid.uuid1() for _ in range(3)]
+    assert list(UuidList(uuids).value) == uuids
+    with raises(TypeError) as ei:
+        UuidList(['not uuid'])
+    assert (str(ei.value) ==
+            "expected typing.Sequence[uuid.UUID], not ['not uuid']")
+    with raises(TypeError) as ei:
+        UuidList(uuids + ['not uuid'])
+    assert str(ei.value) == \
+        "expected typing.Sequence[uuid.UUID], not %r" % (uuids + ['not uuid'])
+
+
 def test_enum():
     assert type(Gender) is enum.EnumMeta
     assert set(Gender) == {Gender.male, Gender.female}
@@ -102,7 +119,9 @@ def test_record():
     assert point != Point1(left=4, top=14)
     assert point != Point1(left=4, top=15)
     assert point != 'foo'
-    assert hash(Point1(left=3, top=14))
+    assert hash(point) == hash(Point1(left=3, top=14))
+    assert hash(point) != hash(Point1(left=0, top=14))
+    assert hash(point) != hash(Point1(left=3, top=0))
     point_serialized = {'_type': 'point1', 'x': 3, 'top': 14}
     assert point.__nirum_serialize__() == point_serialized
     assert Point1.__nirum_deserialize__(point_serialized) == point
@@ -124,6 +143,7 @@ top: invalid literal for int() with base 10: 'b'\
         Point1(left='a', top=1)
     with raises(TypeError):
         Point1(left='a', top='b')
+    assert repr(point) == 'fixture.foo.Point1(left=3, top=14)'
     assert isinstance(Point2, type)
     int_three = IntUnbox(3)
     int_four_teen = IntUnbox(14)
@@ -135,6 +155,9 @@ top: invalid literal for int() with base 10: 'b'\
     assert point2 != Point2(left=IntUnbox(4), top=IntUnbox(14))
     assert point2 != Point2(left=IntUnbox(4), top=IntUnbox(15))
     assert point2 != 'foo'
+    assert hash(point2) == hash(Point2(left=IntUnbox(3), top=IntUnbox(14)))
+    assert hash(point2) != hash(Point2(left=IntUnbox(0), top=IntUnbox(14)))
+    assert hash(point2) != hash(Point2(left=IntUnbox(3), top=IntUnbox(0)))
     point2_serialize = {'_type': 'point2', 'left': 3, 'top': 14}
     assert point2.__nirum_serialize__() == point2_serialize
     assert Point2.__nirum_deserialize__(point2_serialize) == point2
@@ -154,6 +177,10 @@ top: invalid literal for int() with base 10: 'b'\
         Point2(left=IntUnbox(1), top='a')
     with raises(TypeError):
         Point2(left=IntUnbox(1), top=2)
+    assert repr(point2) == (
+        'fixture.foo.Point2(left=fixture.foo.bar.IntUnbox(3), '
+        'top=fixture.foo.bar.IntUnbox(14))'
+    )
     assert isinstance(Point3d, type)
     point3d = Point3d(xy=Point(x=1, y=2), z=3)
     assert point3d.xy == Point(x=1, y=2)
@@ -169,6 +196,8 @@ top: invalid literal for int() with base 10: 'b'\
     }
     assert point3d.__nirum_serialize__() == point3d_serialize
     assert Point3d.__nirum_deserialize__(point3d_serialize) == point3d
+    assert (repr(point3d) ==
+            'fixture.foo.Point3d(xy=fixture.foo.bar.Point(x=1, y=2), z=3)')
 
     # Optional fields can be empty
     r = RecordWithOptionalRecordField(f=None)
@@ -228,7 +257,16 @@ def test_union():
                                        middle_name=u'wrong',
                                        last_name=u'wrong')
     assert hash(WesternName(first_name=u'foo', middle_name=u'bar',
-                            last_name=u'baz'))
+                            last_name=u'baz')) == hash(western_name)
+    assert hash(western_name) != hash(
+        WesternName(first_name=u'', middle_name=u'bar', last_name=u'baz')
+    )
+    assert hash(western_name) != hash(
+        WesternName(first_name=u'foo', middle_name=u'', last_name=u'baz')
+    )
+    assert hash(western_name) != hash(
+        WesternName(first_name=u'foo', middle_name=u'bar', last_name=u'')
+    )
     if PY3:
         assert repr(western_name) == (
             "fixture.foo.MixedName.WesternName(first_name='foo', "
@@ -444,3 +482,61 @@ def test_map_serializer():
             },
         ],
     }
+
+
+def test_name_shadowing_field():
+    NameShadowingFieldRecord(
+        typing={u'a': [u'b', u'c']},
+        collections={u'a': {u'b', u'c'}},
+        numbers=1234,
+        uuid=uuid.uuid4(),
+        bytes=b'binary',
+    )
+    with raises(TypeError) as ei:
+        NameShadowingFieldRecord(
+            typing={u'invalid'},
+            collections={u'a': {u'b', u'c'}},
+            numbers=1234,
+            uuid=uuid.uuid4(),
+            bytes=b'binary',
+        )
+    assert str(ei.value).startswith('typing must be a value of typing.Mapping')
+    with raises(TypeError) as ei:
+        NameShadowingFieldRecord(
+            typing={u'a': [u'b', u'c']},
+            collections={u'invalid'},
+            numbers=1234,
+            uuid=uuid.uuid4(),
+            bytes=b'binary',
+        )
+    assert str(ei.value).startswith(
+        'collections must be a value of typing.Mapping['
+    )
+    with raises(TypeError):
+        NameShadowingFieldRecord(
+            typing={u'a': [u'b', u'c']},
+            collections={u'a': {u'b', u'c'}},
+            numbers='invalid',
+            uuid=uuid.uuid4(),
+            bytes=b'binary',
+        )
+    with raises(TypeError) as ei:
+        NameShadowingFieldRecord(
+            typing={u'a': [u'b', u'c']},
+            collections={u'a': {u'b', u'c'}},
+            numbers=1234,
+            uuid='invalid',
+            bytes=b'binary',
+        )
+    assert str(ei.value) == "uuid must be a value of uuid.UUID, not 'invalid'"
+    with raises(TypeError) as ei:
+        NameShadowingFieldRecord(
+            typing={u'a': [u'b', u'c']},
+            collections={u'a': {u'b', u'c'}},
+            numbers=1234,
+            uuid=uuid.uuid4(),
+            bytes=['invalid'],
+        )
+    assert "bytes must be a value of {0}, not ['invalid']".format(
+        'bytes' if PY3 else 'str'
+    ) == str(ei.value)

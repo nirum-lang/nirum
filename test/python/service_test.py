@@ -1,6 +1,7 @@
 import uuid
 
 from nirum.transport import Transport
+from pytest import raises
 from six import PY2
 
 from fixture.foo import (Dog, Gender, PingService, Product, RpcError,
@@ -85,6 +86,44 @@ def test_service_client_payload_serialization():
         'g': 1234,
         'hh': 'text data',
     }
+
+
+def test_service_client_validation():
+    """https://github.com/spoqa/nirum/issues/220"""
+    t = DumbTransport()
+    c = SampleService.Client(t)
+    kwargs = dict(
+        a=Dog(name=u'Dog.name', age=3),
+        b=Product(name=u'Product.name', sale=False),
+        c=Gender.female,
+        d=Way(u'way/path/text'),
+        e=uuid.UUID('F7DB93E3-731E-48EF-80A2-CAC81E02F1AE'),
+        f=b'binary data',
+        g=1234,
+        h=u'text data'
+    )
+    c.sample_method(**kwargs)  # ok
+
+    # Missing argument raises TypeError
+    missing_arg = dict(kwargs)
+    del missing_arg['a']
+    with raises(TypeError):
+        c.sample_method(**missing_arg)
+
+    # Passing a value of unmatched type raises TypeError
+    unmatched_type = dict(kwargs, g='not bigint')
+    with raises(TypeError):
+        c.sample_method(**unmatched_type)
+
+    # Passing None to non-optional parameter raises TypeError
+    passing_none = dict(kwargs, a=None)
+    with raises(TypeError):
+        c.sample_method(**passing_none)
+
+    # Passing integer greater than 2^31-1 raises ValueError
+    pc = PingService.Client(t)
+    with raises(ValueError):
+        pc.no_return_method(0x80000000)
 
 
 def test_service_client_representation():

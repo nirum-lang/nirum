@@ -23,9 +23,38 @@ To be released.
         classes.  Nirum type names are qualified and their leading module paths
         are also normalized (the same rule to `nirum.modules` applies here).
 
+ -  All integral types (`int32`, `int64`, and `bigint`) became represented
+    as [`numbers.Integral`][python2-numbers-integral] instead of
+    [`int`][python2-int].
+
+    There's no change to Python 3.
+
+ -  The `uri` type became represented as [`basestring`][python2-basestring]
+    instead of [`unicode`][python2-unicode] in Python 2, since URI (unlike IRI)
+    is limited to a subset of ASCII character set.
+
+    There's no change to Python 3.
+
+ -  Generated type constructors became to validate field value's range or format
+    besides class checks: range checks for `int32`/`int64`, time zone
+    (``tzinfo``) awareness check for `datetime`, and basic format check for
+    `uri`.
+
+ -  Fixed a bug that generated service methods hadn't checked its arguments
+    before its transport sends a payload.  [[#220]]
+
+ -  Fixed a bug that field/parameter names that use a module name of the Python
+    standard library cause runtime `TypeError`s (due to name shadowing).
+    Under the hood, all generated `import`s are now aliased with a name prefixed
+    an underscore.
+
 [#13]: https://github.com/spoqa/nirum/issues/13
+[#220]: https://github.com/spoqa/nirum/issues/220
 [#227]: https://github.com/spoqa/nirum/pull/227
 [entry points]: https://setuptools.readthedocs.io/en/latest/pkg_resources.html#entry-points
+[python2-numbers-integral]: https://docs.python.org/2/library/numbers.html#numbers.Integral
+[python2-basestring]: https://docs.python.org/2/library/functions.html#basestring
+[python2-unicode]: https://docs.python.org/2/library/functions.html#unicode
 
 
 Version 0.3.1

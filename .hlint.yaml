@@ -55,6 +55,7 @@
     within:
     - Nirum.Parser
     - Nirum.ParserSpec
+    - Nirum.Targets.Python.CodeGenSpec
 - ignore: {name: Unnecessary hiding}
 
 

@@ -33,12 +33,12 @@ compileTypeExpression mod' (Just (TypeIdentifier i)) =
 compileTypeExpression mod' (Just (MapModifier k v)) = do
     kExpr <- compileTypeExpression mod' (Just k)
     vExpr <- compileTypeExpression mod' (Just v)
-    insertStandardImport "typing"
-    return [qq|typing.Mapping[$kExpr, $vExpr]|]
+    typing <- importStandardLibrary "typing"
+    return [qq|$typing.Mapping[$kExpr, $vExpr]|]
 compileTypeExpression mod' (Just modifier) = do
     expr <- compileTypeExpression mod' (Just typeExpr)
-    insertStandardImport "typing"
-    return [qq|typing.$className[$expr]|]
+    typing <- importStandardLibrary "typing"
+    return [qq|$typing.$className[$expr]|]
   where
     typeExpr :: TypeExpression
     className :: Text
@@ -55,27 +55,34 @@ compilePrimitiveType :: PrimitiveTypeIdentifier -> CodeGen Code
 compilePrimitiveType primitiveTypeIdentifier' = do
     pyVer <- getPythonVersion
     case (primitiveTypeIdentifier', pyVer) of
-        (Bool, _) -> return "bool"
-        (Bigint, _) -> return "int"
+        (Bool, _) -> builtins "bool"
+        (Bigint, Python2) -> do
+            numbers <- importStandardLibrary "numbers"
+            return [qq|$numbers.Integral|]
+        (Bigint, Python3) -> builtins "int"
         (Decimal, _) -> do
-            insertStandardImport "decimal"
-            return "decimal.Decimal"
-        (Int32, _) -> return "int"
-        (Int64, Python2) -> do
-            insertStandardImport "numbers"
-            return "numbers.Integral"
-        (Int64, Python3) -> return "int"
-        (Float32, _) -> return "float"
-        (Float64, _) -> return "float"
-        (Text, Python2) -> return "unicode"
-        (Text, Python3) -> return "str"
-        (Binary, _) -> return "bytes"
+            decimal <- importStandardLibrary "decimal"
+            return [qq|$decimal.Decimal|]
+        (Int32, _) -> compilePrimitiveType Bigint
+        (Int64, _) -> compilePrimitiveType Bigint
+        (Float32, _) -> builtins "float"
+        (Float64, _) -> builtins "float"
+        (Text, Python2) -> builtins "unicode"
+        (Text, Python3) -> builtins "str"
+        (Binary, _) -> builtins "bytes"
         (Date, _) -> do
-            insertStandardImport "datetime"
-            return "datetime.date"
+            datetime <- importStandardLibrary "datetime"
+            return [qq|$datetime.date|]
         (Datetime, _) -> do
-            insertStandardImport "datetime"
-            return "datetime.datetime"
-        (Uuid, _) -> insertStandardImport "uuid" >> return "uuid.UUID"
-        (Uri, Python2) -> return "unicode"
-        (Uri, Python3) -> return "str"
+            datetime <- importStandardLibrary "datetime"
+            return [qq|$datetime.datetime|]
+        (Uuid, _) -> do
+            uuid <- importStandardLibrary "uuid"
+            return [qq|$uuid.UUID|]
+        (Uri, Python2) -> builtins "basestring"
+        (Uri, Python3) -> builtins "str"
+  where
+    builtins :: Code -> CodeGen Code
+    builtins typename' = do
+        builtinsMod <- importBuiltins
+        return [qq|$builtinsMod.$typename'|]
