@@ -140,6 +140,8 @@ Have you kicked off a new project related to Nirum?  Please add *nirum*
          Nirum HTTP transport for Python.
      -   [nirum-python-wsgi](https://github.com/spoqa/nirum-python-wsgi):
          Adapt Nirum services to WSGI apps.
+ -  [elm-nirum](https://github.com/spoqa/elm-nirum): The official Elm runtime
+    library for Nirum.
 
 ### Editor supports
 
