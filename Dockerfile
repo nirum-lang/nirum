@@ -4,11 +4,11 @@
 FROM alpine:3.7 AS build
 
 RUN apk add --no-cache \
-        bash=4.4.19-r1 \
-        build-base=0.5-r0 \
-        curl=7.58.0-r0 \
-        ghc=8.0.2-r6 \
-        zlib-dev=1.2.11-r1
+        bash~4.4.19 \
+        build-base~0.5 \
+        curl~7.58.0 \
+        ghc~8.0.2 \
+        zlib-dev~1.2.11
 RUN curl -sSL https://get.haskellstack.org/ | bash
 
 RUN stack config set system-ghc --global true
@@ -33,7 +33,7 @@ RUN stack build --flag nirum:static --copy-bins
 
 FROM alpine:3.7
 
-RUN apk add --no-cache bash=4.4.19-r1
+RUN apk add --no-cache bash~4.4.19
 
 RUN mkdir -p /bin
 COPY --from=build /root/.local/bin/nirum /bin/

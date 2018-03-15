@@ -6,6 +6,10 @@ Version 0.3.2
 
 To be released.
 
+### Et cetera
+
+ -  Fixed a broken build of the official Docker images.
+
 
 Version 0.3.1
 -------------
