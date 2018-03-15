@@ -6,6 +6,10 @@ Version 0.3.3
 
 To be released.
 
+### Et cetera
+
+ -  The official Docker images became to have CA certificates.
+
 
 Version 0.3.2
 -------------
