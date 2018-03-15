@@ -6,6 +6,7 @@ FROM alpine:3.7 AS build
 RUN apk add --no-cache \
         bash~4.4.19 \
         build-base~0.5 \
+        ca-certificates \
         curl~7.58.0 \
         ghc~8.0.2 \
         zlib-dev~1.2.11
@@ -33,7 +34,7 @@ RUN stack build --flag nirum:static --copy-bins
 
 FROM alpine:3.7
 
-RUN apk add --no-cache bash~4.4.19
+RUN apk add --no-cache bash~4.4.19 ca-certificates
 
 RUN mkdir -p /bin
 COPY --from=build /root/.local/bin/nirum /bin/

@@ -57,6 +57,16 @@ To be released.
 [python2-unicode]: https://docs.python.org/2/library/functions.html#unicode
 
 
+Version 0.3.3
+-------------
+
+Released on March 15, 2018.
+
+### Et cetera
+
+ -  The official Docker images became to have CA certificates.
+
+
 Version 0.3.2
 -------------
 
