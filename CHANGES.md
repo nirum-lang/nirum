@@ -4,7 +4,7 @@ Nirum changelog
 Version 0.3.2
 -------------
 
-To be released.
+Released on March 15, 2018.
 
 ### Et cetera
 
