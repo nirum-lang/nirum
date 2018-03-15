@@ -57,6 +57,16 @@ To be released.
 [python2-unicode]: https://docs.python.org/2/library/functions.html#unicode
 
 
+Version 0.3.2
+-------------
+
+Released on March 15, 2018.
+
+### Et cetera
+
+ -  Fixed a broken build of the official Docker images.
+
+
 Version 0.3.1
 -------------
 
