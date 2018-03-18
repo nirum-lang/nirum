@@ -66,5 +66,10 @@ Translation
     E.g., `record point (float32 x, float32 y);` becomes to
     `type Point = Point { x : Float, y : Float }`.
 
+ -  A `union` type is translated in the same way to a `record` type, but with
+    multiple constructors.  Each constructor corresponds to a `union` tag.
+    E.g., `union user = anonymous | named ( text name );` becomes
+    `type User = Anonymous | Named { name : String }`.
+
  -  An `alias` to a type is translated to a `type alias`,
     e.g., `type foo-bar = text;` becomes `type alias FooBar = String`.

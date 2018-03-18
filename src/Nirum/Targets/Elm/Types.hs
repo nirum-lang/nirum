@@ -1,6 +1,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 module Nirum.Targets.Elm.Types (compileType) where
 
+import Control.Monad
 import GHC.Exts (IsList (..))
 
 import Text.Blaze (Markup)
@@ -70,5 +71,43 @@ type #{toPascalCaseText fTypename}
         }
 |]
 
-compileType _ _ =
+compileType boundModule
+            TypeDeclaration { type' = union@UnionType {}
+                            , typename = Name { facialName = fTypename}
+                            } = do
+    tags' <- forM (toList $ tags union) $ \ (Tag (Name tName _) fields' _) -> do
+        let fields'' = toList fields'
+        fieldTypeExprs <- mapM (compileTypeExpression boundModule . fieldType)
+                               fields''
+        let fieldNames = fmap (facialName . fieldName) fields''
+        return (tName, zip fieldNames fieldTypeExprs)
+    return [compileText|
+type #{toPascalCaseText fTypename}
+%{ forall (i, (tagName, fields')) <- enumerate tags' }
+%{ if i < 1 }
+    = #{toPascalCaseText tagName}
+%{ else }
+    | #{toPascalCaseText tagName}
+%{ endif }
+%{ if not (null fields') }
+%{ forall (j, (fName, fTypeExpr)) <- enumerate fields' }
+%{ if j < 1 }
+        { #{toCamelCaseText fName} : #{fTypeExpr}
+%{ else }
+        , #{toCamelCaseText fName} : #{fTypeExpr}
+%{ endif }
+%{ endforall }
+        }
+%{ endif }
+%{ endforall }
+|]
+
+compileType _ TypeDeclaration { type' = PrimitiveType {} } =
+    -- Must never happen.
+    error "unexpected error during trying to compile a primitive ttype"
+
+compileType _ ServiceDeclaration {} =
+    return [compileText||]
+
+compileType _ Import {} =
     return [compileText||]
