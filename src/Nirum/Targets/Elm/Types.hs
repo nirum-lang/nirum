@@ -16,6 +16,15 @@ import Nirum.TypeInstance.BoundModule
 
 compileType :: BoundModule Elm -> TypeDeclaration -> CodeGen Markup
 
+compileType boundModule
+            TypeDeclaration { type' = Alias canon
+                            , typename = Name { facialName = fName}
+                            } = do
+    typeExpr <- compileTypeExpression boundModule canon
+    return [compileText|
+type alias #{toPascalCaseText fName} = #{typeExpr}
+|]
+
 compileType _ TypeDeclaration { type' = EnumType members'
                               , typename = Name { facialName = fName}
                               } =

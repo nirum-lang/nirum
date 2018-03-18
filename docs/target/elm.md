@@ -59,3 +59,6 @@ Translation
     no field.  Each constructor corresponds to a `enum` member.
     E.g., `enum business-entity = ltd | inc;` becomes
     `type BusinessEntity = Ltd | Inc`.
+
+ -  An `alias` to a type is translated to a `type alias`,
+    e.g., `type foo-bar = text;` becomes `type alias FooBar = String`.
