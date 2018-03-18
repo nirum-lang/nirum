@@ -60,5 +60,11 @@ Translation
     E.g., `enum business-entity = ltd | inc;` becomes
     `type BusinessEntity = Ltd | Inc`.
 
+ -  A `record` type becomes a `type` with a single constructor which has
+    the same name to the type.  A constructor has a parameter of a record,
+    and the record consits of fields (in Elm) mapped to fields (in Nirum).
+    E.g., `record point (float32 x, float32 y);` becomes to
+    `type Point = Point { x : Float, y : Float }`.
+
  -  An `alias` to a type is translated to a `type alias`,
     e.g., `type foo-bar = text;` becomes `type alias FooBar = String`.

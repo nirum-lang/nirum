@@ -49,5 +49,26 @@ type #{toPascalCaseText fName}
     = #{toPascalCaseText fName} (#{typeExpr})
 |]
 
+compileType boundModule
+            TypeDeclaration { type' = RecordType fields'
+                            , typename = Name { facialName = fTypename}
+                            } = do
+    let fieldList = toList fields'
+    fieldTypeExprs <- mapM (compileTypeExpression boundModule . fieldType)
+                           fieldList
+    let fieldNames = fmap (facialName . fieldName) fieldList
+    return [compileText|
+type #{toPascalCaseText fTypename}
+    = #{toPascalCaseText fTypename}
+%{ forall (i, (fName, fTypeExpr)) <- enumerate (zip fieldNames fieldTypeExprs) }
+%{ if i < 1 }
+        { #{toCamelCaseText fName} : #{fTypeExpr}
+%{ else }
+        , #{toCamelCaseText fName} : #{fTypeExpr}
+%{ endif }
+%{ endforall }
+        }
+|]
+
 compileType _ _ =
     return [compileText||]
