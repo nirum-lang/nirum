@@ -11,6 +11,9 @@ To be released.
  -  Union tags became possible to have `default` keyword.  It's useful
     for migrating a record type to a union type.  [[#13], [#227]]
 
+ -  Added aliased import.  It's handy to avoid a module name shadowing.
+    [[#217]]
+
  -  Enum members and union tags became disallowed to shadow an other type name
     in a module.  It's because in some target languages we compile both types
     and members/tags into objects that share the same namespace.  In Python,
@@ -170,6 +173,7 @@ To be released.
     March 2018.
 
 [#13]: https://github.com/spoqa/nirum/issues/13
+[#217]: https://github.com/spoqa/nirum/issues/217
 [#220]: https://github.com/spoqa/nirum/issues/220
 [#227]: https://github.com/spoqa/nirum/pull/227
 [#253]: https://github.com/spoqa/nirum/pull/253
