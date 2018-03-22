@@ -1,18 +1,23 @@
 # To correctly make a statically-linked binary, we use Alpine Linux.
 # The distro entirely uses musl instead of glibc which is unfriendly to be
 # statically linked.
-FROM alpine:3.7 AS build
+FROM bitnami/minideb:jessie AS build
 
-RUN apk add --no-cache \
-        bash~4.4.19 \
-        build-base~0.5 \
-        ca-certificates \
-        curl~7.58.0 \
-        ghc~8.0.2 \
-        zlib-dev~1.2.11
-RUN curl -sSL https://get.haskellstack.org/ | bash
+ARG APT_REPOSITORY
 
-RUN stack config set system-ghc --global true
+RUN if [ "${APT_REPOSITORY}" != "" ]; then \
+        sed -i 's|http://httpredir\.debian\.org/debian|'"${APT_REPOSITORY}|" \
+        /etc/apt/sources.list; \
+    fi
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+            build-essential ca-certificates curl \
+    && \
+    rm -rf /var/lib/apt/lists/*
+RUN apt-get update && \
+    curl -sSL https://get.haskellstack.org/ | sh && \
+    rm -rf /var/lib/apt/lists/*
 
 # Add just the package.yaml file to capture dependencies
 COPY package.yaml /src/nirum/package.yaml
@@ -32,9 +37,9 @@ COPY . /src/nirum
 RUN mkdir -p "/root/.local/bin"
 RUN stack build --flag nirum:static --copy-bins
 
-FROM alpine:3.7
+FROM bitnami/minideb:jessie
 
-RUN apk add --no-cache bash~4.4.19 ca-certificates
+RUN install_packages bash ca-certificates
 
 RUN mkdir -p /bin
 COPY --from=build /root/.local/bin/nirum /bin/
