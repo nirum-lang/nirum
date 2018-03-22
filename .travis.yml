@@ -151,20 +151,19 @@ notifications:
 before_deploy:
 - mkdir -p /tmp/nirum-build
 - export NIGHTLY_BINARY_PATH="/tmp/nirum-build/nirum-$(uname -s | tr '[A-Z]' '[a-z]')-$(uname -m)"
+- echo "$NIGHTLY_BINARY_PATH"
+- stack clean --no-terminal
+- stack build --no-terminal --copy-bins --flag nirum:static
+- ls -al "$(stack path --local-bin)/nirum"
+- cp "$(stack path --local-bin)/nirum" "$NIGHTLY_BINARY_PATH"
+- ls -al "$(dirname "$NIGHTLY_BINARY_PATH")"
+- ls -al "$NIGHTLY_BINARY_PATH"
+- chmod +x "$NIGHTLY_BINARY_PATH"
 - |
   if [[ "$TRAVIS_OS_NAME" = "linux" ]]; then
-    docker build -t nirum .
-    docker run --entrypoint /bin/cat nirum /bin/nirum > "$NIGHTLY_BINARY_PATH"
-    chmod +x "$NIGHTLY_BINARY_PATH"
     upx-ucl -9 "$NIGHTLY_BINARY_PATH"
-  elif [[ "$TRAVIS_OS_NAME" = "osx" ]]; then
-    stack clean --no-terminal
-    stack build --no-terminal --copy-bins --flag nirum:static
-    ls -al "$(stack path --local-bin)/nirum"
-    cp "$(stack path --local-bin)/nirum" "$NIGHTLY_BINARY_PATH"
-    ls -al /tmp/nirum-build
   fi
-  ls -al "$NIGHTLY_BINARY_PATH"
+- ls -al "$NIGHTLY_BINARY_PATH"
 
 deploy:
 

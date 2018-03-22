@@ -50,6 +50,8 @@ To be released.
 
 ### Et cetera
 
+ -  The officially distributed executable binaries for Linux became
+    dependent on [glibc] again.
  -  The official Docker images became based on Debian ([minideb]) instead of
     Alpine Linux.  It's because Alpine Linux doesn't provide GHC 8.2 as of
     March 2018.
@@ -61,6 +63,7 @@ To be released.
 [python2-numbers-integral]: https://docs.python.org/2/library/numbers.html#numbers.Integral
 [python2-basestring]: https://docs.python.org/2/library/functions.html#basestring
 [python2-unicode]: https://docs.python.org/2/library/functions.html#unicode
+[glibc]: https://www.gnu.org/software/libc/
 [minideb]: https://hub.docker.com/r/bitnami/minideb/
 
 
