@@ -3,3 +3,6 @@ version = "0.3.0"
 [targets.python]
 name = "nirum-examples"
 minimum_runtime = "0.3.9"
+
+[targets.docs]
+title = "Nirum Examples"

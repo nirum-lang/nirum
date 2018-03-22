@@ -52,12 +52,15 @@ import Nirum.Package.Metadata ( Author (Author, email, name, uri)
                                        , targetName
                                        , toByteString
                                        )
+                              , stringField
                               )
 import qualified Nirum.Package.ModuleSet as MS
 import Nirum.TypeInstance.BoundModule
 import Nirum.Version (versionText)
 
-data Docs = Docs deriving (Eq, Ord, Show)
+newtype Docs = Docs
+    { docsTitle :: T.Text
+    } deriving (Eq, Ord, Show)
 
 type Error = T.Text
 
@@ -104,8 +107,8 @@ $case expr'
 |]
 
 module' :: BoundModule Docs -> Html
-module' docsModule = layout pkg depth path $ [shamlet|
-    $maybe tit <- title
+module' docsModule = layout pkg depth title $ [shamlet|
+    $maybe tit <- headingTitle
         <h1><code>#{path}</code>
         <p>#{tit}
     $nothing
@@ -121,6 +124,8 @@ module' docsModule = layout pkg depth path $ [shamlet|
     pkg = boundPackage docsModule
     path :: T.Text
     path = toCode docsModulePath
+    title :: T.Text
+    title = T.concat [path, " \8212 ", docsTitle $ target pkg]
     types' :: [(Identifier, TD.TypeDeclaration)]
     types' = [ (facialName $ DE.name decl, decl)
              | decl <- DES.toList $ boundTypes docsModule
@@ -130,8 +135,8 @@ module' docsModule = layout pkg depth path $ [shamlet|
              ]
     mod' :: Maybe Module
     mod' = resolveModule docsModulePath pkg
-    title :: Maybe Html
-    title = do
+    headingTitle :: Maybe Html
+    headingTitle = do
         m <- mod'
         moduleTitle m
     depth :: Int
@@ -258,7 +263,7 @@ showKind TD.Import {} = "import"
 contents :: Package Docs -> Html
 contents pkg@Package { metadata = md
                      , modules = ms
-                     } = layout pkg 0 ("Package docs" :: T.Text) [shamlet|
+                     } = layout pkg 0 title [shamlet|
 <h1>Modules
 $forall (modulePath', mod) <- MS.toAscList ms
     $maybe tit <- moduleTitle mod
@@ -285,6 +290,8 @@ $forall (modulePath', mod) <- MS.toAscList ms
                 <dd.author>#{n}
 |]
   where
+    title :: T.Text
+    title = docsTitle $ target pkg
     emailText :: E.EmailAddress -> T.Text
     emailText = decodeUtf8 . E.toByteString
 
@@ -372,7 +379,9 @@ instance Target Docs where
     type CompileResult Docs = BS.ByteString
     type CompileError Docs = Error
     targetName _ = "docs"
-    parseTarget _ = return Docs
+    parseTarget table = do
+        title <- stringField "title" table
+        return Docs { docsTitle = title }
     compilePackage = compilePackage'
     showCompileError _ = id
     toByteString _ = id

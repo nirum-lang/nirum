@@ -111,6 +111,12 @@ To be released.
     union qux = bar (text a) | quux (text b);
     ~~~~~~~~
 
+### Docs target
+
+ -  A new required configuration `targets.docs.title` was added.
+    It's rendered in generated HTML documents' `<title>` element.
+    [[#253]]
+
 ### Python target
 
  -  Generated Python packages became to have two [entry points] (a feature
@@ -159,6 +165,7 @@ To be released.
 [#13]: https://github.com/spoqa/nirum/issues/13
 [#220]: https://github.com/spoqa/nirum/issues/220
 [#227]: https://github.com/spoqa/nirum/pull/227
+[#253]: https://github.com/spoqa/nirum/pull/253
 [entry points]: https://setuptools.readthedocs.io/en/latest/pkg_resources.html#entry-points
 [python2-numbers-integral]: https://docs.python.org/2/library/numbers.html#numbers.Integral
 [python2-basestring]: https://docs.python.org/2/library/functions.html#basestring
