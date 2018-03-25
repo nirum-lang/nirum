@@ -21,6 +21,7 @@ def test_setup_metadata():
     assert ['nirum'] == pkg['Requires']
     assert set(pkg['Provides']) == {
         'fixture', 'fixture.foo', 'fixture.foo.bar', 'fixture.qux',
+        'fixture.reserved_keyword_enum', 'fixture.reserved_keyword_union',
         'fixture.types',
         'renamed', 'renamed.foo', 'renamed.foo.bar',
     }
@@ -33,6 +34,7 @@ def test_module_entry_points():
     map_ = pkg_resources.get_entry_map('nirum_fixture', group='nirum.modules')
     assert frozenset(map_) == {
         'fixture.foo', 'fixture.foo.bar', 'fixture.qux',
+        'fixture.reserved-keyword-enum', 'fixture.reserved-keyword-union',
         'fixture.types',
         'renames.test.foo', 'renames.test.foo.bar',
     }

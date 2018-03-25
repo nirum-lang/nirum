@@ -7,9 +7,9 @@ import qualified Data.Text as T
 import Test.Hspec.Meta
 
 import Nirum.Constructs (Construct (toCode))
-import Nirum.Constructs.Annotation hiding (docs, name)
+import Nirum.Constructs.Annotation hiding (docs, fromList, name)
 import Nirum.Constructs.Declaration (Declaration (name), docs)
-import Nirum.Constructs.DeclarationSet (DeclarationSet)
+import Nirum.Constructs.DeclarationSet hiding (empty)
 import Nirum.Constructs.Service (Method (Method), Service (Service))
 import Nirum.Constructs.TypeDeclaration ( EnumMember (EnumMember)
                                         , Field (Field)
@@ -192,6 +192,89 @@ service ping-service (
                 docs import' `shouldBe` Nothing
             specify "toCode" $
                 toCode import' `shouldBe` "import foo.bar (baz);\n"
+
+        context "member/tag name shadowing" $ do
+            let fromRight either' = head [v | Right v <- [either']]
+            let unionType' t a = fromRight $ unionType t a
+            let unionFoo = TypeDeclaration
+                    { typename = "foo"
+                    , type' = unionType'
+                          [ Tag "bar" [Field "a" "text" empty] empty
+                          , Tag "baz" [Field "b" "text" empty] empty
+                          ]
+                          Nothing
+                    , typeAnnotations = empty
+                    }
+            let enumQux = TypeDeclaration
+                    { typename = "qux"
+                    , type' = EnumType
+                          [ EnumMember "quux" empty
+                          , EnumMember "bar" empty
+                          ]
+                    , typeAnnotations = empty
+                    }
+            let unboxedBar = TypeDeclaration "bar" (UnboxedType "text") empty
+            specify "a union tag is disallowed to shadow a type name" $ do
+                fromList [unionFoo, unboxedBar]
+                    `shouldBe` Left (FacialNameDuplication "bar")
+                fromList
+                    [ TypeDeclaration
+                          { typename = "bar"
+                          , type' = unionType'
+                                [ Tag "foo" [Field "a" "text" empty] empty
+                                , Tag "bar" [Field "b" "text" empty] empty
+                                ]
+                                Nothing
+                          , typeAnnotations = empty
+                          }
+                    ]
+                    `shouldBe` Left (FacialNameDuplication "bar")
+            specify "an enum member is disallowed to shadow a type name" $ do
+                fromList [enumQux, unboxedBar]
+                    `shouldBe` Left (FacialNameDuplication "bar")
+                fromList
+                    [ TypeDeclaration
+                          { typename = "foo"
+                          , type' = EnumType
+                                [ EnumMember "foo" empty
+                                , EnumMember "bar" empty
+                                ]
+                          , typeAnnotations = empty
+                          }
+                    ]
+                    `shouldBe` Left (FacialNameDuplication "foo")
+            it "is disallowed two unions to have a tag of the same name" $
+                fromList
+                    [ unionFoo
+                    , TypeDeclaration
+                          { typename = "qux"
+                          , type' = unionType'
+                                [ Tag "quux" [Field "c" "text" empty] empty
+                                , Tag "baz" [Field "d" "text" empty] empty
+                                ]
+                                Nothing
+                          , typeAnnotations = empty
+                          }
+                    ]
+                    `shouldBe` Left (FacialNameDuplication "baz")
+            it "is disallowed two enums to have a member of the same name" $
+                fromList
+                    [ TypeDeclaration
+                          { typename = "foo"
+                          , type' = EnumType
+                                [ EnumMember "bar" empty
+                                , EnumMember "baz" empty
+                                ]
+                          , typeAnnotations = empty
+                          }
+                    , enumQux
+                    ]
+                    `shouldBe` Left (FacialNameDuplication "bar")
+            it ("is disallowed an enum member and a union tag to " ++
+                "have the same name") $
+                fromList [unionFoo, enumQux] `shouldBe`
+                    Left (FacialNameDuplication "bar")
+
     describe "EnumMember" $ do
         let kr = EnumMember "kr" empty
             jp = EnumMember "jp" (singleDocs "Japan")

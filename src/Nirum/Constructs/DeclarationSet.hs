@@ -1,4 +1,7 @@
-{-# LANGUAGE OverloadedLists, TypeFamilies #-}
+{-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 module Nirum.Constructs.DeclarationSet ( DeclarationSet ()
                                        , NameDuplication ( BehindNameDuplication
                                                          , FacialNameDuplication
@@ -24,7 +27,7 @@ import Prelude hiding (lookup, null)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 
-import Nirum.Constructs.Declaration (Declaration (name))
+import Nirum.Constructs.Declaration (Declaration (..))
 import Nirum.Constructs.Identifier (Identifier)
 import Nirum.Constructs.Name (Name (Name, behindName, facialName))
 
@@ -46,28 +49,52 @@ empty = DeclarationSet { declarations = M.empty
                        , index = []
                        }
 
-fromList :: Declaration a => [a] -> Either NameDuplication (DeclarationSet a)
-fromList declarations' =
-    case findDup names facialName S.empty of
-        Just dup -> Left $ FacialNameDuplication dup
-        _ -> case findDup names behindName S.empty of
-            Just dup -> Left $ BehindNameDuplication dup
-            _ -> Right DeclarationSet { declarations = M.fromList mapList
-                                      , index = index'
-                                      }
+fromList :: forall a . Declaration a
+         => [a]
+         -> Either NameDuplication (DeclarationSet a)
+fromList decls =
+    case ( List.find (\ d -> facialName (name d) `S.member` extraPublicNames d)
+                     decls
+         , findDup decls publicNames S.empty
+         , findDup decls (S.singleton . behindName . name) S.empty
+         ) of
+        (Nothing, Nothing, Nothing) ->
+            Right DeclarationSet
+                { declarations = M.fromList mapList
+                , index = index'
+                }
+        (Just dup, _, _) ->
+            Left $ FacialNameDuplication (name dup)
+        (Nothing, Just dup, _) ->
+            Left $ FacialNameDuplication dup
+        (Nothing, Nothing, Just dup) ->
+            Left $ BehindNameDuplication dup
   where
     names :: [Name]
-    names = map name declarations'
+    names = map name decls
     index' :: [Identifier]
     index' = map facialName names
-    mapList = [(facialName (name d), d) | d <- declarations']
-    findDup :: [Name] -> (Name -> Identifier) -> S.Set Identifier -> Maybe Name
-    findDup names' f dups =
-        case names' of
-            x : xs -> let name' = f x
-                      in if name' `S.member` dups
-                         then Just x
-                         else findDup xs f $ S.insert name' dups
+    mapList = [(facialName (name d), d) | d <- decls]
+    publicNames :: a -> S.Set Identifier
+    publicNames decl = facialName (name decl) `S.insert` extraPublicNames decl
+    findDup :: [a]
+            -> (a -> S.Set Identifier)
+            -> S.Set Identifier
+            -> Maybe Name
+    findDup decls' f dups =
+        case decls' of
+            x : xs ->
+                let publicNames' = f x
+                    xName = name x
+                    shadowings = publicNames' `S.intersection` dups
+                in
+                    case S.lookupMin shadowings of
+                        Nothing -> findDup xs f $ S.union publicNames' dups
+                        Just shadowing ->
+                            if facialName xName `S.member` shadowings ||
+                               behindName xName `S.member` shadowings
+                            then Just xName
+                            else Just (Name shadowing shadowing)
             _ -> Nothing
 
 toList :: Declaration a => DeclarationSet a -> [a]

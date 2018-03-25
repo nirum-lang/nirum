@@ -9,16 +9,17 @@ from six import PY3
 from fixture.foo import (Album, CultureAgnosticName, Dog,
                          EastAsianName, EvaChar,
                          FloatUnbox, Gender, ImportedTypeUnbox, Irum,
-                         Line, MixedName, Mro, Music, NoMro,
+                         Line, MixedName, Music,
                          NameShadowingFieldRecord, NullService,
                          Person, People,
                          Point1, Point2, Point3d, Pop, PingService, Product,
                          RecordWithMap, RecordWithOptionalRecordField,
-                         ReservedKeywordEnum, ReservedKeywordUnion,
                          Rnb, RpcError, Run, Song, Status, Stop, Way,
                          WesternName)
 from fixture.foo.bar import PathUnbox, IntUnbox, Point
 from fixture.qux import Path, Name
+from fixture.reserved_keyword_enum import ReservedKeywordEnum
+from fixture.reserved_keyword_union import Mro, NoMro, ReservedKeywordUnion
 from fixture.types import UuidList
 
 
