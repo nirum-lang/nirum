@@ -32,12 +32,12 @@ module Nirum.Parser ( Parser
                     , unionTypeDeclaration
                     ) where
 
-import Control.Monad (void)
+import Control.Monad (void, when)
 import Data.Void
 import qualified System.IO as SIO
 
 import qualified Data.List as L
-import Data.Map.Strict as Map hiding (foldl)
+import Data.Map.Strict as Map hiding (foldl, toList)
 import Data.Set hiding (foldl)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
@@ -54,8 +54,9 @@ import Text.Megaparsec.Char.Lexer (charLiteral)
 
 import qualified Nirum.Constructs.Annotation as A
 import Nirum.Constructs.Declaration (Declaration)
+import qualified Nirum.Constructs.Declaration as D
 import Nirum.Constructs.Docs (Docs (Docs))
-import Nirum.Constructs.DeclarationSet as DeclarationSet
+import Nirum.Constructs.DeclarationSet as DeclarationSet hiding (toList)
 import Nirum.Constructs.Identifier ( Identifier
                                    , identifierRule
                                    , reservedKeywords
@@ -63,7 +64,7 @@ import Nirum.Constructs.Identifier ( Identifier
                                    )
 import Nirum.Constructs.Module (Module (Module))
 import Nirum.Constructs.ModulePath (ModulePath (ModulePath, ModuleName))
-import Nirum.Constructs.Name (Name (Name))
+import Nirum.Constructs.Name (Name (Name, facialName))
 import Nirum.Constructs.Service ( Method (Method)
                                 , Parameter (Parameter)
                                 , Service (Service)
@@ -82,6 +83,19 @@ import Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
 
 type Parser = Parsec Void T.Text
 type ParseError = E.ParseError Char Void
+
+-- | State-tracking 'many'.
+many' :: [a] -> ([a] -> Parser a) -> Parser [a]
+many' i p = do
+    r <- optional (p i)
+    case r of
+        Nothing -> return i
+        Just v -> many' (i ++ [v]) p
+        -- FIXME: i ++ [v] is not efficient
+
+-- | Get the facial name of a declaration.
+declFacialName :: Declaration d => d -> Identifier
+declFacialName = facialName . D.name
 
 -- CHECK: If a new reserved keyword is introduced, it has to be also
 -- added to `reservedKeywords` set in the `Nirum.Constructs.Identifier`
@@ -117,13 +131,35 @@ identifier =
 
 name :: Parser Name
 name = do
-    facialName <- identifier <?> "facial name"
-    behindName <- option facialName $ try $ do
+    facialName' <- identifier <?> "facial name"
+    behindName <- option facialName' $ try $ do
         spaces
         char '/'
         spaces
         identifier <?> "behind name"
-    return $ Name facialName behindName
+    return $ Name facialName' behindName
+
+uniqueIdentifier :: [Identifier] -> String -> Parser Identifier
+uniqueIdentifier forwardNames label' = try $ do
+    ident <- lookAhead identP
+    when (ident `elem` forwardNames)
+         (fail $ "the " ++ label' ++ " `" ++ toString ident ++
+                 "` is duplicated")
+    identP
+  where
+    identP :: Parser Identifier
+    identP = identifier <?> label'
+
+uniqueName :: [Identifier] -> String -> Parser Name
+uniqueName forwardNames label' = try $ do
+    Name fName _ <- lookAhead nameP
+    when (fName `elem` forwardNames)
+         (fail $ "the " ++ label' ++ " `" ++ toString fName ++
+                 "` is duplicated")
+    nameP
+  where
+    nameP :: Parser Name
+    nameP = name <?> label'
 
 annotationArgumentValue :: Parser T.Text
 annotationArgumentValue = do
@@ -239,12 +275,12 @@ annotationsWithDocs :: Monad m
 annotationsWithDocs set' (Just docs') = A.insertDocs docs' set'
 annotationsWithDocs set' Nothing = return set'
 
-aliasTypeDeclaration :: Parser TypeDeclaration
-aliasTypeDeclaration = do
+aliasTypeDeclaration :: [Identifier] -> Parser TypeDeclaration
+aliasTypeDeclaration forwardNames = do
     annotationSet' <- annotationSet <?> "type alias annotations"
     string' "type" <?> "type alias keyword"
     spaces
-    typeName <- identifier <?> "alias type name"
+    typeName <- uniqueIdentifier forwardNames "alias type name"
     let name' = Name typeName typeName
     spaces
     char '='
@@ -257,12 +293,12 @@ aliasTypeDeclaration = do
     return $ TypeDeclaration name' (Alias canonicalType') annotationSet''
 
 
-unboxedTypeDeclaration :: Parser TypeDeclaration
-unboxedTypeDeclaration = do
+unboxedTypeDeclaration :: [Identifier] -> Parser TypeDeclaration
+unboxedTypeDeclaration forwardNames = do
     annotationSet' <- annotationSet <?> "unboxed type annotations"
     string' "unboxed" <?> "unboxed type keyword"
     spaces
-    typeName <- identifier <?> "unboxed type name"
+    typeName <- uniqueIdentifier forwardNames "unboxed type name"
     let name' = Name typeName typeName
     spaces
     char '('
@@ -276,11 +312,11 @@ unboxedTypeDeclaration = do
     annotationSet'' <- annotationsWithDocs annotationSet' docs'
     return $ TypeDeclaration name' (UnboxedType innerType') annotationSet''
 
-enumMember :: Parser EnumMember
-enumMember = do
+enumMember :: [Identifier] -> Parser EnumMember
+enumMember forwardNames = do
     annotationSet' <- annotationSet <?> "enum member annotations"
     spaces
-    memberName <- name <?> "enum member name"
+    memberName <- uniqueName forwardNames "enum member name"
     spaces
     docs' <- optional $ do
         d <- docs <?> "enum member docs"
@@ -309,12 +345,12 @@ handleNameDuplicationError label' (Left dup) =
         BehindNameDuplication (Name _ bname) -> ("behind", bname)
         FacialNameDuplication (Name fname _) -> ("facial", fname)
 
-enumTypeDeclaration :: Parser TypeDeclaration
-enumTypeDeclaration = do
+enumTypeDeclaration :: [Identifier] -> Parser TypeDeclaration
+enumTypeDeclaration forwardNames = do
     annotationSet' <- annotationSet <?> "enum type annotations"
     string "enum" <?> "enum keyword"
     spaces
-    typeName <- name <?> "enum type name"
+    typeName@(Name typeFName _) <- uniqueName forwardNames "enum type name"
     spaces
     frontDocs <- optional $ do
         d <- docs <?> "enum type docs"
@@ -329,7 +365,9 @@ enumTypeDeclaration = do
             spaces
             return d
     annotationSet'' <- annotationsWithDocs annotationSet' docs'
-    members' <- (enumMember `sepBy1` (spaces >> char '|' >> spaces))
+    members' <- sepBy1
+        (enumMember (typeFName : forwardNames))
+        (spaces >> char '|' >> spaces)
         <?> "enum members"
     case DeclarationSet.fromList members' of
         Left (BehindNameDuplication (Name _ bname)) ->
@@ -387,12 +425,12 @@ fieldSet = do
     fields' <- fields <?> "fields"
     handleNameDuplication "field" fields' return
 
-recordTypeDeclaration :: Parser TypeDeclaration
-recordTypeDeclaration = do
+recordTypeDeclaration :: [Identifier] -> Parser TypeDeclaration
+recordTypeDeclaration forwardNames = do
     annotationSet' <- annotationSet <?> "record type annotations"
     string "record" <?> "record keyword"
     spaces
-    typeName <- name <?> "record type name"
+    typeName <- uniqueName forwardNames "record type name"
     spaces
     char '('
     spaces
@@ -408,13 +446,13 @@ recordTypeDeclaration = do
     annotationSet'' <- annotationsWithDocs annotationSet' docs'
     return $ TypeDeclaration typeName (RecordType fields') annotationSet''
 
-tag :: Parser (Tag, Bool)
-tag = do
+tag :: [Identifier] -> Parser (Tag, Bool)
+tag forwardNames = do
     annotationSet' <- annotationSet <?> "union tag annotations"
     spaces
     default' <- optional (string "default" <?> "default tag")
     spaces
-    tagName' <- name <?> "union tag name"
+    tagName' <- uniqueName forwardNames "union tag name"
     spaces
     paren <- optional $ char '('
     spaces
@@ -444,12 +482,12 @@ tag = do
                  Nothing -> False
            )
 
-unionTypeDeclaration :: Parser TypeDeclaration
-unionTypeDeclaration = do
+unionTypeDeclaration :: [Identifier] -> Parser TypeDeclaration
+unionTypeDeclaration forwardNames = do
     annotationSet' <- annotationSet <?> "union type annotations"
     string "union" <?> "union keyword"
     spaces
-    typeName <- name <?> "union type name"
+    typeName <- uniqueName forwardNames "union type name"
     spaces
     docs' <- optional $ do
         d <- docs <?> "union type docs"
@@ -457,8 +495,10 @@ unionTypeDeclaration = do
         return d
     char '='
     spaces
-    tags' <- (tag `sepBy1` try (spaces >> char '|' >> spaces))
-             <?> "union tags"
+    tags' <- sepBy1
+        (tag forwardNames)
+        (try (spaces >> char '|' >> spaces))
+        <?> "union tags"
     let tags'' = [t | (t, _) <- tags']
     let defaultTag' = do
             (t''', _) <- L.find snd tags'
@@ -473,19 +513,23 @@ unionTypeDeclaration = do
                 unionType tags'' defaultTag'
             return $ TypeDeclaration typeName ut annotationSet''
 
-typeDeclaration :: Parser TypeDeclaration
-typeDeclaration = do
+typeDeclaration :: [Identifier] -> Parser TypeDeclaration
+typeDeclaration forwardNames = do
     -- Preconsume the common prefix (annotations) to disambiguate
     -- the continued branches of parsers.
     spaces
     annotationSet' <- annotationSet <?> "type annotations"
     spaces
     typeDecl <- choice
-        [ unless' ["union", "record", "enum", "unboxed"] aliasTypeDeclaration
-        , unless' ["union", "record", "enum"] unboxedTypeDeclaration
-        , unless' ["union", "record"] enumTypeDeclaration
-        , unless' ["union"] recordTypeDeclaration
-        , unionTypeDeclaration
+        [ unless' ["union", "record", "enum", "unboxed"]
+                  (aliasTypeDeclaration forwardNames)
+        , unless' ["union", "record", "enum"]
+                  (unboxedTypeDeclaration forwardNames)
+        , unless' ["union", "record"]
+                  (enumTypeDeclaration forwardNames)
+        , unless' ["union"]
+                  (recordTypeDeclaration forwardNames)
+        , unionTypeDeclaration forwardNames
         ] <?> "type declaration (e.g. enum, record, unboxed, union)"
     -- In theory, though it preconsumes annotationSet' before parsing typeDecl
     -- so that typeDecl itself has no annotations, to prepare for an
@@ -547,12 +591,12 @@ methodSet = do
     methods' <- methods <?> "service methods"
     handleNameDuplication "method" methods' return
 
-serviceDeclaration :: Parser TypeDeclaration
-serviceDeclaration = do
+serviceDeclaration :: [Identifier] -> Parser TypeDeclaration
+serviceDeclaration forwardNames = do
     annotationSet' <- annotationSet <?> "service annotation"
     string "service" <?> "service keyword"
     spaces
-    serviceName' <- name <?> "service name"
+    serviceName' <- uniqueName forwardNames "service name"
     spaces
     char '('
     spaces
@@ -619,16 +663,24 @@ module' = do
         importList <- imports
         spaces
         return importList
-    types <- many $ do
+    let imports' = [i | l <- importLists, i <- l]
+    types <- many' imports' $ \ tds -> do
         typeDecl <- do
             -- Preconsume the common prefix (annotations) to disambiguate
             -- the continued branches of parsers.
             spaces
             annotationSet' <- annotationSet <?> "annotations"
             spaces
-            decl <- choice [ notFollowedBy (string "service") >> typeDeclaration
-                           , serviceDeclaration <?> "service declaration"
-                           ]
+            let forwardNames =
+                    [ n
+                    | td <- tds
+                    , n <- declFacialName td : toList (D.extraPublicNames td)
+                    ]
+            decl <- choice
+                [ notFollowedBy (string "service")
+                      >> typeDeclaration forwardNames
+                , serviceDeclaration forwardNames <?> "service declaration"
+                ]
             -- In theory, though it preconsumes annotationSet' before parsing
             -- decl so that decl itself has no annotations, to prepare for an
             -- unlikely situation (that I bet it'll never happen)
@@ -642,7 +694,7 @@ module' = do
                 _ -> decl  -- Never happen!
         spaces
         return typeDecl
-    handleNameDuplication "type" (types ++ [i | l <- importLists, i <- l]) $
+    handleNameDuplication "type" types $
                           \ typeSet -> return $ Module typeSet docs'
 
 file :: Parser Module
