@@ -2,8 +2,10 @@
 module Nirum.Constructs.DeclarationSetSpec (SampleDecl (..), spec) where
 
 import Control.Exception.Base (evaluate)
+import Data.List (sort)
 import Data.String (IsString (..))
 
+import qualified Data.Set as S
 import Test.Hspec.Meta
 
 import Nirum.Constructs (Construct (..))
@@ -22,6 +24,7 @@ import Nirum.Constructs.DeclarationSet ( DeclarationSet
                                        , union
                                        , (!)
                                        )
+import Nirum.Constructs.Identifier (Identifier)
 import Nirum.Constructs.Name (Name (Name))
 
 data SampleDecl = SampleDecl Name AnnotationSet deriving (Eq, Ord, Show)
@@ -39,6 +42,19 @@ instance IsString SampleDecl where
     fromString s = SampleDecl (fromString s) A.empty
 
 type SampleDeclSet = DeclarationSet SampleDecl
+
+data SampleDecl2 =
+    SampleDecl2 Name (S.Set Identifier) AnnotationSet deriving (Eq, Ord, Show)
+
+instance Construct SampleDecl2 where
+    toCode _ = "(do not impl)"
+
+instance Documented SampleDecl2
+
+instance Declaration SampleDecl2 where
+    name (SampleDecl2 name' _ _) = name'
+    extraPublicNames (SampleDecl2 _ otherNames _) = otherNames
+    annotations (SampleDecl2 _ _ annotations') = annotations'
 
 spec :: Spec
 spec =
@@ -64,6 +80,22 @@ spec =
             it "returns Right DeclarationSet if there are no duplications" $ do
                 let Right dset = fl ["foo", "bar", "baz"]
                 toList dset `shouldBe` ["foo", "bar", "baz"]
+            it "checks extraPublicNames as well" $ do
+                let sampleDecl n on = SampleDecl2 n on A.empty
+                let decls =
+                        [ sampleDecl "foo" ["foo-a", "foo-b"]
+                        , sampleDecl (Name "bar" "bar2") ["bar-a", "bar-b"]
+                        ]
+                let Right a = fromList decls
+                sort (toList a) `shouldBe` sort decls
+                fromList (sampleDecl "baz" ["foo"] : decls) `shouldBe`
+                    Left (FacialNameDuplication "foo")
+                fromList (sampleDecl "baz" ["bar"] : decls) `shouldBe`
+                    Left (FacialNameDuplication $ Name "bar" "bar2")
+                fromList (sampleDecl "baz" ["foo-a"] : decls) `shouldBe`
+                    Left (FacialNameDuplication "foo-a")
+                fromList [sampleDecl "foo" ["foo"]] `shouldBe`
+                    Left (FacialNameDuplication "foo")
         let dset = ["foo", "bar", sd "baz" "asdf"] :: SampleDeclSet
         context "toList" $
             it "returns [Declaration]" $ do

@@ -61,17 +61,18 @@ import Data.Maybe (isJust, maybeToList)
 import Data.String (IsString (fromString))
 
 import qualified Data.Text as T
+import qualified Data.Set as S
 
 import Nirum.Constructs (Construct (toCode))
 import Nirum.Constructs.Annotation as A (AnnotationSet, empty, lookupDocs)
-import Nirum.Constructs.Declaration ( Declaration (annotations, name)
+import Nirum.Constructs.Declaration ( Declaration (..)
                                     , Documented (docs)
                                     )
 import Nirum.Constructs.Docs (Docs (Docs), toCodeWithPrefix)
 import Nirum.Constructs.DeclarationSet as DS
 import Nirum.Constructs.Identifier (Identifier)
 import Nirum.Constructs.ModulePath (ModulePath)
-import Nirum.Constructs.Name (Name (Name))
+import Nirum.Constructs.Name (Name (..))
 import Nirum.Constructs.Service ( Method
                                 , Service (Service)
                                 , methodDocs
@@ -298,6 +299,11 @@ instance Declaration TypeDeclaration where
     name TypeDeclaration { typename = name' } = name'
     name ServiceDeclaration { serviceName = name' } = name'
     name Import { importName = id' } = Name id' id'
+    extraPublicNames TypeDeclaration { type' = EnumType { members = ms } } =
+        S.fromList [facialName mName | EnumMember mName _ <- toList ms]
+    extraPublicNames TypeDeclaration { type' = unionType'@UnionType {} } =
+        S.fromList $ map (facialName . tagName) $ toList $ tags unionType'
+    extraPublicNames _ = S.empty
     annotations TypeDeclaration { typeAnnotations = anno' } = anno'
     annotations ServiceDeclaration { serviceAnnotations = anno' } = anno'
     annotations Import { importAnnotations = anno' } = anno'

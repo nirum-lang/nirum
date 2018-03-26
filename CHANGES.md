@@ -11,6 +11,106 @@ To be released.
  -  Union tags became possible to have `default` keyword.  It's useful
     for migrating a record type to a union type.  [[#13], [#227]]
 
+ -  Enum members and union tags became disallowed to shadow an other type name
+    in a module.  It's because in some target languages we compile both types
+    and members/tags into objects that share the same namespace.  In Python,
+    both types and union tags are compiled into classes.
+
+    For example, the following definitions had been allowed, but now became
+    disallowed:
+
+    ~~~~~~~~ nirum
+    unboxed foo (text);
+    //      ^~~
+    enum bar = foo | baz;
+    //         ^~~
+    ~~~~~~~~
+
+    ~~~~~~~~ nirum
+    record foo (text a);
+    //     ^~~
+    union bar = foo (text b) | baz (text c);
+    //          ^~~
+    ~~~~~~~~
+
+    This rule is applied even between a member/tag and its belonging enum/union
+    type as well.  The following definitions are disallowed:
+
+    ~~~~~~~~ nirum
+    enum foo = foo | bar;
+         ^~~   ^~~
+    ~~~~~~~~
+
+    ~~~~~~~~ nirum
+    union bar = foo (text a) | bar (text b);
+          ^~~                  ^~~
+    ~~~~~~~~
+
+    If you already have used the same name for a type and a tag, you can avoid
+    breaking backward compatibility of serialization by specifying a different
+    behind name.  For example, if you've had a definition like:
+
+    ~~~~~~~~ nirum
+    enum foo = foo | bar;
+    //   ^~~   ^~~
+    ~~~~~~~~
+
+    It can be changed like the following:
+
+    ~~~~~~~~ nirum
+    enum foo = foo-renamed/foo | bar;
+    //         ^~~~~~~~~~~ ^~~
+    ~~~~~~~~
+
+ -  Enum members and union tags became disallowed to shadow other enum members
+    and union tags even if they belong to an other type.  It's because in some
+    target language we compile them into objects that share the same namespace,
+    regardless of their belonging type.
+
+    For example, the following definitions had been allowed, but now became
+    disallowed:
+
+    ~~~~~~~~ nirum
+    enum foo = bar | baz;
+    //         ^~~
+    enum qux = quux | bar;
+    //                ^~~
+    ~~~~~~~~
+
+    ~~~~~~~~ nirum
+    union foo = bar (text a) | baz (text b);
+    //          ^~~
+    enum qux = quux | bar;
+    //                ^~~
+    ~~~~~~~~
+
+    ~~~~~~~~ nirum
+    union foo = bar (text a) | baz (text b);
+    //                         ^~~
+    union qux = quux (text c) | baz (text d);
+    //                          ^~~
+    ~~~~~~~~
+
+    If you already have used the same name for members/tags of different
+    enum/union types, you can avoid breaking backward compatibility of
+    serialization by specifying a different behind name.
+    For example, if you've had a definition like:
+
+    ~~~~~~~~ nirum
+    enum foo = bar | baz;
+    //         ^~~
+    union qux = bar (text a) | quux (text b);
+    //          ^~~
+    ~~~~~~~~
+
+    It can be changed like the following:
+
+    ~~~~~~~~ nirum
+    enum foo = bar-renamed/bar | baz;
+    //         ^~~~~~~~~~~ ^~~
+    union qux = bar (text a) | quux (text b);
+    ~~~~~~~~
+
 ### Python target
 
  -  Generated Python packages became to have two [entry points] (a feature
