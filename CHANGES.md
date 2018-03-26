@@ -168,6 +168,7 @@ To be released.
 [#253]: https://github.com/spoqa/nirum/pull/253
 [entry points]: https://setuptools.readthedocs.io/en/latest/pkg_resources.html#entry-points
 [python2-numbers-integral]: https://docs.python.org/2/library/numbers.html#numbers.Integral
+[python2-int]: https://docs.python.org/2/library/functions.html#int
 [python2-basestring]: https://docs.python.org/2/library/functions.html#basestring
 [python2-unicode]: https://docs.python.org/2/library/functions.html#unicode
 [glibc]: https://www.gnu.org/software/libc/
