@@ -7,8 +7,10 @@ keywords = ["sample", "example", "nirum"]
 name = "nirum"
 email = "dev@nirum.org"
 
-[targets]
 [targets.python]
 name = "nirum_fixture"
 [targets.python.renames]
 "renames.test" = "renamed"
+
+[targets.docs]
+title = "Fixtures for Nirum tests"

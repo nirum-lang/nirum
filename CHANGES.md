@@ -118,6 +118,12 @@ To be released.
  -  Fixed a compiler bug that an error message on name duplicates had referred
     to a wrong line/column number.  [[#255]]
 
+### Docs target
+
+ -  A new required configuration `targets.docs.title` was added.
+    It's rendered in generated HTML documents' `<title>` element.
+    [[#253]]
+
 ### Python target
 
  -  Generated Python packages became to have two [entry points] (a feature
@@ -166,10 +172,12 @@ To be released.
 [#13]: https://github.com/spoqa/nirum/issues/13
 [#220]: https://github.com/spoqa/nirum/issues/220
 [#227]: https://github.com/spoqa/nirum/pull/227
+[#253]: https://github.com/spoqa/nirum/pull/253
 [#254]: https://github.com/spoqa/nirum/pull/254
 [#255]: https://github.com/spoqa/nirum/pull/255
 [entry points]: https://setuptools.readthedocs.io/en/latest/pkg_resources.html#entry-points
 [python2-numbers-integral]: https://docs.python.org/2/library/numbers.html#numbers.Integral
+[python2-int]: https://docs.python.org/2/library/functions.html#int
 [python2-basestring]: https://docs.python.org/2/library/functions.html#basestring
 [python2-unicode]: https://docs.python.org/2/library/functions.html#unicode
 [glibc]: https://www.gnu.org/software/libc/

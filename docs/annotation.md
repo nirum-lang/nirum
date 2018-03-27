@@ -76,7 +76,7 @@ The following annotations are common among more than one target languages.
 For target-specific annotations, read each target's docs.
 
 
-### `@docs` (`docs`)
+### `@docs` (`docs`)                                                     {#docs}
 
 `@docs` annotations represent docs comments (`# ...`).  The following two
 examples are equivalent, and the former is internally transformed to the latter:
@@ -102,7 +102,7 @@ a time.
 :   A docs text.
 
 
-### `@error`
+### `@error`                                                            {#error}
 
 Many object-oriented languages (e.g., Java, Python) require exception classes
 to inherit a specific base class (e.g., `Exception`) to be thrown.
