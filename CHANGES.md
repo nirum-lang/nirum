@@ -62,6 +62,8 @@ To be released.
     //         ^~~~~~~~~~~ ^~~
     ~~~~~~~~
 
+    [[#254], [#255]]
+
  -  Enum members and union tags became disallowed to shadow other enum members
     and union tags even if they belong to an other type.  It's because in some
     target language we compile them into objects that share the same namespace,
@@ -111,6 +113,11 @@ To be released.
     union qux = bar (text a) | quux (text b);
     ~~~~~~~~
 
+    [[#254], [#255]]
+
+ -  Fixed a compiler bug that an error message on name duplicates had referred
+    to a wrong line/column number.  [[#255]]
+
 ### Python target
 
  -  Generated Python packages became to have two [entry points] (a feature
@@ -159,6 +166,8 @@ To be released.
 [#13]: https://github.com/spoqa/nirum/issues/13
 [#220]: https://github.com/spoqa/nirum/issues/220
 [#227]: https://github.com/spoqa/nirum/pull/227
+[#254]: https://github.com/spoqa/nirum/pull/254
+[#255]: https://github.com/spoqa/nirum/pull/255
 [entry points]: https://setuptools.readthedocs.io/en/latest/pkg_resources.html#entry-points
 [python2-numbers-integral]: https://docs.python.org/2/library/numbers.html#numbers.Integral
 [python2-basestring]: https://docs.python.org/2/library/functions.html#basestring

@@ -1,4 +1,7 @@
-{-# LANGUAGE OverloadedLists, QuasiQuotes, TypeFamilies #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TypeFamilies #-}
 module Nirum.ParserSpec where
 
 import Control.Monad (forM_)
@@ -25,7 +28,7 @@ import Nirum.Constructs.Annotation as A
 import Nirum.Constructs.Docs (Docs (Docs))
 import Nirum.Constructs.DeclarationSet (DeclarationSet)
 import Nirum.Constructs.DeclarationSetSpec (SampleDecl (..))
-import Nirum.Constructs.Identifier (fromText)
+import Nirum.Constructs.Identifier (Identifier, fromText)
 import Nirum.Constructs.Module (Module (Module))
 import Nirum.Constructs.Name (Name (..))
 import Nirum.Constructs.Service ( Method (Method)
@@ -355,12 +358,13 @@ spec = do
             expectError "// comment" 1 1
 
     let descTypeDecl label parser spec' =
-            let parsers = [ (label, parser)
-                          , (label ++ " (typeDescription)", P.typeDeclaration)
-                          ] :: [(String, Parser TypeDeclaration)]
+            let parsers =
+                    [ (label, parser)
+                    , (label ++ " (typeDescription)", P.typeDeclaration)
+                    ] :: [(String, [Identifier] -> Parser TypeDeclaration)]
             in forM_ parsers $ \ (label', parser') ->
                 describe label' $
-                    spec' $ helperFuncs parser'
+                    spec' $ helperFuncs $ parser' []
 
     describe "handleNameDuplication" $ do
         let cont dset = do
@@ -514,9 +518,10 @@ enum dup = a/b
          ;|] 4 10
         it "fails to parse if trailing semicolon is missing" $ do
             let (_, expectErr) = helperFuncs P.module'
-            expectErr "enum a = x | y;\nenum b = x | y\nenum c = x | y;" 3 1
+            expectErr "enum a = a1 | a2;\nenum b = b1 | y\nenum c = c1 | c2;"
+                      3 1
             expectErr "unboxed a (text);\nenum b = x | y\nunboxed c (text);" 3 1
-            expectErr "enum a = x | y;\nunboxed b (text)\nenum c = x | y;" 3 1
+            expectErr "enum a = x | y;\nunboxed b (text)\nenum c = c1 | c2;" 3 1
 
     descTypeDecl "recordTypeDeclaration"
                  P.recordTypeDeclaration $ \ helpers -> do
@@ -800,10 +805,13 @@ union dup
     ;|] 2 38
         it "fails to parse if trailing semicolon is missing" $ do
             let (_, expectErr) = helperFuncs P.module'
-            expectErr "union a = x | y;\nunion b = x | y\nunion c = x | y;" 3 1
+            expectErr
+                "union a = a1 | a2;\nunion b = b1 | b2\nunion c = c1 | c2;"
+                3 1
             expectErr "unboxed a (text);\nunion b = x | y\nunboxed c (text);"
                       3 1
-            expectErr "union a = x | y;\nunboxed b (text)\nunion c = x | y;" 3 1
+            expectErr "union a = a1 | a2;\nunboxed b (text)\nunion c = c1 | c2;"
+                      3 1
         it "failed to parse union with more than 1 default keyword." $ do
             let (_, expectErr) = helperFuncs P.module'
             expectErr [s|
@@ -925,7 +933,7 @@ text get-name (
             expectError "bool pred(text a/c, text b/c)" 1 11
 
     describe "serviceDeclaration" $ do
-        let (parse', expectError) = helperFuncs P.serviceDeclaration
+        let (parse', expectError) = helperFuncs $ P.serviceDeclaration []
             getUserD = singleDocs "Gets an user by its id."
             createUserD = singleDocs "Creates a new user"
             noMethodsD = singleDocs "Service having no methods."
@@ -1113,7 +1121,7 @@ service method-dups (
                 parse' "" `shouldBeRight` Module [] Nothing
                 parse' "# docs" `shouldBeRight` Module [] (Just "docs")
             it "errors if there are any duplicated facial names" $
-                expectError "type a = text;\ntype a/b = text;" 2 7
+                expectError "type a = text;\ntype a/b = text;" 2 6
             it "errors if there are any duplicated behind names" $
                 expectError "type b = text;\ntype a/b = text;" 2 7
 
@@ -1173,6 +1181,34 @@ service method-dups (
                 ]
         it "errors if parentheses have nothing" $
             expectError "import foo.bar ();" 1 17
+
+    describe "module'" $ context "handling name duplications" $ do
+        let (_, expectError) = helperFuncs P.module'
+        let examples =
+                -- Vertical alignment of `dup` is an intention; it purposes
+                -- to generate the same error offsets.
+                [ "type       dup = text;"
+                , "unboxed    dup (text);"
+                , "record     dup (text a);"
+                , "enum       dup = m1 | m2;"
+                , "enum e1 =  dup | foo;"
+                , "union      dup = t1 | t2;"
+                , "union u1 = dup | foo;"
+                , "service    dup (text ping ());"
+                ]
+        let importExample = "import foo (dup);"
+        let shiftDigit = \ case
+                '1' -> '3'
+                '2' -> '4'
+                c -> c
+        let inputs = [ (a, if a == b then T.map shiftDigit b else b)
+                     | a <- importExample : examples
+                     , b <- examples
+                     ]
+        forM_ inputs $ \ (forward, shadowing) ->
+            let input = T.concat [forward, "\n", shadowing]
+            in
+                specify (T.unpack input) $ expectError input 2 12
 
     specify "parse & parseFile" $ do
         files <- getDirectoryContents "examples"
