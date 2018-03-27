@@ -149,5 +149,6 @@ tests:
     main: test-targets.hs
     source-dirs: app
     dependencies:
+    - temporary >=1.2 && <1.3
     - turtle
 stability: alpha

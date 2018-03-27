@@ -132,7 +132,12 @@ compileElmPackageJson
                 HM.insert "elm-lang/core" (String "5.0.0 <= v < 6.0.0") deps
           )
         , ("dependency-sources", Object sources)
-        , ("elm-version", String "0.18.0 <= v < 0.19.0")
+        , ( "elm-version"
+          -- CHECK: If the Elm version we target changes related docs
+          -- (e.g., *CONTRIBUTING.md*, *docs/target/elm.md*) also should
+          -- be updated.
+          , String "0.18.0 <= v < 0.19.0"
+          )
         ]
   where
     deps :: Object
