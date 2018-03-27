@@ -69,11 +69,11 @@ is unstable (see below).*
 Since Nirum is still changing by leaps and bounds, you could want to try
 its bleeding edge.  We provide nightly builds for this purpose.
 
-- [Linux (x86_64)](https://nightly-builds.nirum.org/travis-builds/nirum-linux-x86_64)
-- [macOS (x86_64)](https://nightly-builds.nirum.org/travis-builds/nirum-darwin-x86_64)
-- [Windows (x64)](https://ci.appveyor.com/api/projects/dahlia/nirum-k5n5y/artifacts/nirum-win-x64.exe?job=Platform%3A%20x64&branch=master)
-- [Windows (x86)](https://ci.appveyor.com/api/projects/dahlia/nirum-k5n5y/artifacts/nirum-win-x86.exe?job=Platform%3A%20x86&branch=master)
-- [Docker (`spoqa/nirum:latest`)][docker]
+ -  [Linux (x86_64)](https://nightly-builds.nirum.org/travis-builds/nirum-linux-x86_64)
+ -  [macOS (x86_64)](https://nightly-builds.nirum.org/travis-builds/nirum-darwin-x86_64)
+ -  [Windows (x64)](https://ci.appveyor.com/api/projects/dahlia/nirum-k5n5y/artifacts/nirum-win-x64.exe?job=Platform%3A%20x64&branch=master)
+ -  [Windows (x86)](https://ci.appveyor.com/api/projects/dahlia/nirum-k5n5y/artifacts/nirum-win-x86.exe?job=Platform%3A%20x86&branch=master)
+ -  [Docker (`spoqa/nirum:latest`)][docker]
 
 Although we call it "nightly build," technically it is not built every night,
 but done every merge commit.
@@ -134,8 +134,8 @@ Have you kicked off a new project related to Nirum?  Please add *nirum*
 
 ### Language runtimes
 
- -   [nirum-python](https://github.com/spoqa/nirum-python): The official Python
-     runtime library for Nirum.
+ -  [nirum-python](https://github.com/spoqa/nirum-python): The official Python
+    runtime library for Nirum.
      -   [nirum-python-http](https://github.com/spoqa/nirum-python-http):
          Nirum HTTP transport for Python.
      -   [nirum-python-wsgi](https://github.com/spoqa/nirum-python-wsgi):
@@ -143,15 +143,15 @@ Have you kicked off a new project related to Nirum?  Please add *nirum*
 
 ### Editor supports
 
- -   [nirum.tmbundle](https://github.com/spoqa/nirum.tmbundle): TextMate bundle
-     for Nirum.  Also can be used by IntelliJ IDEA (or any other JetBrain's
-     IDEs, e.g., PyCharm, WebStorm) through [TextMate bundles support].
- -   [nirum.vim](https://github.com/spoqa/nirum.vim): Nirum syntax highlighter for
-     Vim/Neovim.
- -   [sublime-nirum](https://github.com/spoqa/sublime-nirum): Nirum package for
-     Sublime Text 3.
- -   [nirum-syntax-highlighting](https://marketplace.visualstudio.com/items?itemName=Nirum.nirum-syntax-highlighting)
-     for VS Code: Nirum syntax highlighter for VS Code.
+ -  [nirum.tmbundle](https://github.com/spoqa/nirum.tmbundle): TextMate bundle
+    for Nirum.  Also can be used by IntelliJ IDEA (or any other JetBrain's
+    IDEs, e.g., PyCharm, WebStorm) through [TextMate bundles support].
+ -  [nirum.vim](https://github.com/spoqa/nirum.vim): Nirum syntax highlighter
+    for Vim/Neovim.
+ -  [sublime-nirum](https://github.com/spoqa/sublime-nirum): Nirum package for
+    Sublime Text 3.
+ -  [nirum-syntax-highlighting](https://marketplace.visualstudio.com/items?itemName=Nirum.nirum-syntax-highlighting)
+    for VS Code: Nirum syntax highlighter for VS Code.
 
 [related-projects]: https://github.com/search?q=topic:nirum+fork:false
 [github-topic]: https://github.com/blog/2309-introducing-topics
