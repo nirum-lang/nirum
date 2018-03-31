@@ -73,3 +73,7 @@ Translation
 
  -  An `alias` to a type is translated to a `type alias`,
     e.g., `type foo-bar = text;` becomes `type alias FooBar = String`.
+
+ -  An encoder (serializer) is named starting with a type name in camelCase and
+    a trailing `Encoder`.  For example, a decoder for a type `foo-bar` is
+    `fooBarEncoder`.

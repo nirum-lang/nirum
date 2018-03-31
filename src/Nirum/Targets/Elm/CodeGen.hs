@@ -38,9 +38,11 @@ newtype Elm = Elm { repositoryUrl :: URI } deriving (Eq, Ord, Show)
 type Error = Text
 
 data ElmLibrary
-    = ElmBytes
+    = ElmBase64
+    | ElmBytes
     | ElmDecimal
     | ElmNirum
+    | ElmTime
     | ElmUuid
     deriving (Eq, Ord, Show)
 

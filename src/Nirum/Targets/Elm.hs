@@ -23,9 +23,7 @@ import Text.Heterocephalus (compileText)
 
 import Nirum.Constructs.Declaration
 import Nirum.Constructs.Docs as Docs
-import Nirum.Constructs.Identifier
 import Nirum.Constructs.ModulePath
-import Nirum.Constructs.Name
 import Nirum.Constructs.TypeDeclaration hiding (String, modulePath)
 import Nirum.Package.Metadata hiding (name)
 import Nirum.Package.ModuleSet (keys)
@@ -42,11 +40,11 @@ compileModule boundModule = do
     return $ (,) deps [compileText|
 module #{toImportPath modulePath'}
     exposing
-%{ forall (i, typename) <- enumerate exportNames }
+%{ forall (i, exportName) <- enumerate exportNames }
 %{ if i < 1 }
-        ( #{typename}
+        ( #{exportName}
 %{ else }
-        , #{typename}
+        , #{exportName}
 %{ endif }
 %{ endforall }
         )
@@ -75,13 +73,21 @@ import #{modulePath} as #{alias}
     modulePath' = modulePath boundModule
     types' :: [TypeDeclaration]
     types' = toList $ boundTypes boundModule
-    typeName :: TypeDeclaration -> Text
-    typeName = toPascalCaseText . facialName . name
     exportNames :: [Text]
-    exportNames = sort [typeName t | t@TypeDeclaration {} <- types']
+    exportNames = sort
+        [ f t
+        | t@TypeDeclaration {} <- types'
+        , f <- [typeName, encoderName]
+        ]
 
 toDependency :: ElmLibrary -> (Text, SV.Version, SV.Version, Maybe Text)
 toDependency library = case library of
+    ElmBase64 ->
+        ( "truqu/elm-base64"
+        , SV.version 2 0 3 [] []
+        , SV.version 3 0 0 [] []
+        , Nothing
+        )
     ElmBytes ->
         ( "spisemisu/elm-bytes"
         , SV.version 1 1 0 [] []
@@ -98,6 +104,12 @@ toDependency library = case library of
         ( "spoqa/elm-nirum"
         , SV.version 0 1 0 [] []
         , SV.version 0 2 0 [] []
+        , Just "/Users/dahlia/Projects/elm-nirum/"
+        )
+    ElmTime ->
+        ( "elm-community/elm-time"
+        , SV.version 2 0 0 [] []
+        , SV.version 3 0 0 [] []
         , Nothing
         )
     ElmUuid ->

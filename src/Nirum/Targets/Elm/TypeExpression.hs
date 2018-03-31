@@ -68,12 +68,13 @@ compilePrimitiveType primitiveTypeId = case primitiveTypeId of
         mBytes <- import' "Bytes"
         return [compileText|#{mBytes}.Bytes|]
     Date -> do
-        -- CHECK: Is Date suitable for representing dates without times?
-        mDate <- import' "Date"
-        return [compileText|#{mDate}.Date|]
+        require ElmTime
+        mTDate <- import' "Time.Date"
+        return [compileText|#{mTDate}.Date|]
     Datetime -> do
-        mDate <- import' "Date"
-        return [compileText|#{mDate}.Date|]
+        require ElmTime
+        mTZonedDateTime <- import' "Time.ZonedDateTime"
+        return [compileText|#{mTZonedDateTime}.ZonedDateTime|]
     Bool -> prim "Bool_"
     Uuid -> do
         require ElmUuid
