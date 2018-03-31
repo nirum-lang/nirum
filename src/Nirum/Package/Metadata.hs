@@ -47,6 +47,7 @@ module Nirum.Package.Metadata ( Author (Author, email, name, uri)
                               , readMetadata
                               , stringField
                               , tableField
+                              , uriField
                               , versionField
                               ) where
 

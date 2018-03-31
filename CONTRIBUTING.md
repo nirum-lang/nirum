@@ -76,9 +76,13 @@ External dependencies
 Each target test suite has its external dependencies (i.e. non-library program
 dependencies):
 
+ -  Elm
+     -  Elm Platform 0.18
+     -  [`elm-install`][elm-install]
  -  Python
      -  All Python versions that Nirum should support: Python 2.7, and
         3.4 and above all
      -  [`tox`][tox]
 
+[elm-install]: https://github.com/gdotdesign/elm-github-install
 [tox]: https://tox.readthedocs.io/

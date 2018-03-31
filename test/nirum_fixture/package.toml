@@ -7,10 +7,13 @@ keywords = ["sample", "example", "nirum"]
 name = "nirum"
 email = "dev@nirum.org"
 
+[targets.docs]
+title = "Fixtures for Nirum tests"
+
+[targets.elm]
+repository = "https://github.com/spoqa/nirum-test-ficture-elm.git"  # fake
+
 [targets.python]
 name = "nirum_fixture"
 [targets.python.renames]
 "renames.test" = "renamed"
-
-[targets.docs]
-title = "Fixtures for Nirum tests"
