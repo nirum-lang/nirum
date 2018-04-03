@@ -47,7 +47,9 @@ fooBarModule = Module [] $ Just "foo.bar"
 validModules :: [(ModulePath, Module)]
 validModules =
     [ ( ["abc"]
-      , Module [TypeDeclaration "a" (Alias "text") empty]
+      , Module [ TypeDeclaration "a" (Alias "text") empty
+               , TypeDeclaration "lorem" (Alias "int64") empty
+               ]
                Nothing
       )
     , (["foo"], Module [] $ Just "foo")
@@ -56,6 +58,8 @@ validModules =
     , (["qux"], Module [] $ Just "qux")
     , ( ["xyz"]
       , Module [ Import ["abc"] (ine "a") empty
+               , Import ["abc"] (ImportName "lorem" $ Just "ipsum") empty
+
                , TypeDeclaration "x" (Alias "text") empty
                ] Nothing
       )
