@@ -53,9 +53,9 @@ spec =
             imports mod2 `shouldBe` imports mod1
         specify "toCode" $ do
             toCode mod1 `shouldBe` [q|import foo.bar (baz, qux);
+import some (over as rainbow);
 import xyz (asdf);
 import zzz (ppp, qqq);
-import some (over as rainbow);
 
 type path = text;
 # path string
@@ -65,9 +65,9 @@ unboxed offset (float64);
             toCode mod2 `shouldBe` [q|# module level docs...
 # blahblah
 import foo.bar (baz, qux);
+import some (over as rainbow);
 import xyz (asdf);
 import zzz (ppp, qqq);
-import some (over as rainbow);
 
 type path = text;
 # path string

@@ -65,13 +65,13 @@ compileValidator mod' (TypeIdentifier typeId) pythonVar =
     case lookupType typeId mod' of
         Missing -> return $ Validator "False" []  -- must never happen
         Local (Alias typeExpr') -> compileValidator mod' typeExpr' pythonVar
-        Imported modulePath' (Alias typeExpr') ->
+        Imported modulePath' _ (Alias typeExpr') ->
             case resolveBoundModule modulePath' (boundPackage mod') of
                 Nothing -> return $ Validator "False" []  -- must never happen
                 Just foundMod -> compileValidator foundMod typeExpr' pythonVar
         Local PrimitiveType { primitiveTypeIdentifier = pId } ->
             compilePrimitiveTypeValidator pId pythonVar
-        Imported _ PrimitiveType { primitiveTypeIdentifier = pId } ->
+        Imported _ _ PrimitiveType { primitiveTypeIdentifier = pId } ->
             compilePrimitiveTypeValidator pId pythonVar
         _ ->
             compileInstanceValidator mod' typeId pythonVar

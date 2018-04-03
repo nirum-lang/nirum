@@ -51,11 +51,11 @@ testPackage target' = do
         specify "lookupType" $ do
             lookupType "a" bm `shouldBe` Missing
             lookupType "a" abc `shouldBe` Local (Alias "text")
-            lookupType "a" xyz `shouldBe` Imported ["abc"] "abc" (Alias "text")
+            lookupType "a" xyz `shouldBe` Imported ["abc"] "a" (Alias "text")
             lookupType "x" bm `shouldBe` Missing
             lookupType "x" abc `shouldBe` Missing
             lookupType "x" xyz `shouldBe` Local (Alias "text")
             lookupType "text" bm `shouldBe`
-                Imported coreModulePath "core" (PrimitiveType Text String)
+                Imported coreModulePath "text" (PrimitiveType Text String)
             lookupType "text" abc `shouldBe` lookupType "text" bm
             lookupType "text" xyz `shouldBe` lookupType "text" bm

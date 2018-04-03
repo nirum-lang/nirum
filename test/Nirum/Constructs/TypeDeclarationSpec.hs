@@ -1,4 +1,6 @@
-{-# LANGUAGE OverloadedLists, QuasiQuotes #-}
+{-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
 module Nirum.Constructs.TypeDeclarationSpec where
 
 
@@ -181,14 +183,18 @@ service ping-service (
                 toCode annoDecl `shouldBe`
                     "@bar(val = \"baz\")\nservice anno-service (bool ping ());"
                 -- TODO: more tests
-        context "Import" $ do
+        specify "Import" $ do
             let import' = Import ["foo", "bar"] (ine "baz") empty
-            specify "name" $
-                name import' `shouldBe` "baz"
-            specify "docs" $
-                docs import' `shouldBe` Nothing
-            specify "toCode" $
-                toCode import' `shouldBe` "import foo.bar (baz);\n"
+            let importAs = Import
+                               ["foo", "bar"]
+                               (ImportName "baz" $ Just "qux")
+                               empty
+            name import' `shouldBe` "baz"
+            docs import' `shouldBe` Nothing
+            toCode import' `shouldBe` "import foo.bar (baz);\n"
+            name importAs `shouldBe` "qux"
+            docs importAs `shouldBe` Nothing
+            toCode importAs `shouldBe` "import foo.bar (baz as qux);\n"
 
         context "member/tag name shadowing" $ do
             let fromRight either' = head [v | Right v <- [either']]
