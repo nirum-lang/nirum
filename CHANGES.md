@@ -11,8 +11,13 @@ To be released.
  -  Union tags became possible to have `default` keyword.  It's useful
     for migrating a record type to a union type.  [[#13], [#227]]
 
- -  Added aliased import.  It's handy to avoid a module name shadowing.
+ -  Added aliased import.  It's handy to avoid a name shadowing.
     [[#217]]
+
+    ~~~~~~~~ nirum
+    import iso (country as iso-country);
+    import types (country);
+    ~~~~~~~~
 
  -  Enum members and union tags became disallowed to shadow an other type name
     in a module.  It's because in some target languages we compile both types
