@@ -19,7 +19,7 @@ import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import System.FilePath ((</>))
 import Text.Blaze (ToMarkup (preEscapedToMarkup))
 import Text.Blaze.Html.Renderer.Utf8 (renderHtml)
-import Text.Cassius (cassius, renderCss)
+import Text.Cassius
 import Text.Hamlet (Html, shamlet)
 
 import Nirum.Constructs (Construct (toCode))
@@ -64,6 +64,11 @@ newtype Docs = Docs
 
 type Error = T.Text
 
+data CurrentPage
+    = IndexPage
+    | ModulePage ModulePath
+    deriving (Eq, Show)
+
 makeFilePath :: ModulePath -> FilePath
 makeFilePath modulePath' = foldl (</>) "" $
     map toNormalizedString (toList modulePath') ++ ["index.html"]
@@ -74,8 +79,20 @@ makeUri modulePath' =
     T.intercalate "/" $
                   map toNormalizedText (toList modulePath') ++ ["index.html"]
 
-layout :: ToMarkup m => Package Docs -> Int -> m -> Html -> Html
-layout Package { metadata = md } dirDepth title body = [shamlet|
+layout :: ToMarkup m => Package Docs -> Int -> CurrentPage -> m -> Html -> Html
+layout pkg dirDepth currentPage title body =
+    layout' pkg dirDepth currentPage title body Nothing
+
+layout' :: ToMarkup m
+        => Package Docs
+        -> Int
+        -> CurrentPage
+        -> m
+        -> Html
+        -> Maybe Html
+        -> Html
+layout' pkg@Package { metadata = md, modules = ms }
+        dirDepth currentPage title body footer = [shamlet|
 $doctype 5
 <html>
     <head>
@@ -84,9 +101,38 @@ $doctype 5
         <meta name="generator" content="Nirum #{versionText}">
         $forall Author { name = name' } <- authors md
             <meta name="author" content="#{name'}">
-        <link rel="stylesheet" href="#{T.replicate dirDepth "../"}style.css">
-    <body>#{body}
+        <link rel="stylesheet" href="#{root}style.css">
+    <body>
+        <nav>
+            $if currentPage == IndexPage
+                <a class="index selected" href="#{root}index.html">
+                    <strong>
+                        #{docsTitle $ target pkg}
+            $else
+                <a class="index" href="#{root}index.html">
+                    #{docsTitle $ target pkg}
+            <ul class="toc">
+                $forall (modulePath', mod) <- MS.toAscList ms
+                    $if currentPage == ModulePage modulePath'
+                        <li class="selected">
+                            <a href="#{root}#{makeUri modulePath'}">
+                                <strong>
+                                    <code>#{toCode modulePath'}</code>
+                                    $maybe tit <- moduleTitle mod
+                                        &mdash; #{tit}
+                    $else
+                        <li>
+                            <a href="#{root}#{makeUri modulePath'}">
+                                <code>#{toCode modulePath'}</code>
+                                $maybe tit <- moduleTitle mod
+                                    &mdash; #{tit}
+        <article>#{body}
+        $maybe f <- footer
+            <footer>#{f}
 |]
+  where
+    root :: T.Text
+    root = T.replicate dirDepth "../"
 
 typeExpression :: BoundModule Docs -> TE.TypeExpression -> Html
 typeExpression _ expr = [shamlet|#{typeExpr expr}|]
@@ -107,15 +153,16 @@ $case expr'
 |]
 
 module' :: BoundModule Docs -> Html
-module' docsModule = layout pkg depth title $ [shamlet|
-    $maybe tit <- headingTitle
-        <h1><code>#{path}</code>
-        <p>#{tit}
-    $nothing
-        <h1><code>#{path}</code>
-    $forall (ident, decl) <- types'
-        <div class="#{showKind decl}" id="#{toNormalizedText ident}">
-            #{typeDecl docsModule ident decl}
+module' docsModule =
+    layout pkg depth (ModulePage docsModulePath) title $ [shamlet|
+$maybe tit <- headingTitle
+    <h1><code>#{path}</code>
+    <p>#{tit}
+$nothing
+    <h1><code>#{path}</code>
+$forall (ident, decl) <- types'
+    <div class="#{showKind decl}" id="#{toNormalizedText ident}">
+        #{typeDecl docsModule ident decl}
 |]
   where
     docsModulePath :: ModulePath
@@ -263,17 +310,25 @@ showKind TD.Import {} = "import"
 contents :: Package Docs -> Html
 contents pkg@Package { metadata = md
                      , modules = ms
-                     } = layout pkg 0 title [shamlet|
+                     } =
+    layout' pkg 0 IndexPage title body $ case authors md of
+        [] -> Nothing
+        _ : _ -> Just footer
+  where
+    body :: Html
+    body = [shamlet|
 <h1>Modules
 $forall (modulePath', mod) <- MS.toAscList ms
-    $maybe tit <- moduleTitle mod
-        <h2>
-            <a href="#{makeUri modulePath'}"><code>#{toCode modulePath'}</code>
-        <p>#{tit}
-    $nothing
-        <h2>
-            <a href="#{makeUri modulePath'}"><code>#{toCode modulePath'}</code>
-<hr>
+    <h2>
+        <a href="#{makeUri modulePath'}">
+            <code>#{toCode modulePath'}</code>
+            $maybe tit <- moduleTitle mod
+                &mdash; #{tit}
+|]
+    title :: T.Text
+    title = docsTitle $ target pkg
+    footer :: Html
+    footer = [shamlet|
 <dl>
     <dt.author>
         $if 1 < length (authors md)
@@ -289,9 +344,6 @@ $forall (modulePath', mod) <- MS.toAscList ms
             $nothing
                 <dd.author>#{n}
 |]
-  where
-    title :: T.Text
-    title = docsTitle $ target pkg
     emailText :: E.EmailAddress -> T.Text
     emailText = decodeUtf8 . E.toByteString
 
@@ -309,12 +361,16 @@ stylesheet :: TL.Text
 stylesheet = renderCss ([cassius|
 @import url(#{fontUrl})
 body
+    padding: 0
+    margin: 0
     font-family: Source Sans Pro
     color: #{gray8}
 code
     font-family: Source Code Pro
     font-weight: 300
     background-color: #{gray1}
+strong code
+    font-weight: 400
 pre
     padding: 16px 10px
     background-color: #{gray1}
@@ -340,6 +396,42 @@ a:hover
 dd
     p
         margin-top: 0
+
+nav
+    position: fixed
+    left: 0
+    top: 0
+    bottom: 0
+    width: #{navWidth}
+    overflow-y: auto
+    border-right: 1px solid #{gray2}
+    background-color: #{gray0}
+    code
+        background: none
+    a.index, ul.toc li a
+        display: block
+        padding: 0 1em
+        margin: 1em 0
+        overflow: hidden
+        white-space: nowrap
+        text-overflow: ellipsis
+        color: #{gray8}
+    .selected > a, a.selected
+        color: #{indigo8} !important
+    ul.toc
+        margin: 0
+        padding: 0
+        border-top: 1px solid #{gray2}
+        li
+            display: block
+article, footer
+    margin-left: #{navWidth}
+    padding: 1em
+    > h1, > h2, > h3, > h4, > h5, > h6, > dl
+        &:first-child
+            margin-top: 0
+footer
+    border-top: 1px solid #{gray2}
 |] undefined)
   where
     fontUrl :: T.Text
@@ -348,16 +440,22 @@ dd
         , "?family=Source+Code+Pro:300,400|Source+Sans+Pro"
         ]
     -- from Open Color https://yeun.github.io/open-color/
-    gray1 :: T.Text
-    gray1 = "#f1f3f5"
-    gray3 :: T.Text
-    gray3 = "#dee2e6"
-    gray8 :: T.Text
-    gray8 = "#343a40"
-    graph8 :: T.Text
-    graph8 = "#9c36b5"
-    indigo8 :: T.Text
-    indigo8 = "#3b5bdb"
+    gray0 :: Color
+    gray0 = Color 0xf8 0xf9 0xfa
+    gray1 :: Color
+    gray1 = Color 0xf1 0xf3 0xf5
+    gray2 :: Color
+    gray2 = Color 0xe9 0xec 0xef
+    gray3 :: Color
+    gray3 = Color 0xde 0xe2 0xe6
+    gray8 :: Color
+    gray8 = Color 0x34 0x3a 0x40
+    graph8 :: Color
+    graph8 = Color 0x9c 0x36 0xb5
+    indigo8 :: Color
+    indigo8 = Color 0x3b 0x5b 0xdb
+    navWidth :: PixelSize
+    navWidth = PixelSize 300
 
 compilePackage' :: Package Docs -> Map FilePath (Either Error BS.ByteString)
 compilePackage' pkg =

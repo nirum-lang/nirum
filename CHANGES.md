@@ -124,6 +124,8 @@ To be released.
     It's rendered in generated HTML documents' `<title>` element.
     [[#253]]
 
+ -  Docs now have a sidebar which contains table of contents.  [[#257]]
+
 ### Python target
 
  -  Generated Python packages became to have two [entry points] (a feature
@@ -175,6 +177,7 @@ To be released.
 [#253]: https://github.com/spoqa/nirum/pull/253
 [#254]: https://github.com/spoqa/nirum/pull/254
 [#255]: https://github.com/spoqa/nirum/pull/255
+[#257]: https://github.com/spoqa/nirum/pull/257
 [entry points]: https://setuptools.readthedocs.io/en/latest/pkg_resources.html#entry-points
 [python2-numbers-integral]: https://docs.python.org/2/library/numbers.html#numbers.Integral
 [python2-int]: https://docs.python.org/2/library/functions.html#int
