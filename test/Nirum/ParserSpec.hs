@@ -1166,10 +1166,14 @@ service method-dups (
                              union fooAnnotationSet bazAnnotationSet
                     , Import ["foo", "bar"] (ine "b") empty
                     ]
-        specify "import names can have a trailing comma" $
+        specify "import names can have a trailing comma" $ do
             parse' "import foo.bar (a, b,);" `shouldBeRight`
                 [ Import ["foo", "bar"] (ine "a") empty
                 , Import ["foo", "bar"] (ine "b") empty
+                ]
+            parse' "import foo.bar (a as baz, b as qux,);" `shouldBeRight`
+                [ Import ["foo", "bar"] (ImportName "a" $ Just "baz") empty
+                , Import ["foo", "bar"] (ImportName "b" $ Just "qux") empty
                 ]
         specify "import names in parentheses can be multiline" $ do
             -- without a trailing comma
@@ -1177,10 +1181,18 @@ service method-dups (
                 [ Import ["foo", "bar"] (ine "a") empty
                 , Import ["foo", "bar"] (ine "b") empty
                 ]
+            parse' "import foo.bar (\n  a as baz,\n  b as qux\n);" `shouldBeRight`
+                [ Import ["foo", "bar"] (ImportName "a" $ Just "baz") empty
+                , Import ["foo", "bar"] (ImportName "b" $ Just "qux") empty
+                ]
             -- with a trailing comma
             parse' "import foo.bar (\n  c,\n  d,\n);" `shouldBeRight`
                 [ Import ["foo", "bar"] (ine "c") empty
                 , Import ["foo", "bar"] (ine "d") empty
+                ]
+            parse' "import foo.bar (\n  c as baz,\n  d as qux,\n);" `shouldBeRight`
+                [ Import ["foo", "bar"] (ImportName "c" $ Just "baz") empty
+                , Import ["foo", "bar"] (ImportName "d" $ Just "qux") empty
                 ]
         it "errors if parentheses have nothing" $
             expectError "import foo.bar ();" 1 17
