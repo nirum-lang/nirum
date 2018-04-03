@@ -632,11 +632,12 @@ importName = do
     aSet <- annotationSet <?> "import annotations"
     spaces
     iName <- identifier <?> "name to import"
-    aName <- optional $ do
+    aName <- optional $ try $ do
       spaces
       string' "as"
       spaces
       n <- identifier <?> "alias name to import"
+      spaces
       return n
     return (iName, aName, aSet)
 

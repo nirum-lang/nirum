@@ -1221,7 +1221,7 @@ if hasattr({className}.Client, '__qualname__'):
     methodAnnotations' = wrapMap $ commaNl $ map compileMethodAnnotation
         methodList
 
-compileTypeDeclaration _ Import { importNames = _ } = do
+compileTypeDeclaration _ Import { importNames = _ } =
     return "" -- Nothing to compile
 
 compileModuleBody :: Source -> CodeGen Code
