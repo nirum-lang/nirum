@@ -302,3 +302,9 @@ service ping-service (
                 `shouldBe` "circle (point origin, offset radius,)\n# docs"
             toCode (Tag "unit" [] empty) `shouldBe` "unit"
             toCode (Tag "unit" [] (singleDocs "docs")) `shouldBe` "unit\n# docs"
+    describe "importScopeName" $ do
+        let import' = ine "baz"
+        let importAs = ImportName "baz" $ Just "qux"
+        it "return its name" $ do
+            importScopeName import' `shouldBe` "baz"
+            importScopeName importAs `shouldBe` "qux"
