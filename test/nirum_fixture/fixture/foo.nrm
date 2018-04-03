@@ -1,5 +1,6 @@
 import fixture.foo.bar (path-unbox, point, int-unbox);
 import fixture.qux (path, name);
+import fixture.types (uuid-list as ul);
 
 unboxed float-unbox (float64);
 # Unboxed type docs.
@@ -137,4 +138,8 @@ record name-shadowing-field-record (
     bigint numbers,
     uuid uuid,
     binary bytes,
+);
+
+record whitelist (
+    ul ids,
 );
