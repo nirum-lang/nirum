@@ -234,12 +234,20 @@ typeDecl mod' ident
                 <dd>#{blockToHtml d}
 |]
 typeDecl mod' ident
-         tc@TD.TypeDeclaration { TD.type' = TD.UnionType tags _} = [shamlet|
+         tc@TD.TypeDeclaration
+             { TD.type' = unionType@TD.UnionType
+                   { TD.defaultTag = defaultTag
+                   }
+             } =
+    [shamlet|
     <h2>union <code>#{toNormalizedText ident}</code>
     $maybe d <- docsBlock tc
         #{blockToHtml d}
-    $forall tagDecl@(TD.Tag _ fields _) <- DES.toList tags
-        <h3 class="tag"><code>#{nameText $ DE.name tagDecl}</code>
+    $forall (default_, tagDecl@(TD.Tag _ fields _)) <- tagList
+        <h3 .tag :default_:.default-tag>
+            $if default_
+                default&#32;
+            <code>#{nameText $ DE.name tagDecl}</code>
         $maybe d <- docsBlock tagDecl
             #{blockToHtml d}
         $forall fieldDecl@(TD.Field _ fieldType _) <- DES.toList fields
@@ -248,7 +256,13 @@ typeDecl mod' ident
                 <code>#{nameText $ DE.name fieldDecl}
             $maybe d <- docsBlock fieldDecl
                 #{blockToHtml d}
-|]
+    |]
+  where
+    tagList :: [(Bool, TD.Tag)]
+    tagList =
+        [ (defaultTag == Just tag, tag)
+        | tag <- DES.toList (TD.tags unionType)
+        ]
 typeDecl _ ident
          TD.TypeDeclaration { TD.type' = TD.PrimitiveType {} } = [shamlet|
     <h2>primitive <code>#{toNormalizedText ident}</code>
