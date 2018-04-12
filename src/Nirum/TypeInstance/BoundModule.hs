@@ -53,10 +53,11 @@ data TypeLookup = Missing
 lookupType :: Target t => Identifier -> BoundModule t -> TypeLookup
 lookupType identifier boundModule =
     case DS.lookup identifier (boundTypes boundModule) of
-        Nothing -> toType
-                       coreModulePath
-                       identifier
-                       (DS.lookup identifier $ types coreModule)
+        Nothing ->
+            toType
+                coreModulePath
+                identifier
+                (DS.lookup identifier $ types coreModule)
         Just TypeDeclaration { type' = t } -> Local t
         Just (Import path' _ s _) ->
             case resolveModule path' (boundPackage boundModule) of

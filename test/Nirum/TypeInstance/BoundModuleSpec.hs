@@ -37,25 +37,31 @@ testPackage target' = do
         let Just bm = resolveBoundModule ["foo", "bar"] validPackage
             Just abc = resolveBoundModule ["abc"] validPackage
             Just xyz = resolveBoundModule ["xyz"] validPackage
+            Just zar = resolveBoundModule ["zar"] validPackage
         specify "docs" $ do
             docs bm `shouldBe` Just "foo.bar"
             let Just bm' = resolveBoundModule ["foo"] validPackage
             docs bm' `shouldBe` Just "foo"
         specify "boundTypes" $ do
             boundTypes bm `shouldBe` []
-            boundTypes abc `shouldBe` [TypeDeclaration "a" (Alias "text") empty]
+            boundTypes abc `shouldBe`
+                [TypeDeclaration "a" (Alias "text") empty]
             boundTypes xyz `shouldBe`
-                [ Import ["abc"] "a" empty
+                [ Import ["abc"] "a" "a" empty
                 , TypeDeclaration "x" (Alias "text") empty
                 ]
         specify "lookupType" $ do
             lookupType "a" bm `shouldBe` Missing
             lookupType "a" abc `shouldBe` Local (Alias "text")
-            lookupType "a" xyz `shouldBe` Imported ["abc"] (Alias "text")
+            lookupType "a" xyz `shouldBe` Imported ["abc"] "a" (Alias "text")
+            lookupType "aliased" zar `shouldBe`
+                Imported ["abc"] "a" (Alias "text")
             lookupType "x" bm `shouldBe` Missing
             lookupType "x" abc `shouldBe` Missing
             lookupType "x" xyz `shouldBe` Local (Alias "text")
+            lookupType "quuz" zar `shouldBe` Local (Alias "text")
             lookupType "text" bm `shouldBe`
-                Imported coreModulePath (PrimitiveType Text String)
+                Imported coreModulePath "text" (PrimitiveType Text String)
             lookupType "text" abc `shouldBe` lookupType "text" bm
             lookupType "text" xyz `shouldBe` lookupType "text" bm
+            lookupType "text" zar `shouldBe` lookupType "text" bm
