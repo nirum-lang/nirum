@@ -1,4 +1,5 @@
 import countries (country);
+import geo (geo as geo-point);
 
 record address (
     float32 lat,
@@ -7,4 +8,9 @@ record address (
     text town,
     country country,
     text postal-code,
+);
+
+
+record pin (
+    geo-point geo,
 );
