@@ -126,6 +126,9 @@ To be released.
 
  -  Docs now have a sidebar which contains table of contents.  [[#257]]
 
+ -  Fixed a bug that a module-level docs hadn't been rendered.
+    Now it's shown in the right below the module name.  [[#259]]
+
 ### Python target
 
  -  Generated Python packages became to have two [entry points] (a feature
@@ -178,6 +181,7 @@ To be released.
 [#254]: https://github.com/spoqa/nirum/pull/254
 [#255]: https://github.com/spoqa/nirum/pull/255
 [#257]: https://github.com/spoqa/nirum/pull/257
+[#259]: https://github.com/spoqa/nirum/pull/259
 [entry points]: https://setuptools.readthedocs.io/en/latest/pkg_resources.html#entry-points
 [python2-numbers-integral]: https://docs.python.org/2/library/numbers.html#numbers.Integral
 [python2-int]: https://docs.python.org/2/library/functions.html#int

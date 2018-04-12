@@ -5,16 +5,7 @@ import Data.Text (Text)
 import Test.Hspec.Meta
 import Text.InterpolatedString.Perl6 (q)
 
-import Nirum.Docs ( Block (..)
-                  , HeadingLevel (..)
-                  , Inline (..)
-                  , ItemList (..)
-                  , ListDelimiter (..)
-                  , ListType (..)
-                  , filterReferences
-                  , headingLevelFromInt
-                  , parse
-                  )
+import Nirum.Docs
 
 sampleSource :: Text
 sampleSource = [q|
@@ -38,11 +29,18 @@ A [complex *link*][1].
 
 |]
 
+sampleHeading :: Block
+sampleHeading =
+    Heading H1 ["Hello"]
+
 sampleDocument :: Block
 sampleDocument =
-    Document
-        [ Heading H1 ["Hello"]
-        , Paragraph ["Tight list:"]
+    sampleDocument' (sampleHeading :)
+
+sampleDocument' :: ([Block] -> [Block]) -> Block
+sampleDocument' adjust =
+    (Document . adjust)
+        [ Paragraph ["Tight list:"]
         , List BulletList $ TightItemList [ ["List test"]
                                           , ["test2"]
                                           ]
@@ -91,3 +89,8 @@ spec = do
                 , "image"
                 , "."
                 ]
+    specify "trimTitle" $ do
+        -- Remove the top-level heading if it exists:
+        trimTitle sampleDocument `shouldBe` sampleDocument' id
+        -- No-op if there is no top-level heading:
+        trimTitle (sampleDocument' id) `shouldBe` sampleDocument' id

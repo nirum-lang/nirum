@@ -39,6 +39,7 @@ import qualified Nirum.Constructs.TypeDeclaration as TD
 import qualified Nirum.Constructs.TypeExpression as TE
 import Nirum.Docs ( Block (Heading)
                   , filterReferences
+                  , trimTitle
                   )
 import Nirum.Docs.Html (render, renderInlines)
 import Nirum.Package
@@ -161,6 +162,9 @@ $maybe tit <- headingTitle
         &#32;&mdash; #{tit}
 $nothing
     <h1><code>#{path}</code>
+$maybe m <- mod'
+    $maybe d <- docsBlock m
+        #{blockToHtml (trimTitle d)}
 $forall (ident, decl) <- types'
     <div class="#{showKind decl}" id="#{toNormalizedText ident}">
         #{typeDecl docsModule ident decl}
