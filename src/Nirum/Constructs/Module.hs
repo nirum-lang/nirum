@@ -57,10 +57,18 @@ instance Construct Module where
       where
         typeList :: [TypeDeclaration]
         typeList = DS.toList types'
+        importIdentifiersToCode :: (Identifier, Identifier) -> T.Text
+        importIdentifiersToCode (i, s) = if i == s
+                                            then toCode i
+                                            else T.concat [ toCode s
+                                                          , " as "
+                                                          , toCode i
+                                                          ]
         importCodes :: [T.Text]
         importCodes =
             [ T.concat [ "import ", toCode p, " ("
-                       , T.intercalate ", " $ map toCode $ S.toAscList i
+                       , T.intercalate ", " $
+                           map importIdentifiersToCode $ S.toAscList i
                        , ");"
                        ]
             | (p, i) <- M.toAscList (imports m)
@@ -76,9 +84,9 @@ instance Construct Module where
 instance Documented Module where
     docs (Module _ docs') = docs'
 
-imports :: Module -> M.Map ModulePath (S.Set Identifier)
+imports :: Module -> M.Map ModulePath (S.Set (Identifier, Identifier))
 imports (Module decls _) =
-    M.fromListWith S.union [(p, [i]) | Import p i _ <- DS.toList decls]
+    M.fromListWith S.union [(p, [(i, s)]) | Import p i s _ <- DS.toList decls]
 
 coreModulePath :: ModulePath
 coreModulePath = ["core"]

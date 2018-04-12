@@ -79,9 +79,9 @@ spec = do
             let run' = fst . runBuilder package ["fruits"] ()
             let core = ModuleName "core"
             run' (lookupType "text") `shouldBe`
-                Imported core (TD.PrimitiveType TD.Text TD.String)
+                Imported core "text" (TD.PrimitiveType TD.Text TD.String)
             run' (lookupType "int32") `shouldBe`
-                Imported core (TD.PrimitiveType TD.Int32 TD.Number)
+                Imported core "int32" (TD.PrimitiveType TD.Int32 TD.Number)
 
 
 data DummyTarget = DummyTarget deriving (Eq, Ord, Show)
