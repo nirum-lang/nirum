@@ -23,7 +23,8 @@ import Nirum.TestFixtures
 
 spec :: Spec
 spec = describe "Docs" $ do
-    let decls = [Import ["zzz"] "qqq" empty] :: DeclarationSet TypeDeclaration
+    let decls = [ Import ["zzz"] "qqq" "qqq" empty
+                ] :: DeclarationSet TypeDeclaration
         mod1 = Module decls Nothing
         mod2 = Module decls $ Just "module level docs...\nblahblah"
         mod3 = Module decls $ Just "# One Spoqa Trinity Studio\nblahblah"
