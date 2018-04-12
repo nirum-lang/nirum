@@ -15,7 +15,8 @@ from fixture.foo import (Album, CultureAgnosticName, Dog,
                          Point1, Point2, Point3d, Pop, PingService, Product,
                          RecordWithMap, RecordWithOptionalRecordField,
                          Rnb, RpcError, Run, Song, Status, Stop, Way,
-                         WesternName)
+                         WesternName,
+                         Whitelist)
 from fixture.foo.bar import PathUnbox, IntUnbox, Point
 from fixture.qux import Path, Name
 from fixture.reserved_keyword_enum import ReservedKeywordEnum
@@ -541,3 +542,8 @@ def test_name_shadowing_field():
     assert "bytes must be a value of {0}, not ['invalid']".format(
         'bytes' if PY3 else 'str'
     ) == str(ei.value)
+
+
+def test_import_as():
+    wl = Whitelist(ids=UuidList([]))
+    assert isinstance(wl.ids, UuidList)

@@ -45,6 +45,9 @@ import Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
                                        )
 import Util (singleDocs)
 
+ine :: Identifier -> ImportName
+ine i = ImportName i Nothing
+
 shouldBeRight :: (Eq l, Eq r, Show l, Show r) => Either l r -> r -> Expectation
 shouldBeRight actual expected = actual `shouldBe` Right expected
 
@@ -1145,70 +1148,97 @@ service method-dups (
             expectError "foo.bar.baz." 1 13
 
     describe "imports" $ do
-        let (parse', expectError) = helperFuncs P.imports
+        let (parse', expectError) = helperFuncs $ P.imports []
         it "emits Import values if succeeded to parse" $
             parse' "import foo.bar (a, b);" `shouldBeRight`
-                [ Import ["foo", "bar"] "a" empty
-                , Import ["foo", "bar"] "b" empty
+                [ Import ["foo", "bar"] (ine "a") empty
+                , Import ["foo", "bar"] (ine "b") empty
                 ]
         it "can be annotated" $ do
             parse' "import foo.bar (@foo (v = \"bar\") a, @baz b);"
                 `shouldBeRight`
-                    [ Import ["foo", "bar"] "a" fooAnnotationSet
-                    , Import ["foo", "bar"] "b" bazAnnotationSet
+                    [ Import ["foo", "bar"] (ine "a") fooAnnotationSet
+                    , Import ["foo", "bar"] (ine "b") bazAnnotationSet
                     ]
             parse' "import foo.bar (@foo (v = \"bar\") @baz a, b);"
                 `shouldBeRight`
-                    [ Import ["foo", "bar"] "a" $
+                    [ Import ["foo", "bar"] (ine "a") $
                              union fooAnnotationSet bazAnnotationSet
-                    , Import ["foo", "bar"] "b" empty
+                    , Import ["foo", "bar"] (ine "b") empty
                     ]
-        specify "import names can have a trailing comma" $
+        specify "import names can have a trailing comma" $ do
             parse' "import foo.bar (a, b,);" `shouldBeRight`
-                [ Import ["foo", "bar"] "a" empty
-                , Import ["foo", "bar"] "b" empty
+                [ Import ["foo", "bar"] (ine "a") empty
+                , Import ["foo", "bar"] (ine "b") empty
+                ]
+            parse' "import foo.bar (a as baz, b as qux,);" `shouldBeRight`
+                [ Import ["foo", "bar"] (ImportName "a" $ Just "baz") empty
+                , Import ["foo", "bar"] (ImportName "b" $ Just "qux") empty
                 ]
         specify "import names in parentheses can be multiline" $ do
             -- without a trailing comma
             parse' "import foo.bar (\n  a,\n  b\n);" `shouldBeRight`
-                [ Import ["foo", "bar"] "a" empty
-                , Import ["foo", "bar"] "b" empty
+                [ Import ["foo", "bar"] (ine "a") empty
+                , Import ["foo", "bar"] (ine "b") empty
+                ]
+            parse' "import foo.bar (\n  a as baz,\n  b as qux\n);" `shouldBeRight`
+                [ Import ["foo", "bar"] (ImportName "a" $ Just "baz") empty
+                , Import ["foo", "bar"] (ImportName "b" $ Just "qux") empty
                 ]
             -- with a trailing comma
             parse' "import foo.bar (\n  c,\n  d,\n);" `shouldBeRight`
-                [ Import ["foo", "bar"] "c" empty
-                , Import ["foo", "bar"] "d" empty
+                [ Import ["foo", "bar"] (ine "c") empty
+                , Import ["foo", "bar"] (ine "d") empty
+                ]
+            parse' "import foo.bar (\n  c as baz,\n  d as qux,\n);" `shouldBeRight`
+                [ Import ["foo", "bar"] (ImportName "c" $ Just "baz") empty
+                , Import ["foo", "bar"] (ImportName "d" $ Just "qux") empty
                 ]
         it "errors if parentheses have nothing" $
             expectError "import foo.bar ();" 1 17
+    
+        specify "errors import~as" $ do
+            -- has a name duplication
+            expectError "import foo.bar (a as c, b as c);" 1 29
+            expectError "import foo.bar (a as c, c);" 1 24
+            -- has invalid identifier
+            expectError "import foo.bar (a as -ab);" 1 21
 
-    describe "module'" $ context "handling name duplications" $ do
-        let (_, expectError) = helperFuncs P.module'
-        let examples =
-                -- Vertical alignment of `dup` is an intention; it purposes
-                -- to generate the same error offsets.
-                [ "type       dup = text;"
-                , "unboxed    dup (text);"
-                , "record     dup (text a);"
-                , "enum       dup = m1 | m2;"
-                , "enum e1 =  dup | foo;"
-                , "union      dup = t1 | t2;"
-                , "union u1 = dup | foo;"
-                , "service    dup (text ping ());"
-                ]
-        let importExample = "import foo (dup);"
-        let shiftDigit = \ case
-                '1' -> '3'
-                '2' -> '4'
-                c -> c
-        let inputs = [ (a, if a == b then T.map shiftDigit b else b)
-                     | a <- importExample : examples
-                     , b <- examples
-                     ]
-        forM_ inputs $ \ (forward, shadowing) ->
-            let input = T.concat [forward, "\n", shadowing]
-            in
-                specify (T.unpack input) $ expectError input 2 12
+    describe "module'" $ do
+        context "handling name duplications" $ do
+            let (_, expectError) = helperFuncs P.module'
+            let examples =
+                    -- Vertical alignment of `dup` is an intention; it purposes
+                    -- to generate the same error offsets.
+                    [ "type       dup = text;"
+                    , "unboxed    dup (text);"
+                    , "record     dup (text a);"
+                    , "enum       dup = m1 | m2;"
+                    , "enum e1 =  dup | foo;"
+                    , "union      dup = t1 | t2;"
+                    , "union u1 = dup | foo;"
+                    , "service    dup (text ping ());"
+                    ]
+            let importExample = "import foo (dup);"
+            let shiftDigit = \ case
+                    '1' -> '3'
+                    '2' -> '4'
+                    c -> c
+            let inputs = [ (a, if a == b then T.map shiftDigit b else b)
+                         | a <- importExample : examples
+                         , b <- examples
+                         ]
+            forM_ inputs $ \ (forward, shadowing) ->
+                let input = T.concat [forward, "\n", shadowing]
+                in
+                    specify (T.unpack input) $ expectError input 2 12
+        context "handle import name duplications" $ do
+            let (_, expectError) = helperFuncs P.module'
+            specify "multi import name duplication" $
+                expectError
+                    "import foo.bar (a as c);\nimport foo.bar (c);"
+                    2
+                    20
 
     specify "parse & parseFile" $ do
         files <- getDirectoryContents "examples"

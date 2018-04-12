@@ -1,4 +1,6 @@
-{-# LANGUAGE OverloadedLists, QuasiQuotes #-}
+{-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
 module Nirum.Constructs.TypeDeclarationSpec where
 
 
@@ -10,20 +12,17 @@ import Nirum.Constructs (Construct (toCode))
 import Nirum.Constructs.Annotation hiding (docs, fromList, name)
 import Nirum.Constructs.Declaration (Declaration (name), docs)
 import Nirum.Constructs.DeclarationSet hiding (empty)
+import Nirum.Constructs.Identifier
 import Nirum.Constructs.Service (Method (Method), Service (Service))
-import Nirum.Constructs.TypeDeclaration ( EnumMember (EnumMember)
-                                        , Field (Field)
-                                        , JsonType (String)
-                                        , PrimitiveTypeIdentifier (Text)
-                                        , Tag (Tag)
-                                        , Type (..)
-                                        , TypeDeclaration (..)
-                                        , unionType
-                                        )
+import Nirum.Constructs.TypeDeclaration
+
 import Util (singleDocs)
 
 barAnnotationSet :: AnnotationSet
 barAnnotationSet = singleton $ Annotation "bar" [("val", "baz")]
+
+ine :: Identifier -> ImportName
+ine i = ImportName i Nothing
 
 spec :: Spec
 spec = do
@@ -184,14 +183,18 @@ service ping-service (
                 toCode annoDecl `shouldBe`
                     "@bar(val = \"baz\")\nservice anno-service (bool ping ());"
                 -- TODO: more tests
-        context "Import" $ do
-            let import' = Import ["foo", "bar"] "baz" empty
-            specify "name" $
-                name import' `shouldBe` "baz"
-            specify "docs" $
-                docs import' `shouldBe` Nothing
-            specify "toCode" $
-                toCode import' `shouldBe` "import foo.bar (baz);\n"
+        specify "Import" $ do
+            let import' = Import ["foo", "bar"] (ine "baz") empty
+            let importAs = Import
+                               ["foo", "bar"]
+                               (ImportName "baz" $ Just "qux")
+                               empty
+            name import' `shouldBe` "baz"
+            docs import' `shouldBe` Nothing
+            toCode import' `shouldBe` "import foo.bar (baz);\n"
+            name importAs `shouldBe` "qux"
+            docs importAs `shouldBe` Nothing
+            toCode importAs `shouldBe` "import foo.bar (baz as qux);\n"
 
         context "member/tag name shadowing" $ do
             let fromRight either' = head [v | Right v <- [either']]
@@ -299,3 +302,9 @@ service ping-service (
                 `shouldBe` "circle (point origin, offset radius,)\n# docs"
             toCode (Tag "unit" [] empty) `shouldBe` "unit"
             toCode (Tag "unit" [] (singleDocs "docs")) `shouldBe` "unit\n# docs"
+    describe "importScopeName" $ do
+        let import' = ine "baz"
+        let importAs = ImportName "baz" $ Just "qux"
+        it "return its name" $ do
+            importScopeName import' `shouldBe` "baz"
+            importScopeName importAs `shouldBe` "qux"

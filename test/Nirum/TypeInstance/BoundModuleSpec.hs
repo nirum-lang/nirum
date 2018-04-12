@@ -43,19 +43,27 @@ testPackage target' = do
             docs bm' `shouldBe` Just "foo"
         specify "boundTypes" $ do
             boundTypes bm `shouldBe` []
-            boundTypes abc `shouldBe` [TypeDeclaration "a" (Alias "text") empty]
+            boundTypes abc `shouldBe`
+                [ TypeDeclaration "a" (Alias "text") empty
+                , TypeDeclaration "lorem" (Alias "int64") empty
+                ]
             boundTypes xyz `shouldBe`
-                [ Import ["abc"] "a" empty
+                [ Import ["abc"] (ImportName "a" Nothing) empty
+                , Import ["abc"] (ImportName "lorem" $ Just "ipsum") empty
                 , TypeDeclaration "x" (Alias "text") empty
                 ]
         specify "lookupType" $ do
             lookupType "a" bm `shouldBe` Missing
             lookupType "a" abc `shouldBe` Local (Alias "text")
-            lookupType "a" xyz `shouldBe` Imported ["abc"] (Alias "text")
+            lookupType "lorem" abc `shouldBe` Local (Alias "int64")
+            lookupType "a" xyz `shouldBe` Imported ["abc"] "a" (Alias "text")
+            lookupType "lorem" xyz `shouldBe` Missing
+            lookupType "ipsum" xyz `shouldBe`
+                Imported ["abc"] "lorem" (Alias "int64")
             lookupType "x" bm `shouldBe` Missing
             lookupType "x" abc `shouldBe` Missing
             lookupType "x" xyz `shouldBe` Local (Alias "text")
             lookupType "text" bm `shouldBe`
-                Imported coreModulePath (PrimitiveType Text String)
+                Imported coreModulePath "text" (PrimitiveType Text String)
             lookupType "text" abc `shouldBe` lookupType "text" bm
             lookupType "text" xyz `shouldBe` lookupType "text" bm

@@ -47,25 +47,31 @@ boundTypes = findInBoundModule types DS.empty
 
 data TypeLookup = Missing
                 | Local Type
-                | Imported ModulePath Type
+                | Imported ModulePath Identifier Type
                 deriving (Eq, Ord, Show)
 
 lookupType :: Target t => Identifier -> BoundModule t -> TypeLookup
 lookupType identifier boundModule =
     case DS.lookup identifier (boundTypes boundModule) of
-        Nothing -> toType coreModulePath
+        Nothing -> toType coreModulePath identifier
             (DS.lookup identifier $ types coreModule)
         Just TypeDeclaration { type' = t } -> Local t
-        Just (Import path' _ _) ->
+        Just (Import path' importName _) -> -- here
             case resolveModule path' (boundPackage boundModule) of
                 Nothing -> Missing
                 Just (Module decls _) ->
-                    toType path' (DS.lookup identifier decls)
+                    toType
+                        path'
+                        (impName importName)
+                        (DS.lookup (impName importName) decls)
         Just ServiceDeclaration {} -> Missing
   where
-    toType :: ModulePath -> Maybe TypeDeclaration -> TypeLookup
-    toType mp (Just TypeDeclaration { type' = t }) = Imported mp t
-    toType _ _ = Missing
+    toType :: ModulePath
+           -> Identifier
+           -> Maybe TypeDeclaration
+           -> TypeLookup
+    toType mp i (Just TypeDeclaration { type' = t }) = Imported mp i t
+    toType _ _ _ = Missing
 
 instance Target t => Documented (BoundModule t) where
     docs = findInBoundModule Nirum.Constructs.Module.docs Nothing

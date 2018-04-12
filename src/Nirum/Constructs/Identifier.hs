@@ -62,6 +62,7 @@ reservedKeywords = [ "enum"
                    , "unboxed"
                    , "union"
                    , "default"
+                   , "as"
                    ]
 
 identifierRule :: P.Parsec Void T.Text Identifier

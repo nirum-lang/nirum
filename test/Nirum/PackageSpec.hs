@@ -82,6 +82,7 @@ testPackage target' = do
                 Right countriesM <- parseFile (path </> "countries.nrm")
                 Right addressM <- parseFile (path </> "address.nrm")
                 Right pdfServiceM <- parseFile (path </> "pdf-service.nrm")
+                Right typesM <- parseFile (path </> "types.nrm")
                 let modules = [ (["blockchain"], blockchainM)
                               , (["builtins"], builtinsM)
                               , (["product"], productM)
@@ -89,6 +90,7 @@ testPackage target' = do
                               , (["countries"], countriesM)
                               , (["address"], addressM)
                               , (["pdf-service"], pdfServiceM)
+                              , (["types"], typesM)
                               ] :: [(ModulePath, Module)]
                     metadata' = Metadata { version = SV.version 0 3 0 [] []
                                          , authors = []
@@ -127,6 +129,7 @@ testPackage target' = do
                              , (["countries"], path </> "countries.nrm")
                              , (["address"], path </> "address.nrm")
                              , (["pdf-service"], path </> "pdf-service.nrm")
+                             , (["types"], path </> "types.nrm")
                              ]
   where
     scanPackage' :: FilePath -> IO (Either PackageError (Package t))

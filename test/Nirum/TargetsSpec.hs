@@ -59,6 +59,7 @@ spec =
                     , "src-py2" </> "pdf_service" </> "__init__.py"
                     , "src-py2" </> "product" </> "__init__.py"
                     , "src-py2" </> "shapes" </> "__init__.py"
+                    , "src-py2" </> "types" </> "__init__.py"
                     , "src" </> "address" </> "__init__.py"
                     , "src" </> "blockchain" </> "__init__.py"
                     , "src" </> "builtins" </> "__init__.py"
@@ -66,4 +67,5 @@ spec =
                     , "src" </> "pdf_service" </> "__init__.py"
                     , "src" </> "product" </> "__init__.py"
                     , "src" </> "shapes" </> "__init__.py"
+                    , "src" </> "types" </> "__init__.py"
                     ]

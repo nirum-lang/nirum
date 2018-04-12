@@ -4,6 +4,10 @@ module Nirum.Constructs.TypeDeclaration ( EnumMember (EnumMember)
                                                 , fieldName
                                                 , fieldType
                                                 )
+                                        , ImportName ( ImportName
+                                                     , name
+                                                     , sourceName
+                                                     )
                                         , JsonType ( Boolean
                                                    , Number
                                                    , String
@@ -44,7 +48,7 @@ module Nirum.Constructs.TypeDeclaration ( EnumMember (EnumMember)
                                         , TypeDeclaration ( Import
                                                           , ServiceDeclaration
                                                           , TypeDeclaration
-                                                          , importName
+                                                          , importNames
                                                           , modulePath
                                                           , service
                                                           , serviceAnnotations
@@ -55,6 +59,7 @@ module Nirum.Constructs.TypeDeclaration ( EnumMember (EnumMember)
                                                           )
                                         , unionType
                                         , tags
+                                        , importScopeName
                                         ) where
 
 import Data.Maybe (isJust, maybeToList)
@@ -179,6 +184,14 @@ data PrimitiveTypeIdentifier
 -- | Possible coded types of 'PrimitiveType' in JSON representation.
 data JsonType = Boolean | Number | String deriving (Eq, Ord, Show)
 
+
+-- |
+data ImportName = ImportName { name :: Identifier
+                             , sourceName :: Maybe Identifier
+                             }
+                             deriving (Eq, Ord, Show)
+
+
 -- Top-level 'Declaration' of type.
 data TypeDeclaration
     = TypeDeclaration { typename :: Name
@@ -190,7 +203,11 @@ data TypeDeclaration
                          , serviceAnnotations :: AnnotationSet
                          }
     | Import { modulePath :: ModulePath
-             , importName :: Identifier
+             ,
+
+fg
+
+             , sourceName :: Identifier
              , importAnnotations :: AnnotationSet
              }
     deriving (Eq, Ord, Show)
@@ -285,20 +302,27 @@ instance Construct TypeDeclaration where
         methodsText = T.intercalate "\n" $ map toCode methods'
         docs' :: Maybe Docs
         docs' = A.lookupDocs annotations'
-    toCode (Import path ident aSet) = T.concat [ "import "
-                                               , toCode path
-                                               , " ("
-                                               , toCode aSet
-                                               , toCode ident
-                                               , ");\n"
-                                               ]
+    toCode (Import path (ImportName n s) aSet) = T.concat
+        [ "import "
+        , toCode path
+        , " ("
+        , toCode aSet
+        , case sourceName iName of
+            Just s ->  T.intercalate " " [ toCode s
+                                         , "as"
+                                         , toCode $ name iName
+                                         ]
+            Nothing -> toCode $ name iName
+        , ");\n"
+        ]
 
 instance Documented TypeDeclaration
 
 instance Declaration TypeDeclaration where
     name TypeDeclaration { typename = name' } = name'
     name ServiceDeclaration { serviceName = name' } = name'
-    name Import { importName = id' } = Name id' id'
+    name Import { importNames = n  } =
+        Name (importScopeName n) (importScopeName n)
     extraPublicNames TypeDeclaration { type' = EnumType { members = ms } } =
         S.fromList [facialName mName | EnumMember mName _ <- toList ms]
     extraPublicNames TypeDeclaration { type' = unionType'@UnionType {} } =

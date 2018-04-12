@@ -16,9 +16,12 @@ import Nirum.Constructs.Annotation (empty)
 import Nirum.Constructs.Declaration (Documented (docs))
 import qualified Nirum.Constructs.DeclarationSet as DS
 import Nirum.Constructs.Docs (Docs)
-import Nirum.Constructs.Identifier (Identifier)
 import Nirum.Constructs.ModulePath (ModulePath)
-import Nirum.Constructs.TypeDeclaration ( JsonType (Boolean, Number, String)
+import Nirum.Constructs.TypeDeclaration ( ImportName ( ImportName
+                                                     , asName
+                                                     , impName
+                                                     )
+                                        , JsonType (Boolean, Number, String)
                                         , PrimitiveTypeIdentifier ( Bigint
                                                                   , Binary
                                                                   , Bool
@@ -57,10 +60,15 @@ instance Construct Module where
       where
         typeList :: [TypeDeclaration]
         typeList = DS.toList types'
+        importNametoCode :: ImportName -> T.Text
+        importNametoCode ImportName { asName = a, impName = i } = case a of
+            Just a' -> T.concat [ toCode i, " as ", toCode a' ]
+            _ -> toCode i
         importCodes :: [T.Text]
         importCodes =
             [ T.concat [ "import ", toCode p, " ("
-                       , T.intercalate ", " $ map toCode $ S.toAscList i
+                       , T.intercalate ", " $
+                             map importNametoCode $ S.toAscList i
                        , ");"
                        ]
             | (p, i) <- M.toAscList (imports m)
@@ -76,7 +84,7 @@ instance Construct Module where
 instance Documented Module where
     docs (Module _ docs') = docs'
 
-imports :: Module -> M.Map ModulePath (S.Set Identifier)
+imports :: Module -> M.Map ModulePath (S.Set ImportName)
 imports (Module decls _) =
     M.fromListWith S.union [(p, [i]) | Import p i _ <- DS.toList decls]
 
