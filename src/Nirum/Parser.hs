@@ -11,6 +11,7 @@ module Nirum.Parser ( Parser
                     , handleNameDuplication
                     , handleNameDuplicationError
                     , identifier
+                    , importName
                     , imports
                     , listModifier
                     , mapModifier
@@ -32,12 +33,13 @@ module Nirum.Parser ( Parser
                     , unionTypeDeclaration
                     ) where
 
-import Control.Monad (void, when)
+import Control.Monad (unless, void, when)
 import Data.Void
 import qualified System.IO as SIO
 
 import qualified Data.List as L
 import Data.Map.Strict as Map hiding (foldl, toList)
+import Data.Maybe
 import Data.Set hiding (foldl)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
@@ -627,28 +629,44 @@ modulePath = do
     f Nothing i = Just $ ModuleName i
     f (Just p) i = Just $ ModulePath p i
 
-importName :: Parser (Identifier, A.AnnotationSet)
-importName = do
+importName :: [Identifier]
+           -> Parser (Identifier, Identifier, A.AnnotationSet)
+importName forwardNames = do
     aSet <- annotationSet <?> "import annotations"
     spaces
     iName <- identifier <?> "name to import"
-    return (iName, aSet)
+    aName <- optional $ try $ do
+      spaces
+      string' "as"
+      spaces
+      n <- uniqueIdentifier forwardNames "alias name to import"
+      spaces
+      return n
+    return (iName, fromMaybe iName aName, aSet)
 
-imports :: Parser [TypeDeclaration]
-imports = do
+imports :: [Identifier] -> Parser [TypeDeclaration]
+imports forwardNames = do
     string' "import" <?> "import keyword"
     spaces
     path <- modulePath <?> "module path"
     spaces
     char '('
     spaces
-    idents <- (importName >>= \ i -> spaces >> return i)
-        `sepEndBy1` (char ',' >> spaces)
-        <?> "names to import"
+    idents <- many' [] $ \ importNames' -> do
+        let forwardNames' = [ i | (_, i, _) <- importNames' ] ++
+                forwardNames
+        unless (L.null importNames') $ do
+            string' ","
+            spaces
+        i <- importName forwardNames'
+        spaces
+        return i
     char ')'
     spaces
     char ';'
-    return [Import path ident aSet | (ident, aSet) <- idents]
+    return [ Import path source imp aSet
+           | (imp, source, aSet) <- idents
+           ]
 
 
 module' :: Parser Module
@@ -660,7 +678,7 @@ module' = do
         return d
     spaces
     importLists <- many $ do
-        importList <- imports
+        importList <- imports []
         spaces
         return importList
     let imports' = [i | l <- importLists, i <- l]
