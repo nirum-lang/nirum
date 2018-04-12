@@ -49,6 +49,7 @@ module Nirum.Constructs.TypeDeclaration ( EnumMember (EnumMember)
                                                           , service
                                                           , serviceAnnotations
                                                           , serviceName
+                                                          , sourceName
                                                           , type'
                                                           , typeAnnotations
                                                           , typename
@@ -191,6 +192,7 @@ data TypeDeclaration
                          }
     | Import { modulePath :: ModulePath
              , importName :: Identifier
+             , sourceName :: Identifier
              , importAnnotations :: AnnotationSet
              }
     deriving (Eq, Ord, Show)
@@ -285,13 +287,16 @@ instance Construct TypeDeclaration where
         methodsText = T.intercalate "\n" $ map toCode methods'
         docs' :: Maybe Docs
         docs' = A.lookupDocs annotations'
-    toCode (Import path ident aSet) = T.concat [ "import "
-                                               , toCode path
-                                               , " ("
-                                               , toCode aSet
-                                               , toCode ident
-                                               , ");\n"
-                                               ]
+    toCode (Import path iName sName aSet) = T.concat
+        [ "import "
+        , toCode path
+        , " ("
+        , toCode aSet
+        , if iName == sName
+             then toCode iName
+             else T.concat [ toCode sName, " as ", toCode iName ]
+        , ");\n"
+        ]
 
 instance Documented TypeDeclaration
 
