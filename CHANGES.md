@@ -118,6 +118,15 @@ To be released.
  -  Fixed a compiler bug that an error message on name duplicates had referred
     to a wrong line/column number.  [[#255]]
 
+ -  Added aliased import.  It's handy to avoid a name shadowing.
+    [[#217], [#258]]
+
+    ~~~~~~~~ nirum
+    import iso (country as iso-country);
+    import types (country);
+    ~~~~~~~~
+
+
 ### Docs target
 
  -  A new required configuration `targets.docs.title` was added.
@@ -175,12 +184,14 @@ To be released.
     March 2018.
 
 [#13]: https://github.com/spoqa/nirum/issues/13
+[#217]: https://github.com/spoqa/nirum/issues/217
 [#220]: https://github.com/spoqa/nirum/issues/220
 [#227]: https://github.com/spoqa/nirum/pull/227
 [#253]: https://github.com/spoqa/nirum/pull/253
 [#254]: https://github.com/spoqa/nirum/pull/254
 [#255]: https://github.com/spoqa/nirum/pull/255
 [#257]: https://github.com/spoqa/nirum/pull/257
+[#258]: https://github.com/spoqa/nirum/pull/258
 [#259]: https://github.com/spoqa/nirum/pull/259
 [entry points]: https://setuptools.readthedocs.io/en/latest/pkg_resources.html#entry-points
 [python2-numbers-integral]: https://docs.python.org/2/library/numbers.html#numbers.Integral
