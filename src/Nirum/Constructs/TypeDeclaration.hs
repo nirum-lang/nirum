@@ -5,8 +5,8 @@ module Nirum.Constructs.TypeDeclaration ( EnumMember (EnumMember)
                                                 , fieldType
                                                 )
                                         , ImportName ( ImportName
-                                                     , asName
-                                                     , impName
+                                                     , name
+                                                     , sourceName
                                                      )
                                         , JsonType ( Boolean
                                                    , Number
@@ -186,15 +186,10 @@ data JsonType = Boolean | Number | String deriving (Eq, Ord, Show)
 
 
 -- |
-data ImportName = ImportName { impName :: Identifier
-                             , asName :: Maybe Identifier
+data ImportName = ImportName { name :: Identifier
+                             , sourceName :: Maybe Identifier
                              }
                              deriving (Eq, Ord, Show)
-
-importScopeName :: ImportName -> Identifier
-importScopeName ImportName { impName = i, asName = a } = case a of
-    Just n' -> n'
-    _ -> i
 
 
 -- Top-level 'Declaration' of type.
@@ -208,7 +203,11 @@ data TypeDeclaration
                          , serviceAnnotations :: AnnotationSet
                          }
     | Import { modulePath :: ModulePath
-             , importNames :: ImportName
+             ,
+
+fg
+
+             , sourceName :: Identifier
              , importAnnotations :: AnnotationSet
              }
     deriving (Eq, Ord, Show)
@@ -303,19 +302,19 @@ instance Construct TypeDeclaration where
         methodsText = T.intercalate "\n" $ map toCode methods'
         docs' :: Maybe Docs
         docs' = A.lookupDocs annotations'
-    toCode (Import path iName aSet) = T.concat [ "import "
-                                               , toCode path
-                                               , " ("
-                                               , toCode aSet
-                                               , toCode $ impName iName
-                                               , case asName iName of
-                                                   Just i ->
-                                                       T.concat [ " as "
-                                                                , toCode i
-                                                                ]
-                                                   _ -> ""
-                                               , ");\n"
-                                               ]
+    toCode (Import path (ImportName n s) aSet) = T.concat
+        [ "import "
+        , toCode path
+        , " ("
+        , toCode aSet
+        , case sourceName iName of
+            Just s ->  T.intercalate " " [ toCode s
+                                         , "as"
+                                         , toCode $ name iName
+                                         ]
+            Nothing -> toCode $ name iName
+        , ");\n"
+        ]
 
 instance Documented TypeDeclaration
 

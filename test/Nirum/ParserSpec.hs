@@ -1148,7 +1148,7 @@ service method-dups (
             expectError "foo.bar.baz." 1 13
 
     describe "imports" $ do
-        let (parse', expectError) = helperFuncs P.imports
+        let (parse', expectError) = helperFuncs $ P.imports []
         it "emits Import values if succeeded to parse" $
             parse' "import foo.bar (a, b);" `shouldBeRight`
                 [ Import ["foo", "bar"] (ine "a") empty
@@ -1196,34 +1196,49 @@ service method-dups (
                 ]
         it "errors if parentheses have nothing" $
             expectError "import foo.bar ();" 1 17
+    
+        specify "errors import~as" $ do
+            -- has a name duplication
+            expectError "import foo.bar (a as c, b as c);" 1 29
+            expectError "import foo.bar (a as c, c);" 1 24
+            -- has invalid identifier
+            expectError "import foo.bar (a as -ab);" 1 21
 
-    describe "module'" $ context "handling name duplications" $ do
-        let (_, expectError) = helperFuncs P.module'
-        let examples =
-                -- Vertical alignment of `dup` is an intention; it purposes
-                -- to generate the same error offsets.
-                [ "type       dup = text;"
-                , "unboxed    dup (text);"
-                , "record     dup (text a);"
-                , "enum       dup = m1 | m2;"
-                , "enum e1 =  dup | foo;"
-                , "union      dup = t1 | t2;"
-                , "union u1 = dup | foo;"
-                , "service    dup (text ping ());"
-                ]
-        let importExample = "import foo (dup);"
-        let shiftDigit = \ case
-                '1' -> '3'
-                '2' -> '4'
-                c -> c
-        let inputs = [ (a, if a == b then T.map shiftDigit b else b)
-                     | a <- importExample : examples
-                     , b <- examples
-                     ]
-        forM_ inputs $ \ (forward, shadowing) ->
-            let input = T.concat [forward, "\n", shadowing]
-            in
-                specify (T.unpack input) $ expectError input 2 12
+    describe "module'" $ do
+        context "handling name duplications" $ do
+            let (_, expectError) = helperFuncs P.module'
+            let examples =
+                    -- Vertical alignment of `dup` is an intention; it purposes
+                    -- to generate the same error offsets.
+                    [ "type       dup = text;"
+                    , "unboxed    dup (text);"
+                    , "record     dup (text a);"
+                    , "enum       dup = m1 | m2;"
+                    , "enum e1 =  dup | foo;"
+                    , "union      dup = t1 | t2;"
+                    , "union u1 = dup | foo;"
+                    , "service    dup (text ping ());"
+                    ]
+            let importExample = "import foo (dup);"
+            let shiftDigit = \ case
+                    '1' -> '3'
+                    '2' -> '4'
+                    c -> c
+            let inputs = [ (a, if a == b then T.map shiftDigit b else b)
+                         | a <- importExample : examples
+                         , b <- examples
+                         ]
+            forM_ inputs $ \ (forward, shadowing) ->
+                let input = T.concat [forward, "\n", shadowing]
+                in
+                    specify (T.unpack input) $ expectError input 2 12
+        context "handle import name duplications" $ do
+            let (_, expectError) = helperFuncs P.module'
+            specify "multi import name duplication" $
+                expectError
+                    "import foo.bar (a as c);\nimport foo.bar (c);"
+                    2
+                    20
 
     specify "parse & parseFile" $ do
         files <- getDirectoryContents "examples"

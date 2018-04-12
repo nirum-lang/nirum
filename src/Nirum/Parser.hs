@@ -33,10 +33,11 @@ module Nirum.Parser ( Parser
                     , unionTypeDeclaration
                     ) where
 
-import Control.Monad (void, when)
+import Control.Monad (unless, void, when)
 import Data.Void
 import qualified System.IO as SIO
 
+import Debug.Trace
 import qualified Data.List as L
 import Data.Map.Strict as Map hiding (foldl, toList)
 import Data.Set hiding (foldl)
@@ -627,8 +628,9 @@ modulePath = do
     f Nothing i = Just $ ModuleName i
     f (Just p) i = Just $ ModulePath p i
 
-importName :: Parser (Identifier, Maybe Identifier, A.AnnotationSet)
-importName = do
+importName :: [Identifier]
+           -> Parser (Identifier, Maybe Identifier, A.AnnotationSet)
+importName forwardNames = do
     aSet <- annotationSet <?> "import annotations"
     spaces
     iName <- identifier <?> "name to import"
@@ -636,22 +638,28 @@ importName = do
       spaces
       string' "as"
       spaces
-      n <- identifier <?> "alias name to import"
+      n <- uniqueIdentifier (trace "importName.fowardNames" forwardNames) "alias name to import"
       spaces
       return n
     return (iName, aName, aSet)
 
-imports :: Parser [TypeDeclaration]
-imports = do
+imports :: [Identifier] -> Parser [TypeDeclaration]
+imports forwardNames = do
     string' "import" <?> "import keyword"
     spaces
     path <- modulePath <?> "module path"
     spaces
     char '('
     spaces
-    idents <- (importName >>= \ i -> spaces >> return i)
-        `sepEndBy1` (char ',' >> spaces)
-        <?> "names to import"
+    idents <- many' [] $ \ importNames' -> do
+        let forwardNames' = [ i | (_, Just i, _) <- importNames' ] ++
+                forwardNames
+        unless (L.null importNames') $ do
+            string' ","
+            spaces
+        i <- importName forwardNames'
+        spaces
+        return i
     char ')'
     spaces
     char ';'
@@ -669,7 +677,7 @@ module' = do
         return d
     spaces
     importLists <- many $ do
-        importList <- imports
+        importList <- imports []
         spaces
         return importList
     let imports' = [i | l <- importLists, i <- l]
