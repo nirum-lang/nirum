@@ -1,5 +1,7 @@
 # Introducing built-in types
 # ==========================
+#
+# This example module introduces the built-in types Nirum provides.
 
 record number-types (
     bigint a,

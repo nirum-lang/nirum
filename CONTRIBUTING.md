@@ -79,6 +79,6 @@ dependencies):
  -  Python
      -  All Python versions that Nirum should support: Python 2.7, and
         3.4 and above all
-     -  [`tox`][tox]
+     -  [`tox`][tox] 3.0.0 or higher
 
 [tox]: https://tox.readthedocs.io/

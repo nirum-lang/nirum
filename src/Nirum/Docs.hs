@@ -37,6 +37,7 @@ module Nirum.Docs ( Block ( BlockQuote
                   , headingLevelFromInt
                   , headingLevelInt
                   , parse
+                  , trimTitle
                   ) where
 
 import Data.String (IsString (fromString))
@@ -111,6 +112,13 @@ data Inline
     | Link { linkUrl :: Url, linkTitle :: Title, linkContents :: [Inline] }
     | Image { imageUrl :: Url, imageTitle :: Title }
     deriving (Eq, Ord, Show)
+
+-- | Trim the top-level first heading from the block, if it exists.
+trimTitle :: Block -> Block
+trimTitle block =
+    case block of
+        Document (Heading {} : rest) -> Document rest
+        b -> b
 
 parse :: T.Text -> Block
 parse =
