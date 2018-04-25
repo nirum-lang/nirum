@@ -1,7 +1,7 @@
 Serialization format
 ====================
 
-Identifier
+Identifier                                                         {#identifier}
 ----------
 
 All identifiers has to be normalized in JSON representation.  Normalized rules
