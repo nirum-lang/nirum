@@ -39,7 +39,6 @@ import qualified System.IO as SIO
 
 import qualified Data.List as L
 import Data.Map.Strict as Map hiding (foldl, toList)
-import Data.Maybe
 import Data.Set hiding (foldl)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
@@ -635,14 +634,16 @@ importName forwardNames = do
     aSet <- annotationSet <?> "import annotations"
     spaces
     iName <- identifier <?> "name to import"
-    aName <- optional $ try $ do
-      spaces
-      string' "as"
-      spaces
-      n <- uniqueIdentifier forwardNames "alias name to import"
-      spaces
-      return n
-    return (iName, fromMaybe iName aName, aSet)
+    hasAlias <- optional $ try $ do
+        spaces
+        string' "as"
+    aName <- case hasAlias of
+        Just _ -> do
+            spaces
+            uniqueIdentifier forwardNames "alias name to import"
+        Nothing ->
+            return iName
+    return (aName, iName, aSet)
 
 imports :: [Identifier] -> Parser [TypeDeclaration]
 imports forwardNames = do
@@ -653,18 +654,21 @@ imports forwardNames = do
     char '('
     spaces
     idents <- many' [] $ \ importNames' -> do
-        let forwardNames' = [ i | (_, i, _) <- importNames' ] ++
-                forwardNames
+        notFollowedBy $ choice [char ')', char ',' >> spaces >> char ')']
+        let forwardNames' = [i | (i, _, _) <- importNames'] ++ forwardNames
         unless (L.null importNames') $ do
             string' ","
             spaces
-        i <- importName forwardNames'
+        n <- importName forwardNames'
         spaces
-        return i
+        return n
+    when (L.null idents) $ fail "parentheses cannot be empty"
+    void $ optional $ string' ","
+    spaces
     char ')'
     spaces
     char ';'
-    return [ Import path source imp aSet
+    return [ Import path imp source aSet
            | (imp, source, aSet) <- idents
            ]
 
