@@ -82,8 +82,10 @@ testPackage target' = do
                 Right countriesM <- parseFile (path </> "countries.nrm")
                 Right addressM <- parseFile (path </> "address.nrm")
                 Right pdfServiceM <- parseFile (path </> "pdf-service.nrm")
+                Right geoM <- parseFile (path </> "geo.nrm")
                 let modules = [ (["blockchain"], blockchainM)
                               , (["builtins"], builtinsM)
+                              , (["geo"], geoM)
                               , (["product"], productM)
                               , (["shapes"], shapesM)
                               , (["countries"], countriesM)
@@ -122,6 +124,7 @@ testPackage target' = do
             mods' <- scanModules path
             mods' `shouldBe` [ (["blockchain"], path </> "blockchain.nrm")
                              , (["builtins"], path </> "builtins.nrm")
+                             , (["geo"], path </> "geo.nrm")
                              , (["product"], path </> "product.nrm")
                              , (["shapes"], path </> "shapes.nrm")
                              , (["countries"], path </> "countries.nrm")

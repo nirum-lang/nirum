@@ -90,12 +90,12 @@ detectMissingImports moduleSet =
                 Nothing -> [MissingModulePathError path path']
                 Just (Module decls _) ->
                     [ e
-                    | i <- S.toList idents
-                    , e <- case DS.lookup i decls of
+                    | (_, s) <- S.toList idents
+                    , e <- case DS.lookup s decls of
                         Just TypeDeclaration {} -> []
                         Just ServiceDeclaration {} -> []
-                        Just Import {} -> [MissingImportError path path' i]
-                        Nothing -> [MissingImportError path path' i]
+                        Just Import {} -> [MissingImportError path path' s]
+                        Nothing -> [MissingImportError path path' s]
                     ]
         ]
 

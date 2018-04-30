@@ -1145,70 +1145,123 @@ service method-dups (
             expectError "foo.bar.baz." 1 13
 
     describe "imports" $ do
-        let (parse', expectError) = helperFuncs P.imports
-        it "emits Import values if succeeded to parse" $
+        let (parse', expectError) = helperFuncs $ P.imports []
+        it "can single import name w/o trailing comma" $ do
+            parse' "import foo.bar (a);" `shouldBeRight`
+                [Import ["foo", "bar"] "a" "a" empty]
+            parse' "import foo.bar (a as qux);" `shouldBeRight`
+                [Import ["foo", "bar"] "qux" "a" empty]
+        it "can single import name w/ trailing comma" $ do
+            parse' "import foo.bar (a,);" `shouldBeRight`
+                [Import ["foo", "bar"] "a" "a" empty]
+            parse' "import foo.bar (a as qux,);" `shouldBeRight`
+                [Import ["foo", "bar"] "qux" "a" empty]
+        it "emits Import values if succeeded to parse" $ do
             parse' "import foo.bar (a, b);" `shouldBeRight`
-                [ Import ["foo", "bar"] "a" empty
-                , Import ["foo", "bar"] "b" empty
+                [ Import ["foo", "bar"] "a" "a" empty
+                , Import ["foo", "bar"] "b" "b" empty
+                ]
+            parse' "import foo.bar (a as foo, b as bar);" `shouldBeRight`
+                [ Import ["foo", "bar"] "foo" "a" empty
+                , Import ["foo", "bar"] "bar" "b" empty
                 ]
         it "can be annotated" $ do
             parse' "import foo.bar (@foo (v = \"bar\") a, @baz b);"
                 `shouldBeRight`
-                    [ Import ["foo", "bar"] "a" fooAnnotationSet
-                    , Import ["foo", "bar"] "b" bazAnnotationSet
+                    [ Import ["foo", "bar"] "a" "a" fooAnnotationSet
+                    , Import ["foo", "bar"] "b" "b" bazAnnotationSet
                     ]
             parse' "import foo.bar (@foo (v = \"bar\") @baz a, b);"
                 `shouldBeRight`
-                    [ Import ["foo", "bar"] "a" $
+                    [ Import ["foo", "bar"] "a" "a" $
                              union fooAnnotationSet bazAnnotationSet
-                    , Import ["foo", "bar"] "b" empty
+                    , Import ["foo", "bar"] "b" "b" empty
                     ]
-        specify "import names can have a trailing comma" $
+            parse'
+                "import foo.bar (@foo (v = \"bar\") a as foo, @baz b as bar);"
+                `shouldBeRight`
+                    [ Import ["foo", "bar"] "foo" "a" fooAnnotationSet
+                    , Import ["foo", "bar"] "bar" "b" bazAnnotationSet
+                    ]
+            parse'
+                "import foo.bar (@foo (v = \"bar\") @baz a as foo, b as bar);"
+                `shouldBeRight`
+                    [ Import ["foo", "bar"] "foo" "a" $
+                             union fooAnnotationSet bazAnnotationSet
+                    , Import ["foo", "bar"] "bar" "b" empty
+                    ]
+        specify "import names can have a trailing comma" $ do
             parse' "import foo.bar (a, b,);" `shouldBeRight`
-                [ Import ["foo", "bar"] "a" empty
-                , Import ["foo", "bar"] "b" empty
+                [ Import ["foo", "bar"] "a" "a" empty
+                , Import ["foo", "bar"] "b" "b" empty
+                ]
+            parse' "import foo.bar (a as foo, b as bar,);" `shouldBeRight`
+                [ Import ["foo", "bar"] "foo" "a" empty
+                , Import ["foo", "bar"] "bar" "b" empty
                 ]
         specify "import names in parentheses can be multiline" $ do
             -- without a trailing comma
             parse' "import foo.bar (\n  a,\n  b\n);" `shouldBeRight`
-                [ Import ["foo", "bar"] "a" empty
-                , Import ["foo", "bar"] "b" empty
+                [ Import ["foo", "bar"] "a" "a" empty
+                , Import ["foo", "bar"] "b" "b" empty
                 ]
+            parse' "import foo.bar (\n  a as foo,\n  b as bar\n);"
+                `shouldBeRight`
+                    [ Import ["foo", "bar"] "foo" "a" empty
+                    , Import ["foo", "bar"] "bar" "b" empty
+                    ]
             -- with a trailing comma
-            parse' "import foo.bar (\n  c,\n  d,\n);" `shouldBeRight`
-                [ Import ["foo", "bar"] "c" empty
-                , Import ["foo", "bar"] "d" empty
-                ]
+            parse' "import foo.bar (\n  c,\n  d,\n);"
+                `shouldBeRight`
+                    [ Import ["foo", "bar"] "c" "c" empty
+                    , Import ["foo", "bar"] "d" "d" empty
+                    ]
+            parse' "import foo.bar (\n  c as foo,\n  d as bar,\n);"
+                `shouldBeRight`
+                    [ Import ["foo", "bar"] "foo" "c" empty
+                    , Import ["foo", "bar"] "bar" "d" empty
+                    ]
+
         it "errors if parentheses have nothing" $
             expectError "import foo.bar ();" 1 17
+        it "disallows when there are duplicated alias names" $
+            expectError "import foo.bar (lorem as yolo, ipsum as yolo);" 1 41
 
-    describe "module'" $ context "handling name duplications" $ do
-        let (_, expectError) = helperFuncs P.module'
-        let examples =
-                -- Vertical alignment of `dup` is an intention; it purposes
-                -- to generate the same error offsets.
-                [ "type       dup = text;"
-                , "unboxed    dup (text);"
-                , "record     dup (text a);"
-                , "enum       dup = m1 | m2;"
-                , "enum e1 =  dup | foo;"
-                , "union      dup = t1 | t2;"
-                , "union u1 = dup | foo;"
-                , "service    dup (text ping ());"
-                ]
-        let importExample = "import foo (dup);"
-        let shiftDigit = \ case
-                '1' -> '3'
-                '2' -> '4'
-                c -> c
-        let inputs = [ (a, if a == b then T.map shiftDigit b else b)
-                     | a <- importExample : examples
-                     , b <- examples
-                     ]
-        forM_ inputs $ \ (forward, shadowing) ->
-            let input = T.concat [forward, "\n", shadowing]
-            in
-                specify (T.unpack input) $ expectError input 2 12
+    describe "module'" $ do
+        context "handling name duplications" $ do
+            let (_, expectError) = helperFuncs P.module'
+            let examples =
+                    -- Vertical alignment of `dup` is an intention; it purposes
+                    -- to generate the same error offsets.
+                    [ "type       dup = text;"
+                    , "unboxed    dup (text);"
+                    , "record     dup (text a);"
+                    , "enum       dup = m1 | m2;"
+                    , "enum e1 =  dup | foo;"
+                    , "union      dup = t1 | t2;"
+                    , "union u1 = dup | foo;"
+                    , "service    dup (text ping ());"
+                    ]
+            let importExample = "import foo (dup);"
+            let shiftDigit = \ case
+                    '1' -> '3'
+                    '2' -> '4'
+                    c -> c
+            let inputs = [ (a, if a == b then T.map shiftDigit b else b)
+                         | a <- importExample : examples
+                         , b <- examples
+                         ]
+            forM_ inputs $ \ (forward, shadowing) ->
+                let input = T.concat [forward, "\n", shadowing]
+                in
+                    specify (T.unpack input) $ expectError input 2 12
+        specify "allows import duplicated source name when it use alias" $ do
+            let (parse', _) = helperFuncs P.module'
+            parse' "import foo.bar (a);\n import lorem.ipsum (a as dolor);"
+                `shouldBeRight`
+                    Module [ Import ["foo", "bar"] "a" "a" empty
+                           , Import ["lorem", "ipsum"] "dolor" "a" empty
+                           ] Nothing
 
     specify "parse & parseFile" $ do
         files <- getDirectoryContents "examples"

@@ -39,22 +39,22 @@ compileSerializer mod' (TypeIdentifier typeId) pythonVar =
     case lookupType typeId mod' of
         Missing -> "None"  -- must never happen
         Local (Alias t) -> compileSerializer mod' t pythonVar
-        Imported modulePath' (Alias t) ->
+        Imported modulePath' _ (Alias t) ->
             case resolveBoundModule modulePath' (boundPackage mod') of
                 Nothing -> "None"  -- must never happen
                 Just foundMod -> compileSerializer foundMod t pythonVar
         Local PrimitiveType { primitiveTypeIdentifier = p } ->
             compilePrimitiveTypeSerializer p pythonVar
-        Imported _ PrimitiveType { primitiveTypeIdentifier = p } ->
+        Imported _ _ PrimitiveType { primitiveTypeIdentifier = p } ->
             compilePrimitiveTypeSerializer p pythonVar
         Local EnumType {} -> serializerCall
-        Imported _ EnumType {} -> serializerCall
+        Imported _ _ EnumType {} -> serializerCall
         Local RecordType {} -> serializerCall
-        Imported _ RecordType {} -> serializerCall
+        Imported _ _ RecordType {} -> serializerCall
         Local UnboxedType {} -> serializerCall
-        Imported _ UnboxedType {} -> serializerCall
+        Imported _ _ UnboxedType {} -> serializerCall
         Local UnionType {} -> serializerCall
-        Imported _ UnionType {} -> serializerCall
+        Imported _ _ UnionType {} -> serializerCall
   where
     serializerCall :: Code
     serializerCall = [qq|$pythonVar.__nirum_serialize__()|]

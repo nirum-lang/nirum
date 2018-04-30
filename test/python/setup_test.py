@@ -22,7 +22,7 @@ def test_setup_metadata():
     assert set(pkg['Provides']) == {
         'fixture', 'fixture.foo', 'fixture.foo.bar', 'fixture.qux',
         'fixture.reserved_keyword_enum', 'fixture.reserved_keyword_union',
-        'fixture.types',
+        'fixture.types', 'fixture.alias',
         'renamed', 'renamed.foo', 'renamed.foo.bar',
     }
     assert ['0.3.0'] == pkg['Version']
@@ -36,6 +36,7 @@ def test_module_entry_points():
         'fixture.foo', 'fixture.foo.bar', 'fixture.qux',
         'fixture.reserved-keyword-enum', 'fixture.reserved-keyword-union',
         'fixture.types',
+        'fixture.alias',
         'renames.test.foo', 'renames.test.foo.bar',
     }
     import fixture.foo

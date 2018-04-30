@@ -55,7 +55,7 @@ makeDummySource' pathPrefix m renames =
             metadata'
             [ (mp ["foo"], m)
             , ( mp ["foo", "bar"]
-              , Module [ Import (mp ["qux"]) "path" empty
+              , Module [ Import (mp ["qux"]) "path" "path" empty
                        , TypeDeclaration "path-unbox" (UnboxedType "path") empty
                        , TypeDeclaration "int-unbox"
                                          (UnboxedType "bigint") empty

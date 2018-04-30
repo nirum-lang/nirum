@@ -47,45 +47,67 @@ validModules =
     , (["foo", "baz"], Module [] $ Just "foo.baz")
     , (["qux"], Module [] $ Just "qux")
     , ( ["xyz"]
-      , Module [ Import ["abc"] "a" empty
+      , Module [ Import ["abc"] "a" "a" empty
                , TypeDeclaration "x" (Alias "text") empty
-               ] Nothing
+               ]
+               Nothing
+      )
+    , ( ["zar"]
+      , Module [ Import ["abc"] "aliased" "a" empty
+               , TypeDeclaration "quuz" (Alias "text") empty
+               ]
+               Nothing
       )
     ]
 
 missingImportsModules :: [(ModulePath, Module)]
 missingImportsModules =
     [ ( ["foo"]
-      , Module [ Import ["foo", "bar"] "xyz" empty -- MissingModulePathError
-               , Import ["foo", "bar"] "zzz" empty -- MissingModulePathError
-               , Import ["baz"] "qux" empty
-               ] Nothing
+      , Module
+            [ Import ["foo", "bar"] "xyz" "xyz" empty -- MissingModulePathError
+            , Import ["foo", "bar"] "zzz" "zzz" empty -- MissingModulePathError
+            , Import ["baz"] "qux" "qux" empty
+            ]
+            Nothing
       )
     , ( ["baz"]
       , Module [ TypeDeclaration "qux" (Alias "text") empty ] Nothing
       )
-    , (["qux"], Module [ Import ["foo"] "abc" empty -- MissingImportError
-                       , Import ["foo"] "def" empty -- MissingImportError
-                       ] Nothing)
+    , ( ["qux"]
+      , Module [ Import ["foo"] "abc" "abc" empty -- MissingImportError
+               , Import ["foo"] "def" "def" empty -- MissingImportError
+               ]
+               Nothing
+      )
     ]
 
 circularImportsModules :: [(ModulePath, Module)]
 circularImportsModules =
-    [ (["asdf"], Module [ Import ["asdf"] "foo" empty
-                        , TypeDeclaration "bar" (Alias "text") empty
-                        ] Nothing)
-    , (["abc", "def"], Module [ Import ["abc", "ghi"] "bar" empty
-                              , TypeDeclaration
-                                    "foo" (Alias "text") empty
-                              ] Nothing)
-    , (["abc", "ghi"], Module [ Import ["abc", "xyz"] "baz" empty
-                              , TypeDeclaration
-                                    "bar" (Alias "text") empty
-                              ] Nothing)
-    , (["abc", "xyz"], Module [ Import ["abc", "def"] "foo" empty
-                              , TypeDeclaration
-                                    "baz" (Alias "text") empty
-                              ] Nothing)
+    [ ( ["asdf"]
+      , Module [ Import ["asdf"] "foo" "foo" empty
+               , TypeDeclaration "bar" (Alias "text") empty
+               ]
+               Nothing
+      )
+    , ( ["abc", "def"]
+      , Module [ Import ["abc", "ghi"] "bar" "bar" empty
+               , TypeDeclaration
+                     "foo" (Alias "text") empty
+               ]
+               Nothing
+      )
+    , ( ["abc", "ghi"]
+      , Module [ Import ["abc", "xyz"] "baz" "baz" empty
+               , TypeDeclaration "bar" (Alias "text") empty
+               ]
+               Nothing
+      )
+    , ( ["abc", "xyz"]
+      , Module [ Import ["abc", "def"] "foo" "foo" empty
+               , TypeDeclaration "baz" (Alias "text") empty
+               ]
+               Nothing
+      )
     ]
 
 spec :: Spec
@@ -119,7 +141,7 @@ spec =
             mod' `shouldBe` fooBarModule
             lookup ["wrong", "path"] validModuleSet `shouldSatisfy` isNothing
         specify "length" $
-            length validModuleSet `shouldBe` 6
+            length validModuleSet `shouldBe` 7
         specify "null" $
             validModuleSet `shouldNotSatisfy` null
   where
