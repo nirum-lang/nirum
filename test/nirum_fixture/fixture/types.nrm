@@ -3,3 +3,5 @@ unboxed uuid-list ([uuid]);
 unboxed int32-unboxed (int32);
 
 unboxed datetime-unboxed (datetime);
+
+unboxed float-unbox (float32);

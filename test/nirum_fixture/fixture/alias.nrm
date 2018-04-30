@@ -1,0 +1,7 @@
+import fixture.types (float-unbox as float64-unbox);
+import fixture.foo (float-unbox as float32-unbox);
+
+record float-unbox (
+    float64-unbox f64,
+    float32-unbox f32,
+);
