@@ -54,6 +54,7 @@ import qualified Text.Megaparsec.Error as E
 import Text.Megaparsec.Char.Lexer (charLiteral)
 
 import qualified Nirum.Constructs.Annotation as A
+import Nirum.Constructs.Annotation.Internal hiding (annotations, name)
 import Nirum.Constructs.Declaration (Declaration)
 import qualified Nirum.Constructs.Declaration as D
 import Nirum.Constructs.Docs (Docs (Docs))
@@ -162,13 +163,13 @@ uniqueName forwardNames label' = try $ do
     nameP :: Parser Name
     nameP = name <?> label'
 
-annotationArgumentValue :: Parser T.Text
+annotationArgumentValue :: Parser AnnotationArgument
 annotationArgumentValue = do
     char '"'
     value <- manyTill charLiteral (char '"')
-    return $ T.pack value
+    return $ AText $ T.pack value
 
-annotationArgument :: Parser (Identifier, T.Text)
+annotationArgument :: Parser (Identifier, AnnotationArgument)
 annotationArgument = do
     arg <- identifier <?> "annotation parameter"
     spaces

@@ -40,6 +40,7 @@ import Text.Heterocephalus (compileText)
 import Text.InterpolatedString.Perl6 (q, qq)
 
 import qualified Nirum.Constructs.Annotation as A
+import Nirum.Constructs.Annotation.Internal hiding (annotations, name)
 import qualified Nirum.Constructs.DeclarationSet as DS
 import qualified Nirum.Constructs.Identifier as I
 import Nirum.Constructs.Declaration (Documented (docsBlock))
@@ -1198,7 +1199,7 @@ if hasattr({className}.Client, '__qualname__'):
     compileAnnotation ident annoArgument =
         toKeyItem ident $
             wrapMap $ T.intercalate ","
-                [ toKeyStr ident' value :: T.Text
+                [ toKeyStr ident' $ annoArgToText value
                 | (ident', value) <- M.toList annoArgument
                 ]
       where
@@ -1207,6 +1208,9 @@ if hasattr({className}.Client, '__qualname__'):
         toKeyStr :: I.Identifier -> T.Text -> T.Text
         toKeyStr k v =
             [qq|'{toAttributeName k}': u'''{escapeSingle v}'''|]
+        annoArgToText :: AnnotationArgument -> T.Text
+        annoArgToText (AText t) = t
+        annoArgToText (AInt i) = T.pack $ show i
     compileMethodAnnotation :: Method -> T.Text
     compileMethodAnnotation Method { methodName = mName
                                    , methodAnnotations = annoSet

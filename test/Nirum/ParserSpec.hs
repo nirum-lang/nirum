@@ -25,6 +25,7 @@ import qualified Nirum.Parser as P
 import Nirum.Parser (Parser, ParseError)
 import Nirum.Constructs (Construct (toCode))
 import Nirum.Constructs.Annotation as A
+import Nirum.Constructs.Annotation.Internal
 import Nirum.Constructs.Docs (Docs (Docs))
 import Nirum.Constructs.DeclarationSet (DeclarationSet)
 import Nirum.Constructs.DeclarationSetSpec (SampleDecl (..))
@@ -80,7 +81,7 @@ helperFuncs parser =
 
 
 fooAnnotationSet :: AnnotationSet
-fooAnnotationSet = A.singleton $ Annotation "foo" [("v", "bar")]
+fooAnnotationSet = A.singleton $ Annotation "foo" [("v", AText "bar")]
 
 bazAnnotationSet :: AnnotationSet
 bazAnnotationSet = A.singleton $ Annotation "baz" []
@@ -177,7 +178,8 @@ spec = do
     describe "annotation" $ do
         let (parse', expectError) = helperFuncs P.annotation
         context "with single argument" $ do
-            let rightAnnotaiton = Annotation "name-abc" [("foo", "wo\"rld")]
+            let rightAnnotaiton =
+                    Annotation "name-abc" [("foo", AText "wo\"rld")]
             it "success" $ do
                 parse' "@name-abc(foo=\"wo\\\"rld\")"
                     `shouldBeRight` rightAnnotaiton
@@ -192,7 +194,7 @@ spec = do
                 parse' "@name-abc ( foo=\"wo\\\"rld\")"
                     `shouldBeRight` rightAnnotaiton
                 parse' "@name-abc(foo=\"wo\\\"rld\\n\")" `shouldBeRight`
-                    Annotation "name-abc" [("foo", "wo\"rld\n")]
+                    Annotation "name-abc" [("foo", AText "wo\"rld\n")]
             it "fails to parse if annotation name start with hyphen" $ do
                 expectError "@-abc(v=\"helloworld\")" 1 2
                 expectError "@-abc-d(v = \"helloworld\")" 1 2
@@ -218,7 +220,7 @@ spec = do
     describe "annotationSet" $ do
         let (parse', expectError) = helperFuncs P.annotationSet
             Right annotationSet = fromList
-                [ Annotation "a" [("arg", "b")]
+                [ Annotation "a" [("arg", AText "b")]
                 , Annotation "c" []
                 ]
         it "success" $ do
@@ -822,8 +824,8 @@ union shape
     describe "method" $ do
         let (parse', expectError) = helperFuncs P.method
             httpGetAnnotation = singleton $ Annotation "http"
-                [ ("method", "GET")
-                , ("path", "/get-name/")
+                [ ("method", AText "GET")
+                , ("path", AText "/get-name/")
                 ]
         it "emits Method if succeeded to parse" $ do
             parse' "text get-name()" `shouldBeRight`
