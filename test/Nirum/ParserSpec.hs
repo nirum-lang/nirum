@@ -180,6 +180,8 @@ spec = do
         context "with single argument" $ do
             let rightAnnotaiton =
                     Annotation "name-abc" [("foo", AText "wo\"rld")]
+            let rightIntAnnotation =
+                    Annotation "name-abc" [("foo", AInt 1)]
             it "success" $ do
                 parse' "@name-abc(foo=\"wo\\\"rld\")"
                     `shouldBeRight` rightAnnotaiton
@@ -195,6 +197,10 @@ spec = do
                     `shouldBeRight` rightAnnotaiton
                 parse' "@name-abc(foo=\"wo\\\"rld\\n\")" `shouldBeRight`
                     Annotation "name-abc" [("foo", AText "wo\"rld\n")]
+                parse' "@name-abc(foo=1)" `shouldBeRight` rightIntAnnotation
+                parse' "@name-abc( foo=1)" `shouldBeRight` rightIntAnnotation
+                parse' "@name-abc(foo=1 )" `shouldBeRight` rightIntAnnotation
+                parse' "@name-abc( foo=1 )" `shouldBeRight` rightIntAnnotation
             it "fails to parse if annotation name start with hyphen" $ do
                 expectError "@-abc(v=\"helloworld\")" 1 2
                 expectError "@-abc-d(v = \"helloworld\")" 1 2

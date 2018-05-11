@@ -44,6 +44,7 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import Text.Megaparsec hiding (ParseError, parse)
 import Text.Megaparsec.Char ( char
+                            , digitChar
                             , eol
                             , noneOf
                             , spaceChar
@@ -52,6 +53,7 @@ import Text.Megaparsec.Char ( char
                             )
 import qualified Text.Megaparsec.Error as E
 import Text.Megaparsec.Char.Lexer (charLiteral)
+import Text.Read hiding (choice)
 
 import qualified Nirum.Constructs.Annotation as A
 import Nirum.Constructs.Annotation.Internal hiding (annotations, name)
@@ -165,9 +167,16 @@ uniqueName forwardNames label' = try $ do
 
 annotationArgumentValue :: Parser AnnotationArgument
 annotationArgumentValue = do
-    char '"'
-    value <- manyTill charLiteral (char '"')
-    return $ AText $ T.pack value
+    startQuote <- optional $ try $ char '"'
+    case startQuote of
+        Just _ -> do
+            v <- manyTill charLiteral (char '"')
+            return $ AText $ T.pack v
+        Nothing -> do
+            v <- many digitChar
+            case readMaybe v of
+                Just i -> return $ AInt i
+                Nothing -> fail "digit expected"
 
 annotationArgument :: Parser (Identifier, AnnotationArgument)
 annotationArgument = do

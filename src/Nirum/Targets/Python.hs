@@ -1199,17 +1199,14 @@ if hasattr({className}.Client, '__qualname__'):
     compileAnnotation ident annoArgument =
         toKeyItem ident $
             wrapMap $ T.intercalate ","
-                [ toKeyStr ident' $ annoArgToText value
+                [ [qq|'{toAttributeName ident'}': {annoArgToText value}|]
                 | (ident', value) <- M.toList annoArgument
                 ]
       where
         escapeSingle :: T.Text -> T.Text
         escapeSingle = T.strip . T.replace "'" "\\'"
-        toKeyStr :: I.Identifier -> T.Text -> T.Text
-        toKeyStr k v =
-            [qq|'{toAttributeName k}': u'''{escapeSingle v}'''|]
         annoArgToText :: AnnotationArgument -> T.Text
-        annoArgToText (AText t) = t
+        annoArgToText (AText t) = [qq|u'''{escapeSingle t}'''|]
         annoArgToText (AInt i) = T.pack $ show i
     compileMethodAnnotation :: Method -> T.Text
     compileMethodAnnotation Method { methodName = mName
