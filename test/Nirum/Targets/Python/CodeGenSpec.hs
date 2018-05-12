@@ -14,7 +14,7 @@ import Data.Maybe
 import Data.SemVer hiding (Identifier, metadata)
 import Test.Hspec.Meta
 import Text.Email.Validate (emailAddress)
-import Text.InterpolatedString.Perl6 (qq)
+import Text.InterpolatedString.Perl6 (q, qq)
 
 import Nirum.Constructs.Annotation (empty)
 import Nirum.Constructs.Identifier
@@ -264,3 +264,12 @@ spec = do
         renameModulePath renames ["baz"] `shouldBe` ["p", "az"]
         renameModulePath renames ["baz", "qux"] `shouldBe` ["p", "az", "qux"]
         renameModulePath renames ["qux", "foo"] `shouldBe` ["qux", "foo"]
+
+    specify "stringLiteral" $ do
+        stringLiteral "asdf" `shouldBe` [q|"asdf"|]
+        stringLiteral [q|Say 'hello world'|]
+            `shouldBe` [q|"Say 'hello world'"|]
+        stringLiteral [q|Say "hello world"|]
+            `shouldBe` [q|"Say \"hello world\""|]
+        stringLiteral "Say '\xc548\xb155'"
+            `shouldBe` [q|u"Say '\uc548\ub155'"|]

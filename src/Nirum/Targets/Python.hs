@@ -14,7 +14,6 @@ module Nirum.Targets.Python
     , compileModule
     , compileTypeDeclaration
     , parseModulePath
-    , stringLiteral
     , toNamePair
     , unionInstallRequires
     ) where
@@ -23,7 +22,6 @@ import Control.Monad (forM)
 import qualified Data.List as L
 import Data.Maybe (catMaybes, fromMaybe)
 import GHC.Exts (IsList (toList))
-import Text.Printf (printf)
 
 import qualified Data.HashMap.Strict as HM
 import qualified Data.Map.Strict as M
@@ -132,24 +130,6 @@ toEnumMemberName name'
 
 toNamePair :: Name -> T.Text
 toNamePair (Name f b) = [qq|('{toAttributeName f}', '{I.toSnakeCaseText b}')|]
-
-stringLiteral :: T.Text -> T.Text
-stringLiteral string =
-    open $ T.concatMap esc string `T.snoc` '"'
-  where
-    open :: T.Text -> T.Text
-    open = if T.any (> '\xff') string then T.append [qq|u"|] else T.cons '"'
-    esc :: Char -> T.Text
-    esc '"' = "\\\""
-    esc '\\' = "\\\\"
-    esc '\t' = "\\t"
-    esc '\n' = "\\n"
-    esc '\r' = "\\r"
-    esc c
-        | c >= '\x10000' = T.pack $ printf "\\U%08x" c
-        | c >= '\xff' = T.pack $ printf "\\u%04x" c
-        | c < ' ' || c >= '\x7f' = T.pack $ printf "\\x%02x" c
-        | otherwise = T.singleton c
 
 toIndentedCodes :: (a -> T.Text) -> [a] -> T.Text -> T.Text
 toIndentedCodes f traversable concatenator =

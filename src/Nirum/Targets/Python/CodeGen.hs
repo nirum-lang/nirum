@@ -26,6 +26,7 @@ module Nirum.Targets.Python.CodeGen
     , renameModulePath
     , renameModulePath'
     , runCodeGen
+    , stringLiteral
     , toAttributeName
     , toAttributeName'
     , toClassName
@@ -43,6 +44,7 @@ import Data.Map.Strict hiding (empty, member, toAscList)
 import Data.SemVer hiding (Identifier)
 import Data.Set hiding (empty)
 import Data.Text hiding (empty)
+import Text.Printf (printf)
 
 import qualified Nirum.CodeGen
 import Nirum.Constructs.Identifier
@@ -237,3 +239,24 @@ mangleVar expr arbitrarySideName = Data.Text.concat
     , arbitrarySideName
     , "__"
     ]
+
+stringLiteral :: Text -> Code
+stringLiteral string =
+    open $ Data.Text.concatMap esc string `snoc` '"'
+  where
+    open :: Text -> Text
+    open =
+        if Data.Text.any (> '\xff') string
+        then Data.Text.append "u\""
+        else Data.Text.cons '"'
+    esc :: Char -> Text
+    esc '"' = "\\\""
+    esc '\\' = "\\\\"
+    esc '\t' = "\\t"
+    esc '\n' = "\\n"
+    esc '\r' = "\\r"
+    esc c
+        | c >= '\x10000' = pack $ printf "\\U%08x" c
+        | c >= '\xff' = pack $ printf "\\u%04x" c
+        | c < ' ' || c >= '\x7f' = pack $ printf "\\x%02x" c
+        | otherwise = Data.Text.singleton c

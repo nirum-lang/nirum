@@ -1,11 +1,10 @@
-{-# LANGUAGE OverloadedLists, OverloadedStrings, QuasiQuotes,
-             ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Nirum.Targets.PythonSpec where
 
 import qualified Data.Map.Strict as M
 import System.FilePath ((</>))
 import Test.Hspec.Meta
-import Text.InterpolatedString.Perl6 (q)
 
 import Nirum.Constructs.Module (Module (Module))
 import Nirum.Constructs.Name (Name (Name))
@@ -20,7 +19,6 @@ import Nirum.Targets.Python
     , addDependency
     , addOptionalDependency
     , parseModulePath
-    , stringLiteral
     , toNamePair
     , unionInstallRequires
     )
@@ -41,15 +39,6 @@ spec = do
             toNamePair "lambda" `shouldBe` "('lambda_', 'lambda')"
             toNamePair (Name "abc" "lambda") `shouldBe` "('abc', 'lambda')"
             toNamePair (Name "lambda" "abc") `shouldBe` "('lambda_', 'abc')"
-
-    specify "stringLiteral" $ do
-        stringLiteral "asdf" `shouldBe` [q|"asdf"|]
-        stringLiteral [q|Say 'hello world'|]
-            `shouldBe` [q|"Say 'hello world'"|]
-        stringLiteral [q|Say "hello world"|]
-            `shouldBe` [q|"Say \"hello world\""|]
-        stringLiteral "Say '\xc548\xb155'"
-            `shouldBe` [q|u"Say '\uc548\ub155'"|]
 
     describe "compilePackage" $ do
         it "returns a Map of file paths and their contents to generate" $ do
