@@ -12,10 +12,10 @@ import Nirum.Constructs.Annotation.Internal
 spec :: Spec
 spec = do
     let annotation = Annotation "foo" M.empty
-        loremAnno = Annotation "lorem" [("arg", AText "ipsum")]
-        escapeCharAnno = Annotation "quote" [("arg", AText "\"")]
+        loremAnno = Annotation "lorem" [("arg", Text "ipsum")]
+        escapeCharAnno = Annotation "quote" [("arg", Text "\"")]
         longNameAnno =
-            Annotation "long-cat-is-long" [("long", AText "nyancat")]
+            Annotation "long-cat-is-long" [("long", Text "nyancat")]
         docsAnno = docs "Description"
     describe "Annotation" $ do
         describe "toCode Annotation" $
@@ -25,15 +25,15 @@ spec = do
                 toCode escapeCharAnno `shouldBe` "@quote(arg = \"\\\"\")"
         specify "docs" $
             docsAnno `shouldBe`
-                Annotation "docs" [("docs", AText "Description\n")]
+                Annotation "docs" [("docs", Text "Description\n")]
     describe "AnnotationSet" $ do
         specify "empty" $
             empty `shouldSatisfy` null
         specify "singleton" $ do
             singleton (Annotation "foo" []) `shouldBe`
                 AnnotationSet [("foo", [])]
-            singleton (Annotation "bar" [("arg", AText "baz")]) `shouldBe`
-                AnnotationSet [("bar", [("arg", AText "baz")])]
+            singleton (Annotation "bar" [("arg", Text "baz")]) `shouldBe`
+                AnnotationSet [("bar", [("arg", Text "baz")])]
         describe "fromList" $ do
             it "success" $ do
                 let Right empty' = fromList []
@@ -50,12 +50,12 @@ spec = do
         specify "union" $ do
             let Right a = fromList [annotation, loremAnno]
             let Right b = fromList [docsAnno, escapeCharAnno]
-            let c = AnnotationSet [("foo", [("arg", AText "bar")])]
+            let c = AnnotationSet [("foo", [("arg", Text "bar")])]
             A.union a b `shouldBe`
                 AnnotationSet [ ("foo", [])
-                              , ("lorem", [("arg", AText "ipsum")])
-                              , ("quote", [("arg", AText "\"")])
-                              , ("docs", [("docs", AText "Description\n")])
+                              , ("lorem", [("arg", Text "ipsum")])
+                              , ("quote", [("arg", Text "\"")])
+                              , ("docs", [("docs", Text "Description\n")])
                               ]
             A.union a c `shouldBe` a
         let Right annotationSet = fromList [ annotation
@@ -86,6 +86,6 @@ spec = do
         describe "insertDocs" $ do
             it "should insert the doc comment as an annotation" $
                 A.insertDocs "yay" empty `shouldReturn`
-                    AnnotationSet [("docs", [("docs", AText "yay\n")])]
+                    AnnotationSet [("docs", [("docs", Text "yay\n")])]
             it "should fail on the annotation that already have a doc" $
                 A.insertDocs "yay" annotationSet `shouldThrow` anyException

@@ -8,7 +8,7 @@ import Test.Hspec.Meta
 
 import Nirum.Constructs (Construct (toCode))
 import Nirum.Constructs.Annotation hiding (docs, fromList, name)
-import Nirum.Constructs.Annotation.Internal hiding (name)
+import qualified Nirum.Constructs.Annotation.Internal as AI
 import Nirum.Constructs.Declaration (Declaration (name), docs)
 import Nirum.Constructs.DeclarationSet hiding (empty)
 import Nirum.Constructs.Service (Method (Method), Service (Service))
@@ -24,7 +24,7 @@ import Nirum.Constructs.TypeDeclaration ( EnumMember (EnumMember)
 import Util (singleDocs)
 
 barAnnotationSet :: AnnotationSet
-barAnnotationSet = singleton $ Annotation "bar" [("val", AText "baz")]
+barAnnotationSet = singleton $ Annotation "bar" [("val", AI.Text "baz")]
 
 spec :: Spec
 spec = do

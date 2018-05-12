@@ -40,7 +40,8 @@ import Text.Heterocephalus (compileText)
 import Text.InterpolatedString.Perl6 (q, qq)
 
 import qualified Nirum.Constructs.Annotation as A
-import Nirum.Constructs.Annotation.Internal hiding (annotations, name)
+import Nirum.Constructs.Annotation.Internal hiding (Text, annotations, name)
+import qualified Nirum.Constructs.Annotation.Internal as AI
 import qualified Nirum.Constructs.DeclarationSet as DS
 import qualified Nirum.Constructs.Identifier as I
 import Nirum.Constructs.Declaration (Documented (docsBlock))
@@ -1206,8 +1207,8 @@ if hasattr({className}.Client, '__qualname__'):
         escapeSingle :: T.Text -> T.Text
         escapeSingle = T.strip . T.replace "'" "\\'"
         annoArgToText :: AnnotationArgument -> T.Text
-        annoArgToText (Text t) = [qq|u'''{escapeSingle t}'''|]
-        annoArgToText (Int i) = T.pack $ show i
+        annoArgToText (AI.Text t) = [qq|u'''{escapeSingle t}'''|]
+        annoArgToText (Integer i) = T.pack $ show i
     compileMethodAnnotation :: Method -> T.Text
     compileMethodAnnotation Method { methodName = mName
                                    , methodAnnotations = annoSet

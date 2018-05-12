@@ -25,7 +25,8 @@ import qualified Nirum.Parser as P
 import Nirum.Parser (Parser, ParseError)
 import Nirum.Constructs (Construct (toCode))
 import Nirum.Constructs.Annotation as A
-import Nirum.Constructs.Annotation.Internal
+import Nirum.Constructs.Annotation.Internal hiding (Text)
+import qualified Nirum.Constructs.Annotation.Internal as AI
 import Nirum.Constructs.Docs (Docs (Docs))
 import Nirum.Constructs.DeclarationSet (DeclarationSet)
 import Nirum.Constructs.DeclarationSetSpec (SampleDecl (..))
@@ -81,7 +82,7 @@ helperFuncs parser =
 
 
 fooAnnotationSet :: AnnotationSet
-fooAnnotationSet = A.singleton $ Annotation "foo" [("v", Text "bar")]
+fooAnnotationSet = A.singleton $ Annotation "foo" [("v", AI.Text "bar")]
 
 bazAnnotationSet :: AnnotationSet
 bazAnnotationSet = A.singleton $ Annotation "baz" []
@@ -179,9 +180,9 @@ spec = do
         let (parse', expectError) = helperFuncs P.annotation
         context "with single argument" $ do
             let rightAnnotaiton =
-                    Annotation "name-abc" [("foo", Text "wo\"rld")]
+                    Annotation "name-abc" [("foo", AI.Text "wo\"rld")]
             let rightIntAnnotation =
-                    Annotation "name-abc" [("foo", Int 1)]
+                    Annotation "name-abc" [("foo", Integer 1)]
             it "success" $ do
                 parse' "@name-abc(foo=\"wo\\\"rld\")"
                     `shouldBeRight` rightAnnotaiton
@@ -196,7 +197,7 @@ spec = do
                 parse' "@name-abc ( foo=\"wo\\\"rld\")"
                     `shouldBeRight` rightAnnotaiton
                 parse' "@name-abc(foo=\"wo\\\"rld\\n\")" `shouldBeRight`
-                    Annotation "name-abc" [("foo", Text "wo\"rld\n")]
+                    Annotation "name-abc" [("foo", AI.Text "wo\"rld\n")]
                 parse' "@name-abc(foo=1)" `shouldBeRight` rightIntAnnotation
                 parse' "@name-abc( foo=1)" `shouldBeRight` rightIntAnnotation
                 parse' "@name-abc(foo=1 )" `shouldBeRight` rightIntAnnotation
@@ -226,7 +227,7 @@ spec = do
     describe "annotationSet" $ do
         let (parse', expectError) = helperFuncs P.annotationSet
             Right annotationSet = fromList
-                [ Annotation "a" [("arg", Text "b")]
+                [ Annotation "a" [("arg", AI.Text "b")]
                 , Annotation "c" []
                 ]
         it "success" $ do
@@ -830,8 +831,8 @@ union shape
     describe "method" $ do
         let (parse', expectError) = helperFuncs P.method
             httpGetAnnotation = singleton $ Annotation "http"
-                [ ("method", Text "GET")
-                , ("path", Text "/get-name/")
+                [ ("method", AI.Text "GET")
+                , ("path", AI.Text "/get-name/")
                 ]
         it "emits Method if succeeded to parse" $ do
             parse' "text get-name()" `shouldBeRight`

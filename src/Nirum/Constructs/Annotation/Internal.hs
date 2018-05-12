@@ -5,7 +5,7 @@ module Nirum.Constructs.Annotation.Internal
                  , name
                  )
     , AnnotationArgument ( Text
-                         , Int
+                         , Integer
                          )
     , AnnotationArgumentSet
     , AnnotationSet ( AnnotationSet
@@ -24,7 +24,7 @@ import Nirum.Constructs.Docs
 import Nirum.Constructs.Identifier (Identifier)
 
 data AnnotationArgument = Text T.Text
-                        | Int Integer
+                        | Integer Integer
                         deriving (Eq, Ord, Show)
 
 type AnnotationArgumentSet = M.Map Identifier AnnotationArgument
@@ -45,7 +45,7 @@ instance Construct Annotation where
         showArg (key, value) = [qq|{toCode key} = {argToText value}|]
         argToText :: AnnotationArgument -> T.Text
         argToText (Text t) = literal t
-        argToText (Int i) = T.pack $ show i
+        argToText (Integer i) = T.pack $ show i
         literal :: T.Text -> T.Text
         literal s = [qq|"{(showLitString $ T.unpack s) ""}"|]
         showLitString :: String -> ShowS

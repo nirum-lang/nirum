@@ -30,7 +30,7 @@ import Nirum.Constructs.Identifier (Identifier)
 docs :: Docs -> Annotation
 docs (Docs d) = Annotation { name = docsAnnotationName
                            , arguments =
-                                 M.singleton docsAnnotationParameter $ AText d
+                                 M.singleton docsAnnotationParameter $ Text d
                            }
 
 newtype NameDuplication = AnnotationNameDuplication Identifier
@@ -80,7 +80,7 @@ lookupDocs annotationSet = do
     Annotation _ args <- lookup docsAnnotationName annotationSet
     d <- M.lookup docsAnnotationParameter args
     case d of
-        AText d' -> Just $ Docs d'
+        Text d' -> Just $ Docs d'
         _ -> Nothing
 
 insertDocs :: (Monad m) => Docs -> AnnotationSet -> m AnnotationSet
@@ -92,4 +92,4 @@ insertDocs docs' (AnnotationSet anno) =
     insertLookup :: Ord k => k -> a -> M.Map k a -> (Maybe a, M.Map k a)
     insertLookup = M.insertLookupWithKey $ \ _ a _ -> a
     args :: AnnotationArgumentSet
-    args = M.singleton docsAnnotationParameter $ AText $ toText docs'
+    args = M.singleton docsAnnotationParameter $ Text $ toText docs'

@@ -19,8 +19,8 @@ import Util (singleDocs)
 spec :: Spec
 spec = do
     let methodAnno = singleton $ Annotation "http" $ Map.fromList
-            [ ("method", AText "GET")
-            , ("path", AText "/ping/")
+            [ ("method", Text "GET")
+            , ("path", Text "/ping/")
             ]
     let docsAnno = singleDocs "docs..."
     describe "Parameter" $

@@ -56,7 +56,11 @@ import Text.Megaparsec.Char.Lexer (charLiteral)
 import Text.Read hiding (choice)
 
 import qualified Nirum.Constructs.Annotation as A
-import Nirum.Constructs.Annotation.Internal hiding (annotations, name)
+import Nirum.Constructs.Annotation.Internal hiding ( Text
+                                                   , annotations
+                                                   , name
+                                                   )
+import qualified Nirum.Constructs.Annotation.Internal as AI
 import Nirum.Constructs.Declaration (Declaration)
 import qualified Nirum.Constructs.Declaration as D
 import Nirum.Constructs.Docs (Docs (Docs))
@@ -165,18 +169,24 @@ uniqueName forwardNames label' = try $ do
     nameP :: Parser Name
     nameP = name <?> label'
 
+integer :: Parser Integer
+integer = do
+    v <- many digitChar
+    case readMaybe v of
+        Just i -> return i
+        Nothing -> fail "digit expected." -- never happened
+
+
 annotationArgumentValue :: Parser AnnotationArgument
 annotationArgumentValue = do
     startQuote <- optional $ try $ char '"'
     case startQuote of
         Just _ -> do
             v <- manyTill charLiteral (char '"')
-            return $ Text $ T.pack v
+            return $ AI.Text $ T.pack v
         Nothing -> do
-            v <- many digitChar
-            case readMaybe v of
-                Just i -> return $ Int i
-                Nothing -> fail "digit expected"
+            v <- integer
+            return $ Integer v
 
 annotationArgument :: Parser (Identifier, AnnotationArgument)
 annotationArgument = do
