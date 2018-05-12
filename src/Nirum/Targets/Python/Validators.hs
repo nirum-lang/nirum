@@ -113,13 +113,6 @@ compileInstanceValidator mod' typeId pythonVar = do
     cls <- compileTypeExpression mod' (Just (TypeIdentifier typeId))
     return $ Validator [qq|(isinstance(($pythonVar), ($cls)))|] []
 
-collectionsAbc :: CodeGen Code
-collectionsAbc = do
-    ver <- getPythonVersion
-    importStandardLibrary $ case ver of
-        Python2 -> "collections"
-        Python3 -> "collections.abc"
-
 multiplexValidators :: BoundModule Python
                     -> Code
                     -> [(TypeExpression, Code)]

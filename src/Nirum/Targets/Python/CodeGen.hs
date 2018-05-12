@@ -9,6 +9,7 @@ module Nirum.Targets.Python.CodeGen
     , Python (..)
     , PythonVersion (..)
     , RenameMap
+    , collectionsAbc
     , empty
     , getPythonVersion
     , importBuiltins
@@ -245,6 +246,13 @@ mangleVar expr arbitrarySideName = Data.Text.concat
     , arbitrarySideName
     , "__"
     ]
+
+collectionsAbc :: CodeGen Code
+collectionsAbc = do
+    ver <- getPythonVersion
+    importStandardLibrary $ case ver of
+        Python2 -> "collections"
+        Python3 -> "collections.abc"
 
 -- | Indent the given code.  If there are empty lines these are not indented.
 indent :: ToMarkup m => Code -> m -> Code

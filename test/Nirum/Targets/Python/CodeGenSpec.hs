@@ -202,6 +202,13 @@ spec' = pythonVersionSpecs $ \ ver -> do
             thirdPartyImports ctx2 `shouldBe` []
             localImports ctx2 `shouldBe` []
             compileError codeGen2 `shouldBe` Nothing
+        specify "collectionsAbc" $ do
+            let expected@(expectedModule, _) = case ver of
+                    Python2 -> ("_collections", "collections")
+                    Python3 -> ("_collections_abc", "collections.abc")
+            let (abc, ctx) = runCodeGen collectionsAbc empty'
+            abc `shouldBe` Right expectedModule
+            standardImports ctx `shouldBe` [expected]
 
 spec :: Spec
 spec = do
