@@ -9,6 +9,10 @@ email = "dev@nirum.org"
 
 [targets.python]
 name = "nirum_fixture"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)"
+]
 [targets.python.renames]
 "renames.test" = "renamed"
 

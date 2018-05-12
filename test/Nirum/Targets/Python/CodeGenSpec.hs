@@ -48,7 +48,7 @@ makeDummySource' pathPrefix m renames =
         , description = Just "Package description"
         , license = Just "MIT"
         , Nirum.Package.Metadata.keywords = ["sample", "example", "nirum"]
-        , target = Python "sample-package" minimumRuntime renames
+        , target = Python "sample-package" minimumRuntime renames ["classifier"]
         }
     pkg :: Package Python
     pkg = createPackage

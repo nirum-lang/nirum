@@ -68,6 +68,7 @@ type RenameMap = Map ModulePath ModulePath
 data Python = Python { packageName :: Text
                      , minimumRuntimeVersion :: Version
                      , renames :: RenameMap
+                     , classifiers :: [Text]
                      } deriving (Eq, Ord, Show, Typeable)
 
 data PythonVersion = Python2

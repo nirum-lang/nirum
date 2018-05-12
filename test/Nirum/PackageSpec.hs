@@ -4,6 +4,7 @@ module Nirum.PackageSpec where
 
 import Data.Either (isLeft, isRight)
 import Data.Proxy (Proxy (Proxy))
+import Data.Text
 import System.IO.Error (isDoesNotExistError)
 
 import qualified Data.SemVer as SV
@@ -53,8 +54,15 @@ createValidPackage t = createPackage Metadata { version = SV.initial
 
 spec :: Spec
 spec = do
-    testPackage (Python "nirum-examples" minimumRuntime [])
+    testPackage (Python "nirum-examples" minimumRuntime [] classifiers')
     testPackage DummyTarget
+  where
+    classifiers' :: [Text]
+    classifiers' =
+        [ "Development Status :: 3 - Alpha"
+        , append "License :: OSI Approved :: "
+                 "GNU General Public License v3 or later (GPLv3+)"
+        ]
 
 testPackage :: forall t . Target t => t -> Spec
 testPackage target' = do

@@ -28,6 +28,12 @@ def test_setup_metadata():
     assert ['0.3.0'] == pkg['Version']
     assert ['Package description'] == pkg['Summary']
     assert ['MIT'] == pkg['License']
+    expected = [
+        "Development Status :: 3 - Alpha",
+        "License :: OSI Approved :: "
+        "GNU General Public License v3 or later (GPLv3+)",
+    ]
+    assert expected == pkg['Classifier']
 
 
 def test_module_entry_points():

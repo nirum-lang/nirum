@@ -175,6 +175,8 @@ To be released.
     Under the hood, all generated `import`s are now aliased with a name prefixed
     an underscore.
 
+ -  Added Python classifier metadata field.  [[#100], [#269]]
+
 ### Et cetera
 
  -  The officially distributed executable binaries for Linux became
@@ -184,6 +186,7 @@ To be released.
     March 2018.
 
 [#13]: https://github.com/spoqa/nirum/issues/13
+[#100]: https://github.com/spoqa/nirum/issues/100
 [#217]: https://github.com/spoqa/nirum/issues/217
 [#220]: https://github.com/spoqa/nirum/issues/220
 [#227]: https://github.com/spoqa/nirum/pull/227
@@ -193,6 +196,7 @@ To be released.
 [#257]: https://github.com/spoqa/nirum/pull/257
 [#258]: https://github.com/spoqa/nirum/pull/258
 [#259]: https://github.com/spoqa/nirum/pull/259
+[#269]: https://github.com/spoqa/nirum/pull/269
 [entry points]: https://setuptools.readthedocs.io/en/latest/pkg_resources.html#entry-points
 [python2-numbers-integral]: https://docs.python.org/2/library/numbers.html#numbers.Integral
 [python2-int]: https://docs.python.org/2/library/functions.html#int
