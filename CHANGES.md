@@ -126,6 +126,14 @@ To be released.
     import types (country);
     ~~~~~~~~
 
+ -  Added support for integer type annotation argument.  [[#178], [#267]]
+
+    ~~~~~~~~ nirum
+    service foo-service (
+        @bar(baz=1)
+        int32 qux (int32 quux),
+    );
+    ~~~~~~~~
 
 ### Docs target
 
@@ -187,6 +195,7 @@ To be released.
 
 [#13]: https://github.com/spoqa/nirum/issues/13
 [#100]: https://github.com/spoqa/nirum/issues/100
+[#178]: https://github.com/spoqa/nirum/issues/178
 [#217]: https://github.com/spoqa/nirum/issues/217
 [#220]: https://github.com/spoqa/nirum/issues/220
 [#227]: https://github.com/spoqa/nirum/pull/227
@@ -196,6 +205,7 @@ To be released.
 [#257]: https://github.com/spoqa/nirum/pull/257
 [#258]: https://github.com/spoqa/nirum/pull/258
 [#259]: https://github.com/spoqa/nirum/pull/259
+[#267]: https://github.com/spoqa/nirum/pull/267
 [#269]: https://github.com/spoqa/nirum/pull/269
 [entry points]: https://setuptools.readthedocs.io/en/latest/pkg_resources.html#entry-points
 [python2-numbers-integral]: https://docs.python.org/2/library/numbers.html#numbers.Integral
