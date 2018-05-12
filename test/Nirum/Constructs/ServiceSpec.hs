@@ -6,6 +6,7 @@ import Data.Map.Strict as Map (fromList)
 import Test.Hspec.Meta
 
 import Nirum.Constructs.Annotation
+import Nirum.Constructs.Annotation.Internal
 import Nirum.Constructs.Docs (toCode)
 import Nirum.Constructs.Service (Method (Method), Parameter (Parameter))
 import Nirum.Constructs.TypeExpression ( TypeExpression ( ListModifier
@@ -18,8 +19,8 @@ import Util (singleDocs)
 spec :: Spec
 spec = do
     let methodAnno = singleton $ Annotation "http" $ Map.fromList
-            [ ("method", "GET")
-            , ("path", "/ping/")
+            [ ("method", Text "GET")
+            , ("path", Text "/ping/")
             ]
     let docsAnno = singleDocs "docs..."
     describe "Parameter" $

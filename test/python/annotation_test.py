@@ -1,3 +1,4 @@
+from fixture.datetime import DatetimeService
 from fixture.foo import PingService, RpcError
 from nirum.datastructures import Map
 
@@ -11,6 +12,12 @@ def test_service_method_annotation_metadata():
         'docs': Map({'docs': u'Method docs.'}),
         'http_resource': Map({'method': u'GET', 'path': u'/ping'}),
         'quote': Map({'single': u"'", 'triple': u"'''"}),
-        'unicode': Map({'unicode': u'\uc720\ub2c8\ucf54\ub4dc'}),
-    })
+        'unicode': Map({'unicode': u'\uc720\ub2c8\ucf54\ub4dc'}), })
     assert PingService.__nirum_method_annotations__['ping'] == expect
+
+
+def test_annotation_int():
+    exp = Map({
+        'num_constraints': Map({'max': 12, 'min': 1}),
+    })
+    assert DatetimeService.__nirum_method_annotations__['delta_month'] == exp

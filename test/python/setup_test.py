@@ -24,6 +24,7 @@ def test_setup_metadata():
         'fixture.reserved_keyword_enum', 'fixture.reserved_keyword_union',
         'fixture.types', 'fixture.alias',
         'renamed', 'renamed.foo', 'renamed.foo.bar',
+        'fixture.datetime',
     }
     assert ['0.3.0'] == pkg['Version']
     assert ['Package description'] == pkg['Summary']
@@ -44,6 +45,7 @@ def test_module_entry_points():
         'fixture.types',
         'fixture.alias',
         'renames.test.foo', 'renames.test.foo.bar',
+        'fixture.datetime',
     }
     import fixture.foo
     assert map_['fixture.foo'].resolve() is fixture.foo

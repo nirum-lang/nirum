@@ -4,6 +4,9 @@ module Nirum.Constructs.Annotation.Internal
                  , arguments
                  , name
                  )
+    , AnnotationArgument ( Text
+                         , Integer
+                         )
     , AnnotationArgumentSet
     , AnnotationSet ( AnnotationSet
                     , annotations
@@ -20,7 +23,11 @@ import Nirum.Constructs (Construct (toCode))
 import Nirum.Constructs.Docs
 import Nirum.Constructs.Identifier (Identifier)
 
-type AnnotationArgumentSet = M.Map Identifier T.Text
+data AnnotationArgument = Text T.Text
+                        | Integer Integer
+                        deriving (Eq, Ord, Show)
+
+type AnnotationArgumentSet = M.Map Identifier AnnotationArgument
 
 -- | Annotation for 'Declaration'.
 data Annotation = Annotation { name :: Identifier
@@ -32,10 +39,13 @@ instance Construct Annotation where
       | M.null args = '@' `T.cons` toCode n
       | otherwise = [qq|@{toCode n}({showArgs $ M.toList args})|]
       where
-        showArgs :: [(Identifier, T.Text)] -> T.Text
+        showArgs :: [(Identifier, AnnotationArgument)] -> T.Text
         showArgs args' = T.intercalate ", " $ map showArg args'
-        showArg :: (Identifier, T.Text) -> T.Text
-        showArg (key, value) = [qq|{toCode key} = {literal value}|]
+        showArg :: (Identifier, AnnotationArgument) -> T.Text
+        showArg (key, value) = [qq|{toCode key} = {argToText value}|]
+        argToText :: AnnotationArgument -> T.Text
+        argToText (Text t) = literal t
+        argToText (Integer i) = T.pack $ show i
         literal :: T.Text -> T.Text
         literal s = [qq|"{(showLitString $ T.unpack s) ""}"|]
         showLitString :: String -> ShowS

@@ -44,6 +44,7 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import Text.Megaparsec hiding (ParseError, parse)
 import Text.Megaparsec.Char ( char
+                            , digitChar
                             , eol
                             , noneOf
                             , spaceChar
@@ -52,8 +53,14 @@ import Text.Megaparsec.Char ( char
                             )
 import qualified Text.Megaparsec.Error as E
 import Text.Megaparsec.Char.Lexer (charLiteral)
+import Text.Read hiding (choice)
 
 import qualified Nirum.Constructs.Annotation as A
+import Nirum.Constructs.Annotation.Internal hiding ( Text
+                                                   , annotations
+                                                   , name
+                                                   )
+import qualified Nirum.Constructs.Annotation.Internal as AI
 import Nirum.Constructs.Declaration (Declaration)
 import qualified Nirum.Constructs.Declaration as D
 import Nirum.Constructs.Docs (Docs (Docs))
@@ -162,13 +169,26 @@ uniqueName forwardNames label' = try $ do
     nameP :: Parser Name
     nameP = name <?> label'
 
-annotationArgumentValue :: Parser T.Text
-annotationArgumentValue = do
-    char '"'
-    value <- manyTill charLiteral (char '"')
-    return $ T.pack value
+integer :: Parser Integer
+integer = do
+    v <- many digitChar
+    case readMaybe v of
+        Just i -> return i
+        Nothing -> fail "digit expected." -- never happened
 
-annotationArgument :: Parser (Identifier, T.Text)
+
+annotationArgumentValue :: Parser AnnotationArgument
+annotationArgumentValue = do
+    startQuote <- optional $ try $ char '"'
+    case startQuote of
+        Just _ -> do
+            v <- manyTill charLiteral (char '"')
+            return $ AI.Text $ T.pack v
+        Nothing -> do
+            v <- integer
+            return $ Integer v
+
+annotationArgument :: Parser (Identifier, AnnotationArgument)
 annotationArgument = do
     arg <- identifier <?> "annotation parameter"
     spaces
