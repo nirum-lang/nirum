@@ -46,7 +46,7 @@ import Data.Text hiding (empty)
 
 import qualified Nirum.CodeGen
 import Nirum.Constructs.Identifier
-import Nirum.Constructs.ModulePath
+import Nirum.Constructs.ModulePath hiding (isPrefixOf)
 import Nirum.Constructs.Name
 
 minimumRuntime :: Version
