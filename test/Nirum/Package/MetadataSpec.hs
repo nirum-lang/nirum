@@ -40,6 +40,7 @@ import Nirum.Package.Metadata ( Metadata (Metadata, version)
                               , readFromPackage
                               , readMetadata
                               , stringField
+                              , textArrayField
                               , versionField
                               )
 
@@ -250,6 +251,16 @@ spec =
             fieldType (get "t1") `shouldBe` "table of an item"
             fieldType (get "t2") `shouldBe` "table of 2 items"
             fieldType (get "ta") `shouldBe` "array of 2 tables"
+        specify "textArrayField" $ do
+            let Right table = parseTomlDoc "<string>"
+                    [q|ta = []
+                       sa = ["a", "b", "c"]
+                       i = 1|]
+            textArrayField "ta" table `shouldBe` Right []
+            textArrayField "sa" table `shouldBe` Right ["a", "b", "c"]
+            textArrayField "i" table `shouldBe` Left (FieldTypeError
+                "i" "array" "integer (1)")
+
   where
     parse :: Text -> Either MetadataError (Metadata DummyTarget)
     parse = parseMetadata "<string>"

@@ -3,6 +3,10 @@ version = "0.3.0"
 [targets.python]
 name = "nirum-examples"
 minimum_runtime = "0.3.9"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)"
+]
 
 [targets.docs]
 title = "Nirum Examples"

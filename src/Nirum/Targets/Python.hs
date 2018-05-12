@@ -66,10 +66,10 @@ import Nirum.Docs.ReStructuredText (ReStructuredText, render)
 import Nirum.Package hiding (target)
 import Nirum.Package.Metadata ( Author (Author, name, email)
                               , Metadata ( authors
-                                         , target
-                                         , version
                                          , description
                                          , license
+                                         , target
+                                         , version
                                          )
                               , MetadataError ( FieldError
                                               , FieldTypeError
@@ -86,6 +86,7 @@ import Nirum.Package.Metadata ( Author (Author, name, email)
                                        )
                               , stringField
                               , tableField
+                              , textArrayField
                               , versionField
                               )
 import qualified Nirum.Package.ModuleSet as MS
@@ -1319,6 +1320,7 @@ compilePackageMetadata Package
                                  , target = target'@Python
                                        { packageName = packageName'
                                        , minimumRuntimeVersion = minRuntimeVer
+                                       , classifiers = classifiers'
                                        }
                                  }
                            , modules = modules'
@@ -1384,13 +1386,18 @@ SOURCE_ROOT = #{stringLiteral $ sourceDirectory Python3}
 if sys.version_info < (3, 0):
     SOURCE_ROOT = #{stringLiteral $ sourceDirectory Python2}
 
-# TODO: long_description, url, classifiers
+# TODO: long_description, url
 setup(
     name=#{stringLiteral packageName'},
     version=#{stringLiteral $ SV.toText version'},
     description=#{nStringLiteral description'},
     license=#{nStringLiteral license'},
     keywords=#{stringLiteral $ T.intercalate " " keywords'},
+    classifiers=[
+%{ forall classifier <- classifiers' }
+    #{stringLiteral classifier},
+%{ endforall }
+    ],
     author=', '.join([
 %{ forall Author { name = name } <- authors' }
     (#{stringLiteral name}),
@@ -1529,9 +1536,14 @@ instance Target Python where
                                              MD.fieldType v
             | (k, v) <- HM.toList renameTable
             ]
+        classifiers' <- case textArrayField "classifiers" table of
+            Right t -> Right t
+            Left (FieldError _) -> Right []
+            otherwise' -> otherwise'
         return Python { packageName = name'
                       , minimumRuntimeVersion = max minRuntime minimumRuntime
                       , renames = M.fromList renamePairs
+                      , classifiers = classifiers'
                       }
     compilePackage = compilePackage'
     showCompileError _ e = e

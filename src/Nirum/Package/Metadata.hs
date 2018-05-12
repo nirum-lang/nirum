@@ -3,11 +3,11 @@
 module Nirum.Package.Metadata ( Author (Author, email, name, uri)
                               , Metadata ( Metadata
                                          , authors
+                                         , description
+                                         , keywords
+                                         , license
                                          , target
                                          , version
-                                         , description
-                                         , license
-                                         , keywords
                                          )
                               , MetadataError ( FieldError
                                               , FieldTypeError
@@ -47,6 +47,7 @@ module Nirum.Package.Metadata ( Author (Author, email, name, uri)
                               , readMetadata
                               , stringField
                               , tableField
+                              , textArrayField
                               , versionField
                               ) where
 

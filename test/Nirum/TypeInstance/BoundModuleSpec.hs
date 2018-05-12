@@ -21,7 +21,7 @@ import Nirum.TypeInstance.BoundModule
 
 spec :: Spec
 spec = do
-    testPackage (Python "nirum-examples" minimumRuntime [])
+    testPackage (Python "nirum-examples" minimumRuntime [] [])
     testPackage DummyTarget
 
 testPackage :: forall t . Target t => t -> Spec
