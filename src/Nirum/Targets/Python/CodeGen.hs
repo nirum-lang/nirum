@@ -14,6 +14,7 @@ module Nirum.Targets.Python.CodeGen
     , importBuiltins
     , importStandardLibrary
     , importTypingForPython3
+    , indent
     , insertLocalImport
     , insertStandardImport
     , insertStandardImportA
@@ -44,6 +45,11 @@ import Data.Map.Strict hiding (empty, member, toAscList)
 import Data.SemVer hiding (Identifier)
 import Data.Set hiding (empty)
 import Data.Text hiding (empty)
+import qualified Data.Text
+import Data.Text.Lazy (toStrict)
+import qualified Data.Text.Lazy
+import Text.Blaze (ToMarkup (preEscapedToMarkup))
+import Text.Blaze.Renderer.Text (renderMarkup)
 import Text.Printf (printf)
 
 import qualified Nirum.CodeGen
@@ -239,6 +245,20 @@ mangleVar expr arbitrarySideName = Data.Text.concat
     , arbitrarySideName
     , "__"
     ]
+
+-- | Indent the given code.  If there are empty lines these are not indented.
+indent :: ToMarkup m => Code -> m -> Code
+indent space =
+    intercalate "\n"
+        . fmap indentLn
+        . Data.Text.Lazy.split (== '\n')
+        . renderMarkup
+        . preEscapedToMarkup
+  where
+    indentLn :: Data.Text.Lazy.Text -> Code
+    indentLn line
+      | Data.Text.Lazy.null line = Data.Text.empty
+      | otherwise = space `append` toStrict line
 
 stringLiteral :: Text -> Code
 stringLiteral string =

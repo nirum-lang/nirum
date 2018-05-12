@@ -206,15 +206,6 @@ compileDocsComment indentSpace d =
         Nothing -> "\n"
         Just rst -> indent (indentSpace `T.append` "#: ") rst
 
-indent :: Code -> Code -> Code
-indent space =
-    T.intercalate "\n" . map indentLn . T.lines
-  where
-    indentLn :: Code -> Code
-    indentLn line
-      | T.null line = T.empty
-      | otherwise = space `T.append` line
-
 type ParameterName = Code
 type ParameterType = Code
 type ReturnType = Code

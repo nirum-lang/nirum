@@ -265,6 +265,12 @@ spec = do
         renameModulePath renames ["baz", "qux"] `shouldBe` ["p", "az", "qux"]
         renameModulePath renames ["qux", "foo"] `shouldBe` ["qux", "foo"]
 
+    specify "indent" $ do
+        indent "    " ("a\n    b\n\nc\n" :: Code) `shouldBe`
+            "    a\n        b\n\n    c\n"
+        indent "    " ("\"\"\"foo\nbar\n\"\"\"" :: Code) `shouldBe`
+            "    \"\"\"foo\n    bar\n    \"\"\""
+
     specify "stringLiteral" $ do
         stringLiteral "asdf" `shouldBe` [q|"asdf"|]
         stringLiteral [q|Say 'hello world'|]
