@@ -1206,8 +1206,8 @@ if hasattr({className}.Client, '__qualname__'):
         escapeSingle :: T.Text -> T.Text
         escapeSingle = T.strip . T.replace "'" "\\'"
         annoArgToText :: AnnotationArgument -> T.Text
-        annoArgToText (AText t) = [qq|u'''{escapeSingle t}'''|]
-        annoArgToText (AInt i) = T.pack $ show i
+        annoArgToText (Text t) = [qq|u'''{escapeSingle t}'''|]
+        annoArgToText (Int i) = T.pack $ show i
     compileMethodAnnotation :: Method -> T.Text
     compileMethodAnnotation Method { methodName = mName
                                    , methodAnnotations = annoSet

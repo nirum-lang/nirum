@@ -171,11 +171,11 @@ annotationArgumentValue = do
     case startQuote of
         Just _ -> do
             v <- manyTill charLiteral (char '"')
-            return $ AText $ T.pack v
+            return $ Text $ T.pack v
         Nothing -> do
             v <- many digitChar
             case readMaybe v of
-                Just i -> return $ AInt i
+                Just i -> return $ Int i
                 Nothing -> fail "digit expected"
 
 annotationArgument :: Parser (Identifier, AnnotationArgument)
