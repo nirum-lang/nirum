@@ -1,5 +1,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 module Nirum.Targets.Python.CodeGen
     ( Code
@@ -11,6 +12,8 @@ module Nirum.Targets.Python.CodeGen
     , RenameMap
     , addDependency
     , addOptionalDependency
+    , baseIntegerClass
+    , baseStringClass
     , collectionsAbc
     , empty
     , getPythonVersion
@@ -41,6 +44,7 @@ module Nirum.Targets.Python.CodeGen
     ) where
 
 import Control.Monad.State
+import Data.Maybe
 import Data.Typeable
 import GHC.Exts
 
@@ -54,6 +58,7 @@ import Data.Text.Lazy (toStrict)
 import qualified Data.Text.Lazy
 import Text.Blaze (ToMarkup (preEscapedToMarkup))
 import Text.Blaze.Renderer.Text (renderMarkup)
+import Text.InterpolatedString.Perl6 (qq)
 import Text.Printf (printf)
 
 import qualified Nirum.CodeGen
@@ -312,3 +317,20 @@ stringLiteral string =
         | c >= '\xff' = pack $ printf "\\u%04x" c
         | c < ' ' || c >= '\x7f' = pack $ printf "\\x%02x" c
         | otherwise = Data.Text.singleton c
+
+baseStringClass :: CodeGen Code
+baseStringClass = do
+    builtinsMod <- importBuiltins
+    pyVer <- getPythonVersion
+    let className = case pyVer of
+            Python2 -> "basestring" :: Code
+            Python3 -> "str"
+    return [qq|$builtinsMod.$className|]
+
+baseIntegerClass :: CodeGen Code
+baseIntegerClass = do
+    builtinsMod <- importBuiltins
+    pyVer <- getPythonVersion
+    return $ case pyVer of
+        Python2 -> [qq|($builtinsMod.int, $builtinsMod.long)|]
+        Python3 -> [qq|$builtinsMod.int|]

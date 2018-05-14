@@ -209,6 +209,27 @@ spec' = pythonVersionSpecs $ \ ver -> do
             let (abc, ctx) = runCodeGen collectionsAbc empty'
             abc `shouldBe` Right expectedModule
             standardImports ctx `shouldBe` [expected]
+        specify "baseStringClass" $ do
+            let (baseString, ctx) = runCodeGen baseStringClass empty'
+            case ver of
+                Python2 -> do
+                    baseString `shouldBe` Right "__builtin__.basestring"
+                    standardImports ctx `shouldBe`
+                        [("__builtin__", "__builtin__")]
+                Python3 -> do
+                    baseString `shouldBe` Right "__builtin__.str"
+                    standardImports ctx `shouldBe` [("__builtin__", "builtins")]
+        specify "baseIntegerClass" $ do
+            let (baseString, ctx) = runCodeGen baseIntegerClass empty'
+            case ver of
+                Python2 -> do
+                    baseString `shouldBe`
+                        Right "(__builtin__.int, __builtin__.long)"
+                    standardImports ctx `shouldBe`
+                        [("__builtin__", "__builtin__")]
+                Python3 -> do
+                    baseString `shouldBe` Right "__builtin__.int"
+                    standardImports ctx `shouldBe` [("__builtin__", "builtins")]
 
         let evalContext f = snd $ runCodeGen f empty'
         let req = empty'
