@@ -1,0 +1,6 @@
+{
+    "description": "If an unboxed type consists of a primitive type that is represented as a number in JSON it also has to be represented as a number in JSON.",
+    "type": "fixture.types.int32-unboxed",
+    "input": 1234,
+    "normal": 1234
+}

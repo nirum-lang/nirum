@@ -1,0 +1,11 @@
+{
+    "description": "A record value must be represented as an object in JSON.",
+    "type": "fixture.foo.person",
+    "input": "invalid",
+    "errors": [
+        {
+            "path": "",
+            "message": "Expected an object."
+        }
+    ]
+}

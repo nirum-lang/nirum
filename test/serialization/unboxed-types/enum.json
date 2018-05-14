@@ -1,0 +1,6 @@
+{
+    "description": "If an unboxed type consists of an enum type it also has to be represented in the same way to its inner type.",
+    "type": "fixture.types.enum-unboxed",
+    "input": "may",
+    "normal": "may"
+}

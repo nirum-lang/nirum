@@ -25,8 +25,10 @@ def test_no_return_method():
 
 class DumbTransport(Transport):
 
-    def __init__(self):
+    def __init__(self, successful=True, result_serialized=None):
         self.calls = []
+        self.successful = successful
+        self.result_serialized = result_serialized
 
     def call(self,
              method_name,
@@ -41,7 +43,7 @@ class DumbTransport(Transport):
             method_annotations,
             parameter_annotations,
         ))
-        return True, None
+        return self.successful, self.result_serialized
 
     @property
     def latest_call(self):
@@ -124,6 +126,40 @@ def test_service_client_validation():
     pc = PingService.Client(t)
     with raises(ValueError):
         pc.no_return_method(0x80000000)
+
+
+def test_service_client_payload_deserialization():
+    c1 = PingService.Client(DumbTransport(True, True))
+    assert c1.ping(nonce=u'foo') is True
+    c2 = PingService.Client(DumbTransport(True, False))
+    assert c2.ping(nonce=u'bar') is False
+    c3 = PingService.Client(
+        DumbTransport(False, {
+            '_type': 'rpc_error',
+            '_tag': 'not_found_error',
+            'message': 'An error message.',
+        })
+    )
+    with raises(RpcError.NotFoundError) as exc:
+        c3.ping(nonce=u'baz')
+    assert exc.value.message == 'An error message.'
+
+
+def test_service_client_payload_deserialization_error():
+    c1 = PingService.Client(DumbTransport(True, 'Not a boolean'))
+    with raises(ValueError) as exc:
+        c1.ping(nonce=u'foo')
+    assert str(exc.value) == ': Expected a boolean value; true or false.'
+    c2 = PingService.Client(
+        DumbTransport(False, {
+            '_type': 'rpc_error',
+            '_tag': 'not_found_error',
+            'message': ['Not a string but a list.'],
+        })
+    )
+    with raises(ValueError) as exc:
+        c2.ping(nonce=u'bar')
+    assert str(exc.value) == '.message: Expected a string.'
 
 
 def test_service_client_representation():

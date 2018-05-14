@@ -29,6 +29,7 @@ import Data.Text.Lazy (toStrict)
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Data.Function (on)
 import System.FilePath (joinPath)
+import Text.Blaze (Markup)
 import Text.Blaze.Renderer.Text
 import qualified Text.Email.Validate as E
 import Text.Heterocephalus (compileText)
@@ -89,6 +90,7 @@ import Nirum.Package.Metadata ( Author (Author, name, email)
 import qualified Nirum.Package.ModuleSet as MS
 import qualified Nirum.Package.Metadata as MD
 import Nirum.Targets.Python.CodeGen
+import Nirum.Targets.Python.Deserializers
 import Nirum.Targets.Python.Serializers
 import Nirum.Targets.Python.TypeExpression
 import Nirum.Targets.Python.Validators
@@ -226,12 +228,11 @@ returnCompiler = do
 
 compileUnionTag :: Source -> Name -> Tag -> CodeGen Code
 compileUnionTag source parentname d@(Tag typename' fields' _) = do
+    abc <- collectionsAbc
     typeExprCodes <- mapM (compileTypeExpression' source)
         [Just typeExpr | (Field _ typeExpr _) <- fieldList]
     let nameTypeTriples = L.sortBy (compare `on` thd3)
                                    (zip3 tagNames typeExprCodes optionFlags)
-    insertThirdPartyImportsA
-        [("nirum.constructs", [("name_dict_type", "NameDict")])]
     arg <- parameterCompiler
     pyVer <- getPythonVersion
     validators <- sequence
@@ -239,6 +240,15 @@ compileUnionTag source parentname d@(Tag typename' fields' _) = do
               v <- compileValidator' source typeExpr $ toAttributeName' fName
               return (fName, typeExprCode, v)
         | (typeExprCode, Field fName typeExpr _) <- zip typeExprCodes fieldList
+        ]
+    deserializers <- sequence
+        [ do
+              deserializer <- compileDeserializer' source typeExpr
+                  [qq|value.get('{I.toSnakeCaseText bName}')|]
+                  [qq|rv_{toAttributeName fName}|]
+                  [qq|error_{toAttributeName fName}|]
+              return (fieldName', typeExpr, deserializer)
+        | Field fieldName'@(Name fName bName) typeExpr _ <- fieldList
         ]
     initializers <- compileFieldInitializers fields'
     return $ toStrict $ renderMarkup $ [compileText|
@@ -251,15 +261,6 @@ class #{className}(#{parentClass}):
     )
     __nirum_type__ = 'union'
     __nirum_tag__ = #{parentClass}.Tag.#{toEnumMemberName typename'}
-
-    # FIXME: __nirum_tag_names__ becomes unnecessary when deserializers
-    # become independent from the nirum-python runtime library.
-    # https://github.com/spoqa/nirum/issues/160
-    __nirum_tag_names__ = name_dict_type([
-%{ forall Field (Name fFacial fBehind) _ _ <- fieldList }
-        ('#{toAttributeName fFacial}', '#{I.toSnakeCaseText fBehind}'),
-%{ endforall }
-    ])
 
     @staticmethod
     def __nirum_tag_types__():
@@ -328,6 +329,68 @@ class #{className}(#{parentClass}):
 #{compileSerializer' source fType $ T.append "self." $ toAttributeName' fName},
 %{ endforall }
         }
+
+    @classmethod
+%{ case pyVer }
+%{ of Python2 }
+    def __nirum_deserialize__(cls, value, on_error=None):
+%{ of Python3 }
+    def __nirum_deserialize__(
+        cls: type,
+        value,
+        on_error: typing.Optional[
+            typing.Callable[[typing.Tuple[str, str]], None]
+        ]=None
+    ) -> typing.Optional['#{className}']:
+%{ endcase }
+        errors = set()
+        if on_error is None:
+            def on_error(err_field, err_msg):
+                errors.add((err_field, err_msg))
+        errored = [False]
+        def handle_error(err_field, err_msg):
+            errored[0] = True
+            on_error(err_field, err_msg)
+        if isinstance(value, #{abc}.Mapping):
+            try:
+                tag = value['_tag']
+            except KeyError:
+                handle_error('._tag', 'Expected to exist.')
+            else:
+                if tag == '#{toBehindSnakeCaseText typename'}':
+%{ forall (Name fName bName, typeExpr, deserializer) <- deserializers }
+                    error_#{toAttributeName fName} = lambda ef, em: \
+                        handle_error('.#{I.toSnakeCaseText bName}' + ef, em)
+%{ case typeExpr }
+%{ of OptionModifier _ }
+                    if '#{I.toSnakeCaseText bName}' not in value:
+                        value['#{I.toSnakeCaseText bName}'] = None
+#{indent "                    " deserializer}
+%{ of _ }
+                    if '#{I.toSnakeCaseText bName}' in value:
+#{indent "                        " deserializer}
+                    else:
+                        error_#{toAttributeName fName}('', 'Expected to exist.')
+%{ endcase }
+%{ endforall }
+                    pass  # No-op; just for convenience' sake of the compiler
+                else:
+                    handle_error(
+                        '._tag',
+                        'Expected to be a "#{toBehindSnakeCaseText typename'}".'
+                    )
+        else:
+            handle_error('', 'Expected an object.')
+        if errors:
+            raise ValueError(
+                '\n'.join(sorted('{0}: {1}'.format(*e) for e in errors))
+            )
+        if not errored[0]:
+            return cls(
+%{ forall (fName, _, _) <- deserializers }
+                #{toAttributeName' fName}=rv_#{toAttributeName' fName},
+%{ endforall }
+            )
 
 %{ case pyVer }
 %{ of Python2 }
@@ -415,6 +478,15 @@ compileValidator' :: Source -> TypeExpression -> Code -> CodeGen Validator
 compileValidator' Source { sourceModule = boundModule } =
     compileValidator boundModule
 
+compileDeserializer' :: Source
+                     -> TypeExpression
+                     -> Code
+                     -> Code
+                     -> Code
+                     -> CodeGen Markup
+compileDeserializer' Source { sourceModule = boundModule } =
+    compileDeserializer boundModule
+
 compileTypeDeclaration :: Source -> TypeDeclaration -> CodeGen Code
 compileTypeDeclaration _ TypeDeclaration { type' = PrimitiveType {} } =
     return ""  -- never used
@@ -436,18 +508,14 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
     let className = toClassName' typename'
     itypeExpr <- compileTypeExpression' src (Just itype)
     insertStandardImport "typing"
-    insertThirdPartyImports [("nirum.deserialize", ["deserialize_meta"])]
     pyVer <- getPythonVersion
     Validator typePred valueValidators' <- compileValidator' src itype "value"
+    deserializer <- compileDeserializer' src itype "value" "rv" "handle_error"
     return $ toStrict $ renderMarkup $ [compileText|
 class #{className}(object):
 #{compileDocstring "    " d}
 
     __nirum_type__ = 'unboxed'
-
-    @staticmethod
-    def __nirum_get_inner_type__():
-        return #{itypeExpr}
 
 %{ case pyVer }
 %{ of Python2 }
@@ -494,17 +562,31 @@ class #{className}(object):
     @classmethod
 %{ case pyVer }
 %{ of Python2 }
-    def __nirum_deserialize__(cls, value):
+    def __nirum_deserialize__(cls, value, on_error=None):
 %{ of Python3 }
-    def __nirum_deserialize__(cls: type, value: typing.Any) -> '#{className}':
+    def __nirum_deserialize__(
+        cls: type,
+        value: typing.Any,
+        on_error: typing.Optional[
+            typing.Callable[[typing.Tuple[str, str]], None]
+        ]=None
+    ) -> typing.Optional['#{className}']:
 %{ endcase }
-        inner_type = cls.__nirum_get_inner_type__()
-        deserializer = getattr(inner_type, '__nirum_deserialize__', None)
-        if deserializer:
-            value = deserializer(value)
-        else:
-            value = deserialize_meta(inner_type, value)
-        return cls(value=value)
+        errors = set()
+        if on_error is None:
+            def on_error(err_field, err_msg):
+                errors.add((err_field, err_msg))
+        errored = [False]
+        def handle_error(err_field, err_msg):
+            errored[0] = True
+            on_error(err_field, err_msg)
+#{indent "        " deserializer}
+        if errors:
+            raise ValueError(
+                '\n'.join(sorted('{0}: {1}'.format(*e) for e in errors))
+            )
+        if not errored[0]:
+            return cls(rv)
 
 %{ case pyVer }
 %{ of Python2 }
@@ -530,6 +612,8 @@ compileTypeDeclaration _ d@TypeDeclaration { typename = typename'
                                            } = do
     let className = toClassName' typename'
     insertStandardImport "enum"
+    insertStandardImport "typing"
+    baseString <- baseStringClass
     pyVer <- getPythonVersion
     return $ toStrict $ renderMarkup [compileText|
 class #{className}(enum.Enum):
@@ -551,11 +635,42 @@ class #{className}(enum.Enum):
     @classmethod
 %{ case pyVer }
 %{ of Python2 }
-    def __nirum_deserialize__(cls, value):
+    def __nirum_deserialize__(cls, value, on_error=None):
 %{ of Python3 }
-    def __nirum_deserialize__(cls: type, value: str) -> '#{className}':
+    def __nirum_deserialize__(
+        cls: type,
+        value: str,
+        on_error: typing.Optional[
+            typing.Callable[[typing.Tuple[str, str]], None]
+        ]=None
+    ) -> '#{className}':
 %{ endcase }
-        return cls(value.replace('-', '_'))  # FIXME: validate input
+        errors = set()
+        if on_error is None:
+            def on_error(err_field, err_msg):
+                errors.add((err_field, err_msg))
+        if isinstance(value, #{baseString}):
+            member = value.replace('-', '_')
+            try:
+                result = cls(member)
+            except ValueError:
+                on_error(
+                    '',
+                    'Expected a string of a member name, but the given '
+                    'string is not a member.  Available member names are: '
+                    + ', '.join('"{0}"'.format(m.value) for m in cls)
+                )
+        else:
+            on_error(
+                '',
+                'Expected a string of a member name, but the given value '
+                'is not a string.'
+            )
+        if errors:
+            raise ValueError(
+                '\n'.join(sorted('{0}: {1}'.format(*e) for e in errors))
+            )
+        return result
 
 
 # Since enum.Enum doesn't allow to define non-member when the class is defined,
@@ -572,10 +687,7 @@ compileTypeDeclaration src d@TypeDeclaration { typename = Name tnFacial tnBehind
             (zip3 [toAttributeName' name' | Field name' _ _ <- fieldList]
                   typeExprCodes optionFlags)
     insertStandardImport "typing"
-    insertThirdPartyImportsA
-        [ ("nirum.constructs", [("name_dict_type", "NameDict")])
-        , ("nirum.deserialize", [("deserialize_meta", "deserialize_meta")])
-        ]
+    abc <- collectionsAbc
     arg <- parameterCompiler
     pyVer <- getPythonVersion
     validators <- sequence
@@ -583,6 +695,15 @@ compileTypeDeclaration src d@TypeDeclaration { typename = Name tnFacial tnBehind
               v <- compileValidator' src typeExpr $ toAttributeName' fName
               return (fName, typeExprCode, v)
         | (typeExprCode, Field fName typeExpr _) <- zip typeExprCodes fieldList
+        ]
+    deserializers <- sequence
+        [ do
+              deserializer <- compileDeserializer' src typeExpr
+                  [qq|value.get('{I.toSnakeCaseText bName}')|]
+                  [qq|rv_{toAttributeName fName}|]
+                  [qq|error_{toAttributeName fName}|]
+              return (fieldName', typeExpr, deserializer)
+        | Field fieldName'@(Name fName bName) typeExpr _ <- fieldList
         ]
     initializers <- compileFieldInitializers fields'
     return $ toStrict $ renderMarkup $ [compileText|
@@ -594,29 +715,6 @@ class #{className}(object):
 %{ endforall }
     )
     __nirum_type__ = 'record'
-    __nirum_record_behind_name__ = '#{I.toSnakeCaseText tnBehind}'
-
-    # FIXME: __nirum_field_names__ becomes unnecessary when deserializers
-    # become independent from the nirum-python runtime library.
-    # https://github.com/spoqa/nirum/issues/160
-    __nirum_field_names__ = name_dict_type([
-%{ forall Field (Name fFacial fBehind) _ _ <- fieldList }
-        ('#{toAttributeName fFacial}', '#{I.toSnakeCaseText fBehind}'),
-%{ endforall }
-    ])
-
-    @staticmethod
-%{ case pyVer }
-%{ of Python2 }
-    def __nirum_field_types__():
-%{ of Python3 }
-    def __nirum_field_types__() -> typing.Mapping[str, typing.Any]:
-%{ endcase }
-        return {
-%{ forall (n, t, _) <- nameTypeTriples }
-            '#{n}': #{t},
-%{ endforall }
-        }
 
 %{ case pyVer }
 %{ of Python2 }
@@ -717,60 +815,52 @@ class #{className}(object):
     @classmethod
 %{ case pyVer }
 %{ of Python2 }
-    def __nirum_deserialize__(cls, value):
+    def __nirum_deserialize__(cls, value, on_error=None):
 %{ of Python3 }
-    def __nirum_deserialize__(cls, value) -> '#{className}':
+    def __nirum_deserialize__(
+        cls: type,
+        value,
+        on_error: typing.Optional[
+            typing.Callable[[typing.Tuple[str, str]], None]
+        ]=None
+    ) -> typing.Optional['#{className}']:
 %{ endcase }
-        if '_type' not in value:
-            raise ValueError('"_type" field is missing.')
-        if not cls.__nirum_record_behind_name__ == value['_type']:
-            raise ValueError(
-                '%s expect "_type" equal to "%s"'
-                ', but found %s.' % (
-                    typing._type_repr(cls),
-                    cls.__nirum_record_behind_name__,
-                    value['_type']
-                )
-            )
-        args = dict()
-        behind_names = cls.__nirum_field_names__.behind_names
-        field_types = cls.__nirum_field_types__()
         errors = set()
-        for attribute_name, item in value.items():
-            if attribute_name == '_type':
-                continue
-            if attribute_name in behind_names:
-                name = behind_names[attribute_name]
+        if on_error is None:
+            def on_error(err_field, err_msg):
+                errors.add((err_field, err_msg))
+        errored = [False]
+        def handle_error(err_field, err_msg):
+            errored[0] = True
+            on_error(err_field, err_msg)
+        if isinstance(value, #{abc}.Mapping):
+%{ forall (Name fName bName, typeExpr, deserializer) <- deserializers }
+            error_#{toAttributeName fName} = lambda ef, em: \
+                handle_error('.#{I.toSnakeCaseText bName}' + ef, em)
+%{ case typeExpr }
+%{ of OptionModifier _ }
+            if '#{I.toSnakeCaseText bName}' not in value:
+                value['#{I.toSnakeCaseText bName}'] = None
+#{indent "            " deserializer}
+%{ of _ }
+            if '#{I.toSnakeCaseText bName}' in value:
+#{indent "                " deserializer}
             else:
-                name = attribute_name
-            try:
-                field_type = field_types[name]
-            except KeyError:
-                continue
-            if (field_type.__module__ == 'numbers' and
-                field_type.__name__ == 'Integral'):
-                # FIXME: deserialize_meta() cannot determine the Nirum type
-                # from the given Python class, since there are 1:N relationships
-                # between Nirum types and Python classes.  A Python class can
-                # have more than one corresponds and numbers.Integral is
-                # the case: bigint, int32, and int64 all corresponds to
-                # numbers.Integral (on Python 2).
-                # It's the essential reason why we should be free from
-                # deserialize_meta() and generate actual deserializer code
-                # for each field instead.
-                # See also: https://github.com/spoqa/nirum/issues/160
-                try:
-                    args[name] = int(item)
-                except ValueError as e:
-                    errors.add('%s: %s' % (attribute_name, e))
-                continue
-            try:
-                args[name] = deserialize_meta(field_type, item)
-            except ValueError as e:
-                errors.add('%s: %s' % (attribute_name, str(e)))
+                error_#{toAttributeName fName}('', 'Expected to exist.')
+%{ endcase }
+%{ endforall }
+        else:
+            handle_error('', 'Expected an object.')
         if errors:
-            raise ValueError('\n'.join(sorted(errors)))
-        return cls(**args)
+            raise ValueError(
+                '\n'.join(sorted('{0}: {1}'.format(*e) for e in errors))
+            )
+        if not errored[0]:
+            return cls(
+%{ forall (fName, _, _) <- deserializers }
+                #{toAttributeName' fName}=rv_#{toAttributeName' fName},
+%{ endforall }
+            )
 
 %{ case pyVer }
 %{ of Python2 }
@@ -800,25 +890,17 @@ compileTypeDeclaration src
                                          , typeAnnotations = annotations
                                          } = do
     tagCodes <- mapM (compileUnionTag src typename') tags'
+    abc <- collectionsAbc
     insertStandardImport "typing"
     insertStandardImport "enum"
-    insertThirdPartyImports [("nirum.deserialize", ["deserialize_meta"])]
-    insertThirdPartyImportsA
-        [ ("nirum.constructs", [("name_dict_type", "NameDict")])
-        , ("nirum.datastructures", [("map_type", "Map")])
-        ]
+    insertThirdPartyImportsA [("nirum.datastructures", [("map_type", "Map")])]
+    baseString <- baseStringClass
     pyVer <- getPythonVersion
     return $ toStrict $ renderMarkup $ [compileText|
 class #{className}(#{T.intercalate "," $ compileExtendClasses annotations}):
 #{compileDocstring "    " d}
 
     __nirum_type__ = 'union'
-    __nirum_union_behind_name__ = '#{toBehindSnakeCaseText typename'}'
-    __nirum_field_names__ = name_dict_type([
-%{ forall (Tag (Name f b) _ _) <- tags' }
-        ('#{toAttributeName f}', '#{I.toSnakeCaseText b}'),
-%{ endforall }
-    ])
 
     class Tag(enum.Enum):
 %{ forall (Tag tn _ _) <- tags' }
@@ -852,70 +934,72 @@ class #{className}(#{T.intercalate "," $ compileExtendClasses annotations}):
     @classmethod
 %{ case pyVer }
 %{ of Python2 }
-    def __nirum_deserialize__(cls, value):
+    def __nirum_deserialize__(cls, value, on_error=None):
 %{ of Python3 }
-    def __nirum_deserialize__(cls: '#{className}', value) -> '#{className}':
+    def __nirum_deserialize__(
+        cls: type,
+        value,
+        on_error: typing.Optional[
+            typing.Callable[[typing.Tuple[str, str]], None]
+        ]=None
+    ) -> '#{className}':
 %{ endcase }
+        errors = set()
+        if on_error is None:
+            def on_error(err_field, err_msg):
+                errors.add((err_field, err_msg))
+        errored = [False]
+        def handle_error(err_field, err_msg):
+            errored[0] = True
+            on_error(err_field, err_msg)
+        if isinstance(value, #{abc}.Mapping):
+            try:
+                tag = value['_tag']
+            except KeyError:
 %{ case defaultTag union }
 %{ of Just dt }
-        if isinstance(value, dict) and '_tag' not in value:
-            value = dict(value)
-            value['_tag'] = '#{toBehindSnakeCaseText $ tagName dt}'
+                tag = '#{toBehindSnakeCaseText $ tagName dt}'
+                value = dict(value)
+                value['_tag'] = tag
 %{ of Nothing }
+                handle_error('._tag', 'Expected to exist.')
 %{ endcase }
-        if '_type' not in value:
-            raise ValueError('"_type" field is missing.')
-        if '_tag' not in value:
-            raise ValueError('"_tag" field is missing.')
-        if not hasattr(cls, '__nirum_tag__'):
-            for sub_cls in cls.__subclasses__():
-                if sub_cls.__nirum_tag__.value == value['_tag']:
-                    cls = sub_cls
-                    break
-            else:
-                raise ValueError(
-                    '%r is not deserialzable tag of `%s`' % (
-                        value, typing._type_repr(cls)
-                    )
-                )
-        if not cls.__nirum_union_behind_name__ == value['_type']:
-            raise ValueError(
-                '%s expect "_type" equal to "%s", but found %s' % (
-                    typing._type_repr(cls),
-                    cls.__nirum_union_behind_name__,
-                    value['_type']
-                )
+        else:
+            handle_error('', 'Expected an object.')
+        if errored[0]:
+            pass
+%{ forall (Tag tn _ _) <- tags' }
+        elif tag == '#{toBehindSnakeCaseText tn}':
+            rv = #{toClassName' tn}.__nirum_deserialize__(
+                value, handle_error
             )
-        if not cls.__nirum_tag__.value == value['_tag']:
-            raise ValueError(
-                '%s expect "_tag" equal to "%s", but found %s' % (
-                    typing._type_repr(cls),
-                    cls.__nirum_tag__.value,
-                    cls
-                )
+%{ endforall }
+        elif isinstance(tag, #{baseString}):
+            handle_error(
+                '._tag',
+                'Expected one of the following strings: '
+%{ forall (i, (Tag tn _ _)) <- enumerate tags' }
+%{ if i < 1 }
+%{ elseif i < pred (length tags') }
+                ', '
+%{ else }
+                ', or '
+%{ endif }
+                '"#{toBehindSnakeCaseText tn}"'
+%{ endforall }
+                '.'
             )
-        args = dict()
-        behind_names = cls.__nirum_tag_names__.behind_names
-        errors = set()
-        for attribute_name, item in value.items():
-            if attribute_name in ('_type', '_tag'):
-                continue
-            if attribute_name in behind_names:
-                name = behind_names[attribute_name]
-            else:
-                name = attribute_name
-            tag_types = dict(cls.__nirum_tag_types__())
-            try:
-                field_type = tag_types[name]
-            except KeyError:
-                continue
-            try:
-                args[name] = deserialize_meta(field_type, item)
-            except ValueError as e:
-                errors.add('%s: %s' % (attribute_name, str(e)))
+        else:
+            handle_error(
+                '._tag',
+                'Expected a string, but the given value is not a string.'
+            )
         if errors:
-            raise ValueError('\n'.join(sorted(errors)))
-        return cls(**args)
+            raise ValueError(
+                '\n'.join(sorted('{0}: {1}'.format(*e) for e in errors))
+            )
+        if not errored[0]:
+            return rv
 
 %{ forall tagCode <- tagCodes }
 #{tagCode}
@@ -946,8 +1030,6 @@ class #{className}(#{T.intercalate "," $ compileExtendClasses annotations}):
             [ M.lookup annotationName extendsClassMap
             | (A.Annotation annotationName _) <- A.toList annotations'
             ]
-    toBehindSnakeCaseText :: Name -> T.Text
-    toBehindSnakeCaseText = I.toSnakeCaseText . N.behindName
 
 compileTypeDeclaration
     src@Source { sourcePackage = Package { metadata = metadata' } }
@@ -1095,18 +1177,33 @@ if hasattr({className}.Client, '__qualname__'):
     compileClientMethod :: Method -> CodeGen Code
     compileClientMethod Method { methodName = mName
                                , parameters = params
-                               , returnType = rtype
+                               , returnType = rtypeM
                                , errorType = etypeM
                                } = do
         let clientMethodName' = toAttributeName' mName
         params' <- mapM compileMethodParameter $ toList params
-        rtypeExpr <- compileTypeExpression' src rtype
-        errorCode <- case etypeM of
-             Just e -> do
-                e' <- compileTypeExpression' src (Just e)
-                return $ "result_type = " `T.append` e'
-             Nothing ->
-                return "raise UnexpectedNirumResponseError(serialized)"
+        rtypeExpr <- compileTypeExpression' src rtypeM
+        resultDeserializer <- case rtypeM of
+            Just rtype -> compileDeserializer' src rtype
+                "serialized"
+                "result"
+                "on_deserializer_error"
+            Nothing ->
+                return "result = None"
+        errorDeserializer <- case etypeM of
+             Just e -> compileDeserializer' src e
+                "serialized"
+                "result"
+                "on_deserializer_error"
+             Nothing -> do
+                insertThirdPartyImportsA
+                    [ ("nirum.exc", [ ("_unexpected_nirum_response_error"
+                                      , "UnexpectedNirumResponseError"
+                                      )
+                                    ]
+                      )
+                    ]
+                return "raise _unexpected_nirum_response_error(serialized)"
         payloadArguments <- mapM compileClientPayload $ toList params
         validators <- sequence
             [ do
@@ -1148,14 +1245,19 @@ if hasattr({className}.Client, '__qualname__'):
             method_annotations=self.__nirum_method_annotations__,
             parameter_annotations={}
         )
+        deserializer_errors = set()
+        def on_deserializer_error(err_field, err_msg):
+            deserializer_errors.add((err_field, err_msg))
         if successful:
-            result_type = #{rtypeExpr}
+#{indent "            " resultDeserializer}
         else:
-            #{errorCode}
-        if result_type is None:
-            result = None
-        else:
-            result = deserialize_meta(result_type, serialized)
+#{indent "            " errorDeserializer}
+        if deserializer_errors:
+            raise ValueError(
+                '\n'.join(
+                    sorted('{0}: {1}'.format(*e) for e in deserializer_errors)
+                )
+            )
         if successful:
             return result
         raise result

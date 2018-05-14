@@ -158,6 +158,52 @@ To be released.
         classes.  Nirum type names are qualified and their leading module paths
         are also normalized (the same rule to `nirum.modules` applies here).
 
+ -  Generated deserializers became independent from *nirum-python* runtime
+    library.  [[#160], [#272]]
+
+     -  Error messages made during deserialization became more standardized.
+        Every error now consists of two fields: one represents a path to the
+        value having an error, and other one is a human-readable message.
+
+        For example, suppose there's types like:
+
+        ~~~~~~~~ nirum
+        record user (dob date);
+        record user-group ([user] users);
+        ~~~~~~~~
+
+        and the following payload for `user-group` type is given:
+
+        ~~~~~~~~ json
+        [
+          {"_type": "user", "dob": "2000-06-30"},
+          {"_type": "user", "dob": "2000-13-32"}
+        ]
+        ~~~~~~~~
+
+        An error is reported with a path like `[1].dob`.
+
+     -  Added an optional `on_error` callback parameter to generated
+        `__nirum_deserialize__()` methods.
+
+        It has to be a callable which has two parameters (and no return value).
+        An `on_error` callback is called every time any validation/parsing error
+        happens during deserialization, and it can be called multiple times
+        at a single call of `__nirum_deserialize__()`.
+
+        The callback function's first parameter takes a string referring
+        a path to the value having an error (e.g., `'.users[0].dob'`).
+        The second parameter takes an error message string (e.g.,
+        `'Expected a string of RFC 3339 date, but the date is invalid.'`).
+
+        When it's omitted or `None`, a `ValueError` is raised with a multiline
+        message that consists of all error messages made during deserialization,
+        as it has been.
+
+ -  Fixed a bug that record/union deserializers refuses payloads without
+    `"_type"` field.  It is only for humans and can be omitted according to
+    the [specification](./docs/serialization.md).
+
  -  All integral types (`int32`, `int64`, and `bigint`) became represented
     as [`numbers.Integral`][python2-numbers-integral] instead of
     [`int`][python2-int].
@@ -174,6 +220,15 @@ To be released.
     besides class checks: range checks for `int32`/`int64`, time zone
     (``tzinfo``) awareness check for `datetime`, and basic format check for
     `uri`.
+
+ -  Removed `__nirum_get_inner_type__()` class methods from generated unboxed
+    type classes.
+
+ -  Removed `__nirum_record_behind_name__` static fields and
+    `__nirum_field_types__()` class methods from generated record type classes.
+
+ -  Removed `__nirum_tag_names__`, `__nirum_union_behind_name__`, and
+    `__nirum_field_names__` static fields from generated union type classes.
 
  -  Fixed a bug that generated service methods hadn't checked its arguments
     before its transport sends a payload.  [[#220]]
@@ -207,6 +262,7 @@ To be released.
 [#259]: https://github.com/spoqa/nirum/pull/259
 [#267]: https://github.com/spoqa/nirum/pull/267
 [#269]: https://github.com/spoqa/nirum/pull/269
+[#272]: https://github.com/spoqa/nirum/pull/272
 [entry points]: https://setuptools.readthedocs.io/en/latest/pkg_resources.html#entry-points
 [python2-numbers-integral]: https://docs.python.org/2/library/numbers.html#numbers.Integral
 [python2-int]: https://docs.python.org/2/library/functions.html#int

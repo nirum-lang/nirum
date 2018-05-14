@@ -1,0 +1,18 @@
+{
+    "description": "If an unboxed type consists of a record type it also has to be represented in the same way to its inner type.",
+    "type": "fixture.types.union-unboxed",
+    "input": {
+        "_type": "post",
+        "_tag": "link",
+        "link": "https://github.com/spoqa/nirum",
+        "title": "Nirum repository",
+        "quote": null
+    },
+    "normal": {
+        "_type": "post",
+        "_tag": "link",
+        "link": "https://github.com/spoqa/nirum",
+        "title": "Nirum repository",
+        "quote": null
+    }
+}

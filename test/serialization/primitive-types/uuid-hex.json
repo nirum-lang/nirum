@@ -1,0 +1,19 @@
+{
+    "description": "UUID should be represented as a hexadecimal string.",
+    "type": "fixture.types.uuid-list",
+    "input": [
+        "118fe23b-0380-4d15-8f2d-9f8c6f55e5a5",
+        "23343962879229625363648903095734625701",
+        23343962879229625363648903095734625701
+    ],
+    "errors": [
+        {
+            "path": "[1]",
+            "message": "Expected a string of UUID, but the string is not a valid hexadecimal UUID format."
+        },
+        {
+            "path": "[2]",
+            "message": "Expected a string of UUID, but the given value is not a string."
+        }
+    ]
+}

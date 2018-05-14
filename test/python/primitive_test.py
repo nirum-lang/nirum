@@ -126,18 +126,18 @@ def test_record():
     point_serialized = {'_type': 'point1', 'x': 3, 'top': 14}
     assert point.__nirum_serialize__() == point_serialized
     assert Point1.__nirum_deserialize__(point_serialized) == point
-    with raises(ValueError):
-        Point1.__nirum_deserialize__({'x': 3, 'top': 14})
+    assert Point1.__nirum_deserialize__({'x': 3, 'top': 14}) == point
     with raises(ValueError):
         Point1.__nirum_deserialize__({'_type': 'foo'})
     with raises(ValueError) as e:
         Point1.__nirum_deserialize__({'_type': 'point1',
-                                      'left': 'a',
+                                      'x': 'a',
                                       'top': 'b'})
     assert str(e.value) == '''\
-left: invalid literal for int() with base 10: 'a'
-top: invalid literal for int() with base 10: 'b'\
-'''
+.top: Expected a string of decimal digits, but the string consists of other \
+than decimal digits.
+.x: Expected a string of decimal digits, but the string consists of other \
+than decimal digits.'''
     with raises(TypeError):
         Point1(left=1, top='a')
     with raises(TypeError):
@@ -162,8 +162,7 @@ top: invalid literal for int() with base 10: 'b'\
     point2_serialize = {'_type': 'point2', 'left': 3, 'top': 14}
     assert point2.__nirum_serialize__() == point2_serialize
     assert Point2.__nirum_deserialize__(point2_serialize) == point2
-    with raises(ValueError):  # no "_type" -- FIXME: "_type" is unnecessary
-        Point2.__nirum_deserialize__({'left': 3, 'top': 14})
+    assert Point2.__nirum_deserialize__({'left': 3, 'top': 14}) == point2
     with raises(ValueError):  # no "left" and "top" fields
         Point2.__nirum_deserialize__({'_type': 'foo'})
     p = Point2.__nirum_deserialize__({
@@ -320,8 +319,8 @@ def test_union():
             'given_name': 503,  # not a text
         })
     assert str(e.value) == '''\
-family_name: '404' is not a string.
-given_name: '503' is not a string.\
+.family_name: Expected a string.
+.given_name: Expected a string.\
 '''  # message can contain multiple errors
     n = MixedName.__nirum_deserialize__({  # invalid field types
         '_type': 'mixed_name',

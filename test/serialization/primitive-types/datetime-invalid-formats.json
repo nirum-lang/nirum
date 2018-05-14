@@ -1,0 +1,25 @@
+{
+    "description": "Date & time should be a valid RFC 3339 string of a proper date & time.",
+    "type": "fixture.types.datetime-list",
+    "input": [
+        "2018-05-10T17:23:48.274498Z",
+        "2018-05-10T17:23:48Z",
+        "2018-02-29T00:00:00Z",
+        "2018/02/29",
+        20180229
+    ],
+    "errors": [
+        {
+            "path": "[2]",
+            "message": "Expected a string of RFC 3339 date & time, but the date & time is invalid."
+        },
+        {
+            "path": "[3]",
+            "message": "Expected a string of RFC 3339 date & time, but the string is not a valid RFC 3339 date & time format."
+        },
+        {
+            "path": "[4]",
+            "message": "Expected a string of RFC 3339 date & time, but the given value is not a string."
+        }
+    ]
+}

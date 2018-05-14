@@ -36,6 +36,7 @@ module Nirum.Targets.Python.CodeGen
     , stringLiteral
     , toAttributeName
     , toAttributeName'
+    , toBehindSnakeCaseText
     , toClassName
     , toClassName'
     , toImportPath'
@@ -263,6 +264,9 @@ toAttributeName identifier =
 
 toAttributeName' :: Name -> Text
 toAttributeName' = toAttributeName . facialName
+
+toBehindSnakeCaseText :: Name -> Text
+toBehindSnakeCaseText = toSnakeCaseText . behindName
 
 mangleVar :: Code -> Text -> Code
 mangleVar expr arbitrarySideName = Data.Text.concat

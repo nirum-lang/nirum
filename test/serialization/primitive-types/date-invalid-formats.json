@@ -1,0 +1,24 @@
+{
+    "description": "Date should be a valid RFC 3339 string of a proper date.",
+    "type": "fixture.types.date-list",
+    "input": [
+        "2018-05-10",
+        "2018-02-29",
+        "2018/02/29",
+        20180229
+    ],
+    "errors": [
+        {
+            "path": "[1]",
+            "message": "Expected a string of RFC 3339 date, but the date is invalid."
+        },
+        {
+            "path": "[2]",
+            "message": "Expected a string of RFC 3339 date, but the string is not a valid RFC 3339 date format."
+        },
+        {
+            "path": "[3]",
+            "message": "Expected a string of RFC 3339 date, but the given value is not a string."
+        }
+    ]
+}
