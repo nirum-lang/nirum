@@ -1,7 +1,8 @@
 {-# LANGUAGE QuasiQuotes #-}
 module Nirum.Targets.Python.Serializers (compileSerializer) where
 
-import Text.InterpolatedString.Perl6 (qq)
+import Data.Text (replace)
+import Text.InterpolatedString.Perl6 (q, qq)
 
 import Nirum.Constructs.TypeDeclaration
 import Nirum.Constructs.TypeExpression
@@ -70,7 +71,13 @@ compilePrimitiveTypeSerializer Text var = var
 compilePrimitiveTypeSerializer Binary var =
     [qq|__import__('base64').b64encode($var).decode('ascii')|]
 compilePrimitiveTypeSerializer Date var = [qq|($var).isoformat()|]
-compilePrimitiveTypeSerializer Datetime var = [qq|($var).isoformat()|]
+compilePrimitiveTypeSerializer Datetime var = replace "$var" var [q|(
+    '{0}-{1:02}-{2:02}T{3:02}:{4:02}:{5:02}'.format(
+        *($var).utctimetuple()
+    ) +
+    ('.{0:06}'.format(($var).microsecond) if ($var).microsecond else '') +
+    'Z'
+)|]
 compilePrimitiveTypeSerializer Bool var = var
 compilePrimitiveTypeSerializer Uuid var = [qq|str($var).lower()|]
 compilePrimitiveTypeSerializer Uri var = var

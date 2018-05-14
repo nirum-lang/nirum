@@ -1,0 +1,14 @@
+{
+    "description": "Whereas datetime deserializer should be able to consume several forms of RFC 3339 date & time, its serializers should produce only a limited form of RFC 3339 date & time.",
+    "type": "fixture.types.datetime-list",
+    "input": [
+        "2018-05-10T17:23:48.274498Z",
+        "2018-05-10T17:23:48.274498+00:00",
+        "2018-05-11T02:23:48.274498+09:00"
+    ],
+    "normal": [
+        "2018-05-10T17:23:48.274498Z",
+        "2018-05-10T17:23:48.274498Z",
+        "2018-05-10T17:23:48.274498Z"
+    ]
+}
