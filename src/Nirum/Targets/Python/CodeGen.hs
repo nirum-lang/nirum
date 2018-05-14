@@ -9,6 +9,8 @@ module Nirum.Targets.Python.CodeGen
     , Python (..)
     , PythonVersion (..)
     , RenameMap
+    , addDependency
+    , addOptionalDependency
     , collectionsAbc
     , empty
     , getPythonVersion
@@ -45,6 +47,7 @@ import GHC.Exts
 import Data.Map.Strict hiding (empty, member, toAscList)
 import Data.SemVer hiding (Identifier)
 import Data.Set hiding (empty)
+import qualified Data.Set
 import Data.Text hiding (empty)
 import qualified Data.Text
 import Data.Text.Lazy (toStrict)
@@ -93,6 +96,8 @@ data CodeGenContext
                      , thirdPartyImports :: Map Text (Map Text Text)
                      , localImports :: Map Text (Set Text)
                      , pythonVersion :: PythonVersion
+                     , dependencies :: Set Text
+                     , optionalDependencies :: Map (Int, Int) (Set Text)
                      }
     deriving (Eq, Ord, Show)
 
@@ -106,6 +111,8 @@ empty pythonVer = CodeGenContext
     , thirdPartyImports = []
     , localImports = []
     , pythonVersion = pythonVer
+    , dependencies = []
+    , optionalDependencies = []
     }
 
 localImportsMap :: CodeGenContext -> Map Text (Map Text Text)
@@ -182,6 +189,23 @@ importTypingForPython3 = do
     case pyVer of
         Python2 -> return ()
         Python3 -> insertStandardImport "typing"
+
+addDependency :: Text -> CodeGen ()
+addDependency package =
+    modify $ \ c@CodeGenContext { dependencies = deps } ->
+        c { dependencies = Data.Set.insert package deps }
+
+addOptionalDependency :: (Int, Int) -- | Python version already stasified.
+                      -> Text -- | PyPI package name.
+                      -> CodeGen ()
+addOptionalDependency pyVer package =
+    modify $ \ c@CodeGenContext { optionalDependencies = oldOptDeps } ->
+        c { optionalDependencies = newOptDeps oldOptDeps }
+  where
+    newOptDeps :: Map (Int, Int) (Set Text) -> Map (Int, Int) (Set Text)
+    newOptDeps = Data.Map.Strict.alter
+        (Just . Data.Set.insert package . fromMaybe Data.Set.empty)
+        pyVer
 
 getPythonVersion :: CodeGen PythonVersion
 getPythonVersion = fmap pythonVersion Control.Monad.State.get

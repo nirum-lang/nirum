@@ -210,6 +210,44 @@ spec' = pythonVersionSpecs $ \ ver -> do
             abc `shouldBe` Right expectedModule
             standardImports ctx `shouldBe` [expected]
 
+        let evalContext f = snd $ runCodeGen f empty'
+        let req = empty'
+        let req2 = req { dependencies = ["six"] }
+        let req3 = req { optionalDependencies = [((3, 4), ["enum34"])] }
+        specify "addDependency" $ do
+            evalContext (addDependency "six") `shouldBe` req2
+            evalContext (addDependency "six" >> addDependency "six")
+                `shouldBe` req2
+            evalContext (addDependency "nirum") `shouldBe`
+                req { dependencies = ["nirum"] }
+            evalContext (addDependency "six" >> addDependency "nirum")
+                `shouldBe` req2 { dependencies = ["nirum", "six"] }
+        specify "addOptionalDependency" $ do
+            evalContext (addOptionalDependency (3, 4) "enum34") `shouldBe` req3
+            evalContext ( addOptionalDependency (3, 4) "enum34"
+                        >> addOptionalDependency (3, 4) "enum34"
+                        )
+                `shouldBe` req3
+            evalContext (addOptionalDependency (3, 4) "ipaddress") `shouldBe`
+                req { optionalDependencies = [((3, 4), ["ipaddress"])] }
+            evalContext ( addOptionalDependency (3, 4) "enum34"
+                        >> addOptionalDependency (3, 4) "ipaddress"
+                        )
+                `shouldBe` req
+                    { optionalDependencies = [ ((3, 4), ["enum34", "ipaddress"])
+                                             ]
+                    }
+            evalContext (addOptionalDependency (3, 5) "typing")
+                `shouldBe` req { optionalDependencies = [((3, 5), ["typing"])] }
+            evalContext ( addOptionalDependency (3, 4) "enum34"
+                        >> addOptionalDependency (3, 5) "typing"
+                        )
+                `shouldBe` req3
+                    { optionalDependencies = [ ((3, 4), ["enum34"])
+                                             , ((3, 5), ["typing"])
+                                             ]
+                    }
+
 spec :: Spec
 spec = do
     spec'

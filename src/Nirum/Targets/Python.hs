@@ -2,20 +2,17 @@
 {-# LANGUAGE ExtendedDefaultRules #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 module Nirum.Targets.Python
-    ( InstallRequires (..)
-    , Python (..)
+    ( Python (..)
     , Source (..)
-    , addDependency
-    , addOptionalDependency
     , compileModule
     , compileTypeDeclaration
     , parseModulePath
     , toNamePair
-    , unionInstallRequires
     ) where
 
 import Control.Monad (forM)
@@ -1204,52 +1201,28 @@ compileModuleBody src@Source { sourceModule = boundModule } = do
     typeCodes <- mapM (compileTypeDeclaration src) $ toList types'
     return $ T.intercalate "\n\n" typeCodes
 
-data InstallRequires =
-    InstallRequires { dependencies :: S.Set T.Text
-                    , optionalDependencies :: M.Map (Int, Int) (S.Set T.Text)
-                    } deriving (Eq, Ord, Show)
-
-addDependency :: InstallRequires -> T.Text -> InstallRequires
-addDependency requires package =
-    requires { dependencies = S.insert package $ dependencies requires }
-
-addOptionalDependency :: InstallRequires
-                      -> (Int, Int)       -- ^ Python version already stasified
-                      -> T.Text           -- ^ PyPI package name
-                      -> InstallRequires
-addOptionalDependency requires pyVer package =
-    requires { optionalDependencies = newOptDeps }
-  where
-    oldOptDeps :: M.Map (Int, Int) (S.Set T.Text)
-    oldOptDeps = optionalDependencies requires
-    newOptDeps :: M.Map (Int, Int) (S.Set T.Text)
-    newOptDeps = M.alter (Just . S.insert package . fromMaybe S.empty)
-                         pyVer oldOptDeps
-
-unionInstallRequires :: InstallRequires -> InstallRequires -> InstallRequires
-unionInstallRequires a b =
-    a { dependencies = S.union (dependencies a) (dependencies b)
-      , optionalDependencies = M.unionWith S.union (optionalDependencies a)
-                                                   (optionalDependencies b)
-      }
-
 compileModule :: PythonVersion
               -> Source
-              -> Either CompileError' (InstallRequires, Code)
+              -> Either CompileError' ( S.Set T.Text
+                                      , M.Map (Int, Int) (S.Set T.Text)
+                                      , Code
+                                      )
 compileModule pythonVersion' source = do
     let (result, context) = runCodeGen (compileModuleBody source)
                                        (empty pythonVersion')
-    let deps = require "nirum" "nirum" $ M.keysSet $ thirdPartyImports context
+    let deps = S.union
+            (dependencies context)
+            (require "nirum" "nirum" $ M.keysSet $ thirdPartyImports context)
     let standardImportSet' = standardImportSet context
-    let optDeps =
+    let optDeps = M.unionWith S.union
+            (optionalDependencies context)
             [ ((3, 4), require "enum34" "enum" standardImportSet')
             , ((3, 5), require "typing" "typing" standardImportSet')
             ]
-    let installRequires = InstallRequires deps optDeps
     let fromImports = M.assocs (localImportsMap context) ++
                       M.assocs (thirdPartyImports context)
     code <- result
-    return $ (,) installRequires $ toStrict $ renderMarkup $
+    return $ (deps, optDeps,) $ toStrict $ renderMarkup $
         [compileText|# -*- coding: utf-8 -*-
 #{compileDocstring "" $ sourceModule source}
 %{ forall (alias, import') <- M.assocs (standardImports context) }
@@ -1282,7 +1255,9 @@ from #{from} import (
     require pkg module' set =
         if set `has` module' then S.singleton pkg else S.empty
 
-compilePackageMetadata :: Package' -> InstallRequires -> Code
+compilePackageMetadata :: Package'
+                       -> (S.Set T.Text, M.Map (Int, Int) (S.Set T.Text))
+                       -> Code
 compilePackageMetadata Package
                            { metadata = MD.Metadata
                                  { authors = authors'
@@ -1298,7 +1273,7 @@ compilePackageMetadata Package
                                  }
                            , modules = modules'
                            }
-                       (InstallRequires deps optDeps) =
+                       (deps, optDeps) =
     toStrict $ renderMarkup [compileText|# -*- coding: utf-8 -*-
 import sys
 
@@ -1440,11 +1415,11 @@ compilePackage' package@Package { metadata = MD.Metadata { target = target' }
         [ ( f
           , case cd of
                 Left e -> Left e
-                Right (_, cd') -> Right cd'
+                Right (_, _, cd') -> Right cd'
           )
         | (f, cd) <- modules'
         ] ++
-        [ ("setup.py", Right $ compilePackageMetadata package installRequires)
+        [ ("setup.py", Right $ compilePackageMetadata package allDependencies)
         , ("MANIFEST.in", Right manifestIn)
         ]
   where
@@ -1463,7 +1438,13 @@ compilePackage' package@Package { metadata = MD.Metadata { target = target' }
                 , mp' <- S.elems (hierarchy mp)
                 , ver <- versions
                 ]
-    modules' :: [(FilePath, Either CompileError' (InstallRequires, Code))]
+    modules' :: [ ( FilePath
+                  , Either CompileError' ( S.Set T.Text
+                                         , M.Map (Int, Int) (S.Set T.Text)
+                                         , Code
+                                         )
+                  )
+                ]
     modules' =
         [ ( toFilename (sourceDirectory ver) modulePath'
           , compileModule ver $ Source package boundModule
@@ -1472,10 +1453,11 @@ compilePackage' package@Package { metadata = MD.Metadata { target = target' }
         , Just boundModule <- [resolveBoundModule modulePath' package]
         , ver <- versions
         ]
-    installRequires :: InstallRequires
-    installRequires = foldl unionInstallRequires
-                            (InstallRequires [] [])
-                            [deps | (_, Right (deps, _)) <- modules']
+    allDependencies :: (S.Set T.Text, M.Map (Int, Int) (S.Set T.Text))
+    allDependencies =
+        ( S.unions [deps | (_, Right (deps, _, _)) <- modules']
+        , M.unionsWith S.union [oDeps | (_, Right (_, oDeps, _)) <- modules']
+        )
 
 parseModulePath :: T.Text -> Maybe ModulePath
 parseModulePath string =
