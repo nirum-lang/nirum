@@ -19,6 +19,8 @@ matrix:
         - upx-ucl
         - shellcheck
         - netbase
+        - ca-certificates
+        - libgnutls30
 
 env:
 - PIP_MINVER=9.0.1 SETUPTOOLS_MINVER=36.6.0
