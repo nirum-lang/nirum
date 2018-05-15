@@ -18,6 +18,7 @@ matrix:
         - libgmp10
         - upx-ucl
         - shellcheck
+        - netbase
 
 env:
 - PIP_MINVER=9.0.1 SETUPTOOLS_MINVER=36.6.0
