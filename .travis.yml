@@ -66,7 +66,7 @@ before_install:
     checkmate --help
     token_encoded='gJvdss03HpHm1tCqhziBezjVi8Y='
     token="$(echo $token_encoded | python -m base64 -d | xxd -pu)"
-    checkmate github-travis --token "$token"
+    checkmate github-travis --token "$token" || true
   fi
 - |
   if [[ "$TRAVIS_OS_NAME" = "osx" ]]
