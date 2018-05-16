@@ -1,0 +1,35 @@
+{
+    "description": "Parse a set of record.",
+    "type": "fixture.foo.people",
+    "input": {
+        "_type": "people",
+        "people": [
+            {
+                "_type": "person",
+                "first_name": "John",
+                "last_name": "Doe"
+            },
+            {
+                "_type": "person",
+                "first_name": "John",
+                "last_name": "Smith"
+            }
+        ]
+    },
+    "normal": {
+        "_type": "people",
+        "people": [
+            {
+                "_type": "person",
+                "first_name": "John",
+                "last_name": "Doe"
+            },
+            {
+                "_type": "person",
+                "first_name": "John",
+                "last_name": "Smith"
+            }
+        ]
+    },
+    "ignoreOrder": "$.people"
+}

@@ -1,0 +1,10 @@
+{
+    "description": "Nirum date type is represented as RFC 3339 date in JSON.",
+    "type": "fixture.types.date-list",
+    "input": [
+        "2018-05-10"
+    ],
+    "normal": [
+        "2018-05-10"
+    ]
+}

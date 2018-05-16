@@ -1,0 +1,12 @@
+{
+    "description": "Name can have behind name.",
+    "type": "fixture.name.foo",
+    "input": {
+        "_type": "foo",
+        "baz": 1
+    },
+    "normal": {
+        "_type": "foo",
+        "baz": 1
+    }
+}

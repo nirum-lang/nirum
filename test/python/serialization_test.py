@@ -9,6 +9,7 @@ import pkg_resources
 import pprint
 from typing import _type_repr
 
+from jsonpath_ng import parse
 from pytest import mark
 
 
@@ -33,6 +34,17 @@ dump_json = functools.partial(
     ensure_ascii=False,
     sort_keys=True
 )
+
+
+def normalize(path, value):
+    parser = parse(path)
+    for match in parser.find(value):
+        try:
+            match.value.sort(key=lambda x: json.dumps(x, sort_keys=True))
+        except AttributeError:
+            raise AssertionError('$.{!s} is not an array.'.format(
+                match.full_path
+            ))
 
 
 @mark.parametrize('spec_file', list_specs(test_suite_dir))
@@ -66,6 +78,9 @@ def test_serializer_deserializer(spec_file):
         print('Normal:', dump_json(spec['normal']))
         serialized = deserialized.__nirum_serialize__()
         print('Serialized:', dump_json(serialized))
+        if 'ignoreOrder' in spec:
+            normalize(spec['ignoreOrder'], spec['normal'])
+            normalize(spec['ignoreOrder'], serialized)
         assert serialized == spec['normal']
     else:
         print('Expected errors:', dump_json(spec['errors']))

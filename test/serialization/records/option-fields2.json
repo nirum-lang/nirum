@@ -1,0 +1,12 @@
+{
+    "description": "If a field is optional, it is ok to give null.",
+    "type": "fixture.foo.record-with-optional-record-field",
+    "input": {
+        "_type": "record_with_optional_record_field",
+        "f": null
+    },
+    "normal": {
+        "_type": "record_with_optional_record_field",
+        "f": null
+    }
+}

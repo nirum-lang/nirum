@@ -138,3 +138,7 @@ record name-shadowing-field-record (
     uuid uuid,
     binary bytes,
 );
+
+union optional-union = foo ( int32? bar )
+                     | baz ( int32 qux )
+                     ;

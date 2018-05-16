@@ -1,0 +1,15 @@
+FIXME: To follow a general principle of robustness, this test should be successful.
+{
+    "description": "All identifiers has to be normalized.",
+    "type": "fixture.norm.payload",
+    "input": {
+        "_type": "payload",
+        "FIELD_NAME": "FIELD_NAME becomes to field_name",
+        "second-field-name": 3.14
+    },
+    "normal": {
+        "_type": "payload",
+        "field_name": "FIELD_NAME becomes to field_name",
+        "second_field_name": 3.14
+    }
+}
