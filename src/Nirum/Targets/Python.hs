@@ -20,20 +20,22 @@ import qualified Data.List as L
 import Data.Maybe (catMaybes, fromMaybe)
 import GHC.Exts (IsList (toList))
 
+import qualified Data.ByteString.Lazy
 import qualified Data.HashMap.Strict as HM
 import qualified Data.Map.Strict as M
 import qualified Data.SemVer as SV
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Text.Lazy (toStrict)
-import Data.Text.Encoding (decodeUtf8, encodeUtf8)
+import Data.Text.Encoding (decodeUtf8)
 import Data.Function (on)
 import System.FilePath (joinPath)
 import Text.Blaze (Markup)
 import Text.Blaze.Renderer.Text
+import qualified Text.Blaze.Renderer.Utf8
 import qualified Text.Email.Validate as E
 import Text.Heterocephalus (compileText)
-import Text.InterpolatedString.Perl6 (q, qq)
+import Text.InterpolatedString.Perl6 (qq)
 
 import qualified Nirum.Constructs.Annotation as A
 import Nirum.Constructs.Annotation.Internal hiding (Text, annotations, name)
@@ -251,7 +253,7 @@ returnCompiler = do
             (Python3, _) -> [qq| -> '{r}'|]
 
 
-compileUnionTag :: Source -> Name -> Tag -> CodeGen Code
+compileUnionTag :: Source -> Name -> Tag -> CodeGen Markup
 compileUnionTag source parentname d@(Tag typename' fields' _) = do
     abc <- collectionsAbc
     typeExprCodes <- mapM (compileTypeExpression' source)
@@ -276,7 +278,7 @@ compileUnionTag source parentname d@(Tag typename' fields' _) = do
         | Field fieldName'@(Name fName bName) typeExpr _ <- fieldList
         ]
     initializers <- compileFieldInitializers fields'
-    return $ toStrict $ renderMarkup $ [compileText|
+    return $ [compileText|
 class #{className}(#{parentClass}):
 #{compileDocstringWithFields "    " d fields'}
     __slots__ = (
@@ -512,14 +514,14 @@ compileDeserializer' :: Source
 compileDeserializer' Source { sourceModule = boundModule } =
     compileDeserializer boundModule
 
-compileTypeDeclaration :: Source -> TypeDeclaration -> CodeGen Code
+compileTypeDeclaration :: Source -> TypeDeclaration -> CodeGen Markup
 compileTypeDeclaration _ TypeDeclaration { type' = PrimitiveType {} } =
     return ""  -- never used
 compileTypeDeclaration src d@TypeDeclaration { typename = typename'
                                              , type' = Alias ctype
                                              } = do
     ctypeExpr <- compileTypeExpression' src (Just ctype)
-    return $ toStrict $ renderMarkup $ [compileText|
+    return [compileText|
 %{ case compileDocs d }
 %{ of Just rst }
 #: #{rst}
@@ -536,7 +538,7 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
     pyVer <- getPythonVersion
     Validator typePred valueValidators' <- compileValidator' src itype "value"
     deserializer <- compileDeserializer' src itype "value" "rv" "handle_error"
-    return $ toStrict $ renderMarkup $ [compileText|
+    return [compileText|
 class #{className}(object):
 #{compileDocstring "    " d}
 
@@ -640,7 +642,7 @@ compileTypeDeclaration _ d@TypeDeclaration { typename = typename'
     insertStandardImport "typing"
     baseString <- baseStringClass
     pyVer <- getPythonVersion
-    return $ toStrict $ renderMarkup [compileText|
+    return [compileText|
 class #{className}(enum.Enum):
 #{compileDocstring "    " d}
 
@@ -731,7 +733,7 @@ compileTypeDeclaration src d@TypeDeclaration { typename = Name tnFacial tnBehind
         | Field fieldName'@(Name fName bName) typeExpr _ <- fieldList
         ]
     initializers <- compileFieldInitializers fields'
-    return $ toStrict $ renderMarkup $ [compileText|
+    return [compileText|
 class #{className}(object):
 #{compileDocstringWithFields "    " d fields'}
     __slots__ = (
@@ -921,7 +923,7 @@ compileTypeDeclaration src
     insertThirdPartyImportsA [("nirum.datastructures", [("map_type", "Map")])]
     baseString <- baseStringClass
     pyVer <- getPythonVersion
-    return $ toStrict $ renderMarkup $ [compileText|
+    return [compileText|
 class #{className}(#{T.intercalate "," $ compileExtendClasses annotations}):
 #{compileDocstring "    " d}
 
@@ -1076,7 +1078,7 @@ compileTypeDeclaration src d@ServiceDeclaration { serviceName = name'
                 typeExpr <- compileTypeExpression' src $ Just pType
                 return (param', typeExpr)
         return (method', rTypeExpr, errTypeExpr, params')
-    return $ toStrict $ renderMarkup [compileText|
+    return [compileText|
 class #{className}(service_type):
 #{compileDocstring "    " d}
     __nirum_type__ = 'service'
@@ -1212,7 +1214,7 @@ if hasattr(#{className}.Client, '__qualname__'):
             | Parameter pName pTypeExpr _ <- toList params
             ]
         ret <- returnCompiler
-        return $ toStrict $ renderMarkup $ [compileText|
+        return $ toStrict $ renderMarkup [compileText|
     def #{clientMethodName'}(self, #{commaNl params'})#{ret rtypeExpr}:
         _type_repr = __import__('typing')._type_repr
         # typing module can be masked by parameter of the same name, e.g.:
@@ -1296,17 +1298,21 @@ if hasattr(#{className}.Client, '__qualname__'):
 compileTypeDeclaration _ Import {} =
     return ""  -- Nothing to compile
 
-compileModuleBody :: Source -> CodeGen Code
+compileModuleBody :: Source -> CodeGen Markup
 compileModuleBody src@Source { sourceModule = boundModule } = do
     let types' = boundTypes boundModule
     typeCodes <- mapM (compileTypeDeclaration src) $ toList types'
-    return $ T.intercalate "\n\n" typeCodes
+    return $ [compileText|
+%{forall typeCode <- typeCodes}
+#{typeCode}
+%{endforall}
+|]
 
 compileModule :: PythonVersion
               -> Source
               -> Either CompileError' ( S.Set T.Text
                                       , M.Map (Int, Int) (S.Set T.Text)
-                                      , Code
+                                      , Markup
                                       )
 compileModule pythonVersion' source = do
     let (result, context) = runCodeGen (compileModuleBody source)
@@ -1323,7 +1329,7 @@ compileModule pythonVersion' source = do
     let fromImports = M.assocs (localImportsMap context) ++
                       M.assocs (thirdPartyImports context)
     code <- result
-    return $ (deps, optDeps,) $ toStrict $ renderMarkup $
+    return $ (deps, optDeps,) $
         [compileText|# -*- coding: utf-8 -*-
 #{compileDocstring "" $ sourceModule source}
 %{ forall (alias, import') <- M.assocs (standardImports context) }
@@ -1358,7 +1364,7 @@ from #{from} import (
 
 compilePackageMetadata :: Package'
                        -> (S.Set T.Text, M.Map (Int, Int) (S.Set T.Text))
-                       -> Code
+                       -> Markup
 compilePackageMetadata Package
                            { metadata = MD.Metadata
                                  { authors = authors'
@@ -1375,7 +1381,7 @@ compilePackageMetadata Package
                            , modules = modules'
                            }
                        (deps, optDeps) =
-    toStrict $ renderMarkup [compileText|# -*- coding: utf-8 -*-
+    [compileText|# -*- coding: utf-8 -*-
 import sys
 
 from setuptools import setup, __version__ as setuptools_version
@@ -1502,13 +1508,13 @@ setup(
     strings :: [Code] -> Code
     strings values = T.intercalate ", " $ map stringLiteral (L.sort values)
 
-manifestIn :: Code
-manifestIn = [q|recursive-include src *.py
+manifestIn :: Markup
+manifestIn = [compileText|recursive-include src *.py
 recursive-include src-py2 *.py
 |]
 
 compilePackage' :: Package'
-                -> M.Map FilePath (Either CompileError' Code)
+                -> M.Map FilePath (Either CompileError' Markup)
 compilePackage' package@Package { metadata = MD.Metadata { target = target' }
                                 } =
     M.fromList $
@@ -1533,8 +1539,8 @@ compilePackage' package@Package { metadata = MD.Metadata { target = target' }
     toFilename :: T.Text -> ModulePath -> FilePath
     toFilename sourceRootDirectory mp =
         joinPath $ T.unpack sourceRootDirectory : toPythonFilename mp
-    initFiles :: [(FilePath, Either CompileError' Code)]
-    initFiles = [ (toFilename (sourceDirectory ver) mp', Right "")
+    initFiles :: [(FilePath, Either CompileError' Markup)]
+    initFiles = [ (toFilename (sourceDirectory ver) mp', Right [compileText||])
                 | mp <- MS.keys (modules package)
                 , mp' <- S.elems (hierarchy mp)
                 , ver <- versions
@@ -1542,7 +1548,7 @@ compilePackage' package@Package { metadata = MD.Metadata { target = target' }
     modules' :: [ ( FilePath
                   , Either CompileError' ( S.Set T.Text
                                          , M.Map (Int, Int) (S.Set T.Text)
-                                         , Code
+                                         , Markup
                                          )
                   )
                 ]
@@ -1568,7 +1574,7 @@ parseModulePath string =
     identTexts = T.split (== '.') string
 
 instance Target Python where
-    type CompileResult Python = Code
+    type CompileResult Python = Markup
     type CompileError Python = CompileError'
     targetName _ = "python"
     parseTarget table = do
@@ -1603,4 +1609,5 @@ instance Target Python where
                       }
     compilePackage = compilePackage'
     showCompileError _ e = e
-    toByteString _ = encodeUtf8
+    toByteString _ =
+        Data.ByteString.Lazy.toStrict . Text.Blaze.Renderer.Utf8.renderMarkup
