@@ -18,6 +18,9 @@ matrix:
         - libgmp10
         - upx-ucl
         - shellcheck
+        - netbase
+        - ca-certificates
+        - libgnutls28
 
 env:
 - PIP_MINVER=9.0.1 SETUPTOOLS_MINVER=36.6.0
@@ -58,12 +61,12 @@ before_install:
   if [[ "$TRAVIS_OS_NAME" = "linux" ]]
   then
     curl -o "$HOME/.local/bin/checkmate" \
-         -L https://github.com/spoqa/checkmate/releases/download/0.3.2/checkmate-linux-x86_64
+         -L https://github.com/spoqa/checkmate/releases/download/0.3.3/checkmate-linux-x86_64
     chmod +x "$HOME/.local/bin/checkmate"
     checkmate --help
     token_encoded='gJvdss03HpHm1tCqhziBezjVi8Y='
     token="$(echo $token_encoded | python -m base64 -d | xxd -pu)"
-    checkmate github-travis --token "$token"
+    checkmate github-travis --token "$token" || true
   fi
 - |
   if [[ "$TRAVIS_OS_NAME" = "osx" ]]

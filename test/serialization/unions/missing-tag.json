@@ -1,0 +1,14 @@
+{
+    "description": "The \"_tag\" field is required unless there is a default tag.",
+    "type": "fixture.foo.music",
+    "input": {
+        "_type": "music",
+        "country": "South Korea"
+    },
+    "errors": [
+        {
+            "path": "._tag",
+            "message": "Expected to exist."
+        }
+    ]
+}

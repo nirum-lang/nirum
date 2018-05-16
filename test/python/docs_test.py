@@ -13,10 +13,12 @@ def test_record_docs():
 
        Record field docs\.
 
+
     .. attribute:: top'''
     assert Point2.__doc__.strip() == r'''.. attribute:: left
 
        Record field docs\.
+
 
     .. attribute:: top'''
     assert Point3d.__doc__.strip() == r'''.. attribute:: xy

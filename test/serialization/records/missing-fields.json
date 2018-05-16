@@ -1,0 +1,17 @@
+{
+    "description": "Missing fields should make deserialization failed.",
+    "type": "fixture.foo.person",
+    "input": {
+        "_type": "person"
+    },
+    "errors": [
+        {
+            "path": ".first_name",
+            "message": "Expected to exist."
+        },
+        {
+            "path": ".last_name",
+            "message": "Expected to exist."
+        }
+    ]
+}

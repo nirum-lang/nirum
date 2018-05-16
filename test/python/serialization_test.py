@@ -46,6 +46,9 @@ def test_serializer_deserializer(spec_file):
     candidates = list(
         pkg_resources.iter_entry_points('nirum.classes', name=spec['type'])
     )
+    assert 'normal' in spec or 'errors' in spec, (
+        'The specification must have either "normal" or "errors" field.'
+    )
     assert candidates, (
         'Failed to resolve a corresponding Python class to the Nirum '
         'type "{0}".'.format(spec['type'])
@@ -57,10 +60,30 @@ def test_serializer_deserializer(spec_file):
     cls = candidates[0].resolve()
     print('Class:', _type_repr(cls))
     print('Input:', dump_json(spec['input']))
-    deserialized = cls.__nirum_deserialize__(spec['input'])
-    print('Deserialized:', pprint.pformat(deserialized))
-    print('Normal:', dump_json(spec['normal']))
-    serialized = deserialized.__nirum_serialize__()
-    print('Serialized:', dump_json(serialized))
-    assert serialized == spec['normal']
+    if 'normal' in spec:
+        deserialized = cls.__nirum_deserialize__(spec['input'])
+        print('Deserialized:', pprint.pformat(deserialized))
+        print('Normal:', dump_json(spec['normal']))
+        serialized = deserialized.__nirum_serialize__()
+        print('Serialized:', dump_json(serialized))
+        assert serialized == spec['normal']
+    else:
+        print('Expected errors:', dump_json(spec['errors']))
+        actual_errors = set()
+        deserialized = cls.__nirum_deserialize__(
+            spec['input'],
+            on_error=lambda field, msg: actual_errors.add((field, msg))
+        )
+        print(
+            'Actual errors:',
+            dump_json([
+                {'path': p, 'message': m} for (p, m) in sorted(actual_errors)
+            ])
+        )
+        if not actual_errors:
+            print('Deserialized:', pprint.pformat(deserialized))
+        assert actual_errors == frozenset(
+            (e['path'], e['message'])
+            for e in spec['errors']
+        )
     print()

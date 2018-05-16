@@ -1,0 +1,6 @@
+{
+    "description": "If an unboxed type consists of a primitive type that is represented as a string in JSON it also has to be represented as a string in JSON.",
+    "type": "fixture.types.uuid-unboxed",
+    "input": "850cd1a4-3c5e-4575-8c5f-fc41dab078a9",
+    "normal": "850cd1a4-3c5e-4575-8c5f-fc41dab078a9"
+}

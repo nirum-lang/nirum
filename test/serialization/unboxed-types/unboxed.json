@@ -1,0 +1,16 @@
+{
+    "description": "If an unboxed type consists of an unboxed type again it also has to be represented in the same way to the inner type of its inner type.",
+    "type": "fixture.types.record-unboxed",
+    "input": {
+        "_type": "product",
+        "name": "White shirt",
+        "stock": 100,
+        "price_usd": "40.0"
+    },
+    "normal": {
+        "_type": "product",
+        "name": "White shirt",
+        "stock": 100,
+        "price_usd": "40.0"
+    }
+}

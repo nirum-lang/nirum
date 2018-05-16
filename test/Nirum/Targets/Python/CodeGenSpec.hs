@@ -14,7 +14,7 @@ import Data.Maybe
 import Data.SemVer hiding (Identifier, metadata)
 import Test.Hspec.Meta
 import Text.Email.Validate (emailAddress)
-import Text.InterpolatedString.Perl6 (qq)
+import Text.InterpolatedString.Perl6 (q, qq)
 
 import Nirum.Constructs.Annotation (empty)
 import Nirum.Constructs.Identifier
@@ -202,6 +202,72 @@ spec' = pythonVersionSpecs $ \ ver -> do
             thirdPartyImports ctx2 `shouldBe` []
             localImports ctx2 `shouldBe` []
             compileError codeGen2 `shouldBe` Nothing
+        specify "collectionsAbc" $ do
+            let expected@(expectedModule, _) = case ver of
+                    Python2 -> ("_collections", "collections")
+                    Python3 -> ("_collections_abc", "collections.abc")
+            let (abc, ctx) = runCodeGen collectionsAbc empty'
+            abc `shouldBe` Right expectedModule
+            standardImports ctx `shouldBe` [expected]
+        specify "baseStringClass" $ do
+            let (baseString, ctx) = runCodeGen baseStringClass empty'
+            case ver of
+                Python2 -> do
+                    baseString `shouldBe` Right "__builtin__.basestring"
+                    standardImports ctx `shouldBe`
+                        [("__builtin__", "__builtin__")]
+                Python3 -> do
+                    baseString `shouldBe` Right "__builtin__.str"
+                    standardImports ctx `shouldBe` [("__builtin__", "builtins")]
+        specify "baseIntegerClass" $ do
+            let (baseString, ctx) = runCodeGen baseIntegerClass empty'
+            case ver of
+                Python2 -> do
+                    baseString `shouldBe`
+                        Right "(__builtin__.int, __builtin__.long)"
+                    standardImports ctx `shouldBe`
+                        [("__builtin__", "__builtin__")]
+                Python3 -> do
+                    baseString `shouldBe` Right "__builtin__.int"
+                    standardImports ctx `shouldBe` [("__builtin__", "builtins")]
+
+        let evalContext f = snd $ runCodeGen f empty'
+        let req = empty'
+        let req2 = req { dependencies = ["six"] }
+        let req3 = req { optionalDependencies = [((3, 4), ["enum34"])] }
+        specify "addDependency" $ do
+            evalContext (addDependency "six") `shouldBe` req2
+            evalContext (addDependency "six" >> addDependency "six")
+                `shouldBe` req2
+            evalContext (addDependency "nirum") `shouldBe`
+                req { dependencies = ["nirum"] }
+            evalContext (addDependency "six" >> addDependency "nirum")
+                `shouldBe` req2 { dependencies = ["nirum", "six"] }
+        specify "addOptionalDependency" $ do
+            evalContext (addOptionalDependency (3, 4) "enum34") `shouldBe` req3
+            evalContext ( addOptionalDependency (3, 4) "enum34"
+                        >> addOptionalDependency (3, 4) "enum34"
+                        )
+                `shouldBe` req3
+            evalContext (addOptionalDependency (3, 4) "ipaddress") `shouldBe`
+                req { optionalDependencies = [((3, 4), ["ipaddress"])] }
+            evalContext ( addOptionalDependency (3, 4) "enum34"
+                        >> addOptionalDependency (3, 4) "ipaddress"
+                        )
+                `shouldBe` req
+                    { optionalDependencies = [ ((3, 4), ["enum34", "ipaddress"])
+                                             ]
+                    }
+            evalContext (addOptionalDependency (3, 5) "typing")
+                `shouldBe` req { optionalDependencies = [((3, 5), ["typing"])] }
+            evalContext ( addOptionalDependency (3, 4) "enum34"
+                        >> addOptionalDependency (3, 5) "typing"
+                        )
+                `shouldBe` req3
+                    { optionalDependencies = [ ((3, 4), ["enum34"])
+                                             , ((3, 5), ["typing"])
+                                             ]
+                    }
 
 spec :: Spec
 spec = do
@@ -264,3 +330,18 @@ spec = do
         renameModulePath renames ["baz"] `shouldBe` ["p", "az"]
         renameModulePath renames ["baz", "qux"] `shouldBe` ["p", "az", "qux"]
         renameModulePath renames ["qux", "foo"] `shouldBe` ["qux", "foo"]
+
+    specify "indent" $ do
+        indent "    " ("a\n    b\n\nc\n" :: Code) `shouldBe`
+            "    a\n        b\n\n    c\n"
+        indent "    " ("\"\"\"foo\nbar\n\"\"\"" :: Code) `shouldBe`
+            "    \"\"\"foo\n    bar\n    \"\"\""
+
+    specify "stringLiteral" $ do
+        stringLiteral "asdf" `shouldBe` [q|"asdf"|]
+        stringLiteral [q|Say 'hello world'|]
+            `shouldBe` [q|"Say 'hello world'"|]
+        stringLiteral [q|Say "hello world"|]
+            `shouldBe` [q|"Say \"hello world\""|]
+        stringLiteral "Say '\xc548\xb155'"
+            `shouldBe` [q|u"Say '\uc548\ub155'"|]

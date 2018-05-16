@@ -1,7 +1,48 @@
 unboxed uuid-list ([uuid]);
 
+unboxed date-list ([date]);
+
+unboxed datetime-list ([datetime]);
+
 unboxed int32-unboxed (int32);
+
+unboxed uuid-unboxed (uuid);
 
 unboxed datetime-unboxed (datetime);
 
 unboxed float-unbox (float32);
+
+enum month
+    = january
+    | february
+    | march
+    | april
+    | may
+    | june
+    | july
+    | august
+    | september
+    | october
+    | november
+    | december
+    ;
+
+unboxed enum-unboxed (month);
+
+record product (
+    text name,
+    int32 stock,
+    decimal price-usd,
+);
+
+unboxed record-unboxed (product);
+
+union post
+    = image (text mime-type, binary data)
+    | link (uri link, text title, text? quote)
+    | article (text title, text content)
+    ;
+
+unboxed union-unboxed (post);
+
+unboxed unboxed-unboxed (record-unboxed);

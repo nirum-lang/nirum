@@ -1,0 +1,11 @@
+{
+    "description": "A union value must be represented as an object in JSON.",
+    "type": "fixture.foo.mixed-name",
+    "input": "invalid",
+    "errors": [
+        {
+            "path": "",
+            "message": "Expected an object."
+        }
+    ]
+}

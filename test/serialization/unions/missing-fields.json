@@ -1,0 +1,19 @@
+{
+    "description": "Missing fields should make deserialization failed.",
+    "type": "fixture.foo.mixed-name",
+    "input": {
+        "_type": "mixed_name",
+        "_tag": "western_name",
+        "middle_name": "H."
+    },
+    "errors": [
+        {
+            "path": ".first_name",
+            "message": "Expected to exist."
+        },
+        {
+            "path": ".last_name",
+            "message": "Expected to exist."
+        }
+    ]
+}
