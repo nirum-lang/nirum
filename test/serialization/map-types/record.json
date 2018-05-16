@@ -1,0 +1,21 @@
+{
+    "description": "Parse a map type.",
+    "type": "fixture.foo.record-with-map",
+    "input": {
+        "_type": "record_with_map",
+        "text_to_text": [
+            {"key": "a", "value": "foo"},
+            {"key": "b", "value": "bar"},
+            {"key": "c", "value": "baz"}
+        ]
+    },
+    "normal": {
+        "_type": "record_with_map",
+        "text_to_text": [
+            {"key": "a", "value": "foo"},
+            {"key": "b", "value": "bar"},
+            {"key": "c", "value": "baz"}
+        ]
+    },
+    "ignoreOrder": "$.text_to_text"
+}

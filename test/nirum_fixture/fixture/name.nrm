@@ -1,0 +1,3 @@
+record foo (
+    int64 bar/baz,
+);

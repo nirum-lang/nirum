@@ -1,0 +1,15 @@
+{
+    "description": "Parse object has more fields than definition.",
+    "type": "fixture.foo.person",
+    "input": {
+        "_type": "person",
+        "first_name": "foo",
+        "last_name": "bar",
+        "extra": "some"
+    },
+    "normal": {
+        "_type": "person",
+        "first_name": "foo",
+        "last_name": "bar"
+    }
+}

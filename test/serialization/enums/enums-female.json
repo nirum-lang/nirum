@@ -1,0 +1,6 @@
+{
+    "description": "enum",
+    "type": "fixture.foo.gender",
+    "input": "yeoseong",
+    "normal": "yeoseong"
+}

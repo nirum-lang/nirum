@@ -1,0 +1,4 @@
+record Payload (
+    text FIELD_NAME,
+    float64 second-field-name,
+);

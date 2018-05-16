@@ -29,6 +29,8 @@ enum month
 
 unboxed enum-unboxed (month);
 
+unboxed enum-set-unboxed ({month});
+
 record product (
     text name,
     int32 stock,
@@ -46,3 +48,5 @@ union post
 unboxed union-unboxed (post);
 
 unboxed unboxed-unboxed (record-unboxed);
+
+unboxed list-unboxed ([text]);

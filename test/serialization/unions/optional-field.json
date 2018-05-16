@@ -1,0 +1,13 @@
+{
+    "description": "If optional field isn't given, it should treat value of optional field is null.",
+    "type": "fixture.foo.optional-union",
+    "input": {
+        "_tag": "foo",
+        "_type": "optional_union"
+    },
+    "normal": {
+        "_tag": "foo",
+        "_type": "optional_union",
+        "bar": null
+    }
+}

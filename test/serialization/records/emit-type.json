@@ -1,0 +1,13 @@
+{
+    "description": "_type can be emitted.",
+    "type": "fixture.foo.person",
+    "input": {
+        "first_name": "foo",
+        "last_name": "bar"
+    },
+    "normal": {
+        "_type": "person",
+        "first_name": "foo",
+        "last_name": "bar"
+    }
+}
