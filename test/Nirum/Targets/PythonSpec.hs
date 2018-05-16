@@ -7,31 +7,15 @@ import System.FilePath ((</>))
 import Test.Hspec.Meta
 
 import Nirum.Constructs.Module (Module (Module))
-import Nirum.Constructs.Name (Name (Name))
 import Nirum.Package.Metadata (Target (compilePackage))
 import Nirum.Targets.Python
     ( Source (Source)
     , parseModulePath
-    , toNamePair
     )
 import Nirum.Targets.Python.CodeGenSpec hiding (spec)
 
 spec :: Spec
 spec = do
-    describe "toNamePair" $ do
-        it "transforms the name to a Python code string of facial/behind pair" $
-            do toNamePair "text" `shouldBe` "('text', 'text')"
-               toNamePair (Name "test" "hello") `shouldBe` "('test', 'hello')"
-        it "replaces hyphens to underscores" $ do
-            toNamePair "hello-world" `shouldBe` "('hello_world', 'hello_world')"
-            toNamePair (Name "hello-world" "annyeong-sesang") `shouldBe`
-                "('hello_world', 'annyeong_sesang')"
-        it "appends an underscore if the facial name is a Python keyword" $ do
-            toNamePair "def" `shouldBe` "('def_', 'def')"
-            toNamePair "lambda" `shouldBe` "('lambda_', 'lambda')"
-            toNamePair (Name "abc" "lambda") `shouldBe` "('abc', 'lambda')"
-            toNamePair (Name "lambda" "abc") `shouldBe` "('lambda_', 'abc')"
-
     describe "compilePackage" $ do
         it "returns a Map of file paths and their contents to generate" $ do
             let (Source pkg _) = makeDummySource $ Module [] Nothing

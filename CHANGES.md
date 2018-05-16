@@ -230,6 +230,9 @@ To be released.
  -  Removed `__nirum_tag_names__`, `__nirum_union_behind_name__`, and
     `__nirum_field_names__` static fields from generated union type classes.
 
+ -  Removed `__nirum_schema_version__` static field from generated service
+    classes.
+
  -  Fixed a bug that generated service methods hadn't checked its arguments
     before its transport sends a payload.  [[#220]]
 
