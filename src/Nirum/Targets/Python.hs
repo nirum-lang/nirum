@@ -2,6 +2,7 @@
 {-# LANGUAGE ExtendedDefaultRules #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeSynonymInstances #-}
@@ -12,7 +13,6 @@ module Nirum.Targets.Python
     , compileModule
     , compileTypeDeclaration
     , parseModulePath
-    , toNamePair
     ) where
 
 import Control.Monad (forM)
@@ -20,27 +20,30 @@ import qualified Data.List as L
 import Data.Maybe (catMaybes, fromMaybe)
 import GHC.Exts (IsList (toList))
 
+import qualified Data.ByteString.Lazy
 import qualified Data.HashMap.Strict as HM
 import qualified Data.Map.Strict as M
 import qualified Data.SemVer as SV
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Text.Lazy (toStrict)
-import Data.Text.Encoding (decodeUtf8, encodeUtf8)
+import Data.Text.Encoding (decodeUtf8)
 import Data.Function (on)
 import System.FilePath (joinPath)
 import Text.Blaze (Markup)
 import Text.Blaze.Renderer.Text
+import qualified Text.Blaze.Renderer.Utf8
 import qualified Text.Email.Validate as E
 import Text.Heterocephalus (compileText)
-import Text.InterpolatedString.Perl6 (q, qq)
+import Text.InterpolatedString.Perl6 (qq)
 
 import qualified Nirum.Constructs.Annotation as A
 import Nirum.Constructs.Annotation.Internal hiding (Text, annotations, name)
 import qualified Nirum.Constructs.Annotation.Internal as AI
+import Nirum.Constructs.Declaration hiding (annotations, name)
+import qualified Nirum.Constructs.Declaration
 import qualified Nirum.Constructs.DeclarationSet as DS
 import qualified Nirum.Constructs.Identifier as I
-import Nirum.Constructs.Declaration (Documented (docsBlock))
 import Nirum.Constructs.Module hiding (imports)
 import Nirum.Constructs.ModulePath ( ModulePath
                                    , fromIdentifiers
@@ -127,9 +130,6 @@ toEnumMemberName name'
     attributeName :: T.Text
     attributeName = toAttributeName' name'
 
-toNamePair :: Name -> T.Text
-toNamePair (Name f b) = [qq|('{toAttributeName f}', '{I.toSnakeCaseText b}')|]
-
 toIndentedCodes :: (a -> T.Text) -> [a] -> T.Text -> T.Text
 toIndentedCodes f traversable concatenator =
     T.intercalate concatenator $ map f traversable
@@ -199,6 +199,33 @@ compileDocstringWithFields indentSpace decl fields' =
         | f@(Field n _ _) <- toList fields'
         ]
 
+compileDocstringWithParameters :: forall a b . (Documented a, Declaration b)
+                               => Code
+                               -> a
+                               -> [(b, Code)]
+                               -> Code
+compileDocstringWithParameters indentSpace decl paramTypePairs =
+    compileDocstring'
+        indentSpace
+        decl
+        [ case compileDocs p of
+              Nothing ->
+                  [qq|:param {paramName p}: (:class:`{simplifyTypeExpr tx}`)
+|]
+              Just docs' ->
+                  [qq|:param {paramName p}: (:class:`{simplifyTypeExpr tx}`)
+{indentN (9 + (T.length $ paramName p)) docs'}
+|]
+        | (p, tx) <- paramTypePairs
+        ]
+  where
+    indentN :: Int -> Code -> Code
+    indentN n = indent (T.replicate n " ")
+    paramName :: b -> Code
+    paramName = toAttributeName' . Nirum.Constructs.Declaration.name
+    simplifyTypeExpr :: Code -> Code
+    simplifyTypeExpr = T.takeWhileEnd (/= '.')
+
 compileDocsComment :: Documented a => Code -> a -> Code
 compileDocsComment indentSpace d =
     case compileDocs d of
@@ -226,7 +253,7 @@ returnCompiler = do
             (Python3, _) -> [qq| -> '{r}'|]
 
 
-compileUnionTag :: Source -> Name -> Tag -> CodeGen Code
+compileUnionTag :: Source -> Name -> Tag -> CodeGen Markup
 compileUnionTag source parentname d@(Tag typename' fields' _) = do
     abc <- collectionsAbc
     typeExprCodes <- mapM (compileTypeExpression' source)
@@ -251,7 +278,7 @@ compileUnionTag source parentname d@(Tag typename' fields' _) = do
         | Field fieldName'@(Name fName bName) typeExpr _ <- fieldList
         ]
     initializers <- compileFieldInitializers fields'
-    return $ toStrict $ renderMarkup $ [compileText|
+    return $ [compileText|
 class #{className}(#{parentClass}):
 #{compileDocstringWithFields "    " d fields'}
     __slots__ = (
@@ -487,14 +514,14 @@ compileDeserializer' :: Source
 compileDeserializer' Source { sourceModule = boundModule } =
     compileDeserializer boundModule
 
-compileTypeDeclaration :: Source -> TypeDeclaration -> CodeGen Code
+compileTypeDeclaration :: Source -> TypeDeclaration -> CodeGen Markup
 compileTypeDeclaration _ TypeDeclaration { type' = PrimitiveType {} } =
     return ""  -- never used
 compileTypeDeclaration src d@TypeDeclaration { typename = typename'
                                              , type' = Alias ctype
                                              } = do
     ctypeExpr <- compileTypeExpression' src (Just ctype)
-    return $ toStrict $ renderMarkup $ [compileText|
+    return [compileText|
 %{ case compileDocs d }
 %{ of Just rst }
 #: #{rst}
@@ -511,7 +538,7 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
     pyVer <- getPythonVersion
     Validator typePred valueValidators' <- compileValidator' src itype "value"
     deserializer <- compileDeserializer' src itype "value" "rv" "handle_error"
-    return $ toStrict $ renderMarkup $ [compileText|
+    return [compileText|
 class #{className}(object):
 #{compileDocstring "    " d}
 
@@ -615,7 +642,7 @@ compileTypeDeclaration _ d@TypeDeclaration { typename = typename'
     insertStandardImport "typing"
     baseString <- baseStringClass
     pyVer <- getPythonVersion
-    return $ toStrict $ renderMarkup [compileText|
+    return [compileText|
 class #{className}(enum.Enum):
 #{compileDocstring "    " d}
 
@@ -706,7 +733,7 @@ compileTypeDeclaration src d@TypeDeclaration { typename = Name tnFacial tnBehind
         | Field fieldName'@(Name fName bName) typeExpr _ <- fieldList
         ]
     initializers <- compileFieldInitializers fields'
-    return $ toStrict $ renderMarkup $ [compileText|
+    return [compileText|
 class #{className}(object):
 #{compileDocstringWithFields "    " d fields'}
     __slots__ = (
@@ -896,7 +923,7 @@ compileTypeDeclaration src
     insertThirdPartyImportsA [("nirum.datastructures", [("map_type", "Map")])]
     baseString <- baseStringClass
     pyVer <- getPythonVersion
-    return $ toStrict $ renderMarkup $ [compileText|
+    return [compileText|
 class #{className}(#{T.intercalate "," $ compileExtendClasses annotations}):
 #{compileDocstring "    " d}
 
@@ -1031,74 +1058,105 @@ class #{className}(#{T.intercalate "," $ compileExtendClasses annotations}):
             | (A.Annotation annotationName _) <- A.toList annotations'
             ]
 
-compileTypeDeclaration
-    src@Source { sourcePackage = Package { metadata = metadata' } }
-    d@ServiceDeclaration { serviceName = name'
-                         , service = Service methods
-                         } = do
-    let methods' = toList methods
-    methodMetadata <- mapM compileMethodMetadata methods'
-    let methodMetadata' = commaNl methodMetadata
-    dummyMethods <- mapM compileMethod methods'
-    clientMethods <- mapM compileClientMethod methods'
-    methodErrorTypes <- mapM compileErrorType methods'
-    let dummyMethods' = T.intercalate "\n\n" dummyMethods
-        clientMethods' = T.intercalate "\n\n" clientMethods
-        methodErrorTypes' =
-            T.intercalate "," $ catMaybes methodErrorTypes
-    param <- parameterCompiler
-    ret <- returnCompiler
-    insertStandardImport "json"
-    insertThirdPartyImports [ ("nirum.deserialize", ["deserialize_meta"])
-                            ]
+compileTypeDeclaration src d@ServiceDeclaration { serviceName = name'
+                                                , service = Service methods
+                                                } = do
+    clientMethods <- mapM compileClientMethod $ toList methods
+    let clientMethods' = T.intercalate "\n\n" clientMethods
     insertThirdPartyImportsA
         [ ("nirum.constructs", [("name_dict_type", "NameDict")])
         , ("nirum.datastructures", [(nirumMapName, "Map")])
         , ("nirum.service", [("service_type", "Service")])
         , ("nirum.transport", [("transport_type", "Transport")])
         ]
-    return [qq|
-class $className(service_type):
-{compileDocstring "    " d}
+    pyVer <- getPythonVersion
+    methods' <- sequence $ (`map` toList methods) $ \ method' -> do
+        rTypeExpr <- compileTypeExpression' src $ returnType method'
+        errTypeExpr <- compileTypeExpression' src $ errorType method'
+        params' <- sequence $ (`map` toList (parameters method')) $
+            \ param'@(Parameter _ pType _) -> do
+                typeExpr <- compileTypeExpression' src $ Just pType
+                return (param', typeExpr)
+        return (method', rTypeExpr, errTypeExpr, params')
+    return [compileText|
+class #{className}(service_type):
+#{compileDocstring "    " d}
     __nirum_type__ = 'service'
-    __nirum_schema_version__ = \'{SV.toText $ version metadata'}\'
-    __nirum_service_methods__ = \{
-        {methodMetadata'}
-    \}
+    __nirum_service_methods__ = {
+%{ forall (Method mName _ _ _ _, rTypeExpr, _, params') <- methods' }
+        '#{toAttributeName' mName}': {
+            '_v': 2,
+            '_return': lambda: #{rTypeExpr},
+            '_names': name_dict_type([
+%{ forall (Parameter (Name pF pB) _ _, _) <- params' }
+                ('#{toAttributeName pF}', '#{I.toSnakeCaseText pB}'),
+%{ endforall }
+            ]),
+%{ forall (Parameter pName _ _, pTypeExpr) <- params' }
+            '#{toAttributeName' pName}': lambda: #{pTypeExpr},
+%{ endforall }
+        },
+%{ endforall }
+    }
     __nirum_method_names__ = name_dict_type([
-        $methodNameMap
+%{ forall (Method (Name mF mB) _ _ _ _, _, _, _) <- methods' }
+        ('#{toAttributeName mF}', '#{I.toSnakeCaseText mB}'),
+%{ endforall }
     ])
-    __nirum_method_annotations__ = $methodAnnotations'
+    __nirum_method_annotations__ = #{methodAnnotations'}
 
     @staticmethod
     def __nirum_method_error_types__(k, d=None):
-        return dict([
-            $methodErrorTypes'
-        ]).get(k, d)
+%{ forall (Method mName _ _ _ _, _, errTypeExpr, _) <- methods' }
+        if k == '#{toAttributeName' mName}':
+            return #{errTypeExpr}
+%{ endforall }
+        return d
 
-    {dummyMethods'}
+%{ forall (m@(Method mName _ _ _ _), rTypeExpr, _, params') <- methods' }
+    def #{toAttributeName' mName}(
+        self,
+%{ case pyVer }
+%{ of Python3 }
+%{ forall (Parameter pName _ _, pTypeExpr) <- params' }
+        #{toAttributeName' pName}: '#{pTypeExpr}',
+%{ endforall }
+    ) -> '#{rTypeExpr}':
+%{ of Python2 }
+%{ forall (Parameter pName _ _, _) <- params' }
+        #{toAttributeName' pName},
+%{ endforall }
+    ):
+%{ endcase }
+#{compileDocstringWithParameters "        " m params'}
+        raise NotImplementedError(
+            '#{className} has to implement #{toAttributeName' mName}()'
+        )
+%{ endforall }
 
 
-# FIXME client MUST be generated & saved on diffrent module
-#       where service isn't included.
-class {className}_Client($className):
+class #{className}_Client(#{className}):
     """The client object of :class:`{className}`."""
 
-    def __init__(self,
-                 { param "transport" "transport_type" }){ ret "None" }:
+%{ case pyVer }
+%{ of Python3 }
+    def __init__(self, transport: transport_type) -> None:
+%{ of Python2 }
+    def __init__(self, transport):
+%{ endcase }
         if not isinstance(transport, transport_type):
             raise TypeError(
-                'expected an instance of \{0.__module__\}.\{0.__name__\}, not '
-                '\{1!r\}'.format(transport_type, transport)
+                'expected an instance of {0.__module__}.{0.__name__}, not '
+                '{1!r}'.format(transport_type, transport)
             )
         self.__nirum_transport__ = transport  # type: transport_type
 
-    {clientMethods'}
+    #{clientMethods'}
 
-{className}.Client = {className}_Client
-{className}.Client.__name__ = 'Client'
-if hasattr({className}.Client, '__qualname__'):
-    {className}.Client.__qualname__ = '{className}.Client'
+#{className}.Client = #{className}_Client
+#{className}.Client.__name__ = 'Client'
+if hasattr(#{className}.Client, '__qualname__'):
+    #{className}.Client.__qualname__ = '#{className}.Client'
 |]
   where
     nirumMapName :: T.Text
@@ -1107,68 +1165,11 @@ if hasattr({className}.Client, '__qualname__'):
     className = toClassName' name'
     commaNl :: [T.Text] -> T.Text
     commaNl = T.intercalate ",\n"
-    compileErrorType :: Method -> CodeGen (Maybe Code)
-    compileErrorType (Method mn _ _ me _) =
-        case me of
-            Just errorTypeExpression -> do
-                et <- compileTypeExpression' src (Just errorTypeExpression)
-                return $ Just [qq|('{toAttributeName' mn}', $et)|]
-            Nothing -> return Nothing
-    compileMethod :: Method -> CodeGen Code
-    compileMethod m@(Method mName params rtype _etype _anno) = do
-        let mName' = toAttributeName' mName
-        params' <- mapM compileMethodParameter $ toList params
-        let paramDocs = [ T.concat [ ":param "
-                                   , toAttributeName' pName
-                                   , maybe "" (T.append ": ") $ compileDocs p
-                                   -- TODO: types
-                                   ]
-                        | p@(Parameter pName _ _) <- toList params
-                        ]
-        rtypeExpr <- compileTypeExpression' src rtype
-        ret <- returnCompiler
-        return [qq|
-    def {mName'}(self, {commaNl params'}){ ret rtypeExpr }:
-{compileDocstring' "        " m paramDocs}
-        raise NotImplementedError('$className has to implement {mName'}()')
-|]
     compileMethodParameter :: Parameter -> CodeGen Code
     compileMethodParameter (Parameter pName pType _) = do
         pTypeExpr <- compileTypeExpression' src (Just pType)
         arg <- parameterCompiler
         return [qq|{arg (toAttributeName' pName) pTypeExpr}|]
-    compileMethodMetadata :: Method -> CodeGen Code
-    compileMethodMetadata Method { methodName = mName
-                                 , parameters = params
-                                 , returnType = rtype
-                                 } = do
-        let params' = toList params :: [Parameter]
-        rtypeExpr <- compileTypeExpression' src rtype
-        paramMetadata <- mapM compileParameterMetadata params'
-        let paramMetadata' = commaNl paramMetadata
-        insertThirdPartyImportsA
-            [("nirum.constructs", [("name_dict_type", "NameDict")])]
-        return [qq|'{toAttributeName' mName}': \{
-            '_v': 2,
-            '_return': lambda: $rtypeExpr,
-            '_names': name_dict_type([{paramNameMap params'}]),
-            {paramMetadata'}
-        \}|]
-    methodList :: [Method]
-    methodList = toList methods
-    compileParameterMetadata :: Parameter -> CodeGen Code
-    compileParameterMetadata (Parameter pName pType _) = do
-        let pName' = toAttributeName' pName
-        pTypeExpr <- compileTypeExpression' src (Just pType)
-        return [qq|'{pName'}': lambda: $pTypeExpr|]
-    methodNameMap :: T.Text
-    methodNameMap = toIndentedCodes
-        toNamePair
-        [mName | Method { methodName = mName } <- methodList]
-        ",\n        "
-    paramNameMap :: [Parameter] -> T.Text
-    paramNameMap params = toIndentedCodes
-        toNamePair [pName | Parameter pName _ _ <- params] ",\n        "
     compileClientPayload :: Parameter -> CodeGen Code
     compileClientPayload (Parameter pName pt _) = do
         let pName' = toAttributeName' pName
@@ -1213,7 +1214,7 @@ if hasattr({className}.Client, '__qualname__'):
             | Parameter pName pTypeExpr _ <- toList params
             ]
         ret <- returnCompiler
-        return $ toStrict $ renderMarkup $ [compileText|
+        return $ toStrict $ renderMarkup [compileText|
     def #{clientMethodName'}(self, #{commaNl params'})#{ret rtypeExpr}:
         _type_repr = __import__('typing')._type_repr
         # typing module can be masked by parameter of the same name, e.g.:
@@ -1292,22 +1293,26 @@ if hasattr({className}.Client, '__qualname__'):
             ]
     methodAnnotations' :: T.Text
     methodAnnotations' = wrapMap $ commaNl $ map compileMethodAnnotation
-        methodList
+        (toList methods)
 
 compileTypeDeclaration _ Import {} =
     return ""  -- Nothing to compile
 
-compileModuleBody :: Source -> CodeGen Code
+compileModuleBody :: Source -> CodeGen Markup
 compileModuleBody src@Source { sourceModule = boundModule } = do
     let types' = boundTypes boundModule
     typeCodes <- mapM (compileTypeDeclaration src) $ toList types'
-    return $ T.intercalate "\n\n" typeCodes
+    return $ [compileText|
+%{forall typeCode <- typeCodes}
+#{typeCode}
+%{endforall}
+|]
 
 compileModule :: PythonVersion
               -> Source
               -> Either CompileError' ( S.Set T.Text
                                       , M.Map (Int, Int) (S.Set T.Text)
-                                      , Code
+                                      , Markup
                                       )
 compileModule pythonVersion' source = do
     let (result, context) = runCodeGen (compileModuleBody source)
@@ -1324,7 +1329,7 @@ compileModule pythonVersion' source = do
     let fromImports = M.assocs (localImportsMap context) ++
                       M.assocs (thirdPartyImports context)
     code <- result
-    return $ (deps, optDeps,) $ toStrict $ renderMarkup $
+    return $ (deps, optDeps,) $
         [compileText|# -*- coding: utf-8 -*-
 #{compileDocstring "" $ sourceModule source}
 %{ forall (alias, import') <- M.assocs (standardImports context) }
@@ -1359,7 +1364,7 @@ from #{from} import (
 
 compilePackageMetadata :: Package'
                        -> (S.Set T.Text, M.Map (Int, Int) (S.Set T.Text))
-                       -> Code
+                       -> Markup
 compilePackageMetadata Package
                            { metadata = MD.Metadata
                                  { authors = authors'
@@ -1376,7 +1381,7 @@ compilePackageMetadata Package
                            , modules = modules'
                            }
                        (deps, optDeps) =
-    toStrict $ renderMarkup [compileText|# -*- coding: utf-8 -*-
+    [compileText|# -*- coding: utf-8 -*-
 import sys
 
 from setuptools import setup, __version__ as setuptools_version
@@ -1503,13 +1508,13 @@ setup(
     strings :: [Code] -> Code
     strings values = T.intercalate ", " $ map stringLiteral (L.sort values)
 
-manifestIn :: Code
-manifestIn = [q|recursive-include src *.py
+manifestIn :: Markup
+manifestIn = [compileText|recursive-include src *.py
 recursive-include src-py2 *.py
 |]
 
 compilePackage' :: Package'
-                -> M.Map FilePath (Either CompileError' Code)
+                -> M.Map FilePath (Either CompileError' Markup)
 compilePackage' package@Package { metadata = MD.Metadata { target = target' }
                                 } =
     M.fromList $
@@ -1534,8 +1539,8 @@ compilePackage' package@Package { metadata = MD.Metadata { target = target' }
     toFilename :: T.Text -> ModulePath -> FilePath
     toFilename sourceRootDirectory mp =
         joinPath $ T.unpack sourceRootDirectory : toPythonFilename mp
-    initFiles :: [(FilePath, Either CompileError' Code)]
-    initFiles = [ (toFilename (sourceDirectory ver) mp', Right "")
+    initFiles :: [(FilePath, Either CompileError' Markup)]
+    initFiles = [ (toFilename (sourceDirectory ver) mp', Right [compileText||])
                 | mp <- MS.keys (modules package)
                 , mp' <- S.elems (hierarchy mp)
                 , ver <- versions
@@ -1543,7 +1548,7 @@ compilePackage' package@Package { metadata = MD.Metadata { target = target' }
     modules' :: [ ( FilePath
                   , Either CompileError' ( S.Set T.Text
                                          , M.Map (Int, Int) (S.Set T.Text)
-                                         , Code
+                                         , Markup
                                          )
                   )
                 ]
@@ -1569,7 +1574,7 @@ parseModulePath string =
     identTexts = T.split (== '.') string
 
 instance Target Python where
-    type CompileResult Python = Code
+    type CompileResult Python = Markup
     type CompileError Python = CompileError'
     targetName _ = "python"
     parseTarget table = do
@@ -1604,4 +1609,5 @@ instance Target Python where
                       }
     compilePackage = compilePackage'
     showCompileError _ e = e
-    toByteString _ = encodeUtf8
+    toByteString _ =
+        Data.ByteString.Lazy.toStrict . Text.Blaze.Renderer.Utf8.renderMarkup

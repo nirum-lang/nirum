@@ -47,5 +47,6 @@ def test_service_docs():
     assert PingService.__doc__.strip() == r'Service docs\.'
     assert PingService.ping.__doc__.strip() == r'''Method docs\.
 
-        :param nonce: Parameter docs\.'''
+        :param nonce: (:class:`{class_}`)
+                      Parameter docs\.'''.format(class_=type(u'').__name__)
     assert NullService.__doc__ is None

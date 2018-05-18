@@ -365,8 +365,6 @@ def test_union_tags_optional_initializer():
 def test_service():
     assert issubclass(NullService, Service)
     assert issubclass(PingService, Service)
-    assert getattr(PingService, '__nirum_schema_version__') == '0.3.0'
-    assert getattr(NullService, '__nirum_schema_version__') == '0.3.0'
     if PY3:
         import typing
         annots = typing.get_type_hints(PingService.ping)
