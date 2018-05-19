@@ -1170,11 +1170,6 @@ if hasattr(#{className}.Client, '__qualname__'):
         pTypeExpr <- compileTypeExpression' src (Just pType)
         arg <- parameterCompiler
         return [qq|{arg (toAttributeName' pName) pTypeExpr}|]
-    compileClientPayload :: Parameter -> CodeGen Code
-    compileClientPayload (Parameter pName pt _) = do
-        let pName' = toAttributeName' pName
-        return [qq|'{I.toSnakeCaseText $ N.behindName pName}':
-                   ({compileSerializer' src pt pName'})|]
     compileClientMethod :: Method -> CodeGen Code
     compileClientMethod Method { methodName = mName
                                , parameters = params
@@ -1205,7 +1200,6 @@ if hasattr(#{className}.Client, '__qualname__'):
                       )
                     ]
                 return "raise _unexpected_nirum_response_error(serialized)"
-        payloadArguments <- mapM compileClientPayload $ toList params
         validators <- sequence
             [ do
                   v <- compileValidator' src pTypeExpr $ toAttributeName' pName
@@ -1240,7 +1234,12 @@ if hasattr(#{className}.Client, '__qualname__'):
 %{ endforall }
         successful, serialized = self.__nirum_transport__(
             '#{I.toSnakeCaseText $ N.behindName mName}',
-            payload={#{commaNl payloadArguments}},
+            payload={
+%{ forall Parameter (Name fn bn) pTypeExpr _ <- toList params }
+                '#{I.toSnakeCaseText bn}':
+                    (#{compileSerializer' src pTypeExpr (toAttributeName fn)}),
+%{ endforall }
+            },
             # FIXME Give annotations.
             service_annotations={},
             method_annotations=self.__nirum_method_annotations__,
