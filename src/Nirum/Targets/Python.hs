@@ -234,7 +234,6 @@ compileDocsComment indentSpace d =
 
 type ParameterName = Code
 type ParameterType = Code
-type ReturnType = Code
 
 parameterCompiler :: CodeGen (ParameterName -> ParameterType -> Code)
 parameterCompiler = do
@@ -242,16 +241,6 @@ parameterCompiler = do
     return $ \ n t -> case ver of
                           Python2 -> n
                           Python3 -> [qq|$n: '{t}'|]
-
-returnCompiler :: CodeGen (ReturnType -> Code)
-returnCompiler = do
-    ver <- getPythonVersion
-    return $ \ r ->
-        case (ver, r) of
-            (Python2, _) -> ""
-            (Python3, "None") -> [qq| -> None|]
-            (Python3, _) -> [qq| -> '{r}'|]
-
 
 compileUnionTag :: Source -> Name -> Tag -> CodeGen Markup
 compileUnionTag source parentname d@(Tag typename' fields' _) = do
@@ -1069,14 +1058,17 @@ compileTypeDeclaration src d@ServiceDeclaration { serviceName = name'
         , ("nirum.service", [("service_type", "Service")])
         , ("nirum.transport", [("transport_type", "Transport")])
         ]
+    builtins <- importBuiltins
+    typing <- importStandardLibrary "typing"
     pyVer <- getPythonVersion
     methods' <- sequence $ (`map` toList methods) $ \ method' -> do
         rTypeExpr <- compileTypeExpression' src $ returnType method'
         errTypeExpr <- compileTypeExpression' src $ errorType method'
         params' <- sequence $ (`map` toList (parameters method')) $
-            \ param'@(Parameter _ pType _) -> do
+            \ param'@(Parameter pName pType _) -> do
                 typeExpr <- compileTypeExpression' src $ Just pType
-                return (param', typeExpr)
+                v <- compileValidator' src pType $ toAttributeName' pName
+                return (param', typeExpr, v)
         return (method', rTypeExpr, errTypeExpr, params')
     return [compileText|
 class #{className}(service_type):
@@ -1088,11 +1080,11 @@ class #{className}(service_type):
             '_v': 2,
             '_return': lambda: #{rTypeExpr},
             '_names': name_dict_type([
-%{ forall (Parameter (Name pF pB) _ _, _) <- params' }
+%{ forall (Parameter (Name pF pB) _ _, _, _) <- params' }
                 ('#{toAttributeName pF}', '#{I.toSnakeCaseText pB}'),
 %{ endforall }
             ]),
-%{ forall (Parameter pName _ _, pTypeExpr) <- params' }
+%{ forall (Parameter pName _ _, pTypeExpr, _) <- params' }
             '#{toAttributeName' pName}': lambda: #{pTypeExpr},
 %{ endforall }
         },
@@ -1118,20 +1110,44 @@ class #{className}(service_type):
         self,
 %{ case pyVer }
 %{ of Python3 }
-%{ forall (Parameter pName _ _, pTypeExpr) <- params' }
+%{ forall (Parameter pName _ _, pTypeExpr, _) <- params' }
         #{toAttributeName' pName}: '#{pTypeExpr}',
 %{ endforall }
     ) -> '#{rTypeExpr}':
 %{ of Python2 }
-%{ forall (Parameter pName _ _, _) <- params' }
+%{ forall (Parameter pName _ _, _, _) <- params' }
         #{toAttributeName' pName},
 %{ endforall }
     ):
 %{ endcase }
-#{compileDocstringWithParameters "        " m params'}
+#{compileDocstringWithParameters "        " m (map tripleToPair params')}
         raise NotImplementedError(
             '#{className} has to implement #{toAttributeName' mName}()'
         )
+
+    #{toAttributeName' mName}.__nirum_argument_serializers__ = {
+    }  # type: typing.Mapping[str, typing.Callable[[object], object]]
+%{ forall (Parameter pName pt _, pTypeE, (Validator pTPred pValVs)) <- params' }
+    def __nirum_argument_serializer__(#{toAttributeName' pName}):
+        if not (#{pTPred}):
+            raise #{builtins}.TypeError(
+                '#{toAttributeName' pName} must be a value of ' +
+                #{typing}._type_repr(#{pTypeE}) + ', not ' +
+                #{builtins}.repr(#{toAttributeName' pName})
+            )
+%{ forall ValueValidator pValuePredCode pValueErrorMsg <- pValVs }
+        elif not (#{pValuePredCode}):
+            raise #{builtins}.ValueError(
+                'invalid #{toAttributeName' pName}: '
+                #{stringLiteral pValueErrorMsg}
+            )
+%{ endforall }
+        return #{compileSerializer' src pt (toAttributeName' pName)}
+    __nirum_argument_serializer__.__name__ = '#{toAttributeName' pName}'
+    #{toAttributeName' mName}.__nirum_argument_serializers__[
+        '#{toAttributeName' pName}'] = __nirum_argument_serializer__
+    del __nirum_argument_serializer__
+%{ endforall }
 %{ endforall }
 
 
@@ -1163,13 +1179,10 @@ if hasattr(#{className}.Client, '__qualname__'):
     nirumMapName = "map_type"
     className :: T.Text
     className = toClassName' name'
+    tripleToPair :: (a, b, c) -> (a, b)
+    tripleToPair (a, b, _) = (a, b)
     commaNl :: [T.Text] -> T.Text
     commaNl = T.intercalate ",\n"
-    compileMethodParameter :: Parameter -> CodeGen Code
-    compileMethodParameter (Parameter pName pType _) = do
-        pTypeExpr <- compileTypeExpression' src (Just pType)
-        arg <- parameterCompiler
-        return [qq|{arg (toAttributeName' pName) pTypeExpr}|]
     compileClientMethod :: Method -> CodeGen Code
     compileClientMethod Method { methodName = mName
                                , parameters = params
@@ -1177,8 +1190,12 @@ if hasattr(#{className}.Client, '__qualname__'):
                                , errorType = etypeM
                                } = do
         let clientMethodName' = toAttributeName' mName
-        params' <- mapM compileMethodParameter $ toList params
-        rtypeExpr <- compileTypeExpression' src rtypeM
+        pyVer <- getPythonVersion
+        rTypeExpr <- compileTypeExpression' src rtypeM
+        params' <- sequence $ (`map` toList params) $
+            \ param@(Parameter _ pType _) -> do
+                pTypeExpr <- compileTypeExpression' src $ Just pType
+                return (param, pTypeExpr)
         resultDeserializer <- case rtypeM of
             Just rtype -> compileDeserializer' src rtype
                 "serialized"
@@ -1200,44 +1217,29 @@ if hasattr(#{className}.Client, '__qualname__'):
                       )
                     ]
                 return "raise _unexpected_nirum_response_error(serialized)"
-        validators <- sequence
-            [ do
-                  v <- compileValidator' src pTypeExpr $ toAttributeName' pName
-                  pTypeExprCode <- compileTypeExpression' src $ Just pTypeExpr
-                  return (pName, pTypeExprCode, v)
-            | Parameter pName pTypeExpr _ <- toList params
-            ]
-        ret <- returnCompiler
         return $ toStrict $ renderMarkup [compileText|
-    def #{clientMethodName'}(self, #{commaNl params'})#{ret rtypeExpr}:
-        _type_repr = __import__('typing')._type_repr
-        # typing module can be masked by parameter of the same name, e.g.:
-        #     service foo-service ( bar (text typing) );
-        # As Nirum identifier disallows to begin with dash/underscore,
-        # we can avoid such name overwrapping by defining _type_repr,
-        # an underscore-leaded alias of typing._type_repr and using it
-        # in the below.
-%{ forall (pName, pType, (Validator pTypePred pValueValidators)) <- validators }
-        if not (#{pTypePred}):
-            raise TypeError(
-                '#{toAttributeName' pName} must be a value of ' +
-                _type_repr(#{pType}) + ', not ' +
-                repr(#{toAttributeName' pName})
-            )
-%{ forall ValueValidator pValuePredCode pValueErrorMsg <- pValueValidators }
-        elif not (#{pValuePredCode}):
-            raise ValueError(
-                'invalid #{toAttributeName' pName}: '
-                #{stringLiteral pValueErrorMsg}
-            )
+    def #{clientMethodName'}(
+        self,
+%{ case pyVer }
+%{ of Python3 }
+%{ forall (Parameter pName _ _, pTypeExpr) <- params' }
+        #{toAttributeName' pName}: '#{pTypeExpr}',
 %{ endforall }
+    ) -> '#{rTypeExpr}':
+%{ of Python2 }
+%{ forall (Parameter pName _ _, _) <- params' }
+        #{toAttributeName' pName},
 %{ endforall }
+    ):
+%{ endcase }
         successful, serialized = self.__nirum_transport__(
             '#{I.toSnakeCaseText $ N.behindName mName}',
             payload={
-%{ forall Parameter (Name fn bn) pTypeExpr _ <- toList params }
-                '#{I.toSnakeCaseText bn}':
-                    (#{compileSerializer' src pTypeExpr (toAttributeName fn)}),
+%{ forall Parameter (Name fn bn) _ _ <- toList params }
+                '#{I.toSnakeCaseText bn}': #{className}.#{clientMethodName'}
+                    .__nirum_argument_serializers__['#{toAttributeName fn}'](
+                    #{toAttributeName fn}
+                ),
 %{ endforall }
             },
             # FIXME Give annotations.

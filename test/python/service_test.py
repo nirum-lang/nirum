@@ -1,3 +1,4 @@
+import collections
 import uuid
 
 from nirum.transport import Transport
@@ -48,6 +49,34 @@ class DumbTransport(Transport):
     @property
     def latest_call(self):
         return self.calls[-1]
+
+
+def test_service_argument_serializers():
+    table = SampleService.sample_method.__nirum_argument_serializers__
+    assert isinstance(table, collections.Mapping)
+    assert len(table) == 8
+    assert table['a'](Dog(name=u'Dog.name', age=3)) == {
+        '_type': 'animal',
+        '_tag': 'dog',
+        'name': 'Dog.name',
+        'kind': None,
+        'age': 3,
+        'weight': None,
+    }
+    assert table['b'](Product(name=u'Product.name', sale=False)) == {
+        '_type': 'product',
+        'name': 'Product.name',
+        'price': None,
+        'sale': False,
+        'url': None,
+    }
+    assert table['c'](Gender.female) == 'yeoseong'
+    assert table['d'](Way(u'way/path/text')) == 'way/path/text'
+    assert table['e'](uuid.UUID('F7DB93E3-731E-48EF-80A2-CAC81E02F1AE')) == \
+        'f7db93e3-731e-48ef-80a2-cac81e02f1ae'
+    assert table['f'](b'binary data') == u'YmluYXJ5IGRhdGE='
+    assert table['g'](1234) == 1234
+    assert table['h'](u'text data') == 'text data'
 
 
 def test_service_client_payload_serialization():
