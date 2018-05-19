@@ -28,7 +28,6 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Text.Lazy (toStrict)
 import Data.Text.Encoding (decodeUtf8)
-import Data.Function (on)
 import System.FilePath (joinPath)
 import Text.Blaze (Markup)
 import Text.Blaze.Renderer.Text
@@ -114,9 +113,6 @@ sourceDirectory :: PythonVersion -> T.Text
 sourceDirectory Python2 = "src-py2"
 sourceDirectory Python3 = "src"
 
-thd3 :: (a, b, c) -> c
-thd3 (_, _, v) = v
-
 enumerate :: [a] -> [(Int, a)]
 enumerate = zip [0 ..]
 
@@ -130,37 +126,21 @@ toEnumMemberName name'
     attributeName :: T.Text
     attributeName = toAttributeName' name'
 
-toIndentedCodes :: (a -> T.Text) -> [a] -> T.Text -> T.Text
-toIndentedCodes f traversable concatenator =
-    T.intercalate concatenator $ map f traversable
-
-compileParameters :: (ParameterName -> ParameterType -> Code)
-                  -> [(T.Text, Code, Bool)]
-                  -> Code
-compileParameters gen nameTypeTriples =
-    toIndentedCodes
-        (\ (n, t, o) -> gen n t `T.append` if o then "=None" else "")
-        nameTypeTriples ", "
-
-compileFieldInitializers :: DS.DeclarationSet Field -> CodeGen [Code]
-compileFieldInitializers fields' =
-    forM (toList fields') compileFieldInitializer
+compileFieldInitializer :: Field -> CodeGen Code
+compileFieldInitializer (Field fieldName' fieldType' _) =
+    case fieldType' of
+        SetModifier _ ->
+            return [qq|self.$attributeName = frozenset($attributeName)|]
+        ListModifier _ -> do
+            insertThirdPartyImportsA [ ( "nirum.datastructures"
+                                       , [("list_type", "List")]
+                                       )
+                                     ]
+            return [qq|self.$attributeName = list_type($attributeName)|]
+        _ -> return [qq|self.$attributeName = $attributeName|]
   where
-    compileFieldInitializer :: Field -> CodeGen Code
-    compileFieldInitializer (Field fieldName' fieldType' _) =
-        case fieldType' of
-            SetModifier _ ->
-                return [qq|self.$attributeName = frozenset($attributeName)|]
-            ListModifier _ -> do
-                insertThirdPartyImportsA [ ( "nirum.datastructures"
-                                           , [("list_type", "List")]
-                                           )
-                                         ]
-                return [qq|self.$attributeName = list_type($attributeName)|]
-            _ -> return [qq|self.$attributeName = $attributeName|]
-      where
-        attributeName :: Code
-        attributeName = toAttributeName' fieldName'
+    attributeName :: Code
+    attributeName = toAttributeName' fieldName'
 
 compileDocs :: Documented a => a -> Maybe ReStructuredText
 compileDocs = fmap render . docsBlock
@@ -179,8 +159,7 @@ compileDocstring' indentSpace d extra =
 compileDocstring :: Documented a => Code -> a -> Code
 compileDocstring indentSpace d = compileDocstring' indentSpace d []
 
-compileDocstringWithFields :: Documented a
-                           => Code -> a -> DS.DeclarationSet Field -> Code
+compileDocstringWithFields :: Documented a => Code -> a -> [Field] -> Code
 compileDocstringWithFields indentSpace decl fields' =
     compileDocstring' indentSpace decl extra
   where
@@ -232,96 +211,142 @@ compileDocsComment indentSpace d =
         Nothing -> "\n"
         Just rst -> indent (indentSpace `T.append` "#: ") rst
 
-type ParameterName = Code
-type ParameterType = Code
+data FieldCode = FieldCode
+    { fcField :: Field
+    , fcInitializer :: Code
+    , fcTypeExpr :: Code
+    , fcValidator :: Validator
+    , fcDeserializer :: Markup
+    }
 
-parameterCompiler :: CodeGen (ParameterName -> ParameterType -> Code)
-parameterCompiler = do
-    ver <- getPythonVersion
-    return $ \ n t -> case ver of
-                          Python2 -> n
-                          Python3 -> [qq|$n: '{t}'|]
+fcAttributeName :: FieldCode -> T.Text
+fcAttributeName = toAttributeName' . fieldName . fcField
+
+fcBehindName :: FieldCode -> T.Text
+fcBehindName = toBehindSnakeCaseText . fieldName . fcField
+
+fcOptional :: FieldCode -> Bool
+fcOptional FieldCode { fcField = Field { fieldType = OptionModifier _ } } = True
+fcOptional _ = False
+
+fcTypePredicateCode :: FieldCode -> Code
+fcTypePredicateCode = typePredicateCode . fcValidator
+
+fcValueValidators :: FieldCode -> [ValueValidator]
+fcValueValidators = valueValidators . fcValidator
+
+toFieldCodes :: Source
+             -> (Field -> Code)
+             -> (Field -> Code)
+             -> (Field -> Code)
+             -> DS.DeclarationSet Field
+             -> CodeGen [FieldCode]
+toFieldCodes src vIn vOut vError = flip (forM . toList) $ \ field -> do
+    typeExpr <- compileTypeExpression' src (Just $ fieldType field)
+    initializer <- compileFieldInitializer field
+    validator <- compileValidator' src
+        (fieldType field)
+        (toAttributeName' $ fieldName field)
+    deserializer <- compileDeserializer' src (fieldType field)
+        (vIn field)
+        (vOut field)
+        (vError field)
+    return FieldCode
+        { fcField = field
+        , fcInitializer = initializer
+        , fcTypeExpr = typeExpr
+        , fcValidator = validator
+        , fcDeserializer = deserializer
+        }
+
+instance Eq FieldCode where
+    a == b =
+        t a == t b
+      where
+          t :: FieldCode
+            -> (Field, Code, Code, Validator, Data.ByteString.Lazy.ByteString)
+          t fc =
+              ( fcField fc
+              , fcInitializer fc
+              , fcTypeExpr fc
+              , fcValidator fc
+              , Text.Blaze.Renderer.Utf8.renderMarkup $ fcDeserializer fc
+              )
+
+-- When [FieldCode] is sorted optional fields go back.
+instance Ord FieldCode where
+    a <= b = fcOptional a <= fcOptional b
 
 compileUnionTag :: Source -> Name -> Tag -> CodeGen Markup
 compileUnionTag source parentname d@(Tag typename' fields' _) = do
     abc <- collectionsAbc
-    typeExprCodes <- mapM (compileTypeExpression' source)
-        [Just typeExpr | (Field _ typeExpr _) <- fieldList]
-    let nameTypeTriples = L.sortBy (compare `on` thd3)
-                                   (zip3 tagNames typeExprCodes optionFlags)
-    arg <- parameterCompiler
+    fieldCodes <- toFieldCodes source
+        (\ f -> [qq|value.get('{toBehindSnakeCaseText (fieldName f)}')|])
+        (\ f -> [qq|rv_{toAttributeName' (fieldName f)}|])
+        (\ f -> [qq|error_{toAttributeName' (fieldName f)}|])
+        fields'
     pyVer <- getPythonVersion
-    validators <- sequence
-        [ do
-              v <- compileValidator' source typeExpr $ toAttributeName' fName
-              return (fName, typeExprCode, v)
-        | (typeExprCode, Field fName typeExpr _) <- zip typeExprCodes fieldList
-        ]
-    deserializers <- sequence
-        [ do
-              deserializer <- compileDeserializer' source typeExpr
-                  [qq|value.get('{I.toSnakeCaseText bName}')|]
-                  [qq|rv_{toAttributeName fName}|]
-                  [qq|error_{toAttributeName fName}|]
-              return (fieldName', typeExpr, deserializer)
-        | Field fieldName'@(Name fName bName) typeExpr _ <- fieldList
-        ]
-    initializers <- compileFieldInitializers fields'
     return $ [compileText|
 class #{className}(#{parentClass}):
-#{compileDocstringWithFields "    " d fields'}
+#{compileDocstringWithFields "    " d (map fcField fieldCodes)}
     __slots__ = (
-%{ forall Field fName _ _ <- fieldList }
-        '#{toAttributeName' fName}',
+%{ forall fieldCode <- fieldCodes }
+        '#{fcAttributeName fieldCode}',
 %{ endforall }
     )
     __nirum_type__ = 'union'
     __nirum_tag__ = #{parentClass}.Tag.#{toEnumMemberName typename'}
-
-    @staticmethod
-    def __nirum_tag_types__():
-        return [
-%{ forall (n, t, _) <- nameTypeTriples }
-            ('#{n}', #{t}),
-%{ endforall }
-        ]
 
 %{ case pyVer }
 %{ of Python2 }
     def __init__(self, **kwargs):
 %{ of Python3 }
     def __init__(
-%{ if null nameTypeTriples }
+%{ if null fieldCodes }
         self
 %{ else }
-        self, *, #{compileParameters arg nameTypeTriples}
+        self, *
+%{ forall fieldCode <- L.sort fieldCodes }
+        , #{fcAttributeName fieldCode}: #{fcTypeExpr fieldCode}
+%{ if fcOptional fieldCode }
+            =None
+%{ endif }
+%{ endforall }
 %{ endif }
     ) -> None:
 %{ endcase }
-        _type_repr = __import__('typing')._type_repr
-        # typing module can be masked by field name of the same name, e.g.:
-        #     union foo = bar ( text typing );
-        # As Nirum identifier disallows to begin with dash/underscore,
-        # we can avoid such name overwrapping by defining _type_repr,
-        # an underscore-leaded alias of typing._type_repr and using it
-        # in the below __init__() inner function.
-        def __init__(#{compileParameters arg nameTypeTriples}):
-%{ forall (fName, fType, (Validator fTypePred fValueValidators)) <- validators }
-            if not (#{fTypePred}):
+        def __init__(
+%{ forall (i, fieldCode) <- enumerate (L.sort fieldCodes) }
+%{ if i > 0 }
+            ,
+%{ endif }
+            #{fcAttributeName fieldCode}
+%{ case pyVer }
+%{ of Python3 }
+                : #{fcTypeExpr fieldCode}
+%{ of Python2 }
+%{ endcase }
+%{ if fcOptional fieldCode }
+                =None
+%{ endif }
+%{ endforall }
+        ):
+%{ forall fc <- fieldCodes }
+            if not (#{fcTypePredicateCode fc}):
                 raise TypeError(
-                    '#{toAttributeName' fName} must be a value of ' +
-                    _type_repr(#{fType}) + ', not ' +
-                    repr(#{toAttributeName' fName})
+                    '#{fcAttributeName fc} must be a value of ' +
+                    __import__('typing')._type_repr(#{fcTypeExpr fc}) +
+                    ', not ' + repr(#{fcAttributeName fc})
                 )
-%{ forall ValueValidator fValuePredCode fValueErrorMsg <- fValueValidators }
+%{ forall ValueValidator fValuePredCode fValueErrorMsg <- fcValueValidators fc }
             elif not (#{fValuePredCode}):
                 raise ValueError(
-                    'invalid #{toAttributeName' fName}: '
+                    'invalid #{fcAttributeName fc}: '
                     #{stringLiteral fValueErrorMsg}
                 )
 %{ endforall }
 %{ endforall }
-%{ forall initializer <- initializers }
+%{ forall FieldCode { fcInitializer = initializer } <- fieldCodes }
             #{initializer}
 %{ endforall }
             pass  # it's necessary when there are no parameters at all
@@ -330,8 +355,8 @@ class #{className}(#{parentClass}):
         __init__(**kwargs)
 %{ of Python3 }
         __init__(
-%{ forall Field fName _ _ <- fieldList }
-            #{toAttributeName' fName}=#{toAttributeName' fName},
+%{ forall fieldCode <- fieldCodes }
+            #{fcAttributeName fieldCode}=#{fcAttributeName fieldCode},
 %{ endforall }
         )
 %{ endcase }
@@ -340,9 +365,9 @@ class #{className}(#{parentClass}):
         return {
             '_type': '#{behindParentTypename}',
             '_tag': '#{behindTagName}',
-%{ forall Field fName@(Name _ fBehind) fType _ <- fieldList }
-            '#{ I.toSnakeCaseText fBehind}':
-#{compileSerializer' source fType $ T.append "self." $ toAttributeName' fName},
+%{ forall fc@FieldCode { fcField = Field { fieldType = fType } } <- fieldCodes }
+            '#{fcBehindName fc}':
+#{compileSerializer' source fType $ T.append "self." $ fcAttributeName fc},
 %{ endforall }
         }
 
@@ -374,20 +399,21 @@ class #{className}(#{parentClass}):
                 handle_error('._tag', 'Expected to exist.')
             else:
                 if tag == '#{toBehindSnakeCaseText typename'}':
-%{ forall (Name fName bName, typeExpr, deserializer) <- deserializers }
-                    error_#{toAttributeName fName} = lambda ef, em: \
-                        handle_error('.#{I.toSnakeCaseText bName}' + ef, em)
-%{ case typeExpr }
-%{ of OptionModifier _ }
-                    if '#{I.toSnakeCaseText bName}' not in value:
-                        value['#{I.toSnakeCaseText bName}'] = None
+%{ forall fieldCode@FieldCode { fcDeserializer = deserializer } <- fieldCodes }
+                    error_#{fcAttributeName fieldCode} = lambda ef, em: \
+                        handle_error('.#{fcBehindName fieldCode}' + ef, em)
+%{ if fcOptional fieldCode }
+                    if '#{fcBehindName fieldCode}' not in value:
+                        value['#{fcBehindName fieldCode}'] = None
 #{indent "                    " deserializer}
-%{ of _ }
-                    if '#{I.toSnakeCaseText bName}' in value:
+%{ else }
+                    if '#{fcBehindName fieldCode}' in value:
 #{indent "                        " deserializer}
                     else:
-                        error_#{toAttributeName fName}('', 'Expected to exist.')
-%{ endcase }
+                        error_#{fcAttributeName fieldCode}(
+                            '', 'Expected to exist.'
+                        )
+%{ endif }
 %{ endforall }
                     pass  # No-op; just for convenience' sake of the compiler
                 else:
@@ -403,8 +429,8 @@ class #{className}(#{parentClass}):
             )
         if not errored[0]:
             return cls(
-%{ forall (fName, _, _) <- deserializers }
-                #{toAttributeName' fName}=rv_#{toAttributeName' fName},
+%{ forall fieldCode <- fieldCodes }
+                #{fcAttributeName fieldCode}=rv_#{fcAttributeName fieldCode},
 %{ endforall }
             )
 
@@ -434,8 +460,8 @@ class #{className}(#{parentClass}):
     def __hash__(self) -> int:
 %{ endcase }
         return hash((
-%{ forall Field fName _ _ <- fieldList }
-            self.#{toAttributeName' fName},
+%{ forall fieldCode <- fieldCodes }
+            self.#{fcAttributeName fieldCode},
 %{ endforall }
         ))
 
@@ -447,12 +473,12 @@ class #{className}(#{parentClass}):
 %{ endcase }
         return ''.join([
             '#{sourceImportPath source}.#{parentClass}.#{className}(',
-%{ forall (i, Field fName _ _) <- enumerate fieldList }
+%{ forall (i, fieldCode) <- enumerate fieldCodes }
 %{ if i > 0 }
             ', ',
 %{ endif }
-            '#{toAttributeName' fName}=',
-            repr(self.#{toAttributeName' fName }),
+            '#{fcAttributeName fieldCode}=',
+            repr(self.#{fcAttributeName fieldCode}),
 %{ endforall }
             ')'
         ])
@@ -463,22 +489,12 @@ if hasattr(#{parentClass}, '__qualname__'):
     (#{className}).__qualname__ = '#{parentClass}.#{className}'
 |]
   where
-    optionFlags :: [Bool]
-    optionFlags = [ case typeExpr of
-                        OptionModifier _ -> True
-                        _ -> False
-                  | (Field _ typeExpr _) <- toList fields'
-                  ]
     className :: T.Text
     className = toClassName' typename'
     behindParentTypename :: T.Text
     behindParentTypename = I.toSnakeCaseText $ N.behindName parentname
-    tagNames :: [T.Text]
-    tagNames = map (toAttributeName' . fieldName) fieldList
     behindTagName :: T.Text
     behindTagName = I.toSnakeCaseText $ N.behindName typename'
-    fieldList :: [Field]
-    fieldList = toList fields'
     parentClass :: T.Text
     parentClass = toClassName' parentname
 
@@ -696,38 +712,21 @@ class #{className}(enum.Enum):
 compileTypeDeclaration src d@TypeDeclaration { typename = Name tnFacial tnBehind
                                              , type' = RecordType fields'
                                              } = do
-    typeExprCodes <- mapM (compileTypeExpression' src)
-        [Just typeExpr | (Field _ typeExpr _) <- fieldList]
-    let nameTypeTriples = L.sortBy
-            (compare `on` thd3)
-            (zip3 [toAttributeName' name' | Field name' _ _ <- fieldList]
-                  typeExprCodes optionFlags)
+    let className = toClassName tnFacial
     insertStandardImport "typing"
     abc <- collectionsAbc
-    arg <- parameterCompiler
     pyVer <- getPythonVersion
-    validators <- sequence
-        [ do
-              v <- compileValidator' src typeExpr $ toAttributeName' fName
-              return (fName, typeExprCode, v)
-        | (typeExprCode, Field fName typeExpr _) <- zip typeExprCodes fieldList
-        ]
-    deserializers <- sequence
-        [ do
-              deserializer <- compileDeserializer' src typeExpr
-                  [qq|value.get('{I.toSnakeCaseText bName}')|]
-                  [qq|rv_{toAttributeName fName}|]
-                  [qq|error_{toAttributeName fName}|]
-              return (fieldName', typeExpr, deserializer)
-        | Field fieldName'@(Name fName bName) typeExpr _ <- fieldList
-        ]
-    initializers <- compileFieldInitializers fields'
+    fieldCodes <- toFieldCodes src
+        (\ f -> [qq|value.get('{toBehindSnakeCaseText (fieldName f)}')|])
+        (\ f -> [qq|rv_{toAttributeName' (fieldName f)}|])
+        (\ f -> [qq|error_{toAttributeName' (fieldName f)}|])
+        fields'
     return [compileText|
 class #{className}(object):
-#{compileDocstringWithFields "    " d fields'}
+#{compileDocstringWithFields "    " d (map fcField fieldCodes)}
     __slots__ = (
-%{ forall Field fName _ _ <- fieldList }
-        '#{toAttributeName' fName}',
+%{ forall fieldCode <- fieldCodes }
+        '#{fcAttributeName fieldCode}',
 %{ endforall }
     )
     __nirum_type__ = 'record'
@@ -737,37 +736,51 @@ class #{className}(object):
     def __init__(self, **kwargs):
 %{ of Python3 }
     def __init__(
-%{ if null nameTypeTriples }
+%{ if null fieldCodes }
         self
 %{ else }
-        self, *, #{compileParameters arg nameTypeTriples}
+        self, *
+%{ forall fieldCode <- L.sort fieldCodes }
+        , #{fcAttributeName fieldCode}: #{fcTypeExpr fieldCode}
+%{ if fcOptional fieldCode }
+            =None
+%{ endif }
+%{ endforall }
 %{ endif }
     ) -> None:
 %{ endcase }
-        _type_repr = __import__('typing')._type_repr
-        # typing module can be masked by field name of the same name, e.g.:
-        #     record foo ( text typing );
-        # As Nirum identifier disallows to begin with dash/underscore,
-        # we can avoid such name overwrapping by defining _type_repr,
-        # an underscore-leaded alias of typing._type_repr and using it
-        # in the below __init__() inner function.
-        def __init__(#{compileParameters arg nameTypeTriples}):
-%{ forall (fName, fType, (Validator fTypePred fValueValidators)) <- validators }
-            if not (#{fTypePred}):
+        def __init__(
+%{ forall (i, fieldCode) <- enumerate (L.sort fieldCodes) }
+%{ if i > 0 }
+            ,
+%{ endif }
+            #{fcAttributeName fieldCode}
+%{ case pyVer }
+%{ of Python3 }
+                : #{fcTypeExpr fieldCode}
+%{ of Python2 }
+%{ endcase }
+%{ if fcOptional fieldCode }
+                =None
+%{ endif }
+%{ endforall }
+        ):
+%{ forall fc <- fieldCodes }
+            if not (#{fcTypePredicateCode fc}):
                 raise TypeError(
-                    '#{toAttributeName' fName} must be a value of ' +
-                    _type_repr(#{fType}) + ', not ' +
-                    repr(#{toAttributeName' fName})
+                    '#{fcAttributeName fc} must be a value of ' +
+                    __import__('typing')._type_repr(#{fcTypeExpr fc}) +
+                    ', not ' + repr(#{fcAttributeName fc})
                 )
-%{ forall ValueValidator fValuePredCode fValueErrorMsg <- fValueValidators }
+%{ forall ValueValidator fValuePredCode fValueErrorMsg <- fcValueValidators fc }
             elif not (#{fValuePredCode}):
                 raise ValueError(
-                    'invalid #{toAttributeName' fName}: '
+                    'invalid #{fcAttributeName fc}: '
                     #{stringLiteral fValueErrorMsg}
                 )
 %{ endforall }
 %{ endforall }
-%{ forall initializer <- initializers }
+%{ forall FieldCode { fcInitializer = initializer } <- fieldCodes }
             #{initializer}
 %{ endforall }
             pass  # it's necessary when there are no parameters at all
@@ -776,8 +789,8 @@ class #{className}(object):
         __init__(**kwargs)
 %{ of Python3 }
         __init__(
-%{ forall Field fName _ _ <- fieldList }
-            #{toAttributeName' fName}=#{toAttributeName' fName},
+%{ forall fieldCode <- fieldCodes }
+            #{fcAttributeName fieldCode}=#{fcAttributeName fieldCode},
 %{ endforall }
         )
 %{ endcase }
@@ -790,12 +803,12 @@ class #{className}(object):
 %{ endcase }
         return ''.join([
             '#{sourceImportPath src}.#{className}(',
-%{ forall (i, Field fName _ _) <- enumerate fieldList }
+%{ forall (i, fieldCode) <- enumerate fieldCodes }
 %{ if i > 0 }
             ', ',
 %{ endif }
-            '#{toAttributeName' fName}=',
-            repr(self.#{toAttributeName' fName }),
+            '#{fcAttributeName fieldCode}=',
+            repr(self.#{fcAttributeName fieldCode}),
 %{ endforall }
             ')'
         ])
@@ -822,9 +835,9 @@ class #{className}(object):
     def __nirum_serialize__(self):
         return {
             '_type': '#{I.toSnakeCaseText tnBehind}',
-%{ forall Field fName@(Name _ fBehind) fType _ <- fieldList }
-            '#{ I.toSnakeCaseText fBehind}':
-#{compileSerializer' src fType $ T.append "self." $ toAttributeName' fName},
+%{ forall fc@FieldCode { fcField = Field { fieldType = fType } } <- fieldCodes }
+            '#{fcBehindName fc}':
+#{compileSerializer' src fType $ T.append "self." $ fcAttributeName fc},
 %{ endforall }
         }
 
@@ -850,20 +863,19 @@ class #{className}(object):
             errored[0] = True
             on_error(err_field, err_msg)
         if isinstance(value, #{abc}.Mapping):
-%{ forall (Name fName bName, typeExpr, deserializer) <- deserializers }
-            error_#{toAttributeName fName} = lambda ef, em: \
-                handle_error('.#{I.toSnakeCaseText bName}' + ef, em)
-%{ case typeExpr }
-%{ of OptionModifier _ }
-            if '#{I.toSnakeCaseText bName}' not in value:
-                value['#{I.toSnakeCaseText bName}'] = None
+%{ forall fieldCode@FieldCode { fcDeserializer = deserializer } <- fieldCodes }
+            error_#{fcAttributeName fieldCode} = lambda ef, em: \
+                handle_error('.#{fcBehindName fieldCode}' + ef, em)
+%{ if fcOptional fieldCode }
+            if '#{fcBehindName fieldCode}' not in value:
+                value['#{fcBehindName fieldCode}'] = None
 #{indent "            " deserializer}
-%{ of _ }
-            if '#{I.toSnakeCaseText bName}' in value:
+%{ else }
+            if '#{fcBehindName fieldCode}' in value:
 #{indent "                " deserializer}
             else:
-                error_#{toAttributeName fName}('', 'Expected to exist.')
-%{ endcase }
+                error_#{fcAttributeName fieldCode}('', 'Expected to exist.')
+%{ endif }
 %{ endforall }
         else:
             handle_error('', 'Expected an object.')
@@ -873,8 +885,8 @@ class #{className}(object):
             )
         if not errored[0]:
             return cls(
-%{ forall (fName, _, _) <- deserializers }
-                #{toAttributeName' fName}=rv_#{toAttributeName' fName},
+%{ forall fieldCode <- fieldCodes }
+                #{fcAttributeName fieldCode}=rv_#{fcAttributeName fieldCode},
 %{ endforall }
             )
 
@@ -885,21 +897,11 @@ class #{className}(object):
     def __hash__(self) -> int:
 %{ endcase }
         return hash((
-%{ forall Field fName _ _ <- fieldList }
-            self.#{toAttributeName' fName},
+%{ forall fieldCode <- fieldCodes }
+            self.#{fcAttributeName fieldCode},
 %{ endforall }
         ))
 |]
-  where
-    className = toClassName tnFacial
-    fieldList :: [Field]
-    fieldList = toList fields'
-    optionFlags :: [Bool]
-    optionFlags = [ case typeExpr of
-                        OptionModifier _ -> True
-                        _ -> False
-                  | (Field _ typeExpr _) <- fieldList
-                  ]
 compileTypeDeclaration src
                        d@TypeDeclaration { typename = typename'
                                          , type' = union@UnionType {}
