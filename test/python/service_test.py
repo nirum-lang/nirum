@@ -2,11 +2,58 @@ import collections
 import uuid
 
 from nirum.transport import Transport
-from pytest import raises
+from pytest import fixture, raises
 from six import PY2
 
 from fixture.foo import (Dog, Gender, PingService, Product, RpcError,
                          SampleService, SampleService_Client, Way)
+
+
+@fixture
+def fx_dog():
+    return Dog(name=u'Puppy', age=3), {
+        '_type': 'animal',
+        '_tag': 'dog',
+        'name': 'Puppy',
+        'kind': None,
+        'age': 3,
+        'weight': None,
+    }
+
+
+@fixture
+def fx_method_args(fx_dog):
+    return (
+        collections.OrderedDict([
+            ('a', fx_dog[0]),
+            ('b', Product(name=u'Product.name', sale=False)),
+            ('c', Gender.female),
+            ('d', Way(u'way/path/text')),
+            ('e', uuid.UUID('F7DB93E3-731E-48EF-80A2-CAC81E02F1AE')),
+            ('f', b'binary data'),
+            ('g', 1234),
+            ('h', u'text data'),
+        ]),
+        collections.OrderedDict([
+            ('a', fx_dog[1]),
+            (
+                'bb',
+                {
+                    '_type': 'product',
+                    'name': 'Product.name',
+                    'price': None,
+                    'sale': False,
+                    'url': None,
+                }
+            ),
+            ('c', 'yeoseong'),
+            ('dd', 'way/path/text'),
+            ('e', 'f7db93e3-731e-48ef-80a2-cac81e02f1ae'),
+            ('ff', u'YmluYXJ5IGRhdGE='),
+            ('g', 1234),
+            ('hh', 'text data'),
+        ]),
+    )
 
 
 def test_throws_error():
@@ -51,88 +98,32 @@ class DumbTransport(Transport):
         return self.calls[-1]
 
 
-def test_service_serialize_arguments():
-    a = Dog(name=u'Dog.name', age=3)
-    b = Product(name=u'Product.name', sale=False)
-    c = Gender.female
-    d = Way(u'way/path/text')
-    e = uuid.UUID('F7DB93E3-731E-48EF-80A2-CAC81E02F1AE')
-    f = b'binary data'
-    g = 1234
-    h = u'text data'
-    expected = {
-        'a': {
-            '_type': 'animal',
-            '_tag': 'dog',
-            'name': 'Dog.name',
-            'kind': None,
-            'age': 3,
-            'weight': None,
-        },
-        'bb': {
-            '_type': 'product',
-            'name': 'Product.name',
-            'price': None,
-            'sale': False,
-            'url': None,
-        },
-        'c': 'yeoseong',
-        'dd': 'way/path/text',
-        'e': 'f7db93e3-731e-48ef-80a2-cac81e02f1ae',
-        'ff': u'YmluYXJ5IGRhdGE=',
-        'g': 1234,
-        'hh': 'text data',
-    }
+def test_service_serialize_arguments(fx_method_args):
+    args, expected = fx_method_args
     assert SampleService.sample_method.__nirum_serialize_arguments__(
-        a=a, b=b, c=c, d=d, e=e, f=f, g=g, h=h
+        **args
     ) == expected
     assert SampleService.sample_method.__nirum_serialize_arguments__(
-        a, b, c, d, e, f, g, h
+        *args.values()
     ) == expected
 
 
-def test_service_argument_serializers():
+def test_service_argument_serializers(fx_method_args):
+    args, expected = fx_method_args
     table = SampleService.sample_method.__nirum_argument_serializers__
     assert isinstance(table, collections.Mapping)
-    assert len(table) == 8
-    assert table['a'](Dog(name=u'Dog.name', age=3)) == {
-        '_type': 'animal',
-        '_tag': 'dog',
-        'name': 'Dog.name',
-        'kind': None,
-        'age': 3,
-        'weight': None,
-    }
-    assert table['b'](Product(name=u'Product.name', sale=False)) == {
-        '_type': 'product',
-        'name': 'Product.name',
-        'price': None,
-        'sale': False,
-        'url': None,
-    }
-    assert table['c'](Gender.female) == 'yeoseong'
-    assert table['d'](Way(u'way/path/text')) == 'way/path/text'
-    assert table['e'](uuid.UUID('F7DB93E3-731E-48EF-80A2-CAC81E02F1AE')) == \
-        'f7db93e3-731e-48ef-80a2-cac81e02f1ae'
-    assert table['f'](b'binary data') == u'YmluYXJ5IGRhdGE='
-    assert table['g'](1234) == 1234
-    assert table['h'](u'text data') == 'text data'
+    assert len(table) == len(args)
+    for (k, arg), expected_value in zip(args.items(), expected.values()):
+        assert table[k](arg) == expected_value
 
 
-def test_service_argument_deserializers():
+def test_service_argument_deserializers(fx_dog, fx_method_args):
+    _, payloads = fx_method_args
     table = SampleService.sample_method.__nirum_argument_deserializers__
     assert isinstance(table, collections.Mapping)
-    assert frozenset(table) == {'a', 'bb', 'c', 'dd', 'e', 'ff', 'g', 'hh'}
+    assert frozenset(table) == frozenset(payloads)
     assert all(callable(f) for f in table.values())
-    a_payload = {
-        '_type': 'animal',
-        '_tag': 'dog',
-        'name': 'Dog.name',
-        'kind': None,
-        'age': 3,
-        'weight': None,
-    }
-    expected = Dog(name=u'Dog.name', age=3)
+    expected, a_payload = fx_dog
     assert table['a'](a_payload) == table['a'](a_payload, None) == expected
     a_invalid_payload = dict(a_payload, age='invalid', weight='invalid')
     with raises(ValueError) as e:
@@ -156,16 +147,8 @@ def test_service_argument_deserializers():
     }
 
 
-def test_service_deserialize_result():
-    payload = {
-        '_type': 'animal',
-        '_tag': 'dog',
-        'name': 'Puppy',
-        'kind': None,
-        'age': 3,
-        'weight': None,
-    }
-    expected = Dog(name=u'Puppy', age=3)
+def test_service_deserialize_result(fx_dog):
+    expected, payload = fx_dog
     f = SampleService.sample_method_that_returns.__nirum_deserialize_result__
     assert f(payload) == expected
     invalid_payload = dict(payload, age='invalid', weight='invalid')
@@ -190,75 +173,39 @@ def test_service_deserialize_result():
     }
 
 
-def test_service_client_payload_serialization():
+def test_service_client_payload_serialization(fx_method_args):
+    args, expected = fx_method_args
     t = DumbTransport()
     c = SampleService.Client(t)
     assert SampleService_Client is SampleService.Client
-    c.sample_method(
-        a=Dog(name=u'Dog.name', age=3),
-        b=Product(name=u'Product.name', sale=False),
-        c=Gender.female,
-        d=Way(u'way/path/text'),
-        e=uuid.UUID('F7DB93E3-731E-48EF-80A2-CAC81E02F1AE'),
-        f=b'binary data',
-        g=1234,
-        h=u'text data'
-    )
+    c.sample_method(**args)
     assert t.latest_call[0] == 'sample_method'
-    assert t.latest_call[1] == {
-        'a': {
-            '_type': 'animal',
-            '_tag': 'dog',
-            'name': 'Dog.name',
-            'kind': None,
-            'age': 3,
-            'weight': None,
-        },
-        'bb': {
-            '_type': 'product',
-            'name': 'Product.name',
-            'price': None,
-            'sale': False,
-            'url': None,
-        },
-        'c': 'yeoseong',
-        'dd': 'way/path/text',
-        'e': 'f7db93e3-731e-48ef-80a2-cac81e02f1ae',
-        'ff': u'YmluYXJ5IGRhdGE=',
-        'g': 1234,
-        'hh': 'text data',
-    }
+    assert t.latest_call[1] == expected
+    c.sample_method(*args.values())
+    assert t.latest_call[0] == 'sample_method'
+    assert t.latest_call[1] == expected
 
 
-def test_service_client_validation():
+def test_service_client_validation(fx_method_args):
     """https://github.com/spoqa/nirum/issues/220"""
+    args, expected = fx_method_args
     t = DumbTransport()
     c = SampleService.Client(t)
-    kwargs = dict(
-        a=Dog(name=u'Dog.name', age=3),
-        b=Product(name=u'Product.name', sale=False),
-        c=Gender.female,
-        d=Way(u'way/path/text'),
-        e=uuid.UUID('F7DB93E3-731E-48EF-80A2-CAC81E02F1AE'),
-        f=b'binary data',
-        g=1234,
-        h=u'text data'
-    )
-    c.sample_method(**kwargs)  # ok
+    c.sample_method(**args)  # ok
 
     # Missing argument raises TypeError
-    missing_arg = dict(kwargs)
+    missing_arg = dict(args)
     del missing_arg['a']
     with raises(TypeError):
         c.sample_method(**missing_arg)
 
     # Passing a value of unmatched type raises TypeError
-    unmatched_type = dict(kwargs, g='not bigint')
+    unmatched_type = dict(args, g='not bigint')
     with raises(TypeError):
         c.sample_method(**unmatched_type)
 
     # Passing None to non-optional parameter raises TypeError
-    passing_none = dict(kwargs, a=None)
+    passing_none = dict(args, a=None)
     with raises(TypeError):
         c.sample_method(**passing_none)
 
