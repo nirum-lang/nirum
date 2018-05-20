@@ -223,13 +223,25 @@ To be released.
     (``tzinfo``) awareness check for `datetime`, and basic format check for
     `uri`.
 
- - Generated service methods now have `__nirum_argument_serializers__`
-   attribute, a mapping object that keys are a string of method's parameter
-   facial name and values are its serializer.
+ -  Generated service methods became to have its own serialization and
+    deserialization functions.  Each method object now has these attributes:
 
-   A serializer function takes an argument value and returns its corresponding
-   value which can be passed to `json.dump()`/`json.dumps()`.
-   It can raise a `TypeError` or `ValueError` if an argument is invalid.
+     -  `__nirum_argument_serializers__` is a mapping object that keys are
+        a string of method's parameter facial name and values are its
+        serializer.
+
+        A serializer function takes an argument value and returns
+        its corresponding value which can be passed to
+        `json.dump()`/`json.dumps()`.  It can raise a `TypeError` or
+        `ValueError` if an argument is invalid.
+
+     -  `__nirum_argument_deserializers__` is a mapping object that keys are
+        a string of method's parameter behind name and values are its
+        deserializer.
+
+        A deserializer function takes an argument value preprocessed by
+        `json.load()`/`json.loads()` with an optional `on_error` callback,
+        and returns its corresponding Python object.
 
  -  Removed `__nirum_get_inner_type__()` class methods from generated unboxed
     type classes.

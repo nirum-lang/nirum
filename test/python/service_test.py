@@ -79,6 +79,44 @@ def test_service_argument_serializers():
     assert table['h'](u'text data') == 'text data'
 
 
+def test_service_argument_deserializers():
+    table = SampleService.sample_method.__nirum_argument_deserializers__
+    assert isinstance(table, collections.Mapping)
+    assert frozenset(table) == {'a', 'bb', 'c', 'dd', 'e', 'ff', 'g', 'hh'}
+    assert all(callable(f) for f in table.values())
+    a_payload = {
+        '_type': 'animal',
+        '_tag': 'dog',
+        'name': 'Dog.name',
+        'kind': None,
+        'age': 3,
+        'weight': None,
+    }
+    assert table['a'](a_payload) == \
+        table['a'](a_payload, None) == \
+        Dog(name=u'Dog.name', age=3)
+    a_invalid_payload = dict(a_payload, age='invalid', weight='invalid')
+    with raises(ValueError) as e:
+        table['a'](a_invalid_payload)
+    assert str(e.value) == '''\
+.age: Expected an integral number or a string of decimal digits.
+.weight: Expected an integral number or a string of decimal digits.'''
+    errors = set()
+    table['a'](a_payload, lambda *pair: errors.add(pair))
+    assert not errors
+    table['a'](a_invalid_payload, lambda *pair: errors.add(pair))
+    assert errors == {
+        (
+            '.age',
+            'Expected an integral number or a string of decimal digits.',
+        ),
+        (
+            '.weight',
+            'Expected an integral number or a string of decimal digits.',
+        ),
+    }
+
+
 def test_service_client_payload_serialization():
     t = DumbTransport()
     c = SampleService.Client(t)

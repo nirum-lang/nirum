@@ -1071,7 +1071,8 @@ compileTypeDeclaration src d@ServiceDeclaration { serviceName = name'
             \ param'@(Parameter pName pType _) -> do
                 typeExpr <- compileTypeExpression' src $ Just pType
                 v <- compileValidator' src pType $ toAttributeName' pName
-                return (param', typeExpr, v)
+                ds <- compileDeserializer' src pType "value" "rv" "_on_error"
+                return (param', typeExpr, v, ds)
         return (method', rTypeExpr, errTypeExpr, params')
     return [compileText|
 class #{className}(service_type):
@@ -1083,11 +1084,11 @@ class #{className}(service_type):
             '_v': 2,
             '_return': lambda: #{rTypeExpr},
             '_names': name_dict_type([
-%{ forall (Parameter (Name pF pB) _ _, _, _) <- params' }
+%{ forall (Parameter (Name pF pB) _ _, _, _, _) <- params' }
                 ('#{toAttributeName pF}', '#{I.toSnakeCaseText pB}'),
 %{ endforall }
             ]),
-%{ forall (Parameter pName _ _, pTypeExpr, _) <- params' }
+%{ forall (Parameter pName _ _, pTypeExpr, _, _) <- params' }
             '#{toAttributeName' pName}': lambda: #{pTypeExpr},
 %{ endforall }
         },
@@ -1113,29 +1114,31 @@ class #{className}(service_type):
         self,
 %{ case pyVer }
 %{ of Python3 }
-%{ forall (Parameter pName _ _, pTypeExpr, _) <- params' }
+%{ forall (Parameter pName _ _, pTypeExpr, _, _) <- params' }
         #{toAttributeName' pName}: '#{pTypeExpr}',
 %{ endforall }
     ) -> '#{rTypeExpr}':
 %{ of Python2 }
-%{ forall (Parameter pName _ _, _, _) <- params' }
+%{ forall (Parameter pName _ _, _, _, _) <- params' }
         #{toAttributeName' pName},
 %{ endforall }
     ):
 %{ endcase }
-#{compileDocstringWithParameters "        " m (map tripleToPair params')}
+#{compileDocstringWithParameters "        " m (map quadrupleToPair params')}
         raise NotImplementedError(
             '#{className} has to implement #{toAttributeName' mName}()'
         )
 
     #{toAttributeName' mName}.__nirum_argument_serializers__ = {
     }  # type: typing.Mapping[str, typing.Callable[[object], object]]
-%{ forall (Parameter pName pt _, pTypeE, (Validator pTPred pValVs)) <- params' }
+    #{toAttributeName' mName}.__nirum_argument_deserializers__ = {
+    }
+%{ forall (Parameter pName pt _, tx, (Validator pTPred pValVs), d) <- params' }
     def __nirum_argument_serializer__(#{toAttributeName' pName}):
         if not (#{pTPred}):
             raise #{builtins}.TypeError(
                 '#{toAttributeName' pName} must be a value of ' +
-                #{typing}._type_repr(#{pTypeE}) + ', not ' +
+                #{typing}._type_repr(#{tx}) + ', not ' +
                 #{builtins}.repr(#{toAttributeName' pName})
             )
 %{ forall ValueValidator pValuePredCode pValueErrorMsg <- pValVs }
@@ -1150,6 +1153,25 @@ class #{className}(service_type):
     #{toAttributeName' mName}.__nirum_argument_serializers__[
         '#{toAttributeName' pName}'] = __nirum_argument_serializer__
     del __nirum_argument_serializer__
+    def __nirum_argument_deserializer__(value, on_error=None):
+        _errors = #{builtins}.set()
+        def _on_error(err_field, err_msg):
+            _errors.add((err_field, err_msg))
+            if on_error is not None:
+                on_error(err_field, err_msg)
+#{indent "        " d}
+        if not _errors:
+            return rv
+        if _errors and on_error is None:
+            raise #{builtins}.ValueError(
+                '\n'.join(
+                    #{builtins}.sorted('{0}: {1}'.format(*e) for e in _errors)
+                )
+            )
+    __nirum_argument_deserializer__.__name__ = '#{toBehindSnakeCaseText pName}'
+    #{toAttributeName' mName}.__nirum_argument_deserializers__[
+        '#{toBehindSnakeCaseText pName}'] = __nirum_argument_deserializer__
+    del __nirum_argument_deserializer__
 %{ endforall }
 %{ endforall }
 
@@ -1182,8 +1204,8 @@ if hasattr(#{className}.Client, '__qualname__'):
     nirumMapName = "map_type"
     className :: T.Text
     className = toClassName' name'
-    tripleToPair :: (a, b, c) -> (a, b)
-    tripleToPair (a, b, _) = (a, b)
+    quadrupleToPair :: (a, b, c, d) -> (a, b)
+    quadrupleToPair (a, b, _, _) = (a, b)
     commaNl :: [T.Text] -> T.Text
     commaNl = T.intercalate ",\n"
     compileClientMethod :: Method -> CodeGen Code
