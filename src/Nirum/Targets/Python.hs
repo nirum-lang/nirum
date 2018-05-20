@@ -129,14 +129,15 @@ toEnumMemberName name'
 compileFieldInitializer :: Field -> CodeGen Code
 compileFieldInitializer (Field fieldName' fieldType' _) =
     case fieldType' of
-        SetModifier _ ->
-            return [qq|self.$attributeName = frozenset($attributeName)|]
+        SetModifier _ -> do
+            b <- importBuiltins
+            return [qq|self.$attributeName = $b.frozenset($attributeName)|]
         ListModifier _ -> do
             insertThirdPartyImportsA [ ( "nirum.datastructures"
-                                       , [("list_type", "List")]
+                                       , [("_list_type", "List")]
                                        )
                                      ]
-            return [qq|self.$attributeName = list_type($attributeName)|]
+            return [qq|self.$attributeName = _list_type($attributeName)|]
         _ -> return [qq|self.$attributeName = $attributeName|]
   where
     attributeName :: Code
