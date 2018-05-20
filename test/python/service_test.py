@@ -173,6 +173,26 @@ def test_service_deserialize_result(fx_dog):
     }
 
 
+def test_service_deserialize_error():
+    assert SampleService.sample_method.__nirum_deserialize_error__ is None
+    f = PingService.ping.__nirum_deserialize_error__
+    payload = {
+        '_type': 'rpc_error',
+        '_tag': 'not_found_error',
+        'message': 'An error message.',
+    }
+    expected = RpcError.NotFoundError(message=u'An error message.')
+    assert f(payload) == expected
+    invalid_payload = dict(payload, message=['Not a string but a list.'])
+    with raises(ValueError) as exc:
+        f(invalid_payload)
+    assert str(exc.value) == '.message: Expected a string.'
+    errors = set()
+    assert f(payload, lambda *pair: errors.add(pair)) == expected
+    f(invalid_payload, lambda *pair: errors.add(pair))
+    assert errors == {('.message', 'Expected a string.')}
+
+
 def test_service_client_payload_serialization(fx_method_args):
     args, expected = fx_method_args
     t = DumbTransport()

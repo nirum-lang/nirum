@@ -254,6 +254,12 @@ To be released.
 
         If the method has no return type it returns only `None`.
 
+     -  `__nirum_deserialize_error__` takes an error value preprocessed by
+        `json.load()`/`json.loads()` and deserialize it into its corresponding
+        Python object.
+
+        This attribute is `None` if the method has no error type.
+
  -  Removed `__nirum_get_inner_type__()` class methods from generated unboxed
     type classes.
 

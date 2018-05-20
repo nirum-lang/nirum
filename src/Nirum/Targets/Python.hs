@@ -1076,11 +1076,21 @@ compileTypeDeclaration src d@ServiceDeclaration { serviceName = name'
                 return $ Just deserializer
             Nothing ->
                 return Nothing
+        errorDeserializer <- case errorType method' of
+            Just etype -> do
+                deserializer <- compileDeserializer' src etype
+                    "value"
+                    "rv"
+                    "on_error"
+                return $ Just deserializer
+            Nothing ->
+                return Nothing
         return ( method'
                , rTypeExpr
                , errTypeExpr
                , params'
                , resultDeserializer
+               , errorDeserializer
                )
     defaultErrorHandler <- defaultDeserializerErrorHandler
     return [compileText|
@@ -1088,7 +1098,7 @@ class #{className}(service_type):
 #{compileDocstring "    " d}
     __nirum_type__ = 'service'
     __nirum_service_methods__ = {
-%{ forall (Method mName _ _ _ _, rTypeExpr, _, params', _) <- methods' }
+%{ forall (Method mName _ _ _ _, rTypeExpr, _, params', _, _) <- methods' }
         '#{toAttributeName' mName}': {
             '_v': 2,
             '_return': lambda: #{rTypeExpr},
@@ -1104,7 +1114,7 @@ class #{className}(service_type):
 %{ endforall }
     }
     __nirum_method_names__ = name_dict_type([
-%{ forall (Method (Name mF mB) _ _ _ _, _, _, _, _) <- methods' }
+%{ forall (Method (Name mF mB) _ _ _ _, _, _, _, _, _) <- methods' }
         ('#{toAttributeName mF}', '#{I.toSnakeCaseText mB}'),
 %{ endforall }
     ])
@@ -1112,13 +1122,13 @@ class #{className}(service_type):
 
     @staticmethod
     def __nirum_method_error_types__(k, d=None):
-%{ forall (Method mName _ _ _ _, _, errTypeExpr, _, _) <- methods' }
+%{ forall (Method mName _ _ _ _, _, errTypeExpr, _, _, _) <- methods' }
         if k == '#{toAttributeName' mName}':
             return #{errTypeExpr}
 %{ endforall }
         return d
 
-%{ forall (m, rTypeExpr, _, params', resultD) <- methods' }
+%{ forall (m, rTypeExpr, _, params', resultD, errorD) <- methods' }
     def #{toAttributeName' (methodName m)}(
         self,
 %{ case pyVer }
@@ -1215,6 +1225,21 @@ class #{className}(service_type):
     #{toAttributeName' (methodName m)}.__nirum_deserialize_result__ = \
         __nirum_deserialize_result__
     del __nirum_deserialize_result__
+
+%{ case errorD }
+%{ of Just errorDeserializer }
+    def __nirum_deserialize_error__(value, on_error=None):
+        on_error = #{defaultErrorHandler}(on_error)
+#{indent "        " errorDeserializer}
+        on_error.raise_error()
+        if not on_error.errored:
+            return rv
+    #{toAttributeName' (methodName m)}.__nirum_deserialize_error__ = \
+        __nirum_deserialize_error__
+    del __nirum_deserialize_error__
+%{ of Nothing }
+    #{toAttributeName' (methodName m)}.__nirum_deserialize_error__ = None
+%{ endcase }
 %{ endforall }
 
 
@@ -1251,27 +1276,17 @@ if hasattr(#{className}.Client, '__qualname__'):
     commaNl :: [T.Text] -> T.Text
     commaNl = T.intercalate ",\n"
     compileClientMethod :: Method -> CodeGen Code
-    compileClientMethod Method { methodName = mName
-                               , returnType = rtypeM
-                               , errorType = etypeM
-                               } = do
+    compileClientMethod Method { methodName = mName, returnType = rtypeM } = do
         let clientMethodName' = toAttributeName' mName
         pyVer <- getPythonVersion
         rTypeExpr <- compileTypeExpression' src rtypeM
-        errorDeserializer <- case etypeM of
-             Just e -> compileDeserializer' src e
-                "serialized"
-                "result"
-                "on_deserializer_error"
-             Nothing -> do
-                insertThirdPartyImportsA
-                    [ ("nirum.exc", [ ("_unexpected_nirum_response_error"
-                                      , "UnexpectedNirumResponseError"
-                                      )
-                                    ]
-                      )
-                    ]
-                return "raise _unexpected_nirum_response_error(serialized)"
+        insertThirdPartyImportsA
+            [ ( "nirum.exc", [ ("_unexpected_nirum_response_error"
+                               , "UnexpectedNirumResponseError"
+                               )
+                             ]
+              )
+            ]
         defaultErrorHandler <- defaultDeserializerErrorHandler
         return $ toStrict $ renderMarkup [compileText|
     def #{clientMethodName'}(
@@ -1297,8 +1312,13 @@ if hasattr(#{className}.Client, '__qualname__'):
                 serialized,
                 on_deserializer_error
             )
+        elif callable(getattr(prototype, '__nirum_deserialize_error__', None)):
+            result = prototype.__nirum_deserialize_error__(
+                serialized,
+                on_deserializer_error
+            )
         else:
-#{indent "            " errorDeserializer}
+            raise _unexpected_nirum_response_error(serialized)
         on_deserializer_error.raise_error()
         if successful:
             return result
