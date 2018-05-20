@@ -51,6 +51,46 @@ class DumbTransport(Transport):
         return self.calls[-1]
 
 
+def test_service_serialize_arguments():
+    a = Dog(name=u'Dog.name', age=3)
+    b = Product(name=u'Product.name', sale=False)
+    c = Gender.female
+    d = Way(u'way/path/text')
+    e = uuid.UUID('F7DB93E3-731E-48EF-80A2-CAC81E02F1AE')
+    f = b'binary data'
+    g = 1234
+    h = u'text data'
+    expected = {
+        'a': {
+            '_type': 'animal',
+            '_tag': 'dog',
+            'name': 'Dog.name',
+            'kind': None,
+            'age': 3,
+            'weight': None,
+        },
+        'bb': {
+            '_type': 'product',
+            'name': 'Product.name',
+            'price': None,
+            'sale': False,
+            'url': None,
+        },
+        'c': 'yeoseong',
+        'dd': 'way/path/text',
+        'e': 'f7db93e3-731e-48ef-80a2-cac81e02f1ae',
+        'ff': u'YmluYXJ5IGRhdGE=',
+        'g': 1234,
+        'hh': 'text data',
+    }
+    assert SampleService.sample_method.__nirum_serialize_arguments__(
+        a=a, b=b, c=c, d=d, e=e, f=f, g=g, h=h
+    ) == expected
+    assert SampleService.sample_method.__nirum_serialize_arguments__(
+        a, b, c, d, e, f, g, h
+    ) == expected
+
+
 def test_service_argument_serializers():
     table = SampleService.sample_method.__nirum_argument_serializers__
     assert isinstance(table, collections.Mapping)

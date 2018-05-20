@@ -226,6 +226,11 @@ To be released.
  -  Generated service methods became to have its own serialization and
     deserialization functions.  Each method object now has these attributes:
 
+     -  `__nirum_serialize_arguments__` takes the same keywords to the method
+        parameters and serialize them into a mapping object (which can be
+        directly translated to a JSON object).  It can raise a `TypeError` or
+        `ValueError` if any invalid values are passed.
+
      -  `__nirum_argument_serializers__` is a mapping object that keys are
         a string of method's parameter facial name and values are its
         serializer.

@@ -1173,6 +1173,30 @@ class #{className}(service_type):
         '#{toBehindSnakeCaseText pName}'] = __nirum_argument_deserializer__
     del __nirum_argument_deserializer__
 %{ endforall }
+    def __nirum_serialize_arguments__(
+%{ case pyVer }
+%{ of Python3 }
+%{ forall (Parameter pName _ _, pTypeExpr, _, _) <- params' }
+        #{toAttributeName' pName}: '#{pTypeExpr}',
+%{ endforall }
+    ) -> '#{rTypeExpr}':
+%{ of Python2 }
+%{ forall (Parameter pName _ _, _, _, _) <- params' }
+        #{toAttributeName' pName},
+%{ endforall }
+    ):
+%{ endcase }
+        return {
+%{ forall (Parameter (Name fn bn) _ _, _, _, _) <- params' }
+            '#{I.toSnakeCaseText bn}': #{className}.#{toAttributeName' mName}
+                .__nirum_argument_serializers__['#{toAttributeName fn}'](
+                #{toAttributeName fn}
+            ),
+%{ endforall }
+        }
+    #{toAttributeName' mName}.__nirum_serialize_arguments__ = \
+        __nirum_serialize_arguments__
+    del __nirum_serialize_arguments__
 %{ endforall }
 
 
@@ -1210,17 +1234,12 @@ if hasattr(#{className}.Client, '__qualname__'):
     commaNl = T.intercalate ",\n"
     compileClientMethod :: Method -> CodeGen Code
     compileClientMethod Method { methodName = mName
-                               , parameters = params
                                , returnType = rtypeM
                                , errorType = etypeM
                                } = do
         let clientMethodName' = toAttributeName' mName
         pyVer <- getPythonVersion
         rTypeExpr <- compileTypeExpression' src rtypeM
-        params' <- sequence $ (`map` toList params) $
-            \ param@(Parameter _ pType _) -> do
-                pTypeExpr <- compileTypeExpression' src $ Just pType
-                return (param, pTypeExpr)
         resultDeserializer <- case rtypeM of
             Just rtype -> compileDeserializer' src rtype
                 "serialized"
@@ -1244,29 +1263,18 @@ if hasattr(#{className}.Client, '__qualname__'):
                 return "raise _unexpected_nirum_response_error(serialized)"
         return $ toStrict $ renderMarkup [compileText|
     def #{clientMethodName'}(
-        self,
+        self, *args, **kwargs
 %{ case pyVer }
 %{ of Python3 }
-%{ forall (Parameter pName _ _, pTypeExpr) <- params' }
-        #{toAttributeName' pName}: '#{pTypeExpr}',
-%{ endforall }
     ) -> '#{rTypeExpr}':
 %{ of Python2 }
-%{ forall (Parameter pName _ _, _) <- params' }
-        #{toAttributeName' pName},
-%{ endforall }
     ):
 %{ endcase }
+        serialize = \
+            #{className}.#{clientMethodName'}.__nirum_serialize_arguments__
         successful, serialized = self.__nirum_transport__(
             '#{I.toSnakeCaseText $ N.behindName mName}',
-            payload={
-%{ forall Parameter (Name fn bn) _ _ <- toList params }
-                '#{I.toSnakeCaseText bn}': #{className}.#{clientMethodName'}
-                    .__nirum_argument_serializers__['#{toAttributeName fn}'](
-                    #{toAttributeName fn}
-                ),
-%{ endforall }
-            },
+            payload=serialize(*args, **kwargs),
             # FIXME Give annotations.
             service_annotations={},
             method_annotations=self.__nirum_method_annotations__,
