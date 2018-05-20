@@ -16,6 +16,7 @@ module Nirum.Targets.Python
     ) where
 
 import Control.Monad (forM)
+import Control.Monad.State (modify)
 import qualified Data.List as L
 import Data.Maybe (catMaybes, fromMaybe)
 import GHC.Exts (IsList (toList))
@@ -278,6 +279,39 @@ instance Eq FieldCode where
 instance Ord FieldCode where
     a <= b = fcOptional a <= fcOptional b
 
+defaultDeserializerErrorHandler :: CodeGen Code
+defaultDeserializerErrorHandler = do
+    modify $ \ c@CodeGenContext { globalDefinitions = defs } ->
+        c { globalDefinitions = S.insert code defs }
+    return funcName
+  where
+    funcName :: Code
+    funcName = "__nirum_default_deserialization_error_handler__"
+    code :: Code
+    code = [qq|
+class $funcName(object):
+    def __init__(self, on_error=None):
+        self.on_error = on_error
+        self.errors = set()
+        self.errored = False
+    def __call__(self, field, message):
+        self.errored = True
+        if self.on_error is None:
+            self.errors.add((field, message))
+        else:
+            self.on_error(field, message)
+    def raise_error(self):
+        """Raise :exc:`ValueError` if there's no overridden ``on_error``
+        callback and ever errored.
+        """
+        if self.errored and self.on_error is None:
+            raise ValueError(
+                chr(0xa).join(
+                    sorted(e[0] + ': ' + e[1] for e in self.errors)
+                )
+            )
+    |]
+
 compileUnionTag :: Source -> Name -> Tag -> CodeGen Markup
 compileUnionTag source parentname d@(Tag typename' fields' _) = do
     abc <- collectionsAbc
@@ -287,6 +321,7 @@ compileUnionTag source parentname d@(Tag typename' fields' _) = do
         (\ f -> [qq|error_{toAttributeName' (fieldName f)}|])
         fields'
     pyVer <- getPythonVersion
+    defaultErrorHandler <- defaultDeserializerErrorHandler
     return $ [compileText|
 class #{className}(#{parentClass}):
 #{compileDocstringWithFields "    " d (map fcField fieldCodes)}
@@ -385,14 +420,7 @@ class #{className}(#{parentClass}):
         ]=None
     ) -> typing.Optional['#{className}']:
 %{ endcase }
-        errors = set()
-        if on_error is None:
-            def on_error(err_field, err_msg):
-                errors.add((err_field, err_msg))
-        errored = [False]
-        def handle_error(err_field, err_msg):
-            errored[0] = True
-            on_error(err_field, err_msg)
+        handle_error = #{defaultErrorHandler}(on_error)
         if isinstance(value, #{abc}.Mapping):
             try:
                 tag = value['_tag']
@@ -424,11 +452,8 @@ class #{className}(#{parentClass}):
                     )
         else:
             handle_error('', 'Expected an object.')
-        if errors:
-            raise ValueError(
-                '\n'.join(sorted('{0}: {1}'.format(*e) for e in errors))
-            )
-        if not errored[0]:
+        handle_error.raise_error()
+        if not handle_error.errored:
             return cls(
 %{ forall fieldCode <- fieldCodes }
                 #{fcAttributeName fieldCode}=rv_#{fcAttributeName fieldCode},
@@ -543,7 +568,8 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
     insertStandardImport "typing"
     pyVer <- getPythonVersion
     Validator typePred valueValidators' <- compileValidator' src itype "value"
-    deserializer <- compileDeserializer' src itype "value" "rv" "handle_error"
+    deserializer <- compileDeserializer' src itype "value" "rv" "on_error"
+    defaultErrorHandler <- defaultDeserializerErrorHandler
     return [compileText|
 class #{className}(object):
 #{compileDocstring "    " d}
@@ -605,20 +631,10 @@ class #{className}(object):
         ]=None
     ) -> typing.Optional['#{className}']:
 %{ endcase }
-        errors = set()
-        if on_error is None:
-            def on_error(err_field, err_msg):
-                errors.add((err_field, err_msg))
-        errored = [False]
-        def handle_error(err_field, err_msg):
-            errored[0] = True
-            on_error(err_field, err_msg)
+        on_error = #{defaultErrorHandler}(on_error)
 #{indent "        " deserializer}
-        if errors:
-            raise ValueError(
-                '\n'.join(sorted('{0}: {1}'.format(*e) for e in errors))
-            )
-        if not errored[0]:
+        on_error.raise_error()
+        if not on_error.errored:
             return cls(rv)
 
 %{ case pyVer }
@@ -648,6 +664,7 @@ compileTypeDeclaration _ d@TypeDeclaration { typename = typename'
     insertStandardImport "typing"
     baseString <- baseStringClass
     pyVer <- getPythonVersion
+    defaultErrorHandler <- defaultDeserializerErrorHandler
     return [compileText|
 class #{className}(enum.Enum):
 #{compileDocstring "    " d}
@@ -678,10 +695,7 @@ class #{className}(enum.Enum):
         ]=None
     ) -> '#{className}':
 %{ endcase }
-        errors = set()
-        if on_error is None:
-            def on_error(err_field, err_msg):
-                errors.add((err_field, err_msg))
+        on_error = #{defaultErrorHandler}(on_error)
         if isinstance(value, #{baseString}):
             member = value.replace('-', '_')
             try:
@@ -699,11 +713,9 @@ class #{className}(enum.Enum):
                 'Expected a string of a member name, but the given value '
                 'is not a string.'
             )
-        if errors:
-            raise ValueError(
-                '\n'.join(sorted('{0}: {1}'.format(*e) for e in errors))
-            )
-        return result
+        on_error.raise_error()
+        if not on_error.errored:
+            return result
 
 
 # Since enum.Enum doesn't allow to define non-member when the class is defined,
@@ -722,6 +734,7 @@ compileTypeDeclaration src d@TypeDeclaration { typename = Name tnFacial tnBehind
         (\ f -> [qq|rv_{toAttributeName' (fieldName f)}|])
         (\ f -> [qq|error_{toAttributeName' (fieldName f)}|])
         fields'
+    defaultErrorHandler <- defaultDeserializerErrorHandler
     return [compileText|
 class #{className}(object):
 #{compileDocstringWithFields "    " d (map fcField fieldCodes)}
@@ -855,18 +868,11 @@ class #{className}(object):
         ]=None
     ) -> typing.Optional['#{className}']:
 %{ endcase }
-        errors = set()
-        if on_error is None:
-            def on_error(err_field, err_msg):
-                errors.add((err_field, err_msg))
-        errored = [False]
-        def handle_error(err_field, err_msg):
-            errored[0] = True
-            on_error(err_field, err_msg)
+        on_error = #{defaultErrorHandler}(on_error)
         if isinstance(value, #{abc}.Mapping):
 %{ forall fieldCode@FieldCode { fcDeserializer = deserializer } <- fieldCodes }
             error_#{fcAttributeName fieldCode} = lambda ef, em: \
-                handle_error('.#{fcBehindName fieldCode}' + ef, em)
+                on_error('.#{fcBehindName fieldCode}' + ef, em)
 %{ if fcOptional fieldCode }
             if '#{fcBehindName fieldCode}' not in value:
                 value['#{fcBehindName fieldCode}'] = None
@@ -879,12 +885,9 @@ class #{className}(object):
 %{ endif }
 %{ endforall }
         else:
-            handle_error('', 'Expected an object.')
-        if errors:
-            raise ValueError(
-                '\n'.join(sorted('{0}: {1}'.format(*e) for e in errors))
-            )
-        if not errored[0]:
+            on_error('', 'Expected an object.')
+        on_error.raise_error()
+        if not on_error.errored:
             return cls(
 %{ forall fieldCode <- fieldCodes }
                 #{fcAttributeName fieldCode}=rv_#{fcAttributeName fieldCode},
@@ -914,6 +917,7 @@ compileTypeDeclaration src
     insertStandardImport "enum"
     insertThirdPartyImportsA [("nirum.datastructures", [("map_type", "Map")])]
     baseString <- baseStringClass
+    defaultErrorHandler <- defaultDeserializerErrorHandler
     pyVer <- getPythonVersion
     return [compileText|
 class #{className}(#{T.intercalate "," $ compileExtendClasses annotations}):
@@ -963,14 +967,7 @@ class #{className}(#{T.intercalate "," $ compileExtendClasses annotations}):
         ]=None
     ) -> '#{className}':
 %{ endcase }
-        errors = set()
-        if on_error is None:
-            def on_error(err_field, err_msg):
-                errors.add((err_field, err_msg))
-        errored = [False]
-        def handle_error(err_field, err_msg):
-            errored[0] = True
-            on_error(err_field, err_msg)
+        handle_error = #{defaultErrorHandler}(on_error)
         if isinstance(value, #{abc}.Mapping):
             try:
                 tag = value['_tag']
@@ -985,7 +982,7 @@ class #{className}(#{T.intercalate "," $ compileExtendClasses annotations}):
 %{ endcase }
         else:
             handle_error('', 'Expected an object.')
-        if errored[0]:
+        if handle_error.errored:
             pass
 %{ forall (Tag tn _ _) <- tags' }
         elif tag == '#{toBehindSnakeCaseText tn}':
@@ -1013,11 +1010,8 @@ class #{className}(#{T.intercalate "," $ compileExtendClasses annotations}):
                 '._tag',
                 'Expected a string, but the given value is not a string.'
             )
-        if errors:
-            raise ValueError(
-                '\n'.join(sorted('{0}: {1}'.format(*e) for e in errors))
-            )
-        if not errored[0]:
+        handle_error.raise_error()
+        if not handle_error.errored:
             return rv
 
 %{ forall tagCode <- tagCodes }
@@ -1071,14 +1065,14 @@ compileTypeDeclaration src d@ServiceDeclaration { serviceName = name'
             \ param'@(Parameter pName pType _) -> do
                 typeExpr <- compileTypeExpression' src $ Just pType
                 v <- compileValidator' src pType $ toAttributeName' pName
-                ds <- compileDeserializer' src pType "value" "rv" "_on_error"
+                ds <- compileDeserializer' src pType "value" "rv" "on_error"
                 return (param', typeExpr, v, ds)
         resultDeserializer <- case returnType method' of
             Just rtype -> do
                 deserializer <- compileDeserializer' src rtype
                     "value"
                     "rv"
-                    "_on_error"
+                    "on_error"
                 return $ Just deserializer
             Nothing ->
                 return Nothing
@@ -1088,6 +1082,7 @@ compileTypeDeclaration src d@ServiceDeclaration { serviceName = name'
                , params'
                , resultDeserializer
                )
+    defaultErrorHandler <- defaultDeserializerErrorHandler
     return [compileText|
 class #{className}(service_type):
 #{compileDocstring "    " d}
@@ -1169,20 +1164,11 @@ class #{className}(service_type):
     del __nirum_argument_serializer__
 
     def __nirum_argument_deserializer__(value, on_error=None):
-        _errors = #{builtins}.set()
-        def _on_error(err_field, err_msg):
-            _errors.add((err_field, err_msg))
-            if on_error is not None:
-                on_error(err_field, err_msg)
+        on_error = #{defaultErrorHandler}(on_error)
 #{indent "        " d}
-        if not _errors:
+        on_error.raise_error()
+        if not on_error.errored:
             return rv
-        if _errors and on_error is None:
-            raise #{builtins}.ValueError(
-                '\n'.join(
-                    #{builtins}.sorted('{0}: {1}'.format(*e) for e in _errors)
-                )
-            )
     __nirum_argument_deserializer__.__name__ = '#{toBehindSnakeCaseText pName}'
     #{toAttributeName' (methodName m)}.__nirum_argument_deserializers__[
         '#{toBehindSnakeCaseText pName}'] = __nirum_argument_deserializer__
@@ -1218,20 +1204,11 @@ class #{className}(service_type):
     def __nirum_deserialize_result__(value, on_error=None):
 %{ case resultD }
 %{ of Just resultDeserializer }
-        _errors = #{builtins}.set()
-        def _on_error(err_field, err_msg):
-            _errors.add((err_field, err_msg))
-            if on_error is not None:
-                on_error(err_field, err_msg)
+        on_error = #{defaultErrorHandler}(on_error)
 #{indent "        " resultDeserializer}
-        if not _errors:
+        on_error.raise_error()
+        if not on_error.errored:
             return rv
-        if _errors and on_error is None:
-            raise #{builtins}.ValueError(
-                '\n'.join(
-                    #{builtins}.sorted('{0}: {1}'.format(*e) for e in _errors)
-                )
-            )
 %{ of Nothing }
         return
 %{ endcase }
@@ -1295,6 +1272,7 @@ if hasattr(#{className}.Client, '__qualname__'):
                       )
                     ]
                 return "raise _unexpected_nirum_response_error(serialized)"
+        defaultErrorHandler <- defaultDeserializerErrorHandler
         return $ toStrict $ renderMarkup [compileText|
     def #{clientMethodName'}(
         self, *args, **kwargs
@@ -1313,9 +1291,7 @@ if hasattr(#{className}.Client, '__qualname__'):
             method_annotations=self.__nirum_method_annotations__,
             parameter_annotations={}
         )
-        deserializer_errors = set()
-        def on_deserializer_error(err_field, err_msg):
-            deserializer_errors.add((err_field, err_msg))
+        on_deserializer_error = #{defaultErrorHandler}()
         if successful:
             result = prototype.__nirum_deserialize_result__(
                 serialized,
@@ -1323,12 +1299,7 @@ if hasattr(#{className}.Client, '__qualname__'):
             )
         else:
 #{indent "            " errorDeserializer}
-        if deserializer_errors:
-            raise ValueError(
-                '\n'.join(
-                    sorted('{0}: {1}'.format(*e) for e in deserializer_errors)
-                )
-            )
+        on_deserializer_error.raise_error()
         if successful:
             return result
         raise result
@@ -1398,6 +1369,7 @@ compileModule pythonVersion' source = do
             ]
     let fromImports = M.assocs (localImportsMap context) ++
                       M.assocs (thirdPartyImports context)
+    let globalDefs = globalDefinitions context
     code <- result
     return $ (deps, optDeps,) $
         [compileText|# -*- coding: utf-8 -*-
@@ -1420,6 +1392,10 @@ from #{from} import (
 %{ endif }
 %{ endforall }
 )
+%{ endforall }
+
+%{ forall globalDef <- S.toList globalDefs }
+#{globalDef}
 %{ endforall }
 
 #{code}
