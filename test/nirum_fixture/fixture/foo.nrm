@@ -125,6 +125,7 @@ union animal = cat
 service sample-service (
     sample-method (animal a, product b/bb, gender c, way d/dd,
                    uuid e, binary f/ff, bigint g, text h/hh),
+    animal sample-method-that-returns(),
 );
 
 record record-with-map (

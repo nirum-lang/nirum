@@ -248,6 +248,12 @@ To be released.
         `json.load()`/`json.loads()` with an optional `on_error` callback,
         and returns its corresponding Python object.
 
+     -  `__nirum_deserialize_result__` takes a result value preprocessed by
+        `json.load()`/`json.loads()` and deserialize it into its corresponding
+        Python object.
+
+        If the method has no return type it returns only `None`.
+
  -  Removed `__nirum_get_inner_type__()` class methods from generated unboxed
     type classes.
 

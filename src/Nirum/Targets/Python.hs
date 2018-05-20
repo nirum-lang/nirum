@@ -1073,13 +1073,27 @@ compileTypeDeclaration src d@ServiceDeclaration { serviceName = name'
                 v <- compileValidator' src pType $ toAttributeName' pName
                 ds <- compileDeserializer' src pType "value" "rv" "_on_error"
                 return (param', typeExpr, v, ds)
-        return (method', rTypeExpr, errTypeExpr, params')
+        resultDeserializer <- case returnType method' of
+            Just rtype -> do
+                deserializer <- compileDeserializer' src rtype
+                    "value"
+                    "rv"
+                    "_on_error"
+                return $ Just deserializer
+            Nothing ->
+                return Nothing
+        return ( method'
+               , rTypeExpr
+               , errTypeExpr
+               , params'
+               , resultDeserializer
+               )
     return [compileText|
 class #{className}(service_type):
 #{compileDocstring "    " d}
     __nirum_type__ = 'service'
     __nirum_service_methods__ = {
-%{ forall (Method mName _ _ _ _, rTypeExpr, _, params') <- methods' }
+%{ forall (Method mName _ _ _ _, rTypeExpr, _, params', _) <- methods' }
         '#{toAttributeName' mName}': {
             '_v': 2,
             '_return': lambda: #{rTypeExpr},
@@ -1095,7 +1109,7 @@ class #{className}(service_type):
 %{ endforall }
     }
     __nirum_method_names__ = name_dict_type([
-%{ forall (Method (Name mF mB) _ _ _ _, _, _, _) <- methods' }
+%{ forall (Method (Name mF mB) _ _ _ _, _, _, _, _) <- methods' }
         ('#{toAttributeName mF}', '#{I.toSnakeCaseText mB}'),
 %{ endforall }
     ])
@@ -1103,14 +1117,14 @@ class #{className}(service_type):
 
     @staticmethod
     def __nirum_method_error_types__(k, d=None):
-%{ forall (Method mName _ _ _ _, _, errTypeExpr, _) <- methods' }
+%{ forall (Method mName _ _ _ _, _, errTypeExpr, _, _) <- methods' }
         if k == '#{toAttributeName' mName}':
             return #{errTypeExpr}
 %{ endforall }
         return d
 
-%{ forall (m@(Method mName _ _ _ _), rTypeExpr, _, params') <- methods' }
-    def #{toAttributeName' mName}(
+%{ forall (m, rTypeExpr, _, params', resultD) <- methods' }
+    def #{toAttributeName' (methodName m)}(
         self,
 %{ case pyVer }
 %{ of Python3 }
@@ -1126,12 +1140,12 @@ class #{className}(service_type):
 %{ endcase }
 #{compileDocstringWithParameters "        " m (map quadrupleToPair params')}
         raise NotImplementedError(
-            '#{className} has to implement #{toAttributeName' mName}()'
+            '#{className} has to implement #{toAttributeName' (methodName m)}()'
         )
 
-    #{toAttributeName' mName}.__nirum_argument_serializers__ = {
+    #{toAttributeName' (methodName m)}.__nirum_argument_serializers__ = {
     }  # type: typing.Mapping[str, typing.Callable[[object], object]]
-    #{toAttributeName' mName}.__nirum_argument_deserializers__ = {
+    #{toAttributeName' (methodName m)}.__nirum_argument_deserializers__ = {
     }
 %{ forall (Parameter pName pt _, tx, (Validator pTPred pValVs), d) <- params' }
     def __nirum_argument_serializer__(#{toAttributeName' pName}):
@@ -1150,9 +1164,10 @@ class #{className}(service_type):
 %{ endforall }
         return #{compileSerializer' src pt (toAttributeName' pName)}
     __nirum_argument_serializer__.__name__ = '#{toAttributeName' pName}'
-    #{toAttributeName' mName}.__nirum_argument_serializers__[
+    #{toAttributeName' (methodName m)}.__nirum_argument_serializers__[
         '#{toAttributeName' pName}'] = __nirum_argument_serializer__
     del __nirum_argument_serializer__
+
     def __nirum_argument_deserializer__(value, on_error=None):
         _errors = #{builtins}.set()
         def _on_error(err_field, err_msg):
@@ -1169,10 +1184,11 @@ class #{className}(service_type):
                 )
             )
     __nirum_argument_deserializer__.__name__ = '#{toBehindSnakeCaseText pName}'
-    #{toAttributeName' mName}.__nirum_argument_deserializers__[
+    #{toAttributeName' (methodName m)}.__nirum_argument_deserializers__[
         '#{toBehindSnakeCaseText pName}'] = __nirum_argument_deserializer__
     del __nirum_argument_deserializer__
 %{ endforall }
+
     def __nirum_serialize_arguments__(
 %{ case pyVer }
 %{ of Python3 }
@@ -1188,15 +1204,40 @@ class #{className}(service_type):
 %{ endcase }
         return {
 %{ forall (Parameter (Name fn bn) _ _, _, _, _) <- params' }
-            '#{I.toSnakeCaseText bn}': #{className}.#{toAttributeName' mName}
-                .__nirum_argument_serializers__['#{toAttributeName fn}'](
-                #{toAttributeName fn}
-            ),
+            '#{I.toSnakeCaseText bn}':
+                #{className}.#{toAttributeName' (methodName m)}
+                    .__nirum_argument_serializers__['#{toAttributeName fn}'](
+                    #{toAttributeName fn}
+                ),
 %{ endforall }
         }
-    #{toAttributeName' mName}.__nirum_serialize_arguments__ = \
+    #{toAttributeName' (methodName m)}.__nirum_serialize_arguments__ = \
         __nirum_serialize_arguments__
     del __nirum_serialize_arguments__
+
+    def __nirum_deserialize_result__(value, on_error=None):
+%{ case resultD }
+%{ of Just resultDeserializer }
+        _errors = #{builtins}.set()
+        def _on_error(err_field, err_msg):
+            _errors.add((err_field, err_msg))
+            if on_error is not None:
+                on_error(err_field, err_msg)
+#{indent "        " resultDeserializer}
+        if not _errors:
+            return rv
+        if _errors and on_error is None:
+            raise #{builtins}.ValueError(
+                '\n'.join(
+                    #{builtins}.sorted('{0}: {1}'.format(*e) for e in _errors)
+                )
+            )
+%{ of Nothing }
+        return
+%{ endcase }
+    #{toAttributeName' (methodName m)}.__nirum_deserialize_result__ = \
+        __nirum_deserialize_result__
+    del __nirum_deserialize_result__
 %{ endforall }
 
 
@@ -1240,13 +1281,6 @@ if hasattr(#{className}.Client, '__qualname__'):
         let clientMethodName' = toAttributeName' mName
         pyVer <- getPythonVersion
         rTypeExpr <- compileTypeExpression' src rtypeM
-        resultDeserializer <- case rtypeM of
-            Just rtype -> compileDeserializer' src rtype
-                "serialized"
-                "result"
-                "on_deserializer_error"
-            Nothing ->
-                return "result = None"
         errorDeserializer <- case etypeM of
              Just e -> compileDeserializer' src e
                 "serialized"
@@ -1270,11 +1304,10 @@ if hasattr(#{className}.Client, '__qualname__'):
 %{ of Python2 }
     ):
 %{ endcase }
-        serialize = \
-            #{className}.#{clientMethodName'}.__nirum_serialize_arguments__
+        prototype = #{className}.#{clientMethodName'}
         successful, serialized = self.__nirum_transport__(
             '#{I.toSnakeCaseText $ N.behindName mName}',
-            payload=serialize(*args, **kwargs),
+            payload=prototype.__nirum_serialize_arguments__(*args, **kwargs),
             # FIXME Give annotations.
             service_annotations={},
             method_annotations=self.__nirum_method_annotations__,
@@ -1284,7 +1317,10 @@ if hasattr(#{className}.Client, '__qualname__'):
         def on_deserializer_error(err_field, err_msg):
             deserializer_errors.add((err_field, err_msg))
         if successful:
-#{indent "            " resultDeserializer}
+            result = prototype.__nirum_deserialize_result__(
+                serialized,
+                on_deserializer_error
+            )
         else:
 #{indent "            " errorDeserializer}
         if deserializer_errors:

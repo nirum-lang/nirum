@@ -132,9 +132,8 @@ def test_service_argument_deserializers():
         'age': 3,
         'weight': None,
     }
-    assert table['a'](a_payload) == \
-        table['a'](a_payload, None) == \
-        Dog(name=u'Dog.name', age=3)
+    expected = Dog(name=u'Dog.name', age=3)
+    assert table['a'](a_payload) == table['a'](a_payload, None) == expected
     a_invalid_payload = dict(a_payload, age='invalid', weight='invalid')
     with raises(ValueError) as e:
         table['a'](a_invalid_payload)
@@ -142,9 +141,43 @@ def test_service_argument_deserializers():
 .age: Expected an integral number or a string of decimal digits.
 .weight: Expected an integral number or a string of decimal digits.'''
     errors = set()
-    table['a'](a_payload, lambda *pair: errors.add(pair))
+    assert table['a'](a_payload, lambda *pair: errors.add(pair)) == expected
     assert not errors
     table['a'](a_invalid_payload, lambda *pair: errors.add(pair))
+    assert errors == {
+        (
+            '.age',
+            'Expected an integral number or a string of decimal digits.',
+        ),
+        (
+            '.weight',
+            'Expected an integral number or a string of decimal digits.',
+        ),
+    }
+
+
+def test_service_deserialize_result():
+    payload = {
+        '_type': 'animal',
+        '_tag': 'dog',
+        'name': 'Puppy',
+        'kind': None,
+        'age': 3,
+        'weight': None,
+    }
+    expected = Dog(name=u'Puppy', age=3)
+    f = SampleService.sample_method_that_returns.__nirum_deserialize_result__
+    assert f(payload) == expected
+    invalid_payload = dict(payload, age='invalid', weight='invalid')
+    with raises(ValueError) as e:
+        f(invalid_payload)
+    assert str(e.value) == '''\
+.age: Expected an integral number or a string of decimal digits.
+.weight: Expected an integral number or a string of decimal digits.'''
+    errors = set()
+    assert f(payload, lambda *pair: errors.add(pair)) == expected
+    assert not errors
+    f(invalid_payload, lambda *pair: errors.add(pair))
     assert errors == {
         (
             '.age',
