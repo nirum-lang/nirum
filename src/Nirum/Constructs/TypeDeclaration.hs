@@ -19,7 +19,7 @@ module Nirum.Constructs.TypeDeclaration ( EnumMember (EnumMember)
                                                                   , Int32
                                                                   , Int64
                                                                   , Text
-                                                                  , Uri
+                                                                  , Url
                                                                   , Uuid
                                                                   )
                                         , Tag ( Tag
@@ -174,7 +174,7 @@ instance Declaration Tag where
 -- | Primitive type identifiers.
 data PrimitiveTypeIdentifier
     = Bigint | Decimal | Int32 | Int64 | Float32 | Float64 | Text | Binary
-    | Date | Datetime | Bool | Uuid | Uri
+    | Date | Datetime | Bool | Uuid | Url
     deriving (Eq, Ord, Show)
 
 -- | Possible coded types of 'PrimitiveType' in JSON representation.

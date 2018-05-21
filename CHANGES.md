@@ -135,6 +135,8 @@ To be released.
     );
     ~~~~~~~~
 
+ -  Deprecated `uri` and `url` type is added.  [[#126], [#277]]
+
 ### Docs target
 
  -  A new required configuration `targets.docs.title` was added.
@@ -253,6 +255,7 @@ To be released.
 
 [#13]: https://github.com/spoqa/nirum/issues/13
 [#100]: https://github.com/spoqa/nirum/issues/100
+[#126]: https://github.com/spoqa/nirum/issues/126
 [#178]: https://github.com/spoqa/nirum/issues/178
 [#217]: https://github.com/spoqa/nirum/issues/217
 [#220]: https://github.com/spoqa/nirum/issues/220
@@ -266,6 +269,7 @@ To be released.
 [#267]: https://github.com/spoqa/nirum/pull/267
 [#269]: https://github.com/spoqa/nirum/pull/269
 [#272]: https://github.com/spoqa/nirum/pull/272
+[#277]: https://github.com/spoqa/nirum/pull/277
 [entry points]: https://setuptools.readthedocs.io/en/latest/pkg_resources.html#entry-points
 [python2-numbers-integral]: https://docs.python.org/2/library/numbers.html#numbers.Integral
 [python2-int]: https://docs.python.org/2/library/functions.html#int

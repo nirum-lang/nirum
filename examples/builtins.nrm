@@ -53,8 +53,8 @@ record et-cetera (
     uuid b,
     # `uuid` stores a UUID.  Represented as a string in JSON.
 
-    uri c,
-    # `uri` stores a URI.  Represented as a string in JSON.
+    url c,
+    # `url` stores a URL.  Represented as a string in JSON.
 );
 
 record containers (
