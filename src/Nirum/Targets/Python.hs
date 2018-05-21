@@ -1261,6 +1261,15 @@ class #{className}(service_type):
     #{toAttributeName' (methodName m)}.__nirum_deserialize_result__ = None
 %{ endcase }
 
+%{ case errorType m }
+%{ of Just errT }
+    #{toAttributeName' (methodName m)}.__nirum_serialize_error__ = lambda v: (
+        #{compileSerializer' src errT "v"}
+    )
+%{ of Nothing }
+    #{toAttributeName' (methodName m)}.__nirum_serialize_error__ = None
+%{ endcase }
+
 %{ case errorD }
 %{ of Just errorDeserializer }
     def __nirum_deserialize_error__(value, on_error=None):

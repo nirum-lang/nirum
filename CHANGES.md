@@ -265,6 +265,12 @@ To be released.
 
         This attribute is `None` if the method has no return type.
 
+     -  `__nirum_serialize_error__` takes a method's error object and serialize
+        it into a corresponding value which can be passed to
+        `json.dump()`/`json.dumps()`.
+
+        This attribute is `None` if the method has no error type.
+
      -  `__nirum_deserialize_error__` takes an error value preprocessed by
         `json.load()`/`json.loads()` and deserialize it into its corresponding
         Python object.

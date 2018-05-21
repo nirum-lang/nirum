@@ -212,6 +212,17 @@ def test_service_deserialize_result(fx_dog):
     }
 
 
+def test_service_serialize_error():
+    assert SampleService.sample_method.__nirum_serialize_error__ is None
+    assert PingService.ping.__nirum_serialize_error__(
+        RpcError.NotFoundError(message=u'An error message.')
+    ) == {
+        '_type': 'rpc_error',
+        '_tag': 'not_found_error',
+        'message': 'An error message.',
+    }
+
+
 def test_service_deserialize_error():
     assert SampleService.sample_method.__nirum_deserialize_error__ is None
     f = PingService.ping.__nirum_deserialize_error__
