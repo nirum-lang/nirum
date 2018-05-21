@@ -108,6 +108,36 @@ def test_service_serialize_arguments(fx_method_args):
     ) == expected
 
 
+def test_service_deserialize_arguments(fx_method_args):
+    expected, payload = fx_method_args
+    f = SampleService.sample_method.__nirum_deserialize_arguments__
+    assert f(payload) == dict(expected)
+    invalid_payload = dict(
+        payload,
+        a='invalid',
+        bb=dict(payload['bb'], price='invalid')
+    )
+    del invalid_payload['c']
+    with raises(ValueError) as e:
+        f(invalid_payload)
+    assert str(e.value) == '''\
+.a: Expected an object.
+.bb.price: Expected an integral number or a string of decimal digits.
+.c: Expected to exist.'''
+    errors = set()
+    assert f(payload, lambda *pair: errors.add(pair)) == dict(expected)
+    assert not errors
+    f(invalid_payload, lambda *pair: errors.add(pair))
+    assert errors == {
+        ('.a', 'Expected an object.'),
+        (
+            '.bb.price',
+            'Expected an integral number or a string of decimal digits.',
+        ),
+        ('.c', 'Expected to exist.'),
+    }
+
+
 def test_service_argument_serializers(fx_method_args):
     args, expected = fx_method_args
     table = SampleService.sample_method.__nirum_argument_serializers__
@@ -189,6 +219,7 @@ def test_service_deserialize_error():
     assert str(exc.value) == '.message: Expected a string.'
     errors = set()
     assert f(payload, lambda *pair: errors.add(pair)) == expected
+    assert not errors
     f(invalid_payload, lambda *pair: errors.add(pair))
     assert errors == {('.message', 'Expected a string.')}
 

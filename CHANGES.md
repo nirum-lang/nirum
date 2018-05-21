@@ -231,6 +231,11 @@ To be released.
         directly translated to a JSON object).  It can raise a `TypeError` or
         `ValueError` if any invalid values are passed.
 
+     -  `__nirum_deserialize_arguments__` takes a mapping object returned by
+        `json.load()`/`json.loads()` (and an optional `on_error` callable)
+        and deserialize it into a mapping object of pairs from parameter's
+        facial name string to its corresponding Python object.
+
      -  `__nirum_argument_serializers__` is a mapping object that keys are
         a string of method's parameter facial name and values are its
         serializer.

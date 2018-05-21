@@ -1211,6 +1211,32 @@ class #{className}(service_type):
         __nirum_serialize_arguments__
     del __nirum_serialize_arguments__
 
+    def __nirum_deserialize_arguments__(value, on_error=None):
+        on_error = #{defaultErrorHandler}(on_error)
+        table = #{className}.#{toAttributeName' (methodName m)} \
+            .__nirum_argument_deserializers__
+        result = {}
+%{ forall (Parameter pName _ _, _, _, _) <- params' }
+        try:
+            field_value = value['#{toBehindSnakeCaseText pName}']
+        except KeyError:
+            on_error('.#{toBehindSnakeCaseText pName}', 'Expected to exist.')
+        else:
+            result['#{toAttributeName' pName}'] = \
+                table['#{toBehindSnakeCaseText pName}'](
+                    field_value,
+                    lambda f, m: on_error(
+                        '.#{toBehindSnakeCaseText pName}' + f, m
+                    )
+                )
+%{ endforall }
+        on_error.raise_error()
+        if not on_error.errored:
+            return result
+    #{toAttributeName' (methodName m)}.__nirum_deserialize_arguments__ = \
+        __nirum_deserialize_arguments__
+    del __nirum_deserialize_arguments__
+
     def __nirum_deserialize_result__(value, on_error=None):
 %{ case resultD }
 %{ of Just resultDeserializer }
