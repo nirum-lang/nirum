@@ -124,6 +124,9 @@ def test_service_deserialize_arguments(fx_method_args):
 .a: Expected an object.
 .bb.price: Expected an integral number or a string of decimal digits.
 .c: Expected to exist.'''
+    with raises(ValueError) as e:
+        f(1234)
+    assert str(e.value) == ': Expected an object.'
     errors = set()
     assert f(payload, lambda *pair: errors.add(pair)) == dict(expected)
     assert not errors
@@ -136,6 +139,9 @@ def test_service_deserialize_arguments(fx_method_args):
         ),
         ('.c', 'Expected to exist.'),
     }
+    errors.clear()
+    f(1234, lambda *pair: errors.add(pair))
+    assert errors == {('', 'Expected an object.')}
 
 
 def test_service_argument_serializers(fx_method_args):

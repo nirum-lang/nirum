@@ -1055,6 +1055,7 @@ compileTypeDeclaration src d@ServiceDeclaration { serviceName = name'
         , ("nirum.service", [("service_type", "Service")])
         , ("nirum.transport", [("transport_type", "Transport")])
         ]
+    abc <- collectionsAbc
     builtins <- importBuiltins
     typing <- importStandardLibrary "typing"
     pyVer <- getPythonVersion
@@ -1215,21 +1216,27 @@ class #{className}(service_type):
         on_error = #{defaultErrorHandler}(on_error)
         table = #{className}.#{toAttributeName' (methodName m)} \
             .__nirum_argument_deserializers__
-        result = {}
+        if isinstance(value, #{abc}.Mapping):
+            result = {}
 %{ forall (Parameter pName _ _, _, _, _) <- params' }
-        try:
-            field_value = value['#{toBehindSnakeCaseText pName}']
-        except KeyError:
-            on_error('.#{toBehindSnakeCaseText pName}', 'Expected to exist.')
-        else:
-            result['#{toAttributeName' pName}'] = \
-                table['#{toBehindSnakeCaseText pName}'](
-                    field_value,
-                    lambda f, m: on_error(
-                        '.#{toBehindSnakeCaseText pName}' + f, m
-                    )
+            try:
+                field_value = value['#{toBehindSnakeCaseText pName}']
+            except KeyError:
+                on_error(
+                    '.#{toBehindSnakeCaseText pName}',
+                    'Expected to exist.'
                 )
+            else:
+                result['#{toAttributeName' pName}'] = \
+                    table['#{toBehindSnakeCaseText pName}'](
+                        field_value,
+                        lambda f, m: on_error(
+                            '.#{toBehindSnakeCaseText pName}' + f, m
+                        )
+                    )
 %{ endforall }
+        else:
+            on_error('', 'Expected an object.')
         on_error.raise_error()
         if not on_error.errored:
             return result
