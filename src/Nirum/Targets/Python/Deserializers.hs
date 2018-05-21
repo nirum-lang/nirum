@@ -578,7 +578,7 @@ except #{builtins}.ValueError:
     )
         |]
 
-compilePrimitiveTypeDeserializer Uri vInput vOutput vError =
+compilePrimitiveTypeDeserializer Url vInput vOutput vError =
     compilePrimitiveTypeDeserializer Text vInput vOutput vError
 
 -- | Wrap a Python deserializer code block into an isolated scope.

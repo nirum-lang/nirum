@@ -82,8 +82,8 @@ compilePrimitiveType primitiveTypeIdentifier' = do
         (Uuid, _) -> do
             uuid <- importStandardLibrary "uuid"
             return [qq|$uuid.UUID|]
-        (Uri, Python2) -> builtins "basestring"
-        (Uri, Python3) -> builtins "str"
+        (Url, Python2) -> builtins "basestring"
+        (Url, Python3) -> builtins "str"
   where
     builtins :: Code -> CodeGen Code
     builtins typename' = do

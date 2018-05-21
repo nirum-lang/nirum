@@ -80,4 +80,4 @@ compilePrimitiveTypeSerializer Datetime var = replace "$var" var [q|(
 )|]
 compilePrimitiveTypeSerializer Bool var = var
 compilePrimitiveTypeSerializer Uuid var = [qq|str($var).lower()|]
-compilePrimitiveTypeSerializer Uri var = var
+compilePrimitiveTypeSerializer Url var = var

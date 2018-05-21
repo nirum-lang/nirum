@@ -184,7 +184,7 @@ a structure consists of fields which have their name and type.  For example:
         name name,
         date? dob,
         gender? gender,
-        uri? website-uri
+        url? website-url
     );
 
 It's represented in JSON to:
@@ -198,7 +198,7 @@ It's represented in JSON to:
         },
         "dob": null,
         "gender": "male",
-        "uri": null
+        "url": null
     }
 
 When a payload is deserialized, undefined fields are just ignored.
@@ -229,7 +229,7 @@ a union type instead of a record type:
         name name,
         date? dob,
         gender? gender,
-        uri? website-uri
+        url? website-url
     );
 
 It's represented in JSON to:
@@ -244,7 +244,7 @@ It's represented in JSON to:
         },
         "dob": null,
         "gender": "male",
-        "uri": null
+        "url": null
     }
 
 In a similar way to a recrod type, undefined fields in a payload are ignored

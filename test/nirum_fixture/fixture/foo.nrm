@@ -115,7 +115,7 @@ record product (
     text name,
     int64? price,
     bool sale,
-    uri? url,
+    url? url,
 );
 
 union animal = cat
@@ -142,3 +142,5 @@ record name-shadowing-field-record (
 union optional-union = foo ( int32? bar )
                      | baz ( int32 qux )
                      ;
+
+unboxed website (uri);

@@ -57,7 +57,7 @@ spec = pythonVersionSpecs $ \ ver -> do
         let (uuidCode, uuidContext) = run' (compilePrimitiveType Uuid)
         uuidCode `shouldBe` Right "_uuid.UUID"
         standardImports uuidContext `shouldBe` [("_uuid", "uuid")]
-        code (compilePrimitiveType Uri) `shouldBe`
+        code (compilePrimitiveType Url) `shouldBe`
             case ver of
                 Python2 -> "__builtin__.basestring"
                 Python3 -> "__builtin__.str"

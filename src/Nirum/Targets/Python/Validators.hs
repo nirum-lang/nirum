@@ -99,9 +99,9 @@ compilePrimitiveTypeValidator primitiveTypeId pythonVar = do
         [ ValueValidator [qq|(($var).tzinfo is not None)|]
                          "naive datetime (lacking tzinfo)"
         ]
-    vv Uri var =
+    vv Url var =
         [ ValueValidator [qq|('\\n' not in ($var))|]
-                         "URI cannot contain new line characters"
+                         "URL cannot contain new line characters"
         ]
     vv _ _ = []
 

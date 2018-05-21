@@ -30,7 +30,7 @@ import Nirum.Constructs.TypeDeclaration ( JsonType (Boolean, Number, String)
                                                                   , Int32
                                                                   , Int64
                                                                   , Text
-                                                                  , Uri
+                                                                  , Url
                                                                   , Uuid
                                                                   )
                                         , Type (PrimitiveType)
@@ -112,7 +112,9 @@ coreTypes =
     -- et cetera
     , decl' "bool" Bool Boolean
     , decl' "uuid" Uuid String
-    , decl' "uri" Uri String
+    , decl' "url" Url String
+    -- FIXME: deprecated
+    , decl' "uri" Url String
     ]
   where
     decl' name prim json =

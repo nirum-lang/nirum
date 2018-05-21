@@ -41,7 +41,7 @@ unboxed record-unboxed (product);
 
 union post
     = image (text mime-type, binary data)
-    | link (uri link, text title, text? quote)
+    | link (url link, text title, text? quote)
     | article (text title, text content)
     ;
 
