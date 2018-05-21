@@ -1,11 +1,59 @@
+import collections
 import uuid
 
 from nirum.transport import Transport
-from pytest import raises
+from pytest import fixture, raises
 from six import PY2
 
 from fixture.foo import (Dog, Gender, PingService, Product, RpcError,
                          SampleService, SampleService_Client, Way)
+
+
+@fixture
+def fx_dog():
+    return Dog(name=u'Puppy', age=3), {
+        '_type': 'animal',
+        '_tag': 'dog',
+        'name': 'Puppy',
+        'kind': None,
+        'age': 3,
+        'weight': None,
+    }
+
+
+@fixture
+def fx_method_args(fx_dog):
+    return (
+        collections.OrderedDict([
+            ('a', fx_dog[0]),
+            ('b', Product(name=u'Product.name', sale=False)),
+            ('c', Gender.female),
+            ('d', Way(u'way/path/text')),
+            ('e', uuid.UUID('F7DB93E3-731E-48EF-80A2-CAC81E02F1AE')),
+            ('f', b'binary data'),
+            ('g', 1234),
+            ('h', u'text data'),
+        ]),
+        collections.OrderedDict([
+            ('a', fx_dog[1]),
+            (
+                'bb',
+                {
+                    '_type': 'product',
+                    'name': 'Product.name',
+                    'price': None,
+                    'sale': False,
+                    'url': None,
+                }
+            ),
+            ('c', 'yeoseong'),
+            ('dd', 'way/path/text'),
+            ('e', 'f7db93e3-731e-48ef-80a2-cac81e02f1ae'),
+            ('ff', u'YmluYXJ5IGRhdGE='),
+            ('g', 1234),
+            ('hh', 'text data'),
+        ]),
+    )
 
 
 def test_throws_error():
@@ -50,75 +98,191 @@ class DumbTransport(Transport):
         return self.calls[-1]
 
 
-def test_service_client_payload_serialization():
-    t = DumbTransport()
-    c = SampleService.Client(t)
-    assert SampleService_Client is SampleService.Client
-    c.sample_method(
-        a=Dog(name=u'Dog.name', age=3),
-        b=Product(name=u'Product.name', sale=False),
-        c=Gender.female,
-        d=Way(u'way/path/text'),
-        e=uuid.UUID('F7DB93E3-731E-48EF-80A2-CAC81E02F1AE'),
-        f=b'binary data',
-        g=1234,
-        h=u'text data'
+def test_service_serialize_arguments(fx_method_args):
+    args, expected = fx_method_args
+    assert SampleService.sample_method.__nirum_serialize_arguments__(
+        **args
+    ) == expected
+    assert SampleService.sample_method.__nirum_serialize_arguments__(
+        *args.values()
+    ) == expected
+
+
+def test_service_deserialize_arguments(fx_method_args):
+    expected, payload = fx_method_args
+    f = SampleService.sample_method.__nirum_deserialize_arguments__
+    assert f(payload) == dict(expected)
+    invalid_payload = dict(
+        payload,
+        a='invalid',
+        bb=dict(payload['bb'], price='invalid')
     )
-    assert t.latest_call[0] == 'sample_method'
-    assert t.latest_call[1] == {
-        'a': {
-            '_type': 'animal',
-            '_tag': 'dog',
-            'name': 'Dog.name',
-            'kind': None,
-            'age': 3,
-            'weight': None,
-        },
-        'bb': {
-            '_type': 'product',
-            'name': 'Product.name',
-            'price': None,
-            'sale': False,
-            'url': None,
-        },
-        'c': 'yeoseong',
-        'dd': 'way/path/text',
-        'e': 'f7db93e3-731e-48ef-80a2-cac81e02f1ae',
-        'ff': u'YmluYXJ5IGRhdGE=',
-        'g': 1234,
-        'hh': 'text data',
+    del invalid_payload['c']
+    with raises(ValueError) as e:
+        f(invalid_payload)
+    assert str(e.value) == '''\
+.a: Expected an object.
+.bb.price: Expected an integral number or a string of decimal digits.
+.c: Expected to exist.'''
+    with raises(ValueError) as e:
+        f(1234)
+    assert str(e.value) == ': Expected an object.'
+    errors = set()
+    assert f(payload, lambda *pair: errors.add(pair)) == dict(expected)
+    assert not errors
+    f(invalid_payload, lambda *pair: errors.add(pair))
+    assert errors == {
+        ('.a', 'Expected an object.'),
+        (
+            '.bb.price',
+            'Expected an integral number or a string of decimal digits.',
+        ),
+        ('.c', 'Expected to exist.'),
+    }
+    errors.clear()
+    f(1234, lambda *pair: errors.add(pair))
+    assert errors == {('', 'Expected an object.')}
+
+
+def test_service_argument_serializers(fx_method_args):
+    args, expected = fx_method_args
+    table = SampleService.sample_method.__nirum_argument_serializers__
+    assert isinstance(table, collections.Mapping)
+    assert len(table) == len(args)
+    for (k, arg), expected_value in zip(args.items(), expected.values()):
+        assert table[k](arg) == expected_value
+
+
+def test_service_argument_deserializers(fx_dog, fx_method_args):
+    _, payloads = fx_method_args
+    table = SampleService.sample_method.__nirum_argument_deserializers__
+    assert isinstance(table, collections.Mapping)
+    assert frozenset(table) == frozenset(payloads)
+    assert all(callable(f) for f in table.values())
+    expected, a_payload = fx_dog
+    assert table['a'](a_payload) == table['a'](a_payload, None) == expected
+    a_invalid_payload = dict(a_payload, age='invalid', weight='invalid')
+    with raises(ValueError) as e:
+        table['a'](a_invalid_payload)
+    assert str(e.value) == '''\
+.age: Expected an integral number or a string of decimal digits.
+.weight: Expected an integral number or a string of decimal digits.'''
+    errors = set()
+    assert table['a'](a_payload, lambda *pair: errors.add(pair)) == expected
+    assert not errors
+    table['a'](a_invalid_payload, lambda *pair: errors.add(pair))
+    assert errors == {
+        (
+            '.age',
+            'Expected an integral number or a string of decimal digits.',
+        ),
+        (
+            '.weight',
+            'Expected an integral number or a string of decimal digits.',
+        ),
     }
 
 
-def test_service_client_validation():
-    """https://github.com/spoqa/nirum/issues/220"""
+def test_service_serialize_result(fx_dog):
+    assert SampleService.sample_method.__nirum_serialize_result__ is None
+    result, expected = fx_dog
+    assert SampleService.sample_method_that_returns.__nirum_serialize_result__(
+        result
+    ) == expected
+
+
+def test_service_deserialize_result(fx_dog):
+    assert SampleService.sample_method.__nirum_deserialize_result__ is None
+    expected, payload = fx_dog
+    f = SampleService.sample_method_that_returns.__nirum_deserialize_result__
+    assert f(payload) == expected
+    invalid_payload = dict(payload, age='invalid', weight='invalid')
+    with raises(ValueError) as e:
+        f(invalid_payload)
+    assert str(e.value) == '''\
+.age: Expected an integral number or a string of decimal digits.
+.weight: Expected an integral number or a string of decimal digits.'''
+    errors = set()
+    assert f(payload, lambda *pair: errors.add(pair)) == expected
+    assert not errors
+    f(invalid_payload, lambda *pair: errors.add(pair))
+    assert errors == {
+        (
+            '.age',
+            'Expected an integral number or a string of decimal digits.',
+        ),
+        (
+            '.weight',
+            'Expected an integral number or a string of decimal digits.',
+        ),
+    }
+
+
+def test_service_serialize_error():
+    assert SampleService.sample_method.__nirum_serialize_error__ is None
+    assert PingService.ping.__nirum_serialize_error__(
+        RpcError.NotFoundError(message=u'An error message.')
+    ) == {
+        '_type': 'rpc_error',
+        '_tag': 'not_found_error',
+        'message': 'An error message.',
+    }
+
+
+def test_service_deserialize_error():
+    assert SampleService.sample_method.__nirum_deserialize_error__ is None
+    f = PingService.ping.__nirum_deserialize_error__
+    payload = {
+        '_type': 'rpc_error',
+        '_tag': 'not_found_error',
+        'message': 'An error message.',
+    }
+    expected = RpcError.NotFoundError(message=u'An error message.')
+    assert f(payload) == expected
+    invalid_payload = dict(payload, message=['Not a string but a list.'])
+    with raises(ValueError) as exc:
+        f(invalid_payload)
+    assert str(exc.value) == '.message: Expected a string.'
+    errors = set()
+    assert f(payload, lambda *pair: errors.add(pair)) == expected
+    assert not errors
+    f(invalid_payload, lambda *pair: errors.add(pair))
+    assert errors == {('.message', 'Expected a string.')}
+
+
+def test_service_client_payload_serialization(fx_method_args):
+    args, expected = fx_method_args
     t = DumbTransport()
     c = SampleService.Client(t)
-    kwargs = dict(
-        a=Dog(name=u'Dog.name', age=3),
-        b=Product(name=u'Product.name', sale=False),
-        c=Gender.female,
-        d=Way(u'way/path/text'),
-        e=uuid.UUID('F7DB93E3-731E-48EF-80A2-CAC81E02F1AE'),
-        f=b'binary data',
-        g=1234,
-        h=u'text data'
-    )
-    c.sample_method(**kwargs)  # ok
+    assert SampleService_Client is SampleService.Client
+    c.sample_method(**args)
+    assert t.latest_call[0] == 'sample_method'
+    assert t.latest_call[1] == expected
+    c.sample_method(*args.values())
+    assert t.latest_call[0] == 'sample_method'
+    assert t.latest_call[1] == expected
+
+
+def test_service_client_validation(fx_method_args):
+    """https://github.com/spoqa/nirum/issues/220"""
+    args, expected = fx_method_args
+    t = DumbTransport()
+    c = SampleService.Client(t)
+    c.sample_method(**args)  # ok
 
     # Missing argument raises TypeError
-    missing_arg = dict(kwargs)
+    missing_arg = dict(args)
     del missing_arg['a']
     with raises(TypeError):
         c.sample_method(**missing_arg)
 
     # Passing a value of unmatched type raises TypeError
-    unmatched_type = dict(kwargs, g='not bigint')
+    unmatched_type = dict(args, g='not bigint')
     with raises(TypeError):
         c.sample_method(**unmatched_type)
 
     # Passing None to non-optional parameter raises TypeError
-    passing_none = dict(kwargs, a=None)
+    passing_none = dict(args, a=None)
     with raises(TypeError):
         c.sample_method(**passing_none)
 

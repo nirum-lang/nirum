@@ -41,25 +41,28 @@ compileValidator mod' (OptionModifier typeExpr) pythonVar = do
     return $ Validator typeValidator valueValidators'
 compileValidator mod' (SetModifier typeExpr) pythonVar = do
     abc <- collectionsAbc
+    builtins <- importBuiltins
     Validator typePred vvs <-
         multiplexValidators mod' pythonVar [(typeExpr, "elem")]
     return $ Validator
-        [qq|(isinstance($pythonVar, $abc.Set) and $typePred)|]
+        [qq|($builtins.isinstance($pythonVar, $abc.Set) and $typePred)|]
         vvs
 compileValidator mod' (ListModifier typeExpr) pythonVar = do
+    builtins <- importBuiltins
     abc <- collectionsAbc
     Validator typePred vvs <-
         multiplexValidators mod' pythonVar [(typeExpr, "item")]
     return $ Validator
-        [qq|(isinstance($pythonVar, $abc.Sequence) and $typePred)|]
+        [qq|($builtins.isinstance($pythonVar, $abc.Sequence) and $typePred)|]
         vvs
 compileValidator mod' (MapModifier keyTypeExpr valueTypeExpr) pythonVar = do
     abc <- collectionsAbc
     Validator typePred vvs <-
         multiplexValidators mod' [qq|(($pythonVar).items())|]
         [(keyTypeExpr, "key"), (valueTypeExpr, "value")]
+    builtins <- importBuiltins
     return $ Validator
-        [qq|(isinstance($pythonVar, $abc.Mapping) and $typePred)|]
+        [qq|($builtins.isinstance($pythonVar, $abc.Mapping) and $typePred)|]
         vvs
 compileValidator mod' (TypeIdentifier typeId) pythonVar =
     case lookupType typeId mod' of
@@ -80,9 +83,10 @@ compilePrimitiveTypeValidator :: PrimitiveTypeIdentifier
                               -> Code
                               -> CodeGen Validator
 compilePrimitiveTypeValidator primitiveTypeId pythonVar = do
+    builtins <- importBuiltins
     typeName <- compilePrimitiveType primitiveTypeId
     return $ Validator
-        [qq|(isinstance(($pythonVar), ($typeName)))|]
+        [qq|($builtins.isinstance(($pythonVar), ($typeName)))|]
         (vv primitiveTypeId pythonVar)
   where
     vv :: PrimitiveTypeIdentifier -> Code -> [ValueValidator]
@@ -110,14 +114,16 @@ compileInstanceValidator :: BoundModule Python
                          -> Code
                          -> CodeGen Validator
 compileInstanceValidator mod' typeId pythonVar = do
+    builtins <- importBuiltins
     cls <- compileTypeExpression mod' (Just (TypeIdentifier typeId))
-    return $ Validator [qq|(isinstance(($pythonVar), ($cls)))|] []
+    return $ Validator [qq|($builtins.isinstance(($pythonVar), ($cls)))|] []
 
 multiplexValidators :: BoundModule Python
                     -> Code
                     -> [(TypeExpression, Code)]
                     -> CodeGen Validator
 multiplexValidators mod' iterableExpr elements = do
+    builtins <- importBuiltins
     validators <- sequence
         [ do
               v <- compileValidator mod' tExpr elemVar
@@ -130,9 +136,13 @@ multiplexValidators mod' iterableExpr elements = do
             " and "
             [typePred | (_, Validator typePred _) <- validators]
     return $ Validator
-        [qq|(all(($typePredLogicalAnds) for ($csElemVars) in $iterableExpr))|]
+        [qq|($builtins.all(
+            ($typePredLogicalAnds) for ($csElemVars) in $iterableExpr)
+        )|]
         [ ValueValidator
-              [qq|(all(($typePred) for ($csElemVars) in $iterableExpr))|]
+              [qq|($builtins.all(
+                  ($typePred) for ($csElemVars) in $iterableExpr)
+              )|]
               [qq|invalid elements ($msg)|]
         | (_, Validator _ vvs) <- validators
         , ValueValidator typePred msg <- vvs

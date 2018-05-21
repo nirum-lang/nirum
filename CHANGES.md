@@ -223,6 +223,60 @@ To be released.
     (``tzinfo``) awareness check for `datetime`, and basic format check for
     `uri`.
 
+ -  Generated service methods became to have its own serialization and
+    deserialization functions.  Each method object now has these attributes:
+
+     -  `__nirum_serialize_arguments__` takes the same keywords to the method
+        parameters and serialize them into a mapping object (which can be
+        directly translated to a JSON object).  It can raise a `TypeError` or
+        `ValueError` if any invalid values are passed.
+
+     -  `__nirum_deserialize_arguments__` takes a mapping object returned by
+        `json.load()`/`json.loads()` (and an optional `on_error` callable)
+        and deserialize it into a mapping object of pairs from parameter's
+        facial name string to its corresponding Python object.
+
+     -  `__nirum_argument_serializers__` is a mapping object that keys are
+        a string of method's parameter facial name and values are its
+        serializer.
+
+        A serializer function takes an argument value and returns
+        its corresponding value which can be passed to
+        `json.dump()`/`json.dumps()`.  It can raise a `TypeError` or
+        `ValueError` if an argument is invalid.
+
+     -  `__nirum_argument_deserializers__` is a mapping object that keys are
+        a string of method's parameter behind name and values are its
+        deserializer.
+
+        A deserializer function takes an argument value preprocessed by
+        `json.load()`/`json.loads()` with an optional `on_error` callback,
+        and returns its corresponding Python object.
+
+     -  `__nirum_serialize_result__` takes a method's return value and serialize
+        it into a corresponding value which can be passed to
+        `json.dump()`/`json.dumps()`.
+
+        This attribute is `None` if the method has no return type.
+
+     -  `__nirum_deserialize_result__` takes a result value preprocessed by
+        `json.load()`/`json.loads()` and deserialize it into its corresponding
+        Python object.
+
+        This attribute is `None` if the method has no return type.
+
+     -  `__nirum_serialize_error__` takes a method's error object and serialize
+        it into a corresponding value which can be passed to
+        `json.dump()`/`json.dumps()`.
+
+        This attribute is `None` if the method has no error type.
+
+     -  `__nirum_deserialize_error__` takes an error value preprocessed by
+        `json.load()`/`json.loads()` and deserialize it into its corresponding
+        Python object.
+
+        This attribute is `None` if the method has no error type.
+
  -  Removed `__nirum_get_inner_type__()` class methods from generated unboxed
     type classes.
 
@@ -231,6 +285,9 @@ To be released.
 
  -  Removed `__nirum_tag_names__`, `__nirum_union_behind_name__`, and
     `__nirum_field_names__` static fields from generated union type classes.
+
+ -  Removed `__nirum_tag_types__` static fields from generated union tag
+    classes.
 
  -  Removed `__nirum_schema_version__` static field from generated service
     classes.

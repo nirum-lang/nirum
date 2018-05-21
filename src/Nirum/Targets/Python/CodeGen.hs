@@ -104,6 +104,7 @@ data CodeGenContext
                      , pythonVersion :: PythonVersion
                      , dependencies :: Set Text
                      , optionalDependencies :: Map (Int, Int) (Set Text)
+                     , globalDefinitions :: Set Code
                      }
     deriving (Eq, Ord, Show)
 
@@ -119,6 +120,7 @@ empty pythonVer = CodeGenContext
     , pythonVersion = pythonVer
     , dependencies = []
     , optionalDependencies = []
+    , globalDefinitions = []
     }
 
 localImportsMap :: CodeGenContext -> Map Text (Map Text Text)

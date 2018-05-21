@@ -16,6 +16,7 @@ module Nirum.Targets.Python
     ) where
 
 import Control.Monad (forM)
+import Control.Monad.State (modify)
 import qualified Data.List as L
 import Data.Maybe (catMaybes, fromMaybe)
 import GHC.Exts (IsList (toList))
@@ -28,7 +29,6 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Text.Lazy (toStrict)
 import Data.Text.Encoding (decodeUtf8)
-import Data.Function (on)
 import System.FilePath (joinPath)
 import Text.Blaze (Markup)
 import Text.Blaze.Renderer.Text
@@ -114,9 +114,6 @@ sourceDirectory :: PythonVersion -> T.Text
 sourceDirectory Python2 = "src-py2"
 sourceDirectory Python3 = "src"
 
-thd3 :: (a, b, c) -> c
-thd3 (_, _, v) = v
-
 enumerate :: [a] -> [(Int, a)]
 enumerate = zip [0 ..]
 
@@ -130,37 +127,22 @@ toEnumMemberName name'
     attributeName :: T.Text
     attributeName = toAttributeName' name'
 
-toIndentedCodes :: (a -> T.Text) -> [a] -> T.Text -> T.Text
-toIndentedCodes f traversable concatenator =
-    T.intercalate concatenator $ map f traversable
-
-compileParameters :: (ParameterName -> ParameterType -> Code)
-                  -> [(T.Text, Code, Bool)]
-                  -> Code
-compileParameters gen nameTypeTriples =
-    toIndentedCodes
-        (\ (n, t, o) -> gen n t `T.append` if o then "=None" else "")
-        nameTypeTriples ", "
-
-compileFieldInitializers :: DS.DeclarationSet Field -> CodeGen [Code]
-compileFieldInitializers fields' =
-    forM (toList fields') compileFieldInitializer
+compileFieldInitializer :: Field -> CodeGen Code
+compileFieldInitializer (Field fieldName' fieldType' _) =
+    case fieldType' of
+        SetModifier _ -> do
+            b <- importBuiltins
+            return [qq|self.$attributeName = $b.frozenset($attributeName)|]
+        ListModifier _ -> do
+            insertThirdPartyImportsA [ ( "nirum.datastructures"
+                                       , [("_list_type", "List")]
+                                       )
+                                     ]
+            return [qq|self.$attributeName = _list_type($attributeName)|]
+        _ -> return [qq|self.$attributeName = $attributeName|]
   where
-    compileFieldInitializer :: Field -> CodeGen Code
-    compileFieldInitializer (Field fieldName' fieldType' _) =
-        case fieldType' of
-            SetModifier _ ->
-                return [qq|self.$attributeName = frozenset($attributeName)|]
-            ListModifier _ -> do
-                insertThirdPartyImportsA [ ( "nirum.datastructures"
-                                           , [("list_type", "List")]
-                                           )
-                                         ]
-                return [qq|self.$attributeName = list_type($attributeName)|]
-            _ -> return [qq|self.$attributeName = $attributeName|]
-      where
-        attributeName :: Code
-        attributeName = toAttributeName' fieldName'
+    attributeName :: Code
+    attributeName = toAttributeName' fieldName'
 
 compileDocs :: Documented a => a -> Maybe ReStructuredText
 compileDocs = fmap render . docsBlock
@@ -179,8 +161,7 @@ compileDocstring' indentSpace d extra =
 compileDocstring :: Documented a => Code -> a -> Code
 compileDocstring indentSpace d = compileDocstring' indentSpace d []
 
-compileDocstringWithFields :: Documented a
-                           => Code -> a -> DS.DeclarationSet Field -> Code
+compileDocstringWithFields :: Documented a => Code -> a -> [Field] -> Code
 compileDocstringWithFields indentSpace decl fields' =
     compileDocstring' indentSpace decl extra
   where
@@ -232,107 +213,176 @@ compileDocsComment indentSpace d =
         Nothing -> "\n"
         Just rst -> indent (indentSpace `T.append` "#: ") rst
 
-type ParameterName = Code
-type ParameterType = Code
-type ReturnType = Code
+data FieldCode = FieldCode
+    { fcField :: Field
+    , fcInitializer :: Code
+    , fcTypeExpr :: Code
+    , fcValidator :: Validator
+    , fcDeserializer :: Markup
+    }
 
-parameterCompiler :: CodeGen (ParameterName -> ParameterType -> Code)
-parameterCompiler = do
-    ver <- getPythonVersion
-    return $ \ n t -> case ver of
-                          Python2 -> n
-                          Python3 -> [qq|$n: '{t}'|]
+fcAttributeName :: FieldCode -> T.Text
+fcAttributeName = toAttributeName' . fieldName . fcField
 
-returnCompiler :: CodeGen (ReturnType -> Code)
-returnCompiler = do
-    ver <- getPythonVersion
-    return $ \ r ->
-        case (ver, r) of
-            (Python2, _) -> ""
-            (Python3, "None") -> [qq| -> None|]
-            (Python3, _) -> [qq| -> '{r}'|]
+fcBehindName :: FieldCode -> T.Text
+fcBehindName = toBehindSnakeCaseText . fieldName . fcField
 
+fcOptional :: FieldCode -> Bool
+fcOptional FieldCode { fcField = Field { fieldType = OptionModifier _ } } = True
+fcOptional _ = False
+
+fcTypePredicateCode :: FieldCode -> Code
+fcTypePredicateCode = typePredicateCode . fcValidator
+
+fcValueValidators :: FieldCode -> [ValueValidator]
+fcValueValidators = valueValidators . fcValidator
+
+toFieldCodes :: Source
+             -> (Field -> Code)
+             -> (Field -> Code)
+             -> (Field -> Code)
+             -> DS.DeclarationSet Field
+             -> CodeGen [FieldCode]
+toFieldCodes src vIn vOut vError = flip (forM . toList) $ \ field -> do
+    typeExpr <- compileTypeExpression' src (Just $ fieldType field)
+    initializer <- compileFieldInitializer field
+    validator <- compileValidator' src
+        (fieldType field)
+        (toAttributeName' $ fieldName field)
+    deserializer <- compileDeserializer' src (fieldType field)
+        (vIn field)
+        (vOut field)
+        (vError field)
+    return FieldCode
+        { fcField = field
+        , fcInitializer = initializer
+        , fcTypeExpr = typeExpr
+        , fcValidator = validator
+        , fcDeserializer = deserializer
+        }
+
+instance Eq FieldCode where
+    a == b =
+        t a == t b
+      where
+          t :: FieldCode
+            -> (Field, Code, Code, Validator, Data.ByteString.Lazy.ByteString)
+          t fc =
+              ( fcField fc
+              , fcInitializer fc
+              , fcTypeExpr fc
+              , fcValidator fc
+              , Text.Blaze.Renderer.Utf8.renderMarkup $ fcDeserializer fc
+              )
+
+-- When [FieldCode] is sorted optional fields go back.
+instance Ord FieldCode where
+    a <= b = fcOptional a <= fcOptional b
+
+defaultDeserializerErrorHandler :: CodeGen Code
+defaultDeserializerErrorHandler = do
+    modify $ \ c@CodeGenContext { globalDefinitions = defs } ->
+        c { globalDefinitions = S.insert code defs }
+    return funcName
+  where
+    funcName :: Code
+    funcName = "__nirum_default_deserialization_error_handler__"
+    code :: Code
+    code = [qq|
+class $funcName(object):
+    def __init__(self, on_error=None):
+        self.on_error = on_error
+        self.errors = set()
+        self.errored = False
+    def __call__(self, field, message):
+        self.errored = True
+        if self.on_error is None:
+            self.errors.add((field, message))
+        else:
+            self.on_error(field, message)
+    def raise_error(self):
+        """Raise :exc:`ValueError` if there's no overridden ``on_error``
+        callback and ever errored.
+        """
+        if self.errored and self.on_error is None:
+            raise ValueError(
+                chr(0xa).join(
+                    sorted(e[0] + ': ' + e[1] for e in self.errors)
+                )
+            )
+    |]
 
 compileUnionTag :: Source -> Name -> Tag -> CodeGen Markup
 compileUnionTag source parentname d@(Tag typename' fields' _) = do
     abc <- collectionsAbc
-    typeExprCodes <- mapM (compileTypeExpression' source)
-        [Just typeExpr | (Field _ typeExpr _) <- fieldList]
-    let nameTypeTriples = L.sortBy (compare `on` thd3)
-                                   (zip3 tagNames typeExprCodes optionFlags)
-    arg <- parameterCompiler
+    fieldCodes <- toFieldCodes source
+        (\ f -> [qq|value.get('{toBehindSnakeCaseText (fieldName f)}')|])
+        (\ f -> [qq|rv_{toAttributeName' (fieldName f)}|])
+        (\ f -> [qq|error_{toAttributeName' (fieldName f)}|])
+        fields'
     pyVer <- getPythonVersion
-    validators <- sequence
-        [ do
-              v <- compileValidator' source typeExpr $ toAttributeName' fName
-              return (fName, typeExprCode, v)
-        | (typeExprCode, Field fName typeExpr _) <- zip typeExprCodes fieldList
-        ]
-    deserializers <- sequence
-        [ do
-              deserializer <- compileDeserializer' source typeExpr
-                  [qq|value.get('{I.toSnakeCaseText bName}')|]
-                  [qq|rv_{toAttributeName fName}|]
-                  [qq|error_{toAttributeName fName}|]
-              return (fieldName', typeExpr, deserializer)
-        | Field fieldName'@(Name fName bName) typeExpr _ <- fieldList
-        ]
-    initializers <- compileFieldInitializers fields'
+    defaultErrorHandler <- defaultDeserializerErrorHandler
     return $ [compileText|
 class #{className}(#{parentClass}):
-#{compileDocstringWithFields "    " d fields'}
+#{compileDocstringWithFields "    " d (map fcField fieldCodes)}
     __slots__ = (
-%{ forall Field fName _ _ <- fieldList }
-        '#{toAttributeName' fName}',
+%{ forall fieldCode <- fieldCodes }
+        '#{fcAttributeName fieldCode}',
 %{ endforall }
     )
     __nirum_type__ = 'union'
     __nirum_tag__ = #{parentClass}.Tag.#{toEnumMemberName typename'}
-
-    @staticmethod
-    def __nirum_tag_types__():
-        return [
-%{ forall (n, t, _) <- nameTypeTriples }
-            ('#{n}', #{t}),
-%{ endforall }
-        ]
 
 %{ case pyVer }
 %{ of Python2 }
     def __init__(self, **kwargs):
 %{ of Python3 }
     def __init__(
-%{ if null nameTypeTriples }
+%{ if null fieldCodes }
         self
 %{ else }
-        self, *, #{compileParameters arg nameTypeTriples}
+        self, *
+%{ forall fieldCode <- L.sort fieldCodes }
+        , #{fcAttributeName fieldCode}: #{fcTypeExpr fieldCode}
+%{ if fcOptional fieldCode }
+            =None
+%{ endif }
+%{ endforall }
 %{ endif }
     ) -> None:
 %{ endcase }
-        _type_repr = __import__('typing')._type_repr
-        # typing module can be masked by field name of the same name, e.g.:
-        #     union foo = bar ( text typing );
-        # As Nirum identifier disallows to begin with dash/underscore,
-        # we can avoid such name overwrapping by defining _type_repr,
-        # an underscore-leaded alias of typing._type_repr and using it
-        # in the below __init__() inner function.
-        def __init__(#{compileParameters arg nameTypeTriples}):
-%{ forall (fName, fType, (Validator fTypePred fValueValidators)) <- validators }
-            if not (#{fTypePred}):
+        def __init__(
+%{ forall (i, fieldCode) <- enumerate (L.sort fieldCodes) }
+%{ if i > 0 }
+            ,
+%{ endif }
+            #{fcAttributeName fieldCode}
+%{ case pyVer }
+%{ of Python3 }
+                : #{fcTypeExpr fieldCode}
+%{ of Python2 }
+%{ endcase }
+%{ if fcOptional fieldCode }
+                =None
+%{ endif }
+%{ endforall }
+        ):
+%{ forall fc <- fieldCodes }
+            if not (#{fcTypePredicateCode fc}):
                 raise TypeError(
-                    '#{toAttributeName' fName} must be a value of ' +
-                    _type_repr(#{fType}) + ', not ' +
-                    repr(#{toAttributeName' fName})
+                    '#{fcAttributeName fc} must be a value of ' +
+                    __import__('typing')._type_repr(#{fcTypeExpr fc}) +
+                    ', not ' + repr(#{fcAttributeName fc})
                 )
-%{ forall ValueValidator fValuePredCode fValueErrorMsg <- fValueValidators }
+%{ forall ValueValidator fValuePredCode fValueErrorMsg <- fcValueValidators fc }
             elif not (#{fValuePredCode}):
                 raise ValueError(
-                    'invalid #{toAttributeName' fName}: '
+                    'invalid #{fcAttributeName fc}: '
                     #{stringLiteral fValueErrorMsg}
                 )
 %{ endforall }
 %{ endforall }
-%{ forall initializer <- initializers }
+%{ forall FieldCode { fcInitializer = initializer } <- fieldCodes }
             #{initializer}
 %{ endforall }
             pass  # it's necessary when there are no parameters at all
@@ -341,8 +391,8 @@ class #{className}(#{parentClass}):
         __init__(**kwargs)
 %{ of Python3 }
         __init__(
-%{ forall Field fName _ _ <- fieldList }
-            #{toAttributeName' fName}=#{toAttributeName' fName},
+%{ forall fieldCode <- fieldCodes }
+            #{fcAttributeName fieldCode}=#{fcAttributeName fieldCode},
 %{ endforall }
         )
 %{ endcase }
@@ -351,9 +401,9 @@ class #{className}(#{parentClass}):
         return {
             '_type': '#{behindParentTypename}',
             '_tag': '#{behindTagName}',
-%{ forall Field fName@(Name _ fBehind) fType _ <- fieldList }
-            '#{ I.toSnakeCaseText fBehind}':
-#{compileSerializer' source fType $ T.append "self." $ toAttributeName' fName},
+%{ forall fc@FieldCode { fcField = Field { fieldType = fType } } <- fieldCodes }
+            '#{fcBehindName fc}':
+#{compileSerializer' source fType $ T.append "self." $ fcAttributeName fc},
 %{ endforall }
         }
 
@@ -370,14 +420,7 @@ class #{className}(#{parentClass}):
         ]=None
     ) -> typing.Optional['#{className}']:
 %{ endcase }
-        errors = set()
-        if on_error is None:
-            def on_error(err_field, err_msg):
-                errors.add((err_field, err_msg))
-        errored = [False]
-        def handle_error(err_field, err_msg):
-            errored[0] = True
-            on_error(err_field, err_msg)
+        handle_error = #{defaultErrorHandler}(on_error)
         if isinstance(value, #{abc}.Mapping):
             try:
                 tag = value['_tag']
@@ -385,20 +428,21 @@ class #{className}(#{parentClass}):
                 handle_error('._tag', 'Expected to exist.')
             else:
                 if tag == '#{toBehindSnakeCaseText typename'}':
-%{ forall (Name fName bName, typeExpr, deserializer) <- deserializers }
-                    error_#{toAttributeName fName} = lambda ef, em: \
-                        handle_error('.#{I.toSnakeCaseText bName}' + ef, em)
-%{ case typeExpr }
-%{ of OptionModifier _ }
-                    if '#{I.toSnakeCaseText bName}' not in value:
-                        value['#{I.toSnakeCaseText bName}'] = None
+%{ forall fieldCode@FieldCode { fcDeserializer = deserializer } <- fieldCodes }
+                    error_#{fcAttributeName fieldCode} = lambda ef, em: \
+                        handle_error('.#{fcBehindName fieldCode}' + ef, em)
+%{ if fcOptional fieldCode }
+                    if '#{fcBehindName fieldCode}' not in value:
+                        value['#{fcBehindName fieldCode}'] = None
 #{indent "                    " deserializer}
-%{ of _ }
-                    if '#{I.toSnakeCaseText bName}' in value:
+%{ else }
+                    if '#{fcBehindName fieldCode}' in value:
 #{indent "                        " deserializer}
                     else:
-                        error_#{toAttributeName fName}('', 'Expected to exist.')
-%{ endcase }
+                        error_#{fcAttributeName fieldCode}(
+                            '', 'Expected to exist.'
+                        )
+%{ endif }
 %{ endforall }
                     pass  # No-op; just for convenience' sake of the compiler
                 else:
@@ -408,14 +452,11 @@ class #{className}(#{parentClass}):
                     )
         else:
             handle_error('', 'Expected an object.')
-        if errors:
-            raise ValueError(
-                '\n'.join(sorted('{0}: {1}'.format(*e) for e in errors))
-            )
-        if not errored[0]:
+        handle_error.raise_error()
+        if not handle_error.errored:
             return cls(
-%{ forall (fName, _, _) <- deserializers }
-                #{toAttributeName' fName}=rv_#{toAttributeName' fName},
+%{ forall fieldCode <- fieldCodes }
+                #{fcAttributeName fieldCode}=rv_#{fcAttributeName fieldCode},
 %{ endforall }
             )
 
@@ -445,8 +486,8 @@ class #{className}(#{parentClass}):
     def __hash__(self) -> int:
 %{ endcase }
         return hash((
-%{ forall Field fName _ _ <- fieldList }
-            self.#{toAttributeName' fName},
+%{ forall fieldCode <- fieldCodes }
+            self.#{fcAttributeName fieldCode},
 %{ endforall }
         ))
 
@@ -458,12 +499,12 @@ class #{className}(#{parentClass}):
 %{ endcase }
         return ''.join([
             '#{sourceImportPath source}.#{parentClass}.#{className}(',
-%{ forall (i, Field fName _ _) <- enumerate fieldList }
+%{ forall (i, fieldCode) <- enumerate fieldCodes }
 %{ if i > 0 }
             ', ',
 %{ endif }
-            '#{toAttributeName' fName}=',
-            repr(self.#{toAttributeName' fName }),
+            '#{fcAttributeName fieldCode}=',
+            repr(self.#{fcAttributeName fieldCode}),
 %{ endforall }
             ')'
         ])
@@ -474,22 +515,12 @@ if hasattr(#{parentClass}, '__qualname__'):
     (#{className}).__qualname__ = '#{parentClass}.#{className}'
 |]
   where
-    optionFlags :: [Bool]
-    optionFlags = [ case typeExpr of
-                        OptionModifier _ -> True
-                        _ -> False
-                  | (Field _ typeExpr _) <- toList fields'
-                  ]
     className :: T.Text
     className = toClassName' typename'
     behindParentTypename :: T.Text
     behindParentTypename = I.toSnakeCaseText $ N.behindName parentname
-    tagNames :: [T.Text]
-    tagNames = map (toAttributeName' . fieldName) fieldList
     behindTagName :: T.Text
     behindTagName = I.toSnakeCaseText $ N.behindName typename'
-    fieldList :: [Field]
-    fieldList = toList fields'
     parentClass :: T.Text
     parentClass = toClassName' parentname
 
@@ -537,7 +568,8 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
     insertStandardImport "typing"
     pyVer <- getPythonVersion
     Validator typePred valueValidators' <- compileValidator' src itype "value"
-    deserializer <- compileDeserializer' src itype "value" "rv" "handle_error"
+    deserializer <- compileDeserializer' src itype "value" "rv" "on_error"
+    defaultErrorHandler <- defaultDeserializerErrorHandler
     return [compileText|
 class #{className}(object):
 #{compileDocstring "    " d}
@@ -599,20 +631,10 @@ class #{className}(object):
         ]=None
     ) -> typing.Optional['#{className}']:
 %{ endcase }
-        errors = set()
-        if on_error is None:
-            def on_error(err_field, err_msg):
-                errors.add((err_field, err_msg))
-        errored = [False]
-        def handle_error(err_field, err_msg):
-            errored[0] = True
-            on_error(err_field, err_msg)
+        on_error = #{defaultErrorHandler}(on_error)
 #{indent "        " deserializer}
-        if errors:
-            raise ValueError(
-                '\n'.join(sorted('{0}: {1}'.format(*e) for e in errors))
-            )
-        if not errored[0]:
+        on_error.raise_error()
+        if not on_error.errored:
             return cls(rv)
 
 %{ case pyVer }
@@ -642,6 +664,7 @@ compileTypeDeclaration _ d@TypeDeclaration { typename = typename'
     insertStandardImport "typing"
     baseString <- baseStringClass
     pyVer <- getPythonVersion
+    defaultErrorHandler <- defaultDeserializerErrorHandler
     return [compileText|
 class #{className}(enum.Enum):
 #{compileDocstring "    " d}
@@ -672,10 +695,7 @@ class #{className}(enum.Enum):
         ]=None
     ) -> '#{className}':
 %{ endcase }
-        errors = set()
-        if on_error is None:
-            def on_error(err_field, err_msg):
-                errors.add((err_field, err_msg))
+        on_error = #{defaultErrorHandler}(on_error)
         if isinstance(value, #{baseString}):
             member = value.replace('-', '_')
             try:
@@ -693,11 +713,9 @@ class #{className}(enum.Enum):
                 'Expected a string of a member name, but the given value '
                 'is not a string.'
             )
-        if errors:
-            raise ValueError(
-                '\n'.join(sorted('{0}: {1}'.format(*e) for e in errors))
-            )
-        return result
+        on_error.raise_error()
+        if not on_error.errored:
+            return result
 
 
 # Since enum.Enum doesn't allow to define non-member when the class is defined,
@@ -707,38 +725,22 @@ class #{className}(enum.Enum):
 compileTypeDeclaration src d@TypeDeclaration { typename = Name tnFacial tnBehind
                                              , type' = RecordType fields'
                                              } = do
-    typeExprCodes <- mapM (compileTypeExpression' src)
-        [Just typeExpr | (Field _ typeExpr _) <- fieldList]
-    let nameTypeTriples = L.sortBy
-            (compare `on` thd3)
-            (zip3 [toAttributeName' name' | Field name' _ _ <- fieldList]
-                  typeExprCodes optionFlags)
+    let className = toClassName tnFacial
     insertStandardImport "typing"
     abc <- collectionsAbc
-    arg <- parameterCompiler
     pyVer <- getPythonVersion
-    validators <- sequence
-        [ do
-              v <- compileValidator' src typeExpr $ toAttributeName' fName
-              return (fName, typeExprCode, v)
-        | (typeExprCode, Field fName typeExpr _) <- zip typeExprCodes fieldList
-        ]
-    deserializers <- sequence
-        [ do
-              deserializer <- compileDeserializer' src typeExpr
-                  [qq|value.get('{I.toSnakeCaseText bName}')|]
-                  [qq|rv_{toAttributeName fName}|]
-                  [qq|error_{toAttributeName fName}|]
-              return (fieldName', typeExpr, deserializer)
-        | Field fieldName'@(Name fName bName) typeExpr _ <- fieldList
-        ]
-    initializers <- compileFieldInitializers fields'
+    fieldCodes <- toFieldCodes src
+        (\ f -> [qq|value.get('{toBehindSnakeCaseText (fieldName f)}')|])
+        (\ f -> [qq|rv_{toAttributeName' (fieldName f)}|])
+        (\ f -> [qq|error_{toAttributeName' (fieldName f)}|])
+        fields'
+    defaultErrorHandler <- defaultDeserializerErrorHandler
     return [compileText|
 class #{className}(object):
-#{compileDocstringWithFields "    " d fields'}
+#{compileDocstringWithFields "    " d (map fcField fieldCodes)}
     __slots__ = (
-%{ forall Field fName _ _ <- fieldList }
-        '#{toAttributeName' fName}',
+%{ forall fieldCode <- fieldCodes }
+        '#{fcAttributeName fieldCode}',
 %{ endforall }
     )
     __nirum_type__ = 'record'
@@ -748,37 +750,51 @@ class #{className}(object):
     def __init__(self, **kwargs):
 %{ of Python3 }
     def __init__(
-%{ if null nameTypeTriples }
+%{ if null fieldCodes }
         self
 %{ else }
-        self, *, #{compileParameters arg nameTypeTriples}
+        self, *
+%{ forall fieldCode <- L.sort fieldCodes }
+        , #{fcAttributeName fieldCode}: #{fcTypeExpr fieldCode}
+%{ if fcOptional fieldCode }
+            =None
+%{ endif }
+%{ endforall }
 %{ endif }
     ) -> None:
 %{ endcase }
-        _type_repr = __import__('typing')._type_repr
-        # typing module can be masked by field name of the same name, e.g.:
-        #     record foo ( text typing );
-        # As Nirum identifier disallows to begin with dash/underscore,
-        # we can avoid such name overwrapping by defining _type_repr,
-        # an underscore-leaded alias of typing._type_repr and using it
-        # in the below __init__() inner function.
-        def __init__(#{compileParameters arg nameTypeTriples}):
-%{ forall (fName, fType, (Validator fTypePred fValueValidators)) <- validators }
-            if not (#{fTypePred}):
+        def __init__(
+%{ forall (i, fieldCode) <- enumerate (L.sort fieldCodes) }
+%{ if i > 0 }
+            ,
+%{ endif }
+            #{fcAttributeName fieldCode}
+%{ case pyVer }
+%{ of Python3 }
+                : #{fcTypeExpr fieldCode}
+%{ of Python2 }
+%{ endcase }
+%{ if fcOptional fieldCode }
+                =None
+%{ endif }
+%{ endforall }
+        ):
+%{ forall fc <- fieldCodes }
+            if not (#{fcTypePredicateCode fc}):
                 raise TypeError(
-                    '#{toAttributeName' fName} must be a value of ' +
-                    _type_repr(#{fType}) + ', not ' +
-                    repr(#{toAttributeName' fName})
+                    '#{fcAttributeName fc} must be a value of ' +
+                    __import__('typing')._type_repr(#{fcTypeExpr fc}) +
+                    ', not ' + repr(#{fcAttributeName fc})
                 )
-%{ forall ValueValidator fValuePredCode fValueErrorMsg <- fValueValidators }
+%{ forall ValueValidator fValuePredCode fValueErrorMsg <- fcValueValidators fc }
             elif not (#{fValuePredCode}):
                 raise ValueError(
-                    'invalid #{toAttributeName' fName}: '
+                    'invalid #{fcAttributeName fc}: '
                     #{stringLiteral fValueErrorMsg}
                 )
 %{ endforall }
 %{ endforall }
-%{ forall initializer <- initializers }
+%{ forall FieldCode { fcInitializer = initializer } <- fieldCodes }
             #{initializer}
 %{ endforall }
             pass  # it's necessary when there are no parameters at all
@@ -787,8 +803,8 @@ class #{className}(object):
         __init__(**kwargs)
 %{ of Python3 }
         __init__(
-%{ forall Field fName _ _ <- fieldList }
-            #{toAttributeName' fName}=#{toAttributeName' fName},
+%{ forall fieldCode <- fieldCodes }
+            #{fcAttributeName fieldCode}=#{fcAttributeName fieldCode},
 %{ endforall }
         )
 %{ endcase }
@@ -801,12 +817,12 @@ class #{className}(object):
 %{ endcase }
         return ''.join([
             '#{sourceImportPath src}.#{className}(',
-%{ forall (i, Field fName _ _) <- enumerate fieldList }
+%{ forall (i, fieldCode) <- enumerate fieldCodes }
 %{ if i > 0 }
             ', ',
 %{ endif }
-            '#{toAttributeName' fName}=',
-            repr(self.#{toAttributeName' fName }),
+            '#{fcAttributeName fieldCode}=',
+            repr(self.#{fcAttributeName fieldCode}),
 %{ endforall }
             ')'
         ])
@@ -833,9 +849,9 @@ class #{className}(object):
     def __nirum_serialize__(self):
         return {
             '_type': '#{I.toSnakeCaseText tnBehind}',
-%{ forall Field fName@(Name _ fBehind) fType _ <- fieldList }
-            '#{ I.toSnakeCaseText fBehind}':
-#{compileSerializer' src fType $ T.append "self." $ toAttributeName' fName},
+%{ forall fc@FieldCode { fcField = Field { fieldType = fType } } <- fieldCodes }
+            '#{fcBehindName fc}':
+#{compileSerializer' src fType $ T.append "self." $ fcAttributeName fc},
 %{ endforall }
         }
 
@@ -852,40 +868,29 @@ class #{className}(object):
         ]=None
     ) -> typing.Optional['#{className}']:
 %{ endcase }
-        errors = set()
-        if on_error is None:
-            def on_error(err_field, err_msg):
-                errors.add((err_field, err_msg))
-        errored = [False]
-        def handle_error(err_field, err_msg):
-            errored[0] = True
-            on_error(err_field, err_msg)
+        on_error = #{defaultErrorHandler}(on_error)
         if isinstance(value, #{abc}.Mapping):
-%{ forall (Name fName bName, typeExpr, deserializer) <- deserializers }
-            error_#{toAttributeName fName} = lambda ef, em: \
-                handle_error('.#{I.toSnakeCaseText bName}' + ef, em)
-%{ case typeExpr }
-%{ of OptionModifier _ }
-            if '#{I.toSnakeCaseText bName}' not in value:
-                value['#{I.toSnakeCaseText bName}'] = None
+%{ forall fieldCode@FieldCode { fcDeserializer = deserializer } <- fieldCodes }
+            error_#{fcAttributeName fieldCode} = lambda ef, em: \
+                on_error('.#{fcBehindName fieldCode}' + ef, em)
+%{ if fcOptional fieldCode }
+            if '#{fcBehindName fieldCode}' not in value:
+                value['#{fcBehindName fieldCode}'] = None
 #{indent "            " deserializer}
-%{ of _ }
-            if '#{I.toSnakeCaseText bName}' in value:
+%{ else }
+            if '#{fcBehindName fieldCode}' in value:
 #{indent "                " deserializer}
             else:
-                error_#{toAttributeName fName}('', 'Expected to exist.')
-%{ endcase }
+                error_#{fcAttributeName fieldCode}('', 'Expected to exist.')
+%{ endif }
 %{ endforall }
         else:
-            handle_error('', 'Expected an object.')
-        if errors:
-            raise ValueError(
-                '\n'.join(sorted('{0}: {1}'.format(*e) for e in errors))
-            )
-        if not errored[0]:
+            on_error('', 'Expected an object.')
+        on_error.raise_error()
+        if not on_error.errored:
             return cls(
-%{ forall (fName, _, _) <- deserializers }
-                #{toAttributeName' fName}=rv_#{toAttributeName' fName},
+%{ forall fieldCode <- fieldCodes }
+                #{fcAttributeName fieldCode}=rv_#{fcAttributeName fieldCode},
 %{ endforall }
             )
 
@@ -896,21 +901,11 @@ class #{className}(object):
     def __hash__(self) -> int:
 %{ endcase }
         return hash((
-%{ forall Field fName _ _ <- fieldList }
-            self.#{toAttributeName' fName},
+%{ forall fieldCode <- fieldCodes }
+            self.#{fcAttributeName fieldCode},
 %{ endforall }
         ))
 |]
-  where
-    className = toClassName tnFacial
-    fieldList :: [Field]
-    fieldList = toList fields'
-    optionFlags :: [Bool]
-    optionFlags = [ case typeExpr of
-                        OptionModifier _ -> True
-                        _ -> False
-                  | (Field _ typeExpr _) <- fieldList
-                  ]
 compileTypeDeclaration src
                        d@TypeDeclaration { typename = typename'
                                          , type' = union@UnionType {}
@@ -922,6 +917,7 @@ compileTypeDeclaration src
     insertStandardImport "enum"
     insertThirdPartyImportsA [("nirum.datastructures", [("map_type", "Map")])]
     baseString <- baseStringClass
+    defaultErrorHandler <- defaultDeserializerErrorHandler
     pyVer <- getPythonVersion
     return [compileText|
 class #{className}(#{T.intercalate "," $ compileExtendClasses annotations}):
@@ -971,14 +967,7 @@ class #{className}(#{T.intercalate "," $ compileExtendClasses annotations}):
         ]=None
     ) -> '#{className}':
 %{ endcase }
-        errors = set()
-        if on_error is None:
-            def on_error(err_field, err_msg):
-                errors.add((err_field, err_msg))
-        errored = [False]
-        def handle_error(err_field, err_msg):
-            errored[0] = True
-            on_error(err_field, err_msg)
+        handle_error = #{defaultErrorHandler}(on_error)
         if isinstance(value, #{abc}.Mapping):
             try:
                 tag = value['_tag']
@@ -993,7 +982,7 @@ class #{className}(#{T.intercalate "," $ compileExtendClasses annotations}):
 %{ endcase }
         else:
             handle_error('', 'Expected an object.')
-        if errored[0]:
+        if handle_error.errored:
             pass
 %{ forall (Tag tn _ _) <- tags' }
         elif tag == '#{toBehindSnakeCaseText tn}':
@@ -1021,11 +1010,8 @@ class #{className}(#{T.intercalate "," $ compileExtendClasses annotations}):
                 '._tag',
                 'Expected a string, but the given value is not a string.'
             )
-        if errors:
-            raise ValueError(
-                '\n'.join(sorted('{0}: {1}'.format(*e) for e in errors))
-            )
-        if not errored[0]:
+        handle_error.raise_error()
+        if not handle_error.errored:
             return rv
 
 %{ forall tagCode <- tagCodes }
@@ -1069,37 +1055,67 @@ compileTypeDeclaration src d@ServiceDeclaration { serviceName = name'
         , ("nirum.service", [("service_type", "Service")])
         , ("nirum.transport", [("transport_type", "Transport")])
         ]
+    abc <- collectionsAbc
+    builtins <- importBuiltins
+    typing <- importStandardLibrary "typing"
     pyVer <- getPythonVersion
     methods' <- sequence $ (`map` toList methods) $ \ method' -> do
         rTypeExpr <- compileTypeExpression' src $ returnType method'
         errTypeExpr <- compileTypeExpression' src $ errorType method'
         params' <- sequence $ (`map` toList (parameters method')) $
-            \ param'@(Parameter _ pType _) -> do
+            \ param'@(Parameter pName pType _) -> do
                 typeExpr <- compileTypeExpression' src $ Just pType
-                return (param', typeExpr)
-        return (method', rTypeExpr, errTypeExpr, params')
+                v <- compileValidator' src pType $ toAttributeName' pName
+                ds <- compileDeserializer' src pType "value" "rv" "on_error"
+                return (param', typeExpr, v, ds)
+        resultDeserializer <- case returnType method' of
+            Just rtype -> do
+                deserializer <- compileDeserializer' src rtype
+                    "value"
+                    "rv"
+                    "on_error"
+                return $ Just deserializer
+            Nothing ->
+                return Nothing
+        errorDeserializer <- case errorType method' of
+            Just etype -> do
+                deserializer <- compileDeserializer' src etype
+                    "value"
+                    "rv"
+                    "on_error"
+                return $ Just deserializer
+            Nothing ->
+                return Nothing
+        return ( method'
+               , rTypeExpr
+               , errTypeExpr
+               , params'
+               , resultDeserializer
+               , errorDeserializer
+               )
+    defaultErrorHandler <- defaultDeserializerErrorHandler
     return [compileText|
 class #{className}(service_type):
 #{compileDocstring "    " d}
     __nirum_type__ = 'service'
     __nirum_service_methods__ = {
-%{ forall (Method mName _ _ _ _, rTypeExpr, _, params') <- methods' }
+%{ forall (Method mName _ _ _ _, rTypeExpr, _, params', _, _) <- methods' }
         '#{toAttributeName' mName}': {
             '_v': 2,
             '_return': lambda: #{rTypeExpr},
             '_names': name_dict_type([
-%{ forall (Parameter (Name pF pB) _ _, _) <- params' }
+%{ forall (Parameter (Name pF pB) _ _, _, _, _) <- params' }
                 ('#{toAttributeName pF}', '#{I.toSnakeCaseText pB}'),
 %{ endforall }
             ]),
-%{ forall (Parameter pName _ _, pTypeExpr) <- params' }
+%{ forall (Parameter pName _ _, pTypeExpr, _, _) <- params' }
             '#{toAttributeName' pName}': lambda: #{pTypeExpr},
 %{ endforall }
         },
 %{ endforall }
     }
     __nirum_method_names__ = name_dict_type([
-%{ forall (Method (Name mF mB) _ _ _ _, _, _, _) <- methods' }
+%{ forall (Method (Name mF mB) _ _ _ _, _, _, _, _, _) <- methods' }
         ('#{toAttributeName mF}', '#{I.toSnakeCaseText mB}'),
 %{ endforall }
     ])
@@ -1107,31 +1123,174 @@ class #{className}(service_type):
 
     @staticmethod
     def __nirum_method_error_types__(k, d=None):
-%{ forall (Method mName _ _ _ _, _, errTypeExpr, _) <- methods' }
+%{ forall (Method mName _ _ _ _, _, errTypeExpr, _, _, _) <- methods' }
         if k == '#{toAttributeName' mName}':
             return #{errTypeExpr}
 %{ endforall }
         return d
 
-%{ forall (m@(Method mName _ _ _ _), rTypeExpr, _, params') <- methods' }
-    def #{toAttributeName' mName}(
+%{ forall (m, rTypeExpr, _, params', resultD, errorD) <- methods' }
+    def #{toAttributeName' (methodName m)}(
         self,
 %{ case pyVer }
 %{ of Python3 }
-%{ forall (Parameter pName _ _, pTypeExpr) <- params' }
+%{ forall (Parameter pName _ _, pTypeExpr, _, _) <- params' }
         #{toAttributeName' pName}: '#{pTypeExpr}',
 %{ endforall }
     ) -> '#{rTypeExpr}':
 %{ of Python2 }
-%{ forall (Parameter pName _ _, _) <- params' }
+%{ forall (Parameter pName _ _, _, _, _) <- params' }
         #{toAttributeName' pName},
 %{ endforall }
     ):
 %{ endcase }
-#{compileDocstringWithParameters "        " m params'}
+#{compileDocstringWithParameters "        " m (map quadrupleToPair params')}
         raise NotImplementedError(
-            '#{className} has to implement #{toAttributeName' mName}()'
+            '#{className} has to implement #{toAttributeName' (methodName m)}()'
         )
+
+    #{toAttributeName' (methodName m)}.__nirum_argument_serializers__ = {
+    }  # type: typing.Mapping[str, typing.Callable[[object], object]]
+    #{toAttributeName' (methodName m)}.__nirum_argument_deserializers__ = {
+    }
+%{ forall (Parameter pName pt _, tx, (Validator pTPred pValVs), d) <- params' }
+    def __nirum_argument_serializer__(#{toAttributeName' pName}):
+        if not (#{pTPred}):
+            raise #{builtins}.TypeError(
+                '#{toAttributeName' pName} must be a value of ' +
+                #{typing}._type_repr(#{tx}) + ', not ' +
+                #{builtins}.repr(#{toAttributeName' pName})
+            )
+%{ forall ValueValidator pValuePredCode pValueErrorMsg <- pValVs }
+        elif not (#{pValuePredCode}):
+            raise #{builtins}.ValueError(
+                'invalid #{toAttributeName' pName}: '
+                #{stringLiteral pValueErrorMsg}
+            )
+%{ endforall }
+        return #{compileSerializer' src pt (toAttributeName' pName)}
+    __nirum_argument_serializer__.__name__ = '#{toAttributeName' pName}'
+    #{toAttributeName' (methodName m)}.__nirum_argument_serializers__[
+        '#{toAttributeName' pName}'] = __nirum_argument_serializer__
+    del __nirum_argument_serializer__
+
+    def __nirum_argument_deserializer__(value, on_error=None):
+        on_error = #{defaultErrorHandler}(on_error)
+#{indent "        " d}
+        on_error.raise_error()
+        if not on_error.errored:
+            return rv
+    __nirum_argument_deserializer__.__name__ = '#{toBehindSnakeCaseText pName}'
+    #{toAttributeName' (methodName m)}.__nirum_argument_deserializers__[
+        '#{toBehindSnakeCaseText pName}'] = __nirum_argument_deserializer__
+    del __nirum_argument_deserializer__
+%{ endforall }
+
+    def __nirum_serialize_arguments__(
+%{ case pyVer }
+%{ of Python3 }
+%{ forall (Parameter pName _ _, pTypeExpr, _, _) <- params' }
+        #{toAttributeName' pName}: '#{pTypeExpr}',
+%{ endforall }
+    ) -> '#{rTypeExpr}':
+%{ of Python2 }
+%{ forall (Parameter pName _ _, _, _, _) <- params' }
+        #{toAttributeName' pName},
+%{ endforall }
+    ):
+%{ endcase }
+        return {
+%{ forall (Parameter (Name fn bn) _ _, _, _, _) <- params' }
+            '#{I.toSnakeCaseText bn}':
+                #{className}.#{toAttributeName' (methodName m)}
+                    .__nirum_argument_serializers__['#{toAttributeName fn}'](
+                    #{toAttributeName fn}
+                ),
+%{ endforall }
+        }
+    #{toAttributeName' (methodName m)}.__nirum_serialize_arguments__ = \
+        __nirum_serialize_arguments__
+    del __nirum_serialize_arguments__
+
+    def __nirum_deserialize_arguments__(value, on_error=None):
+        on_error = #{defaultErrorHandler}(on_error)
+        table = #{className}.#{toAttributeName' (methodName m)} \
+            .__nirum_argument_deserializers__
+        if isinstance(value, #{abc}.Mapping):
+            result = {}
+%{ forall (Parameter pName _ _, _, _, _) <- params' }
+            try:
+                field_value = value['#{toBehindSnakeCaseText pName}']
+            except KeyError:
+                on_error(
+                    '.#{toBehindSnakeCaseText pName}',
+                    'Expected to exist.'
+                )
+            else:
+                result['#{toAttributeName' pName}'] = \
+                    table['#{toBehindSnakeCaseText pName}'](
+                        field_value,
+                        lambda f, m: on_error(
+                            '.#{toBehindSnakeCaseText pName}' + f, m
+                        )
+                    )
+%{ endforall }
+        else:
+            on_error('', 'Expected an object.')
+        on_error.raise_error()
+        if not on_error.errored:
+            return result
+    #{toAttributeName' (methodName m)}.__nirum_deserialize_arguments__ = \
+        __nirum_deserialize_arguments__
+    del __nirum_deserialize_arguments__
+
+%{ case returnType m }
+%{ of Just resultType }
+    #{toAttributeName' (methodName m)}.__nirum_serialize_result__ = lambda v: (
+        #{compileSerializer' src resultType "v"}
+    )
+%{ of Nothing }
+    #{toAttributeName' (methodName m)}.__nirum_serialize_result__ = None
+%{ endcase }
+
+%{ case resultD }
+%{ of Just resultDeserializer }
+    def __nirum_deserialize_result__(value, on_error=None):
+        on_error = #{defaultErrorHandler}(on_error)
+#{indent "        " resultDeserializer}
+        on_error.raise_error()
+        if not on_error.errored:
+            return rv
+    #{toAttributeName' (methodName m)}.__nirum_deserialize_result__ = \
+        __nirum_deserialize_result__
+    del __nirum_deserialize_result__
+%{ of Nothing }
+    #{toAttributeName' (methodName m)}.__nirum_deserialize_result__ = None
+%{ endcase }
+
+%{ case errorType m }
+%{ of Just errT }
+    #{toAttributeName' (methodName m)}.__nirum_serialize_error__ = lambda v: (
+        #{compileSerializer' src errT "v"}
+    )
+%{ of Nothing }
+    #{toAttributeName' (methodName m)}.__nirum_serialize_error__ = None
+%{ endcase }
+
+%{ case errorD }
+%{ of Just errorDeserializer }
+    def __nirum_deserialize_error__(value, on_error=None):
+        on_error = #{defaultErrorHandler}(on_error)
+#{indent "        " errorDeserializer}
+        on_error.raise_error()
+        if not on_error.errored:
+            return rv
+    #{toAttributeName' (methodName m)}.__nirum_deserialize_error__ = \
+        __nirum_deserialize_error__
+    del __nirum_deserialize_error__
+%{ of Nothing }
+    #{toAttributeName' (methodName m)}.__nirum_deserialize_error__ = None
+%{ endcase }
 %{ endforall }
 
 
@@ -1163,102 +1322,53 @@ if hasattr(#{className}.Client, '__qualname__'):
     nirumMapName = "map_type"
     className :: T.Text
     className = toClassName' name'
+    quadrupleToPair :: (a, b, c, d) -> (a, b)
+    quadrupleToPair (a, b, _, _) = (a, b)
     commaNl :: [T.Text] -> T.Text
     commaNl = T.intercalate ",\n"
-    compileMethodParameter :: Parameter -> CodeGen Code
-    compileMethodParameter (Parameter pName pType _) = do
-        pTypeExpr <- compileTypeExpression' src (Just pType)
-        arg <- parameterCompiler
-        return [qq|{arg (toAttributeName' pName) pTypeExpr}|]
-    compileClientPayload :: Parameter -> CodeGen Code
-    compileClientPayload (Parameter pName pt _) = do
-        let pName' = toAttributeName' pName
-        return [qq|'{I.toSnakeCaseText $ N.behindName pName}':
-                   ({compileSerializer' src pt pName'})|]
     compileClientMethod :: Method -> CodeGen Code
-    compileClientMethod Method { methodName = mName
-                               , parameters = params
-                               , returnType = rtypeM
-                               , errorType = etypeM
-                               } = do
+    compileClientMethod Method { methodName = mName, returnType = rtypeM } = do
         let clientMethodName' = toAttributeName' mName
-        params' <- mapM compileMethodParameter $ toList params
-        rtypeExpr <- compileTypeExpression' src rtypeM
-        resultDeserializer <- case rtypeM of
-            Just rtype -> compileDeserializer' src rtype
-                "serialized"
-                "result"
-                "on_deserializer_error"
-            Nothing ->
-                return "result = None"
-        errorDeserializer <- case etypeM of
-             Just e -> compileDeserializer' src e
-                "serialized"
-                "result"
-                "on_deserializer_error"
-             Nothing -> do
-                insertThirdPartyImportsA
-                    [ ("nirum.exc", [ ("_unexpected_nirum_response_error"
-                                      , "UnexpectedNirumResponseError"
-                                      )
-                                    ]
-                      )
-                    ]
-                return "raise _unexpected_nirum_response_error(serialized)"
-        payloadArguments <- mapM compileClientPayload $ toList params
-        validators <- sequence
-            [ do
-                  v <- compileValidator' src pTypeExpr $ toAttributeName' pName
-                  pTypeExprCode <- compileTypeExpression' src $ Just pTypeExpr
-                  return (pName, pTypeExprCode, v)
-            | Parameter pName pTypeExpr _ <- toList params
+        pyVer <- getPythonVersion
+        rTypeExpr <- compileTypeExpression' src rtypeM
+        insertThirdPartyImportsA
+            [ ( "nirum.exc", [ ("_unexpected_nirum_response_error"
+                               , "UnexpectedNirumResponseError"
+                               )
+                             ]
+              )
             ]
-        ret <- returnCompiler
+        defaultErrorHandler <- defaultDeserializerErrorHandler
         return $ toStrict $ renderMarkup [compileText|
-    def #{clientMethodName'}(self, #{commaNl params'})#{ret rtypeExpr}:
-        _type_repr = __import__('typing')._type_repr
-        # typing module can be masked by parameter of the same name, e.g.:
-        #     service foo-service ( bar (text typing) );
-        # As Nirum identifier disallows to begin with dash/underscore,
-        # we can avoid such name overwrapping by defining _type_repr,
-        # an underscore-leaded alias of typing._type_repr and using it
-        # in the below.
-%{ forall (pName, pType, (Validator pTypePred pValueValidators)) <- validators }
-        if not (#{pTypePred}):
-            raise TypeError(
-                '#{toAttributeName' pName} must be a value of ' +
-                _type_repr(#{pType}) + ', not ' +
-                repr(#{toAttributeName' pName})
-            )
-%{ forall ValueValidator pValuePredCode pValueErrorMsg <- pValueValidators }
-        elif not (#{pValuePredCode}):
-            raise ValueError(
-                'invalid #{toAttributeName' pName}: '
-                #{stringLiteral pValueErrorMsg}
-            )
-%{ endforall }
-%{ endforall }
+    def #{clientMethodName'}(
+        self, *args, **kwargs
+%{ case pyVer }
+%{ of Python3 }
+    ) -> '#{rTypeExpr}':
+%{ of Python2 }
+    ):
+%{ endcase }
+        prototype = #{className}.#{clientMethodName'}
         successful, serialized = self.__nirum_transport__(
             '#{I.toSnakeCaseText $ N.behindName mName}',
-            payload={#{commaNl payloadArguments}},
+            payload=prototype.__nirum_serialize_arguments__(*args, **kwargs),
             # FIXME Give annotations.
             service_annotations={},
             method_annotations=self.__nirum_method_annotations__,
             parameter_annotations={}
         )
-        deserializer_errors = set()
-        def on_deserializer_error(err_field, err_msg):
-            deserializer_errors.add((err_field, err_msg))
+        on_deserializer_error = #{defaultErrorHandler}()
         if successful:
-#{indent "            " resultDeserializer}
+            deserializer = prototype.__nirum_deserialize_result__
         else:
-#{indent "            " errorDeserializer}
-        if deserializer_errors:
-            raise ValueError(
-                '\n'.join(
-                    sorted('{0}: {1}'.format(*e) for e in deserializer_errors)
-                )
-            )
+            deserializer = prototype.__nirum_deserialize_error__
+        if callable(deserializer):
+            result = deserializer(serialized, on_deserializer_error)
+        elif not successful:
+            raise _unexpected_nirum_response_error(serialized)
+        else:
+            result = None
+        on_deserializer_error.raise_error()
         if successful:
             return result
         raise result
@@ -1328,6 +1438,7 @@ compileModule pythonVersion' source = do
             ]
     let fromImports = M.assocs (localImportsMap context) ++
                       M.assocs (thirdPartyImports context)
+    let globalDefs = globalDefinitions context
     code <- result
     return $ (deps, optDeps,) $
         [compileText|# -*- coding: utf-8 -*-
@@ -1350,6 +1461,10 @@ from #{from} import (
 %{ endif }
 %{ endforall }
 )
+%{ endforall }
+
+%{ forall globalDef <- S.toList globalDefs }
+#{globalDef}
 %{ endforall }
 
 #{code}
