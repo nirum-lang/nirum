@@ -177,7 +177,16 @@ def test_service_argument_deserializers(fx_dog, fx_method_args):
     }
 
 
+def test_service_serialize_result(fx_dog):
+    assert SampleService.sample_method.__nirum_serialize_result__ is None
+    result, expected = fx_dog
+    assert SampleService.sample_method_that_returns.__nirum_serialize_result__(
+        result
+    ) == expected
+
+
 def test_service_deserialize_result(fx_dog):
+    assert SampleService.sample_method.__nirum_deserialize_result__ is None
     expected, payload = fx_dog
     f = SampleService.sample_method_that_returns.__nirum_deserialize_result__
     assert f(payload) == expected

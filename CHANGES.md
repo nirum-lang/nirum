@@ -253,11 +253,17 @@ To be released.
         `json.load()`/`json.loads()` with an optional `on_error` callback,
         and returns its corresponding Python object.
 
+     -  `__nirum_serialize_result__` takes a method's return value and serialize
+        it into a corresponding value which can be passed to
+        `json.dump()`/`json.dumps()`.
+
+        This attribute is `None` if the method has no return type.
+
      -  `__nirum_deserialize_result__` takes a result value preprocessed by
         `json.load()`/`json.loads()` and deserialize it into its corresponding
         Python object.
 
-        If the method has no return type it returns only `None`.
+        This attribute is `None` if the method has no return type.
 
      -  `__nirum_deserialize_error__` takes an error value preprocessed by
         `json.load()`/`json.loads()` and deserialize it into its corresponding

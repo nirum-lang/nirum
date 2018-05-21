@@ -1237,20 +1237,29 @@ class #{className}(service_type):
         __nirum_deserialize_arguments__
     del __nirum_deserialize_arguments__
 
-    def __nirum_deserialize_result__(value, on_error=None):
+%{ case returnType m }
+%{ of Just resultType }
+    #{toAttributeName' (methodName m)}.__nirum_serialize_result__ = lambda v: (
+        #{compileSerializer' src resultType "v"}
+    )
+%{ of Nothing }
+    #{toAttributeName' (methodName m)}.__nirum_serialize_result__ = None
+%{ endcase }
+
 %{ case resultD }
 %{ of Just resultDeserializer }
+    def __nirum_deserialize_result__(value, on_error=None):
         on_error = #{defaultErrorHandler}(on_error)
 #{indent "        " resultDeserializer}
         on_error.raise_error()
         if not on_error.errored:
             return rv
-%{ of Nothing }
-        return
-%{ endcase }
     #{toAttributeName' (methodName m)}.__nirum_deserialize_result__ = \
         __nirum_deserialize_result__
     del __nirum_deserialize_result__
+%{ of Nothing }
+    #{toAttributeName' (methodName m)}.__nirum_deserialize_result__ = None
+%{ endcase }
 
 %{ case errorD }
 %{ of Just errorDeserializer }
@@ -1334,17 +1343,15 @@ if hasattr(#{className}.Client, '__qualname__'):
         )
         on_deserializer_error = #{defaultErrorHandler}()
         if successful:
-            result = prototype.__nirum_deserialize_result__(
-                serialized,
-                on_deserializer_error
-            )
-        elif callable(getattr(prototype, '__nirum_deserialize_error__', None)):
-            result = prototype.__nirum_deserialize_error__(
-                serialized,
-                on_deserializer_error
-            )
+            deserializer = prototype.__nirum_deserialize_result__
         else:
+            deserializer = prototype.__nirum_deserialize_error__
+        if callable(deserializer):
+            result = deserializer(serialized, on_deserializer_error)
+        elif not successful:
             raise _unexpected_nirum_response_error(serialized)
+        else:
+            result = None
         on_deserializer_error.raise_error()
         if successful:
             return result
