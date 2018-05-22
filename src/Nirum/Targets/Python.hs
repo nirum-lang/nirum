@@ -27,11 +27,9 @@ import qualified Data.Map.Strict as M
 import qualified Data.SemVer as SV
 import qualified Data.Set as S
 import qualified Data.Text as T
-import Data.Text.Lazy (toStrict)
 import Data.Text.Encoding (decodeUtf8)
 import System.FilePath (joinPath)
 import Text.Blaze (Markup)
-import Text.Blaze.Renderer.Text
 import qualified Text.Blaze.Renderer.Utf8
 import qualified Text.Email.Validate as E
 import Text.Heterocephalus (compileText)
@@ -41,7 +39,6 @@ import qualified Nirum.Constructs.Annotation as A
 import Nirum.Constructs.Annotation.Internal hiding (Text, annotations, name)
 import qualified Nirum.Constructs.Annotation.Internal as AI
 import Nirum.Constructs.Declaration hiding (annotations, name)
-import qualified Nirum.Constructs.Declaration
 import qualified Nirum.Constructs.DeclarationSet as DS
 import qualified Nirum.Constructs.Identifier as I
 import Nirum.Constructs.Module hiding (imports)
@@ -180,30 +177,28 @@ compileDocstringWithFields indentSpace decl fields' =
         | f@(Field n _ _) <- toList fields'
         ]
 
-compileDocstringWithParameters :: forall a b . (Documented a, Declaration b)
-                               => Code
-                               -> a
-                               -> [(b, Code)]
+compileDocstringWithParameters :: Code
+                               -> Method
+                               -> [MethodParameterCode]
                                -> Code
-compileDocstringWithParameters indentSpace decl paramTypePairs =
+compileDocstringWithParameters indentSpace decl methodParameterCodes =
     compileDocstring'
         indentSpace
         decl
-        [ case compileDocs p of
+        [ case compileDocs (mpcParam mpc) of
               Nothing ->
-                  [qq|:param {paramName p}: (:class:`{simplifyTypeExpr tx}`)
+                  [qq|:param {paramName}: (:class:`{simplifyTypeExpr tx}`)
 |]
               Just docs' ->
-                  [qq|:param {paramName p}: (:class:`{simplifyTypeExpr tx}`)
-{indentN (9 + (T.length $ paramName p)) docs'}
+                  [qq|:param {paramName}: (:class:`{simplifyTypeExpr tx}`)
+{indentN (9 + (T.length paramName)) docs'}
 |]
-        | (p, tx) <- paramTypePairs
+        | mpc@MethodParameterCode { mpcTypeExpr = tx } <- methodParameterCodes
+        , paramName <- [mpcAttributeName mpc]
         ]
   where
     indentN :: Int -> Code -> Code
     indentN n = indent (T.replicate n " ")
-    paramName :: b -> Code
-    paramName = toAttributeName' . Nirum.Constructs.Declaration.name
     simplifyTypeExpr :: Code -> Code
     simplifyTypeExpr = T.takeWhileEnd (/= '.')
 
@@ -278,6 +273,129 @@ instance Eq FieldCode where
 -- When [FieldCode] is sorted optional fields go back.
 instance Ord FieldCode where
     a <= b = fcOptional a <= fcOptional b
+
+data MethodCode = MethodCode
+    { mcMethod :: Method
+    , mcRTypeExpr :: Code
+    , mcETypeExpr :: Code
+    , mcParams :: [MethodParameterCode]
+    , mcRSerializer :: Code -> Markup
+    , mcRDeserializer :: Maybe Markup
+    , mcESerializer :: Code -> Markup
+    , mcEDeserializer :: Maybe Markup
+    }
+
+mcAttributeName :: MethodCode -> T.Text
+mcAttributeName = toAttributeName' . methodName . mcMethod
+
+mcBehindName :: MethodCode -> T.Text
+mcBehindName = toBehindSnakeCaseText . methodName . mcMethod
+
+toMethodCode :: Source
+             -> Code
+             -> Code
+             -> Code
+             -> (Parameter -> Code)
+             -> (Parameter -> Code)
+             -> (Parameter -> Code)
+             -> Method
+             -> CodeGen MethodCode
+toMethodCode source
+             vInput vOutput vError
+             paramVInput paramVOutput paramVError
+             method@Method { returnType = rType, errorType = eType } = do
+    rTypeExpr <- compileTypeExpression' source rType
+    errTypeExpr <- compileTypeExpression' source eType
+    params' <- sequence $ (`map` toList (parameters method)) $ \ param ->
+        toMethodParameterCode source
+            (paramVInput param)
+            (paramVOutput param)
+            (paramVError param)
+            param
+    resultSerializer <- serializer rType
+    errorSerializer <- serializer eType
+    resultDeserializer <- coalesce rType $ \ t ->
+        compileDeserializer' source t vInput vOutput vError
+    errorDeserializer <- coalesce eType $ \ t ->
+        compileDeserializer' source t vInput vOutput vError
+    return MethodCode
+        { mcMethod = method
+        , mcRTypeExpr = rTypeExpr
+        , mcETypeExpr = errTypeExpr
+        , mcParams = params'
+        , mcRSerializer = resultSerializer
+        , mcRDeserializer = resultDeserializer
+        , mcESerializer = errorSerializer
+        , mcEDeserializer = errorDeserializer
+        }
+  where
+    coalesce :: Maybe a -> (a -> CodeGen b) -> CodeGen (Maybe b)
+    coalesce (Just v) f = Just <$> f v
+    coalesce Nothing _ = return Nothing
+    serializer :: Maybe TypeExpression -> CodeGen (Code -> Markup)
+    serializer Nothing =
+        return $ \ funcName -> [compileText|(#{funcName}) = None|]
+    serializer (Just type_) = do
+        typing <- importStandardLibrary "typing"
+        builtins <- importBuiltins
+        typeExpr <- compileTypeExpression' source $ Just type_
+        Validator predicateCode' valueValidators' <-
+            compileValidator' source type_ "input"
+        return $ \ funcName -> [compileText|
+def #{funcName}(input):
+    if not (#{predicateCode'}):
+        raise #{builtins}.TypeError(
+            'expected a value of ' + #{typing}._type_repr(#{typeExpr}) +
+            ', not ' + repr(input)
+        )
+%{ forall ValueValidator valuePredCode valueErrorMsg <- valueValidators' }
+    elif not (#{valuePredCode}):
+        raise #{builtins}.ValueError(#{stringLiteral valueErrorMsg})
+%{ endforall }
+    return #{compileSerializer' source type_ "input"}
+        |]
+
+data MethodParameterCode = MethodParameterCode
+    { mpcParam :: Parameter
+    , mpcTypeExpr :: Code
+    , mpcValidator :: Validator
+    , mpcDeserializer :: Markup
+    }
+
+mpcAttributeName :: MethodParameterCode -> T.Text
+mpcAttributeName MethodParameterCode { mpcParam = Parameter pName _ _ } =
+    toAttributeName' pName
+
+mpcBehindName :: MethodParameterCode -> T.Text
+mpcBehindName MethodParameterCode { mpcParam = Parameter pName _ _ } =
+    toBehindSnakeCaseText pName
+
+mpcType :: MethodParameterCode -> TypeExpression
+mpcType MethodParameterCode { mpcParam = Parameter _ typeExpr _ } = typeExpr
+
+mpcTypePredicateCode :: MethodParameterCode -> Code
+mpcTypePredicateCode = typePredicateCode . mpcValidator
+
+mpcValueValidators :: MethodParameterCode -> [ValueValidator]
+mpcValueValidators = valueValidators . mpcValidator
+
+toMethodParameterCode :: Source
+                      -> Code
+                      -> Code
+                      -> Code
+                      -> Parameter
+                      -> CodeGen MethodParameterCode
+toMethodParameterCode source vInput vOutput vError
+                      parameter@(Parameter pName pType _) = do
+    typeExpr <- compileTypeExpression' source $ Just pType
+    validator <- compileValidator' source pType $ toAttributeName' pName
+    deserializer <- compileDeserializer' source pType vInput vOutput vError
+    return MethodParameterCode
+        { mpcParam = parameter
+        , mpcTypeExpr = typeExpr
+        , mpcValidator = validator
+        , mpcDeserializer = deserializer
+        }
 
 defaultDeserializerErrorHandler :: CodeGen Code
 defaultDeserializerErrorHandler = do
@@ -1047,11 +1165,14 @@ class #{className}(#{T.intercalate "," $ compileExtendClasses annotations}):
 compileTypeDeclaration src d@ServiceDeclaration { serviceName = name'
                                                 , service = Service methods
                                                 } = do
-    clientMethods <- mapM compileClientMethod $ toList methods
-    let clientMethods' = T.intercalate "\n\n" clientMethods
     insertThirdPartyImportsA
         [ ("nirum.constructs", [("name_dict_type", "NameDict")])
         , ("nirum.datastructures", [(nirumMapName, "Map")])
+        , ("nirum.exc", [ ("_unexpected_nirum_response_error"
+                          , "UnexpectedNirumResponseError"
+                          )
+                        ]
+          )
         , ("nirum.service", [("service_type", "Service")])
         , ("nirum.transport", [("transport_type", "Transport")])
         ]
@@ -1059,194 +1180,145 @@ compileTypeDeclaration src d@ServiceDeclaration { serviceName = name'
     builtins <- importBuiltins
     typing <- importStandardLibrary "typing"
     pyVer <- getPythonVersion
-    methods' <- sequence $ (`map` toList methods) $ \ method' -> do
-        rTypeExpr <- compileTypeExpression' src $ returnType method'
-        errTypeExpr <- compileTypeExpression' src $ errorType method'
-        params' <- sequence $ (`map` toList (parameters method')) $
-            \ param'@(Parameter pName pType _) -> do
-                typeExpr <- compileTypeExpression' src $ Just pType
-                v <- compileValidator' src pType $ toAttributeName' pName
-                ds <- compileDeserializer' src pType "value" "rv" "on_error"
-                return (param', typeExpr, v, ds)
-        resultValidator <- case returnType method' of
-            Just rType -> do
-                validator <- compileValidator' src rType "input"
-                return $ Just validator
-            Nothing ->
-                return Nothing
-        errorValidator <- case errorType method' of
-            Just eType -> do
-                validator <- compileValidator' src eType "error"
-                return $ Just validator
-            Nothing ->
-                return Nothing
-        resultDeserializer <- case returnType method' of
-            Just rtype -> do
-                deserializer <- compileDeserializer' src rtype
-                    "value"
-                    "rv"
-                    "on_error"
-                return $ Just deserializer
-            Nothing ->
-                return Nothing
-        errorDeserializer <- case errorType method' of
-            Just etype -> do
-                deserializer <- compileDeserializer' src etype
-                    "value"
-                    "rv"
-                    "on_error"
-                return $ Just deserializer
-            Nothing ->
-                return Nothing
-        return ( method'
-               , rTypeExpr
-               , errTypeExpr
-               , params'
-               , resultValidator
-               , errorValidator
-               , resultDeserializer
-               , errorDeserializer
-               )
+    methodCodes <- sequence $ (`map` toList methods) $ toMethodCode
+        src
+        "value" "rv" "on_error"
+        (const "value") (const "rv") (const "on_error")
     defaultErrorHandler <- defaultDeserializerErrorHandler
     return [compileText|
 class #{className}(service_type):
 #{compileDocstring "    " d}
     __nirum_type__ = 'service'
     __nirum_service_methods__ = {
-%{ forall (Method mName _ _ _ _, rTypeExpr, _, params', _, _, _, _) <- methods' }
-        '#{toAttributeName' mName}': {
+%{ forall mc <- methodCodes }
+        '#{mcAttributeName mc}': {
             '_v': 2,
-            '_return': lambda: #{rTypeExpr},
+            '_return': lambda: #{mcRTypeExpr mc},
             '_names': name_dict_type([
-%{ forall (Parameter (Name pF pB) _ _, _, _, _) <- params' }
-                ('#{toAttributeName pF}', '#{I.toSnakeCaseText pB}'),
+%{ forall mpc <- mcParams mc }
+                ('#{mpcAttributeName mpc}', '#{mpcBehindName mpc}'),
 %{ endforall }
             ]),
-%{ forall (Parameter pName _ _, pTypeExpr, _, _) <- params' }
-            '#{toAttributeName' pName}': lambda: #{pTypeExpr},
+%{ forall mpc <- mcParams mc }
+            '#{mpcAttributeName mpc}': lambda: #{mpcTypeExpr mpc},
 %{ endforall }
         },
 %{ endforall }
     }
     __nirum_method_names__ = name_dict_type([
-%{ forall (Method (Name mF mB) _ _ _ _, _, _, _, _, _, _, _) <- methods' }
-        ('#{toAttributeName mF}', '#{I.toSnakeCaseText mB}'),
+%{ forall mc <- methodCodes }
+        ('#{mcAttributeName mc}', '#{mcBehindName mc}'),
 %{ endforall }
     ])
     __nirum_method_annotations__ = #{methodAnnotations'}
 
     @staticmethod
     def __nirum_method_error_types__(k, d=None):
-%{ forall (Method mName _ _ _ _, _, errTypeExpr, _, _, _, _, _) <- methods' }
-        if k == '#{toAttributeName' mName}':
-            return #{errTypeExpr}
+%{ forall mc <- methodCodes }
+        if k == '#{mcAttributeName mc}':
+            return #{mcETypeExpr mc}
 %{ endforall }
         return d
 
-%{ forall (m, rTypeExpr, eTypeExpr, params', resultV, errorV, resultD, errorD) <- methods' }
-    def #{toAttributeName' (methodName m)}(
+%{ forall mc <- methodCodes }
+    def #{mcAttributeName mc}(
         self,
 %{ case pyVer }
 %{ of Python3 }
-%{ forall (Parameter pName _ _, pTypeExpr, _, _) <- params' }
-        #{toAttributeName' pName}: '#{pTypeExpr}',
+%{ forall mpc <- mcParams mc }
+        #{mpcAttributeName mpc}: '#{mpcTypeExpr mpc}',
 %{ endforall }
-    ) -> '#{rTypeExpr}':
+    ) -> '#{mcRTypeExpr mc}':
 %{ of Python2 }
-%{ forall (Parameter pName _ _, _, _, _) <- params' }
-        #{toAttributeName' pName},
+%{ forall mpc <- mcParams mc }
+        #{mpcAttributeName mpc},
 %{ endforall }
     ):
 %{ endcase }
-#{compileDocstringWithParameters "        " m (map quadrupleToPair params')}
+#{compileDocstringWithParameters "        " (mcMethod mc) (mcParams mc)}
         raise NotImplementedError(
-            '#{className} has to implement #{toAttributeName' (methodName m)}()'
+            '#{className} has to implement #{mcAttributeName mc}()'
         )
 
-    #{toAttributeName' (methodName m)}.__nirum_argument_serializers__ = {
+    #{mcAttributeName mc}.__nirum_argument_serializers__ = {
     }  # type: typing.Mapping[str, typing.Callable[[object], object]]
-    #{toAttributeName' (methodName m)}.__nirum_argument_deserializers__ = {
+    #{mcAttributeName mc}.__nirum_argument_deserializers__ = {
     }
-%{ forall (Parameter pName pt _, tx, (Validator pTPred pValVs), d) <- params' }
-    def __nirum_argument_serializer__(#{toAttributeName' pName}):
-        if not (#{pTPred}):
+%{ forall mpc <- mcParams mc }
+    def __nirum_argument_serializer__(#{mpcAttributeName mpc}):
+        if not (#{mpcTypePredicateCode mpc}):
             raise #{builtins}.TypeError(
-                '#{toAttributeName' pName} must be a value of ' +
-                #{typing}._type_repr(#{tx}) + ', not ' +
-                #{builtins}.repr(#{toAttributeName' pName})
+                '#{mpcAttributeName mpc} must be a value of ' +
+                #{typing}._type_repr(#{mpcTypeExpr mpc}) + ', not ' +
+                #{builtins}.repr(#{mpcAttributeName mpc})
             )
-%{ forall ValueValidator pValuePredCode pValueErrorMsg <- pValVs }
+%{ forall ValueValidator pValuePredCode pValueErrMsg <- mpcValueValidators mpc}
         elif not (#{pValuePredCode}):
             raise #{builtins}.ValueError(
-                'invalid #{toAttributeName' pName}: '
-                #{stringLiteral pValueErrorMsg}
+                'invalid #{mpcAttributeName mpc}: '
+                #{stringLiteral pValueErrMsg}
             )
 %{ endforall }
-        return #{compileSerializer' src pt (toAttributeName' pName)}
-    __nirum_argument_serializer__.__name__ = '#{toAttributeName' pName}'
-    #{toAttributeName' (methodName m)}.__nirum_argument_serializers__[
-        '#{toAttributeName' pName}'] = __nirum_argument_serializer__
+        return #{compileSerializer' src (mpcType mpc) (mpcAttributeName mpc)}
+    __nirum_argument_serializer__.__name__ = '#{mpcAttributeName mpc}'
+    #{mcAttributeName mc}.__nirum_argument_serializers__[
+        '#{mpcAttributeName mpc}'] = __nirum_argument_serializer__
     del __nirum_argument_serializer__
 
     def __nirum_argument_deserializer__(value, on_error=None):
         on_error = #{defaultErrorHandler}(on_error)
-#{indent "        " d}
+#{indent "        " (mpcDeserializer mpc)}
         on_error.raise_error()
         if not on_error.errored:
             return rv
-    __nirum_argument_deserializer__.__name__ = '#{toBehindSnakeCaseText pName}'
-    #{toAttributeName' (methodName m)}.__nirum_argument_deserializers__[
-        '#{toBehindSnakeCaseText pName}'] = __nirum_argument_deserializer__
+    __nirum_argument_deserializer__.__name__ = '#{mpcBehindName mpc}'
+    #{mcAttributeName mc}.__nirum_argument_deserializers__[
+        '#{mpcBehindName mpc}'] = __nirum_argument_deserializer__
     del __nirum_argument_deserializer__
 %{ endforall }
 
     def __nirum_serialize_arguments__(
 %{ case pyVer }
 %{ of Python3 }
-%{ forall (Parameter pName _ _, pTypeExpr, _, _) <- params' }
-        #{toAttributeName' pName}: '#{pTypeExpr}',
+%{ forall mpc <- mcParams mc }
+        #{mpcAttributeName mpc}: '#{mpcTypeExpr mpc}',
 %{ endforall }
-    ) -> '#{rTypeExpr}':
+    ) -> '#{mcRTypeExpr mc}':
 %{ of Python2 }
-%{ forall (Parameter pName _ _, _, _, _) <- params' }
-        #{toAttributeName' pName},
+%{ forall mpc <- mcParams mc}
+        #{mpcAttributeName mpc},
 %{ endforall }
     ):
 %{ endcase }
         return {
-%{ forall (Parameter (Name fn bn) _ _, _, _, _) <- params' }
-            '#{I.toSnakeCaseText bn}':
-                #{className}.#{toAttributeName' (methodName m)}
-                    .__nirum_argument_serializers__['#{toAttributeName fn}'](
-                    #{toAttributeName fn}
+%{ forall mpc <- mcParams mc }
+            '#{mpcBehindName mpc}':
+                #{className}.#{mcAttributeName mc}
+                    .__nirum_argument_serializers__['#{mpcAttributeName mpc}'](
+                    #{mpcAttributeName mpc}
                 ),
 %{ endforall }
         }
-    #{toAttributeName' (methodName m)}.__nirum_serialize_arguments__ = \
+    #{mcAttributeName mc}.__nirum_serialize_arguments__ = \
         __nirum_serialize_arguments__
     del __nirum_serialize_arguments__
 
     def __nirum_deserialize_arguments__(value, on_error=None):
         on_error = #{defaultErrorHandler}(on_error)
-        table = #{className}.#{toAttributeName' (methodName m)} \
+        table = #{className}.#{mcAttributeName mc} \
             .__nirum_argument_deserializers__
         if isinstance(value, #{abc}.Mapping):
             result = {}
-%{ forall (Parameter pName _ _, _, _, _) <- params' }
+%{ forall mpc <- mcParams mc }
             try:
-                field_value = value['#{toBehindSnakeCaseText pName}']
+                field_value = value['#{mpcBehindName mpc}']
             except KeyError:
-                on_error(
-                    '.#{toBehindSnakeCaseText pName}',
-                    'Expected to exist.'
-                )
+                on_error('.#{mpcBehindName mpc}', 'Expected to exist.')
             else:
-                result['#{toAttributeName' pName}'] = \
-                    table['#{toBehindSnakeCaseText pName}'](
+                result['#{mpcAttributeName mpc}'] = \
+                    table['#{mpcBehindName mpc}'](
                         field_value,
-                        lambda f, m: on_error(
-                            '.#{toBehindSnakeCaseText pName}' + f, m
-                        )
+                        lambda f, m: on_error('.#{mpcBehindName mpc}' + f, m)
                     )
 %{ endforall }
         else:
@@ -1254,36 +1326,16 @@ class #{className}(service_type):
         on_error.raise_error()
         if not on_error.errored:
             return result
-    #{toAttributeName' (methodName m)}.__nirum_deserialize_arguments__ = \
+    #{mcAttributeName mc}.__nirum_deserialize_arguments__ = \
         __nirum_deserialize_arguments__
     del __nirum_deserialize_arguments__
 
-%{ case returnType m }
-%{ of Just resultType }
-    def __nirum_serialize_result__(input):
-%{ case resultV }
-%{ of Just (Validator rPredicateCode rValueValidators) }
-        if not (#{rPredicateCode}):
-            raise TypeError(
-                'expected a value of ' +
-                __import__('typing')._type_repr(#{rTypeExpr}) +
-                ', not ' + repr(input)
-            )
-%{ forall ValueValidator rValuePredCode rValueErrorMsg <- rValueValidators }
-        elif not (#{rValuePredCode}):
-            raise ValueError(#{stringLiteral rValueErrorMsg})
-%{ endforall }
-%{ of Nothing }
-%{ endcase }
-        return #{compileSerializer' src resultType "input"}
-    #{toAttributeName' (methodName m)}.__nirum_serialize_result__ = \
+#{indent "    " (mcRSerializer mc "__nirum_serialize_result__")}
+    #{mcAttributeName mc}.__nirum_serialize_result__ = \
         __nirum_serialize_result__
     del __nirum_serialize_result__
-%{ of Nothing }
-    #{toAttributeName' (methodName m)}.__nirum_serialize_result__ = None
-%{ endcase }
 
-%{ case resultD }
+%{ case mcRDeserializer mc }
 %{ of Just resultDeserializer }
     def __nirum_deserialize_result__(value, on_error=None):
         on_error = #{defaultErrorHandler}(on_error)
@@ -1291,39 +1343,19 @@ class #{className}(service_type):
         on_error.raise_error()
         if not on_error.errored:
             return rv
-    #{toAttributeName' (methodName m)}.__nirum_deserialize_result__ = \
+    #{mcAttributeName mc}.__nirum_deserialize_result__ = \
         __nirum_deserialize_result__
     del __nirum_deserialize_result__
 %{ of Nothing }
-    #{toAttributeName' (methodName m)}.__nirum_deserialize_result__ = None
+    #{mcAttributeName mc}.__nirum_deserialize_result__ = None
 %{ endcase }
 
-%{ case errorType m }
-%{ of Just errT }
-    def __nirum_serialize_error__(error):
-%{ case errorV }
-%{ of Just (Validator ePredicateCode eValueValidators) }
-        if not (#{ePredicateCode}):
-            raise TypeError(
-                'expected a value of ' +
-                __import__('typing')._type_repr(#{eTypeExpr}) +
-                ', not ' + repr(input)
-            )
-%{ forall ValueValidator eValuePredCode eValueErrorMsg <- eValueValidators }
-        elif not (#{eValuePredCode}):
-            raise ValueError(#{stringLiteral eValueErrorMsg})
-%{ endforall }
-%{ of Nothing }
-%{ endcase }
-        return #{compileSerializer' src errT "error"}
-    #{toAttributeName' (methodName m)}.__nirum_serialize_error__ = \
-        __nirum_serialize_error__ 
-    del __nirum_serialize_error__ 
-%{ of Nothing }
-    #{toAttributeName' (methodName m)}.__nirum_serialize_error__ = None
-%{ endcase }
+#{indent "    " (mcESerializer mc "__nirum_serialize_error__")}
+    #{mcAttributeName mc}.__nirum_serialize_error__ = \
+        __nirum_serialize_error__
+    del __nirum_serialize_error__
 
-%{ case errorD }
+%{ case mcEDeserializer mc }
 %{ of Just errorDeserializer }
     def __nirum_deserialize_error__(value, on_error=None):
         on_error = #{defaultErrorHandler}(on_error)
@@ -1331,11 +1363,11 @@ class #{className}(service_type):
         on_error.raise_error()
         if not on_error.errored:
             return rv
-    #{toAttributeName' (methodName m)}.__nirum_deserialize_error__ = \
+    #{mcAttributeName mc}.__nirum_deserialize_error__ = \
         __nirum_deserialize_error__
     del __nirum_deserialize_error__
 %{ of Nothing }
-    #{toAttributeName' (methodName m)}.__nirum_deserialize_error__ = None
+    #{mcAttributeName mc}.__nirum_deserialize_error__ = None
 %{ endcase }
 %{ endforall }
 
@@ -1356,47 +1388,18 @@ class #{className}_Client(#{className}):
             )
         self.__nirum_transport__ = transport  # type: transport_type
 
-    #{clientMethods'}
-
-#{className}.Client = #{className}_Client
-#{className}.Client.__name__ = 'Client'
-if hasattr(#{className}.Client, '__qualname__'):
-    #{className}.Client.__qualname__ = '#{className}.Client'
-|]
-  where
-    nirumMapName :: T.Text
-    nirumMapName = "map_type"
-    className :: T.Text
-    className = toClassName' name'
-    quadrupleToPair :: (a, b, c, d) -> (a, b)
-    quadrupleToPair (a, b, _, _) = (a, b)
-    commaNl :: [T.Text] -> T.Text
-    commaNl = T.intercalate ",\n"
-    compileClientMethod :: Method -> CodeGen Code
-    compileClientMethod Method { methodName = mName, returnType = rtypeM } = do
-        let clientMethodName' = toAttributeName' mName
-        pyVer <- getPythonVersion
-        rTypeExpr <- compileTypeExpression' src rtypeM
-        insertThirdPartyImportsA
-            [ ( "nirum.exc", [ ("_unexpected_nirum_response_error"
-                               , "UnexpectedNirumResponseError"
-                               )
-                             ]
-              )
-            ]
-        defaultErrorHandler <- defaultDeserializerErrorHandler
-        return $ toStrict $ renderMarkup [compileText|
-    def #{clientMethodName'}(
+%{ forall mc <- methodCodes }
+    def #{mcAttributeName mc}(
         self, *args, **kwargs
 %{ case pyVer }
 %{ of Python3 }
-    ) -> '#{rTypeExpr}':
+    ) -> '#{mcRTypeExpr mc}':
 %{ of Python2 }
     ):
 %{ endcase }
-        prototype = #{className}.#{clientMethodName'}
+        prototype = #{className}.#{mcAttributeName mc}
         successful, serialized = self.__nirum_transport__(
-            '#{I.toSnakeCaseText $ N.behindName mName}',
+            '#{mcBehindName mc}',
             payload=prototype.__nirum_serialize_arguments__(*args, **kwargs),
             # FIXME Give annotations.
             service_annotations={},
@@ -1418,7 +1421,20 @@ if hasattr(#{className}.Client, '__qualname__'):
         if successful:
             return result
         raise result
+%{ endforall }
+
+#{className}.Client = #{className}_Client
+#{className}.Client.__name__ = 'Client'
+if hasattr(#{className}.Client, '__qualname__'):
+    #{className}.Client.__qualname__ = '#{className}.Client'
 |]
+  where
+    nirumMapName :: T.Text
+    nirumMapName = "map_type"
+    className :: T.Text
+    className = toClassName' name'
+    commaNl :: [T.Text] -> T.Text
+    commaNl = T.intercalate ",\n"
     toKeyItem :: I.Identifier -> T.Text -> T.Text
     toKeyItem ident v = [qq|'{toAttributeName ident}': {v}|]
     wrapMap :: T.Text -> T.Text
