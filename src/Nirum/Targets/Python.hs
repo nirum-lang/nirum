@@ -1068,6 +1068,18 @@ compileTypeDeclaration src d@ServiceDeclaration { serviceName = name'
                 v <- compileValidator' src pType $ toAttributeName' pName
                 ds <- compileDeserializer' src pType "value" "rv" "on_error"
                 return (param', typeExpr, v, ds)
+        resultValidator <- case returnType method' of
+            Just rType -> do
+                validator <- compileValidator' src rType "input"
+                return $ Just validator
+            Nothing ->
+                return Nothing
+        errorValidator <- case errorType method' of
+            Just eType -> do
+                validator <- compileValidator' src eType "error"
+                return $ Just validator
+            Nothing ->
+                return Nothing
         resultDeserializer <- case returnType method' of
             Just rtype -> do
                 deserializer <- compileDeserializer' src rtype
@@ -1090,6 +1102,8 @@ compileTypeDeclaration src d@ServiceDeclaration { serviceName = name'
                , rTypeExpr
                , errTypeExpr
                , params'
+               , resultValidator
+               , errorValidator
                , resultDeserializer
                , errorDeserializer
                )
@@ -1099,7 +1113,7 @@ class #{className}(service_type):
 #{compileDocstring "    " d}
     __nirum_type__ = 'service'
     __nirum_service_methods__ = {
-%{ forall (Method mName _ _ _ _, rTypeExpr, _, params', _, _) <- methods' }
+%{ forall (Method mName _ _ _ _, rTypeExpr, _, params', _, _, _, _) <- methods' }
         '#{toAttributeName' mName}': {
             '_v': 2,
             '_return': lambda: #{rTypeExpr},
@@ -1115,7 +1129,7 @@ class #{className}(service_type):
 %{ endforall }
     }
     __nirum_method_names__ = name_dict_type([
-%{ forall (Method (Name mF mB) _ _ _ _, _, _, _, _, _) <- methods' }
+%{ forall (Method (Name mF mB) _ _ _ _, _, _, _, _, _, _, _) <- methods' }
         ('#{toAttributeName mF}', '#{I.toSnakeCaseText mB}'),
 %{ endforall }
     ])
@@ -1123,13 +1137,13 @@ class #{className}(service_type):
 
     @staticmethod
     def __nirum_method_error_types__(k, d=None):
-%{ forall (Method mName _ _ _ _, _, errTypeExpr, _, _, _) <- methods' }
+%{ forall (Method mName _ _ _ _, _, errTypeExpr, _, _, _, _, _) <- methods' }
         if k == '#{toAttributeName' mName}':
             return #{errTypeExpr}
 %{ endforall }
         return d
 
-%{ forall (m, rTypeExpr, _, params', resultD, errorD) <- methods' }
+%{ forall (m, rTypeExpr, eTypeExpr, params', resultV, errorV, resultD, errorD) <- methods' }
     def #{toAttributeName' (methodName m)}(
         self,
 %{ case pyVer }
@@ -1246,9 +1260,25 @@ class #{className}(service_type):
 
 %{ case returnType m }
 %{ of Just resultType }
-    #{toAttributeName' (methodName m)}.__nirum_serialize_result__ = lambda v: (
-        #{compileSerializer' src resultType "v"}
-    )
+    def __nirum_serialize_result__(input):
+%{ case resultV }
+%{ of Just (Validator rPredicateCode rValueValidators) }
+        if not (#{rPredicateCode}):
+            raise TypeError(
+                'expected a value of ' +
+                __import__('typing')._type_repr(#{rTypeExpr}) +
+                ', not ' + repr(input)
+            )
+%{ forall ValueValidator rValuePredCode rValueErrorMsg <- rValueValidators }
+        elif not (#{rValuePredCode}):
+            raise ValueError(#{stringLiteral rValueErrorMsg})
+%{ endforall }
+%{ of Nothing }
+%{ endcase }
+        return #{compileSerializer' src resultType "input"}
+    #{toAttributeName' (methodName m)}.__nirum_serialize_result__ = \
+        __nirum_serialize_result__
+    del __nirum_serialize_result__
 %{ of Nothing }
     #{toAttributeName' (methodName m)}.__nirum_serialize_result__ = None
 %{ endcase }
@@ -1270,9 +1300,25 @@ class #{className}(service_type):
 
 %{ case errorType m }
 %{ of Just errT }
-    #{toAttributeName' (methodName m)}.__nirum_serialize_error__ = lambda v: (
-        #{compileSerializer' src errT "v"}
-    )
+    def __nirum_serialize_error__(error):
+%{ case errorV }
+%{ of Just (Validator ePredicateCode eValueValidators) }
+        if not (#{ePredicateCode}):
+            raise TypeError(
+                'expected a value of ' +
+                __import__('typing')._type_repr(#{eTypeExpr}) +
+                ', not ' + repr(input)
+            )
+%{ forall ValueValidator eValuePredCode eValueErrorMsg <- eValueValidators }
+        elif not (#{eValuePredCode}):
+            raise ValueError(#{stringLiteral eValueErrorMsg})
+%{ endforall }
+%{ of Nothing }
+%{ endcase }
+        return #{compileSerializer' src errT "error"}
+    #{toAttributeName' (methodName m)}.__nirum_serialize_error__ = \
+        __nirum_serialize_error__ 
+    del __nirum_serialize_error__ 
 %{ of Nothing }
     #{toAttributeName' (methodName m)}.__nirum_serialize_error__ = None
 %{ endcase }

@@ -257,11 +257,14 @@ To be released.
         it into a corresponding value which can be passed to
         `json.dump()`/`json.dumps()`.
 
+        If the given value does not match to method's return type it raises
+        `TypeError`, or `ValueError` if the value is invalid.
+
         This attribute is `None` if the method has no return type.
 
      -  `__nirum_deserialize_result__` takes a result value preprocessed by
-        `json.load()`/`json.loads()` and deserialize it into its corresponding
-        Python object.
+        `json.load()`/`json.loads()` with an optional `on_error` callback,
+        and deserialize it into its corresponding Python object.
 
         This attribute is `None` if the method has no return type.
 
@@ -269,11 +272,14 @@ To be released.
         it into a corresponding value which can be passed to
         `json.dump()`/`json.dumps()`.
 
+        If the given error object does not match to method's return type
+        it raises `TypeError`, or `ValueError` if the error object is invalid.
+
         This attribute is `None` if the method has no error type.
 
      -  `__nirum_deserialize_error__` takes an error value preprocessed by
-        `json.load()`/`json.loads()` and deserialize it into its corresponding
-        Python object.
+        `json.load()`/`json.loads()` with an optional `on_error` callback,
+        and deserialize it into its corresponding Python object.
 
         This attribute is `None` if the method has no error type.
 
