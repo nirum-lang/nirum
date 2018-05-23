@@ -186,9 +186,12 @@ def test_service_argument_deserializers(fx_dog, fx_method_args):
 def test_service_serialize_result(fx_dog):
     assert SampleService.sample_method.__nirum_serialize_result__ is None
     result, expected = fx_dog
-    assert SampleService.sample_method_that_returns.__nirum_serialize_result__(
-        result
-    ) == expected
+    f = SampleService.sample_method_that_returns.__nirum_serialize_result__
+    assert f(result) == expected
+    with raises(TypeError):
+        f(None)
+    with raises(TypeError):
+        f('invalid')
 
 
 def test_service_deserialize_result(fx_dog):
@@ -220,13 +223,16 @@ def test_service_deserialize_result(fx_dog):
 
 def test_service_serialize_error():
     assert SampleService.sample_method.__nirum_serialize_error__ is None
-    assert PingService.ping.__nirum_serialize_error__(
-        RpcError.NotFoundError(message=u'An error message.')
-    ) == {
+    f = PingService.ping.__nirum_serialize_error__
+    assert f(RpcError.NotFoundError(message=u'An error message.')) == {
         '_type': 'rpc_error',
         '_tag': 'not_found_error',
         'message': 'An error message.',
     }
+    with raises(TypeError):
+        f(None)
+    with raises(TypeError):
+        f('invalid')
 
 
 def test_service_deserialize_error():
