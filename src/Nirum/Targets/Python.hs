@@ -370,6 +370,11 @@ mpcBehindName :: MethodParameterCode -> T.Text
 mpcBehindName MethodParameterCode { mpcParam = Parameter pName _ _ } =
     toBehindSnakeCaseText pName
 
+mpcOptional :: MethodParameterCode -> Bool
+mpcOptional mpc = case mpcType mpc of
+    OptionModifier _ -> True
+    _ -> False
+
 mpcType :: MethodParameterCode -> TypeExpression
 mpcType MethodParameterCode { mpcParam = Parameter _ typeExpr _ } = typeExpr
 
@@ -1313,7 +1318,11 @@ class #{className}(service_type):
             try:
                 field_value = value['#{mpcBehindName mpc}']
             except KeyError:
+%{ if mpcOptional mpc }
+                result['#{mpcAttributeName mpc}'] = None
+%{ else }
                 on_error('.#{mpcBehindName mpc}', 'Expected to exist.')
+%{ endif }
             else:
                 result['#{mpcAttributeName mpc}'] = \
                     table['#{mpcBehindName mpc}'](
