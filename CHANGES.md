@@ -4,7 +4,7 @@ Nirum changelog
 Version 0.4.0
 -------------
 
-To be released.
+Released on May 25, 2018.
 
 ### Language
 
