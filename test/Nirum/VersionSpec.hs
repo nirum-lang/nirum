@@ -17,7 +17,7 @@ spec = do
             version `shouldSatisfy` SV.isDevelopment
         it "is the proper version" $
             -- is it a necessary test?
-            version `shouldBe` SV.version 0 4 0 [] []
+            version `shouldBe` SV.version 0 4 1 [] []
     describe "versionText" $ do
         it "is equivalent to version" $
             versionText `shouldBe` SV.toText version
