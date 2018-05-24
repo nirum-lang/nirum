@@ -93,7 +93,7 @@ For more infomration, use `--help` option:
     Nirum: The IDL compiler and RPC/distributed object framework
 
     Usage: nirum [-v|--version] (-o|--output-dir DIR) (-t|--target TARGET) DIR
-      Nirum compiler 0.4.0
+      Nirum compiler 0.5.0
 
     Available options:
       -h,--help                Show this help text
