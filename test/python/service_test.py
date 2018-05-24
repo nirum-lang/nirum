@@ -144,6 +144,28 @@ def test_service_deserialize_arguments(fx_method_args):
     assert errors == {('', 'Expected an object.')}
 
 
+def test_service_deserialize_arguments_with_omitted_keys(fx_dog):
+    m = SampleService.sample_method_with_optional_param
+    f = m.__nirum_deserialize_arguments__
+    payload = {
+        'a': 'f7db93e3-731e-48ef-80a2-cac81e02f1ae',
+        'b': fx_dog[1],
+    }
+    expected = {
+        'a': uuid.UUID('F7DB93E3-731E-48EF-80A2-CAC81E02F1AE'),
+        'b': fx_dog[0],
+    }
+    assert f(payload) == expected
+    assert f(dict(payload, b=None)) == dict(expected, b=None)
+    assert f({'a': payload['a']}) == dict(expected, b=None)
+    with raises(ValueError) as e:
+        f({'b': fx_dog[1]})
+    assert str(e.value) == '.a: Expected to exist.'
+    with raises(ValueError) as e:
+        f(dict(payload, b=dict(fx_dog[1], name=None)))
+    assert str(e.value) == '.b.name: Expected a string.'
+
+
 def test_service_argument_serializers(fx_method_args):
     args, expected = fx_method_args
     table = SampleService.sample_method.__nirum_argument_serializers__
