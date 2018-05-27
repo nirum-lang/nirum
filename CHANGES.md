@@ -6,6 +6,13 @@ Version 0.5.0
 
 To be released.
 
+### Language
+
+ -  The `uri` type has completly gone; use `url` instead. [[#126], [#281] by Jonghun Park]
+
+[#126]: https://github.com/spoqa/nirum/issues/126
+[#281]: https://github.com/spoqa/nirum/pull/281
+
 
 Version 0.4.0
 -------------

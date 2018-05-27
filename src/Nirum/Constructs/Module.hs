@@ -113,8 +113,6 @@ coreTypes =
     , decl' "bool" Bool Boolean
     , decl' "uuid" Uuid String
     , decl' "url" Url String
-    -- FIXME: deprecated
-    , decl' "uri" Url String
     ]
   where
     decl' name prim json =
