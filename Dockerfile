@@ -13,6 +13,7 @@ RUN if [ "${APT_REPOSITORY}" != "" ]; then \
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
             build-essential ca-certificates curl \
+            netbase \
     && \
     rm -rf /var/lib/apt/lists/*
 RUN apt-get update && \
