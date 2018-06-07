@@ -135,7 +135,7 @@ a command-line prompt and it's consistent within this tutorial):
 
 ~~~~~~~~ sh
 $ nirum -v
-0.4.1
+0.4.2
 ~~~~~~~~
 
 [official releases page]: https://github.com/spoqa/nirum/releases
