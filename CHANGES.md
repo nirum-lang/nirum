@@ -6,6 +6,13 @@ Version 0.4.1
 
 To be released.
 
+### Et cetera
+
+ -  The official Docker images became to have netbase pacakage. See the
+    [related issue on Haskell Stack][commercialhaskell/stack#2372] as well.
+
+[commercialhaskell/stack#2372]: https://github.com/commercialhaskell/stack/issues/2372
+
 
 Version 0.4.0
 -------------
