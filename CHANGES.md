@@ -8,10 +8,24 @@ To be released.
 
 ### Language
 
- -  The `uri` type has completly gone; use `url` instead. [[#126], [#281] by Jonghun Park]
+ -  The `uri` type has completly gone; use `url` instead.
+    [[#126], [#281] by Jonghun Park]
 
 [#126]: https://github.com/spoqa/nirum/issues/126
 [#281]: https://github.com/spoqa/nirum/pull/281
+
+
+Version 0.4.1
+-------------
+
+Released on June 8, 2018.
+
+### Et cetera
+
+ -  The official Docker images became to have netbase pacakage. See the
+    [related issue on Haskell Stack][commercialhaskell/stack#2372] as well.
+
+[commercialhaskell/stack#2372]: https://github.com/commercialhaskell/stack/issues/2372
 
 
 Version 0.4.0

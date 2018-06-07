@@ -49,7 +49,7 @@ Windows.  We provide the prebuilt executable binaries for these three platforms.
 
 ### Released builds
 
-You can download a executable binary for Linux (x86_64), macOS (x86_64), or
+You can download executable binaries for Linux (x86_64), macOS (x86_64), or
 Windows (x64 or x86) from the [latest release note][latest-release].
 You should give it appropriate permissions (e.g., `+x`) depending on your
 platform.
