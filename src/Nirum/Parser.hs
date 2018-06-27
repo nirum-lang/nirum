@@ -184,9 +184,8 @@ annotationArgumentValue = do
         Just _ -> do
             v <- manyTill charLiteral (char '"')
             return $ AI.Text $ T.pack v
-        Nothing -> do
-            v <- integer
-            return $ Integer v
+        Nothing ->
+            Integer <$> integer
 
 annotationArgument :: Parser (Identifier, AnnotationArgument)
 annotationArgument = do

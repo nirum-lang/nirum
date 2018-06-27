@@ -1,11 +1,8 @@
-resolver: lts-10.7
+resolver: lts-11.15
 flags: {}
 packages:
 - '.'
 extra-deps:
-- turtle-1.5.4
-  # Until turtle-1.5.0 it requires Win32<2.4 while unix-compat-0.5.0.1 (which
-  # is the version pinned by the Stackage LTS 10.7) requires Win32>=2.5.0.0.
 - uri-0.1.6.4
   # No in the Stackage LTS 10.7
 ## INSERT CODECOV HERE -- DO NOT REMOVE THIS COMMENT. SEE ALSO ISSUE #156. ##
