@@ -216,7 +216,7 @@ addOptionalDependency pyVer package =
         pyVer
 
 getPythonVersion :: CodeGen PythonVersion
-getPythonVersion = fmap pythonVersion Control.Monad.State.get
+getPythonVersion = Control.Monad.State.gets pythonVersion
 
 renameModulePath :: RenameMap -> ModulePath -> ModulePath
 renameModulePath renameMap path' =

@@ -10,7 +10,7 @@ import qualified Data.ByteString as B
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
-import Control.Concurrent.STM (atomically, newTVar, readTVar, TVar, writeTVar)
+import Control.Concurrent.STM
 import Data.Monoid ((<>))
 import qualified Options.Applicative as OPT
 import System.Directory (createDirectoryIfMissing)
@@ -198,12 +198,12 @@ reactiveBuild :: AppOptions -> IO ()
 reactiveBuild options@AppOptions { building = building'
                                  , changed = changed'
                                  } = do
-    changed'' <- atomically $ readTVar changed'
+    changed'' <- readTVarIO changed'
     when changed'' $ do
         atomically $ writeTVar changed' False
         build options
         atomically $ writeTVar building' False
-        changedDuringBuild <- atomically $ readTVar changed'
+        changedDuringBuild <- readTVarIO changed'
         when changedDuringBuild $ reactiveBuild options
 
 tryDie :: AppOptions -> String -> IO ()

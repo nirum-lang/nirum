@@ -155,7 +155,7 @@ $case expr'
 
 module' :: BoundModule Docs -> Html
 module' docsModule =
-    layout pkg depth (ModulePage docsModulePath) title $ [shamlet|
+    layout pkg depth (ModulePage docsModulePath) title [shamlet|
 $maybe tit <- headingTitle
     <h1>
         <dfn><code>#{path}</code>
