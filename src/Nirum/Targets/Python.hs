@@ -445,7 +445,7 @@ compileUnionTag source parentname d@(Tag typename' fields' _) = do
         fields'
     pyVer <- getPythonVersion
     defaultErrorHandler <- defaultDeserializerErrorHandler
-    return $ [compileText|
+    return [compileText|
 class #{className}(#{parentClass}):
 #{compileDocstringWithFields "    " d (map fcField fieldCodes)}
     __slots__ = (
@@ -1483,7 +1483,7 @@ compileModuleBody :: Source -> CodeGen Markup
 compileModuleBody src@Source { sourceModule = boundModule } = do
     let types' = boundTypes boundModule
     typeCodes <- mapM (compileTypeDeclaration src) $ toList types'
-    return $ [compileText|
+    return [compileText|
 %{forall typeCode <- typeCodes}
 #{typeCode}
 %{endforall}
@@ -1511,7 +1511,7 @@ compileModule pythonVersion' source = do
                       M.assocs (thirdPartyImports context)
     let globalDefs = globalDefinitions context
     code <- result
-    return $ (deps, optDeps,) $
+    return $ (deps, optDeps,)
         [compileText|# -*- coding: utf-8 -*-
 #{compileDocstring "" $ sourceModule source}
 %{ forall (alias, import') <- M.assocs (standardImports context) }
