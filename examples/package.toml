@@ -10,3 +10,6 @@ classifiers = [
 
 [targets.docs]
 title = "Nirum Examples"
+
+[targets.typescript]
+name = "nirum-examples"
