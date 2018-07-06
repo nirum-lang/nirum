@@ -1,14 +1,4 @@
-module Nirum.Docs ( Block ( BlockQuote
-                          , CodeBlock
-                          , Document
-                          , Heading
-                          , HtmlBlock
-                          , List
-                          , Paragraph
-                          , ThematicBreak
-                          , infoString
-                          , code
-                          )
+module Nirum.Docs ( Block (..)
                   , HeadingLevel (H1, H2, H3, H4, H5, H6)
                   , Html
                   , Inline ( Code
@@ -31,7 +21,9 @@ module Nirum.Docs ( Block ( BlockQuote
                   , ListDelimiter (Parenthesis, Period)
                   , LooseItem
                   , TightItem
-                  , Title
+                  , TableCell
+                  , TableColumn (..)
+                  , TableRow
                   , Url
                   , filterReferences
                   , headingLevelFromInt
@@ -40,9 +32,10 @@ module Nirum.Docs ( Block ( BlockQuote
                   , trimTitle
                   ) where
 
+import Data.List.NonEmpty
 import Data.String (IsString (fromString))
 
-import qualified CMark as M
+import qualified CMarkGFM as M
 import qualified Data.Text as T
 
 type Url = T.Text
@@ -89,6 +82,7 @@ data Block = Document [Block]
            | CodeBlock { infoString :: T.Text, code :: T.Text }
            | Heading HeadingLevel [Inline]
            | List ListType ItemList
+           | Table (NonEmpty TableColumn) (NonEmpty TableRow)
            deriving (Eq, Ord, Show)
 
 data ItemList = LooseItemList [LooseItem]
@@ -98,6 +92,17 @@ data ItemList = LooseItemList [LooseItem]
 type LooseItem = [Block]
 
 type TightItem = [Inline]
+
+data TableColumn
+    = NotAligned
+    | LeftAligned
+    | CenterAligned
+    | RightAligned
+    deriving (Eq, Ord, Show)
+
+type TableRow = NonEmpty TableCell
+
+type TableCell = [Inline]
 
 data Inline
     = Text T.Text
@@ -122,7 +127,7 @@ trimTitle block =
 
 parse :: T.Text -> Block
 parse =
-    transBlock . M.commonmarkToNode [M.optNormalize, M.optSmart]
+    transBlock . M.commonmarkToNode [M.optSmart] [M.extTable]
   where
     transBlock :: M.Node -> Block
     transBlock n@(M.Node _ nodeType children) =
@@ -145,18 +150,22 @@ parse =
                                               M.PAREN_DELIM -> Parenthesis
                      ) $
                      if tight
-                        then TightItemList $ map stripParagraph listItems
-                        else LooseItemList $ map (map transBlock) listItems
+                        then TightItemList $ fmap stripParagraph listItems
+                        else LooseItemList $ fmap (fmap transBlock) listItems
+            M.TABLE cellAligns ->
+                Table
+                    (fromList $ fmap toTableColumn cellAligns)
+                    (fromList $ fmap transRow children)
             _ -> error $ "expected block, but got inline: " ++ n'
       where
         blockChildren :: [Block]
-        blockChildren = map transBlock children
+        blockChildren = fmap transBlock children
         inlineChildren :: [Inline]
-        inlineChildren = map transInline children
+        inlineChildren = fmap transInline children
         listItems :: [[M.Node]]
         listItems = [nodes | (M.Node _ M.ITEM nodes) <- children]
         stripParagraph :: [M.Node] -> [Inline]
-        stripParagraph [M.Node _ M.PARAGRAPH nodes] = map transInline nodes
+        stripParagraph [M.Node _ M.PARAGRAPH nodes] = fmap transInline nodes
         stripParagraph ns = error $ "expected a paragraph, but got " ++ show ns
         n' :: String
         n' = show n
@@ -175,7 +184,18 @@ parse =
             _ -> error $ "expected inline, but got block: " ++ show n
       where
         children :: [Inline]
-        children = map transInline childNodes
+        children = fmap transInline childNodes
+    toTableColumn :: M.TableCellAlignment -> TableColumn
+    toTableColumn M.NoAlignment = NotAligned
+    toTableColumn M.LeftAligned = LeftAligned
+    toTableColumn M.CenterAligned = CenterAligned
+    toTableColumn M.RightAligned = RightAligned
+    transRow :: M.Node -> TableRow
+    transRow (M.Node _ M.TABLE_ROW nodes) = fromList (fmap transCell nodes)
+    transRow node = error $ "expected a table row, but got " ++ show node
+    transCell :: M.Node -> TableCell
+    transCell (M.Node _ M.TABLE_CELL nodes) = fmap transInline nodes
+    transCell node = error $ "expected a table cell, but got " ++ show node
 
 instance IsString Block where
     fromString = parse . T.pack

@@ -1,6 +1,10 @@
 {-# LANGUAGE OverloadedStrings, QuasiQuotes #-}
 module Nirum.Docs.ReStructuredText (ReStructuredText, render) where
 
+import qualified Data.List.NonEmpty
+import Data.List.NonEmpty (NonEmpty (..), toList, (<|))
+import Data.Maybe
+
 import qualified Data.Text as T
 import Text.InterpolatedString.Perl6 (qq)
 
@@ -126,6 +130,73 @@ renderBlock (List (OrderedList startNum _) (LooseItemList items)) =
     T.intercalate "\n\n" [ [qq|$n. {T.drop 3 $ indent3 $ renderBlocks i}|]
                          | (n, i) <- indexed startNum items
                          ]
+renderBlock (Table _ allRows@(header :| rows)) = T.concat $
+    ["\n", hline "-", row header, hline "="] ++
+    [row cells `T.append` hline "-" | cells <- rows] ++
+    ["\n"]
+  where
+    widths :: NonEmpty Int
+    widths = columnWidths allRows
+    hline :: T.Text -> ReStructuredText
+    hline c = T.concat
+        [ "+"
+        , T.intercalate "+" [T.replicate (w + 2) c | w <- toList widths]
+        , "+\n"
+        ]
+    row :: TableRow -> ReStructuredText
+    row cells = T.concat
+        [ T.concat
+            [ "|"
+            , T.intercalate "|"
+                [ T.concat
+                    [ " "
+                    , T.justifyLeft w ' ' $ case drop lineIdx lines' of
+                        line' : _ -> line'
+                        [] -> ""
+                    , " "
+                    ]
+                | (lines', w) <- cells'
+                ]
+            , "|\n"
+            ]
+        | lineIdx <- [0 .. (rowHeight cells - 1)]
+        ]
+      where
+        cells' :: [([ReStructuredText], Int)]
+        cells' =
+            [ (T.lines $ renderInlines cell, w)
+            | (cell, w) <- toList $ Data.List.NonEmpty.zip cells widths
+            ]
+
+cellWidthHeight :: TableCell -> (Int, Int)
+cellWidthHeight inlines =
+    case T.lines $ renderInlines inlines of
+        [] -> (0, 0)
+        lines' -> (maximum (map T.length lines'), length lines')
+
+columnWidths :: NonEmpty TableRow -> NonEmpty Int
+columnWidths =
+    widths . fmap Just
+  where
+    cellWidths :: NonEmpty (Maybe TableRow) -> NonEmpty Int
+    cellWidths =
+        fmap (maybe 0 (fst . cellWidthHeight . Data.List.NonEmpty.head))
+    restCols :: NonEmpty (Maybe TableRow) -> NonEmpty (Maybe TableRow)
+    restCols = fmap $ maybe Nothing
+        (Data.List.NonEmpty.nonEmpty . Data.List.NonEmpty.tail)
+    widths :: NonEmpty (Maybe TableRow) -> NonEmpty Int
+    widths rows =
+        let
+            restCols' = restCols rows
+            maxWidth = maximum (cellWidths rows)
+        in
+            if any isJust restCols'
+            then maxWidth <| widths restCols'
+            else maxWidth :| []
+
+rowHeight :: TableRow -> Int
+rowHeight =
+    maximum . fmap (snd . cellWidthHeight)
 
 indexed :: Enum i => i -> [a] -> [(i, a)]
 indexed _ [] = []
