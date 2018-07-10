@@ -1,6 +1,8 @@
 {-# LANGUAGE ExtendedDefaultRules, OverloadedStrings, QuasiQuotes #-}
 module Nirum.DocsSpec where
 
+import Data.List.NonEmpty (NonEmpty ((:|)))
+
 import Data.Text (Text)
 import Test.Hspec.Meta
 import Text.InterpolatedString.Perl6 (q)
@@ -24,6 +26,13 @@ Loose list:
 2. b
 
 A [complex *link*][1].
+
+| A     | B      | C            | D     |
+| ----- | :----- | :----------: | ----: |
+| foo   | bar    | baz          | bim   |
+| qux   | quux   | ![](img.jpg) | quuz  |
+| corge | grault | garply       | waldo |
+| ga    | na     | da           | ra    |
 
 [1]: http://nirum.org/ "Nirum"
 
@@ -55,7 +64,19 @@ sampleDocument' adjust =
                      ["complex ", Emphasis ["link"]]
               , "."
               ]
+        , Table
+              (NotAligned :| [LeftAligned, CenterAligned, RightAligned])
+              ( (["A"] :| [["B"], ["C"], ["D"]])
+              :| [ ["foo"] :| [["bar"], ["baz"], ["bim"]]
+                 , ["qux"] :| [["quux"], [img], ["quuz"]]
+                 , ["corge"] :| [["grault"], ["garply"], ["waldo"]]
+                 , ["ga"] :| [["na"], ["da"], ["ra"]]
+                 ]
+              )
         ]
+  where
+    img :: Inline
+    img = Image "img.jpg" ""
 
 spec :: Spec
 spec = do

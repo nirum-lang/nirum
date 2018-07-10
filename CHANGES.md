@@ -10,9 +10,12 @@ To be released.
 
  -  The `uri` type has completly gone; use `url` instead.
     [[#126], [#281] by Jonghun Park]
+ -  [CommonMark] in docstrings became to support [table syntax extension].
 
 [#126]: https://github.com/spoqa/nirum/issues/126
 [#281]: https://github.com/spoqa/nirum/pull/281
+[CommonMark]: http://commonmark.org/
+[table syntax extension]: https://github.github.com/gfm/#tables-extension-
 
 
 Version 0.4.1

@@ -1,6 +1,9 @@
 {-# LANGUAGE OverloadedStrings, QuasiQuotes #-}
 module Nirum.Docs.Html (render, renderInline, renderInlines, renderBlock) where
 
+import Data.List.NonEmpty
+import Prelude hiding (head, zip)
+
 import qualified Data.Text as T
 import Text.InterpolatedString.Perl6 (qq)
 
@@ -36,7 +39,7 @@ escapeChar '>' = "&gt;"
 escapeChar c = T.singleton c
 
 renderInlines :: [Inline] -> Html
-renderInlines = T.concat . map renderInline
+renderInlines = T.concat . fmap renderInline
 
 renderBlock :: Block -> Html
 renderBlock (Document blocks) = renderBlocks blocks `T.snoc` '\n'
@@ -70,9 +73,28 @@ renderBlock (List listType itemList) =
         nl = '\n'
         liListT = T.intercalate "\n" liList
     in [qq|<$tag>$nl$liListT$nl</$tag>|]
+renderBlock (Table columns rows) =
+    [qq|<table>$lf<thead>$lf<tr>
+{T.concat (toList $ fmap th $ zip columns (head rows))}
+</tr>$lf</thead>
+<tbody>{T.concat (fmap tr $ Data.List.NonEmpty.tail rows)}</tbody></table>|]
+  where
+    lf :: Char
+    lf = '\n'
+    th :: (TableColumn, TableCell) -> Html
+    th (col, cell) = [qq|$lf<th{align col}>{renderInlines cell}</th>|]
+    align :: TableColumn -> Html
+    align NotAligned = ""
+    align LeftAligned = " align=\"left\""
+    align CenterAligned = " align=\"center\""
+    align RightAligned = " align=\"right\""
+    tr :: TableRow -> Html
+    tr cells = [qq|$lf<tr>{T.concat (toList $ fmap td cells)}</tr>|]
+    td :: TableCell -> Html
+    td inlines = [qq|$lf<td>{renderInlines inlines}</td>|]
 
 renderBlocks :: [Block] -> Html
-renderBlocks = T.intercalate "\n" . map renderBlock
+renderBlocks = T.intercalate "\n" . fmap renderBlock
 
 render :: Block -> Html
 render = renderBlock
