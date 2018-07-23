@@ -50,7 +50,7 @@ Windows.  We provide the prebuilt executable binaries for these three platforms.
 ### Released builds
 
 You can download executable binaries for Linux (x86_64), macOS (x86_64), or
-Windows (x64 or x86) from the [latest release note][latest-release].
+Windows (x64) from the [latest release note][latest-release].
 You should give it appropriate permissions (e.g., `+x`) depending on your
 platform.
 
@@ -72,7 +72,6 @@ its bleeding edge.  We provide nightly builds for this purpose.
 - [Linux (x86_64)](https://nightly-builds.nirum.org/travis-builds/nirum-linux-x86_64)
 - [macOS (x86_64)](https://nightly-builds.nirum.org/travis-builds/nirum-darwin-x86_64)
 - [Windows (x64)](https://ci.appveyor.com/api/projects/dahlia/nirum-k5n5y/artifacts/nirum-win-x64.exe?job=Platform%3A%20x64&branch=master)
-- [Windows (x86)](https://ci.appveyor.com/api/projects/dahlia/nirum-k5n5y/artifacts/nirum-win-x86.exe?job=Platform%3A%20x86&branch=master)
 - [Docker (`spoqa/nirum:latest`)][docker]
 
 Although we call it "nightly build," technically it is not built every night,

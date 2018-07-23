@@ -1,7 +1,6 @@
 version: "{build}"
 platform:
 - x64
-- x86
 environment:
   STACK_ROOT: C:\sr
   TOX: C:\Python36\Scripts\tox.exe
@@ -21,12 +20,7 @@ install:
 - ps: $env:PATH = 'C:\upx394w;' + $env:PATH;
 - ps: >
     if((Test-Path $env:STACK_ROOT) -ne $true) {
-      if($env:PLATFORM -eq 'x86') {
-        $stackUrl = 'https://github.com/commercialhaskell/stack/releases/download/v1.6.5/stack-1.6.5-windows-i386.zip';
-      }
-      elseif($env:PLATFORM -eq 'x64') {
-        $stackUrl = 'https://github.com/commercialhaskell/stack/releases/download/v1.6.5/stack-1.6.5-windows-x86_64.zip';
-      }
+      $stackUrl = 'https://github.com/commercialhaskell/stack/releases/download/v1.6.5/stack-1.6.5-windows-x86_64.zip';
       Invoke-WebRequest -OutFile C:\stack.zip $stackUrl;
       Add-Type -AssemblyName System.IO.Compression.FileSystem;
       [System.IO.Compression.ZipFile]::ExtractToDirectory('C:\stack.zip', $env:STACK_ROOT);
@@ -62,7 +56,6 @@ after_build:
 test_script:
 - stack --no-terminal test --jobs 1
 artifacts:
-- path: nirum-win-x86.exe
 - path: nirum-win-x64.exe
 deploy:
   provider: GitHub
