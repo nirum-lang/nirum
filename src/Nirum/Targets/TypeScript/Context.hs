@@ -4,6 +4,7 @@ module Nirum.Targets.TypeScript.Context
               , thirdPartyImports
               )
     , CodeBuilder
+    , TypeScript ( TypeScript, packageName )
     , empty
     ) where
 
@@ -14,6 +15,9 @@ import Data.Text hiding (empty)
 
 import qualified Nirum.CodeBuilder as CB
 import Nirum.Constructs.ModulePath
+
+newtype TypeScript = TypeScript { packageName :: Text }
+                   deriving (Eq, Ord, Show)
 
 data Context =
     Context { localImports :: Map ModulePath (Set Text)
