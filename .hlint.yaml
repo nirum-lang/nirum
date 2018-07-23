@@ -58,13 +58,6 @@
     - Nirum.Targets.Python.CodeGenSpec
 - ignore: {name: Unnecessary hiding}
 
-# Hlint seems unaware of variables in quasi-quotes.
-# See also: https://github.com/ndmitchell/hlint/issues/506
-- ignore:
-    name: Use const
-    within:
-    - Nirum.Targets.Python
-
 
 # Define some custom infix operators
 # - fixity: infixr 3 ~^#^~

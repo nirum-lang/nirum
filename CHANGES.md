@@ -12,6 +12,10 @@ To be released.
     [[#126], [#281] by Jonghun Park]
  -  [CommonMark] in docstrings became to support [table syntax extension].
 
+### Et cetera
+
+ -  Dropped 32-bit Windows support.
+
 [#126]: https://github.com/spoqa/nirum/issues/126
 [#281]: https://github.com/spoqa/nirum/pull/281
 [CommonMark]: http://commonmark.org/
