@@ -10,10 +10,13 @@ To be released.
 
  -  The `uri` type has completly gone; use `url` instead.
     [[#126], [#281] by Jonghun Park]
- -  [CommonMark] in docstrings became to support [table syntax extension].
 
 ### Docs target
 
+ -  Docs target became to support manual pages besides reference docs extracted
+    from Nirum source codes.  It scans all CommonMark (i.e., _*.md_) files and
+    transforms them to HTML pages.
+ -  [CommonMark] in docstrings became to support [table syntax extension].
  -  Fixed an incorrect processing of [CommonMark] thight list items: it had
     crashed when a thight list item contains blocks other than paragraphs.
 

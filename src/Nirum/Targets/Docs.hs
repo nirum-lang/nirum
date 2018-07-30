@@ -12,11 +12,11 @@ import GHC.Exts (IsList (fromList, toList))
 import qualified Data.ByteString as BS
 import Data.ByteString.Lazy (toStrict)
 import qualified Text.Email.Parser as E
-import Data.Map.Strict (Map, union)
+import Data.Map.Strict (Map, mapKeys, mapWithKey, unions)
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
-import System.FilePath ((</>))
+import System.FilePath
 import Text.Blaze (ToMarkup (preEscapedToMarkup))
 import Text.Blaze.Html.Renderer.Utf8 (renderHtml)
 import Text.Cassius
@@ -37,7 +37,9 @@ import Nirum.Constructs.Name (Name (facialName))
 import qualified Nirum.Constructs.Service as S
 import qualified Nirum.Constructs.TypeDeclaration as TD
 import qualified Nirum.Constructs.TypeExpression as TE
-import Nirum.Docs ( Block (Heading)
+import Nirum.Docs ( Block (..)
+                  , Inline (..)
+                  , extractTitle
                   , filterReferences
                   , trimTitle
                   )
@@ -68,6 +70,7 @@ type Error = T.Text
 data CurrentPage
     = IndexPage
     | ModulePage ModulePath
+    | DocumentPage FilePath
     deriving (Eq, Show)
 
 makeFilePath :: ModulePath -> FilePath
@@ -80,15 +83,14 @@ makeUri modulePath' =
     T.intercalate "/" $
                   map toNormalizedText (toList modulePath') ++ ["index.html"]
 
-layout :: ToMarkup m => Package Docs -> Int -> CurrentPage -> m -> Html -> Html
+layout :: Package Docs -> Int -> CurrentPage -> T.Text -> Html -> Html
 layout pkg dirDepth currentPage title body =
     layout' pkg dirDepth currentPage title body Nothing
 
-layout' :: ToMarkup m
-        => Package Docs
+layout' :: Package Docs
         -> Int
         -> CurrentPage
-        -> m
+        -> T.Text
         -> Html
         -> Maybe Html
         -> Html
@@ -98,7 +100,11 @@ $doctype 5
 <html>
     <head>
         <meta charset="utf-8">
-        <title>#{title}
+        <title>
+            $if (title == docsTitle (target pkg))
+                #{title}
+            $else
+                #{title} &mdash; #{docsTitle (target pkg)}
         <meta name="generator" content="Nirum #{versionText}">
         $forall Author { name = name' } <- authors md
             <meta name="author" content="#{name'}">
@@ -155,7 +161,7 @@ $case expr'
 
 module' :: BoundModule Docs -> Html
 module' docsModule =
-    layout pkg depth (ModulePage docsModulePath) title [shamlet|
+    layout pkg depth (ModulePage docsModulePath) path [shamlet|
 $maybe tit <- headingTitle
     <h1>
         <dfn><code>#{path}</code>
@@ -176,8 +182,6 @@ $forall (ident, decl) <- types'
     pkg = boundPackage docsModule
     path :: T.Text
     path = toCode docsModulePath
-    title :: T.Text
-    title = T.concat [path, " \8212 ", docsTitle $ target pkg]
     types' :: [(Identifier, TD.TypeDeclaration)]
     types' = [ (facialName $ DE.name decl, decl)
              | decl <- DES.toList $ boundTypes docsModule
@@ -329,6 +333,40 @@ showKind TD.TypeDeclaration { TD.type' = type'' } = case type'' of
     TD.PrimitiveType {} -> "primitive"
 showKind TD.Import {} = "import"
 
+documentPage :: Package Docs -> FilePath -> D.Docs -> Html
+documentPage pkg filePath docs' =
+    layout pkg depth (DocumentPage filePath) title' content
+  where
+    depth :: Int
+    depth = length (splitPath (documentHtmlPath filePath)) - 1
+    title' :: T.Text
+    title' = renderInlines' $ documentTitle filePath docs'
+    content :: Html
+    content = preEscapedToMarkup $ render $ D.toBlock docs'
+    renderInline :: Inline -> T.Text
+    renderInline (Text t) = t
+    renderInline SoftLineBreak = "\n"
+    renderInline HardLineBreak = "\n"
+    renderInline (HtmlInline _) = ""
+    renderInline (Code code') = code'
+    renderInline (Emphasis inlines) = renderInlines inlines
+    renderInline (Strong inlines) = renderInlines inlines
+    renderInline (Link _ _ inlines) = renderInlines inlines
+    renderInline (Image _ title)
+      | T.null title = ""
+      | otherwise = title
+    renderInlines' :: [Inline] -> T.Text
+    renderInlines' = T.concat . fmap renderInline
+
+documentHtmlPath :: FilePath -> FilePath
+documentHtmlPath = (-<.> "html")
+
+documentTitle :: FilePath -> D.Docs -> [Inline]
+documentTitle filePath document =
+    case extractTitle $ D.toBlock document of
+        Just (_, inlines) -> inlines
+        Nothing -> [Text $ T.pack filePath]
+
 contents :: Package Docs -> Html
 contents pkg@Package { metadata = md
                      , modules = ms
@@ -387,6 +425,8 @@ body
     margin: 0
     font-family: Source Sans Pro
     color: #{gray8}
+article
+    line-height: 1.3
 code
     font-family: Source Code Pro
     font-weight: 300
@@ -480,15 +520,22 @@ footer
     navWidth = PixelSize 300
 
 compilePackage' :: Package Docs -> Map FilePath (Either Error BS.ByteString)
-compilePackage' pkg =
-    fromList [ ("style.css", Right $ encodeUtf8 $ TL.toStrict stylesheet)
-             , ("index.html", Right $ toStrict $ renderHtml $ contents pkg)
-             ] `union`
-          (fromList [ ( makeFilePath $ modulePath m
-                      , Right $ toStrict $ renderHtml $ module' m
-                      )
-                    | m <- modules'
-                    ] :: Map FilePath (Either Error BS.ByteString))
+compilePackage' pkg@Package { documents = documents' } = unions
+    [ fromList
+        [ ("style.css", Right $ encodeUtf8 $ TL.toStrict stylesheet)
+        , ("index.html", Right $ toStrict $ renderHtml $ contents pkg)
+        ]
+    , fromList
+        [ ( makeFilePath $ modulePath m
+          , Right $ toStrict $ renderHtml $ module' m
+          )
+        | m <- modules'
+        ]
+    , mapKeys documentHtmlPath $
+        fmap
+            (Right . toStrict . renderHtml)
+            (mapWithKey (documentPage pkg) documents')
+    ]
   where
     paths' :: [ModulePath]
     paths' = MS.keys $ modules pkg

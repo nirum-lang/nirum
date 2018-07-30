@@ -110,6 +110,10 @@ spec = do
                 , "image"
                 , "."
                 ]
+    specify "extractTitle" $ do
+        let Heading lv inlines = sampleHeading
+        extractTitle sampleDocument `shouldBe` Just (lv, inlines)
+        extractTitle (sampleDocument' id) `shouldBe` Nothing
     specify "trimTitle" $ do
         -- Remove the top-level heading if it exists:
         trimTitle sampleDocument `shouldBe` sampleDocument' id

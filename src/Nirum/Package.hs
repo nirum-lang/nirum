@@ -30,7 +30,7 @@ import Nirum.Constructs.Docs
 import Nirum.Constructs.Module
 import Nirum.Constructs.ModulePath (ModulePath, fromFilePath)
 import Nirum.Package.Metadata ( MetadataError
-                              , Package (Package, metadata, modules)
+                              , Package (..)
                               , Target
                               , metadataPath
                               , packageTarget
@@ -61,10 +61,10 @@ scanPackage packagePath = runExceptT $ do
         Left e -> throwError $ MetadataError e
     modulePaths <- liftIO $ scanModules packagePath
     modules' <- mapM (\ p -> catch (parseFile p) $ ScanError p) modulePaths
-    documents <- liftIO $ scanDocuments packagePath
+    documents' <- liftIO $ scanDocuments packagePath
     case M.foldrWithKey excludeFailedParse (Right M.empty) modules' of
         Right parsedModules -> case MS.fromMap parsedModules of
-            Right ms -> return $ Package metadata' ms documents
+            Right ms -> return $ Package metadata' ms documents'
             Left errors -> throwError $ ImportError errors
         Left error' -> throwError error'
   where

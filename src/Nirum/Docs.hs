@@ -24,6 +24,7 @@ module Nirum.Docs ( Block (..)
                   , TableColumn (..)
                   , TableRow
                   , Url
+                  , extractTitle
                   , filterReferences
                   , headingLevelFromInt
                   , headingLevelInt
@@ -115,6 +116,11 @@ data Inline
     | Link { linkUrl :: Url, linkTitle :: Title, linkContents :: [Inline] }
     | Image { imageUrl :: Url, imageTitle :: Title }
     deriving (Eq, Ord, Show)
+
+-- | Extract the top-level first heading from the block, if it exists.
+extractTitle :: Block -> Maybe (HeadingLevel, [Inline])
+extractTitle (Document (Heading lv inlines : _)) = Just (lv, inlines)
+extractTitle _ = Nothing
 
 -- | Trim the top-level first heading from the block, if it exists.
 trimTitle :: Block -> Block
