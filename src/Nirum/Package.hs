@@ -4,11 +4,15 @@ module Nirum.Package
     , ParseError
     , docs
     , resolveModule
+    , scanDocuments
     , scanModules
     , scanPackage
     , target
     ) where
 
+import Data.Char
+import Data.List (isSuffixOf)
+import System.IO
 import System.IO.Error (catchIOError)
 
 import Control.Monad.Except ( ExceptT
@@ -18,9 +22,11 @@ import Control.Monad.Except ( ExceptT
                             )
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
+import Data.Text.IO
 import System.Directory (doesDirectoryExist, listDirectory)
 import System.FilePath ((</>))
 
+import Nirum.Constructs.Docs
 import Nirum.Constructs.Module
 import Nirum.Constructs.ModulePath (ModulePath, fromFilePath)
 import Nirum.Package.Metadata ( MetadataError
@@ -55,9 +61,10 @@ scanPackage packagePath = runExceptT $ do
         Left e -> throwError $ MetadataError e
     modulePaths <- liftIO $ scanModules packagePath
     modules' <- mapM (\ p -> catch (parseFile p) $ ScanError p) modulePaths
+    documents <- liftIO $ scanDocuments packagePath
     case M.foldrWithKey excludeFailedParse (Right M.empty) modules' of
         Right parsedModules -> case MS.fromMap parsedModules of
-            Right ms -> return $ Package metadata' ms
+            Right ms -> return $ Package metadata' ms documents
             Left errors -> throwError $ ImportError errors
         Left error' -> throwError error'
   where
@@ -84,9 +91,6 @@ scanModules packagePath = do
     files <- scanFiles ""
     return $ M.fromList files
   where
-    isNotHidden :: FilePath -> Bool
-    isNotHidden ('.' : _) = False
-    isNotHidden _ = True
     scanFiles :: FilePath -> IO [(ModulePath, FilePath)]
     scanFiles path = do
         dir <- doesDirectoryExist realPath
@@ -103,3 +107,30 @@ scanModules packagePath = do
         realPath = case path of
                        [] -> packagePath
                        p -> packagePath </> p
+
+scanDocuments :: FilePath -> IO (M.Map FilePath Docs)
+scanDocuments =
+    (`scan'` "")
+  where
+    scan' :: FilePath -> FilePath -> IO (M.Map FilePath Docs)
+    scan' basePath path = do
+        subpaths <- listDirectory (basePath </> path)
+        maps <- sequence $ (<$> filter isNotHidden subpaths) $ \ name -> do
+            let subpath = path </> name
+            dir <- doesDirectoryExist (basePath </> subpath)
+            if dir
+            then scan' basePath subpath
+            else
+                if ".md" `isSuffixOf` map toLower name
+                then do
+                    code <- withFile (basePath </> subpath) ReadMode $ \ h -> do
+                        hSetEncoding h utf8_bom
+                        Data.Text.IO.hGetContents h
+                    return $ M.singleton subpath $ Docs code
+                else
+                    return M.empty
+        return $ M.unions maps
+
+isNotHidden :: FilePath -> Bool
+isNotHidden ('.' : _) = False
+isNotHidden _ = True
