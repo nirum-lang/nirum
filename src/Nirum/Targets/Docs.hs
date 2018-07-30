@@ -12,7 +12,7 @@ import GHC.Exts (IsList (fromList, toList))
 import qualified Data.ByteString as BS
 import Data.ByteString.Lazy (toStrict)
 import qualified Text.Email.Parser as E
-import Data.Map.Strict (Map, mapKeys, mapWithKey, unions)
+import Data.Map.Strict (Map, mapKeys, mapWithKey, toAscList, unions)
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
@@ -43,7 +43,7 @@ import Nirum.Docs ( Block (..)
                   , filterReferences
                   , trimTitle
                   )
-import Nirum.Docs.Html (render, renderInlines)
+import Nirum.Docs.Html (render, renderInlines, renderLinklessInlines)
 import Nirum.Package
 import Nirum.Package.Metadata ( Author (Author, email, name, uri)
                               , Metadata (authors)
@@ -94,7 +94,7 @@ layout' :: Package Docs
         -> Html
         -> Maybe Html
         -> Html
-layout' pkg@Package { metadata = md, modules = ms }
+layout' pkg@Package { metadata = md, modules = ms, documents = ds }
         dirDepth currentPage title body footer = [shamlet|
 $doctype 5
 <html>
@@ -118,10 +118,21 @@ $doctype 5
             $else
                 <a class="index" href="#{root}index.html">
                     #{docsTitle $ target pkg}
-            <ul class="toc">
-                $forall (modulePath', mod) <- MS.toAscList ms
+            <ul.manuals.toc>
+                $forall (documentPath, doc) <- documentPairs
+                    $if currentPage == DocumentPage documentPath
+                        <li.selected>
+                            <a href="#{root}#{documentHtmlPath documentPath}">
+                                <strong>
+                                    #{renderDocumentTitle documentPath doc}
+                    $else
+                        <li>
+                            <a href="#{root}#{documentHtmlPath documentPath}">
+                                #{renderDocumentTitle documentPath doc}
+            <ul.modules.toc>
+                $forall (modulePath', mod) <- modulePairs
                     $if currentPage == ModulePage modulePath'
-                        <li class="selected">
+                        <li.selected>
                             <a href="#{root}#{makeUri modulePath'}">
                                 <strong>
                                     <code>#{toCode modulePath'}</code>
@@ -140,6 +151,10 @@ $doctype 5
   where
     root :: T.Text
     root = T.replicate dirDepth "../"
+    modulePairs :: [(ModulePath, Module)]
+    modulePairs = MS.toAscList ms
+    documentPairs :: [(FilePath, D.Docs)]
+    documentPairs = toAscList ds
 
 typeExpression :: BoundModule Docs -> TE.TypeExpression -> Html
 typeExpression _ expr = [shamlet|#{typeExpr expr}|]
@@ -337,12 +352,30 @@ documentPage :: Package Docs -> FilePath -> D.Docs -> Html
 documentPage pkg filePath docs' =
     layout pkg depth (DocumentPage filePath) title' content
   where
-    depth :: Int
-    depth = length (splitPath (documentHtmlPath filePath)) - 1
     title' :: T.Text
-    title' = renderInlines' $ documentTitle filePath docs'
+    title' = documentTitleText filePath docs'
     content :: Html
     content = preEscapedToMarkup $ render $ D.toBlock docs'
+    depth :: Int
+    depth = length (splitPath (documentHtmlPath filePath)) - 1
+
+documentHtmlPath :: FilePath -> FilePath
+documentHtmlPath = (-<.> "html")
+
+documentTitle :: FilePath -> D.Docs -> [Inline]
+documentTitle filePath document =
+    case extractTitle $ D.toBlock document of
+        Just (_, inlines) -> inlines
+        Nothing -> [Text $ T.pack filePath]
+
+renderDocumentTitle :: FilePath -> D.Docs -> Html
+renderDocumentTitle filePath =
+    preEscapedToMarkup . renderLinklessInlines . documentTitle filePath
+
+documentTitleText :: FilePath -> D.Docs -> T.Text
+documentTitleText filePath =
+    renderInlines' . documentTitle filePath
+  where
     renderInline :: Inline -> T.Text
     renderInline (Text t) = t
     renderInline SoftLineBreak = "\n"
@@ -357,15 +390,6 @@ documentPage pkg filePath docs' =
       | otherwise = title
     renderInlines' :: [Inline] -> T.Text
     renderInlines' = T.concat . fmap renderInline
-
-documentHtmlPath :: FilePath -> FilePath
-documentHtmlPath = (-<.> "html")
-
-documentTitle :: FilePath -> D.Docs -> [Inline]
-documentTitle filePath document =
-    case extractTitle $ D.toBlock document of
-        Just (_, inlines) -> inlines
-        Nothing -> [Text $ T.pack filePath]
 
 contents :: Package Docs -> Html
 contents pkg@Package { metadata = md

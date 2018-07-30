@@ -1,5 +1,11 @@
 {-# LANGUAGE OverloadedStrings, QuasiQuotes #-}
-module Nirum.Docs.Html (render, renderInline, renderInlines, renderBlock) where
+module Nirum.Docs.Html
+    ( render
+    , renderBlock
+    , renderInline
+    , renderInlines
+    , renderLinklessInlines
+    ) where
 
 import Data.List.NonEmpty
 import Prelude hiding (head, zip)
@@ -40,6 +46,14 @@ escapeChar c = T.singleton c
 
 renderInlines :: [Inline] -> Html
 renderInlines = T.concat . fmap renderInline
+
+renderLinklessInlines :: [Inline] -> Html
+renderLinklessInlines inlines = T.concat
+    [ case i of
+        Link _ _ inlines' -> renderInlines inlines'
+        i' -> renderInline i'
+    | i <- inlines
+    ]
 
 renderBlock :: Block -> Html
 renderBlock (Document blocks) = renderBlocks blocks `T.snoc` '\n'
