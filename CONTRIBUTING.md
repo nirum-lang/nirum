@@ -82,3 +82,35 @@ dependencies):
      -  [`tox`][tox] 3.0.0 or higher
 
 [tox]: https://tox.readthedocs.io/
+
+
+Lint
+----
+
+Since we want to keep our coding style consistently, we run [lint] to check
+it.  You can get more information about [hlint] on its homepage.
+
+We recommend you to register lint to Git hooks.
+
+~~~~~~~~ bash
+ln -s "$PWD/lint.sh" "$PWD/.git/hooks/pre-commit"
+~~~~~~~~
+
+If you have registered a hook once, it will be automatically executed
+when you make a commit.
+
+
+Changelog
+---------
+
+We believe logging changes is a part of making software.
+So we have the policy that enforcing every pull request has a log to changelog
+(i.e., a diff on *CHANGES.md* file) on the [CI][changelog-test-ci].
+
+Please put `[chagelog skip]` on commit message if your change is not related to
+the Nirum compiler (e.g., fixing a typo).
+
+
+[lint]: https://en.wikipedia.org/wiki/Lint_(software)
+[hlint]: https://github.com/ndmitchell/hlint
+[changelog-test-ci]: https://github.com/spoqa/nirum/blob/454e4b6f9f934c8cae515b0e4c7a2acf6ba32891/.travis.yml#L45-L55
