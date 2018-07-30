@@ -5,7 +5,7 @@ Build
 -----
 
 In the same way to other Haskell softwares, Nirum compiler can be built using
-[Haskell Stack][].  If you didn't install it yet see also its
+[Haskell Stack].  If you didn't install it yet see also its
 [installation guide][1].
 
 If it's your first build of Nirum compiler you need to setup a proper version
@@ -73,7 +73,7 @@ changes breaking either testing cannot be merged.
 External dependencies
 ---------------------
 
-Each target test suite has its external dependencies (i.e. non-library program
+Each target test suite has its external dependencies (i.e., non-library program
 dependencies):
 
  -  Python
