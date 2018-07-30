@@ -50,8 +50,8 @@ sampleDocument' :: ([Block] -> [Block]) -> Block
 sampleDocument' adjust =
     (Document . adjust)
         [ Paragraph ["Tight list:"]
-        , List BulletList $ TightItemList [ ["List test"]
-                                          , ["test2"]
+        , List BulletList $ TightItemList [ [Paragraph ["List test"]]
+                                          , [Paragraph ["test2"]]
                                           ]
         , Paragraph ["Loose list:"]
         , List (OrderedList 1 Period) $

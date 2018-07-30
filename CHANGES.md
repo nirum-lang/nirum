@@ -12,6 +12,11 @@ To be released.
     [[#126], [#281] by Jonghun Park]
  -  [CommonMark] in docstrings became to support [table syntax extension].
 
+### Docs target
+
+ -  Fixed an incorrect processing of [CommonMark] thight list items: it had
+    crashed when a thight list item contains blocks other than paragraphs.
+
 ### Et cetera
 
  -  Dropped 32-bit Windows support.

@@ -19,8 +19,7 @@ module Nirum.Docs ( Block (..)
                   , ItemList (LooseItemList, TightItemList)
                   , ListType (BulletList, OrderedList, startNumber, delimiter)
                   , ListDelimiter (Parenthesis, Period)
-                  , LooseItem
-                  , TightItem
+                  , ListItem
                   , TableCell
                   , TableColumn (..)
                   , TableRow
@@ -85,13 +84,12 @@ data Block = Document [Block]
            | Table (NonEmpty TableColumn) (NonEmpty TableRow)
            deriving (Eq, Ord, Show)
 
-data ItemList = LooseItemList [LooseItem]
-              | TightItemList [TightItem]
-              deriving (Eq, Ord, Show)
+data ItemList
+    = LooseItemList [ListItem]
+    | TightItemList [ListItem]
+    deriving (Eq, Ord, Show)
 
-type LooseItem = [Block]
-
-type TightItem = [Inline]
+type ListItem = [Block]
 
 data TableColumn
     = NotAligned
@@ -149,9 +147,8 @@ parse =
                                               M.PERIOD_DELIM -> Period
                                               M.PAREN_DELIM -> Parenthesis
                      ) $
-                     if tight
-                        then TightItemList $ fmap stripParagraph listItems
-                        else LooseItemList $ fmap (fmap transBlock) listItems
+                     (if tight then TightItemList else LooseItemList) $
+                        fmap (fmap transBlock) listItems
             M.TABLE cellAligns ->
                 Table
                     (fromList $ fmap toTableColumn cellAligns)
@@ -164,9 +161,6 @@ parse =
         inlineChildren = fmap transInline children
         listItems :: [[M.Node]]
         listItems = [nodes | (M.Node _ M.ITEM nodes) <- children]
-        stripParagraph :: [M.Node] -> [Inline]
-        stripParagraph [M.Node _ M.PARAGRAPH nodes] = fmap transInline nodes
-        stripParagraph ns = error $ "expected a paragraph, but got " ++ show ns
         n' :: String
         n' = show n
     transInline :: M.Node -> Inline

@@ -58,7 +58,7 @@ renderBlock (Heading level inlines) =
 renderBlock (List listType itemList) =
     let liList = case itemList of
                      TightItemList items ->
-                         [ [qq|<li>{renderInlines item}</li>|]
+                         [ [qq|<li>{renderTightBlocks item}</li>|]
                          | item <- items
                          ]
                      LooseItemList items ->
@@ -95,6 +95,14 @@ renderBlock (Table columns rows) =
 
 renderBlocks :: [Block] -> Html
 renderBlocks = T.intercalate "\n" . fmap renderBlock
+
+renderTightBlocks :: [Block] -> Html
+renderTightBlocks blocks = T.intercalate "\n"
+    [ case b of
+        Paragraph inlines -> renderInlines inlines
+        b' -> renderBlock b'
+    | b <- blocks
+    ]
 
 render :: Block -> Html
 render = renderBlock
