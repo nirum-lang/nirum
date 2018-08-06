@@ -10,3 +10,6 @@ classifiers = [
 
 [targets.docs]
 title = "Nirum Examples"
+
+[targets.rust]
+name = "nirum-examples"
