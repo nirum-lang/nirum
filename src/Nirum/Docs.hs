@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 module Nirum.Docs ( Block (..)
                   , HeadingLevel (H1, H2, H3, H4, H5, H6)
                   , Html
@@ -29,6 +30,7 @@ module Nirum.Docs ( Block (..)
                   , headingLevelFromInt
                   , headingLevelInt
                   , parse
+                  , transformReferences
                   , trimTitle
                   ) where
 
@@ -240,3 +242,30 @@ filterReferences (Image { imageTitle = t } : ix) = Text t : filterReferences ix
 filterReferences (Link { linkContents = children } : ix) =
     children ++ filterReferences ix
 filterReferences (i : ix) = i : filterReferences ix
+
+transformReferences :: (Url -> Url) -> Block -> Block
+transformReferences replace = \ case
+    Document blocks ->
+        Document (transformReferences replace <$> blocks)
+    Paragraph inlines ->
+        Paragraph (transformInline <$> inlines)
+    BlockQuote blocks ->
+        BlockQuote (transformReferences replace <$> blocks)
+    Heading lv inlines anchorId ->
+        Heading lv (transformInline <$> inlines) anchorId
+    List lt (LooseItemList items) ->
+        List lt $ LooseItemList (fmap (transformReferences replace) <$> items)
+    List lt (TightItemList items) ->
+        List lt $ TightItemList (fmap (transformReferences replace) <$> items)
+    Table cols rows ->
+        Table cols (fmap (fmap transformInline) <$> rows)
+    block ->
+        block
+  where
+    transformInline :: Inline -> Inline
+    transformInline (Emphasis inlines) = Emphasis (transformInline <$> inlines)
+    transformInline (Strong inlines) = Strong (transformInline <$> inlines)
+    transformInline (Link url title inlines) =
+        Link (replace url) title (transformInline <$> inlines)
+    transformInline (Image url title) = Image (replace url) title
+    transformInline inline = inline

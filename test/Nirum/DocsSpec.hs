@@ -3,7 +3,7 @@ module Nirum.DocsSpec where
 
 import Data.List.NonEmpty (NonEmpty ((:|)))
 
-import Data.Text (Text)
+import Data.Text (Text, snoc)
 import Test.Hspec.Meta
 import Text.InterpolatedString.Perl6 (q)
 
@@ -51,6 +51,10 @@ sampleDocument =
 
 sampleDocument' :: ([Block] -> [Block]) -> Block
 sampleDocument' adjust =
+    sampleDocument_ adjust "http://nirum.org/" (Image "img.jpg" "")
+
+sampleDocument_ :: ([Block] -> [Block]) -> Url -> Inline -> Block
+sampleDocument_ adjust url img =
     (Document . adjust)
         [ Paragraph ["Tight list:"]
         , List BulletList $ TightItemList [ [Paragraph ["List test"]]
@@ -63,7 +67,7 @@ sampleDocument' adjust =
                              ]
         , Paragraph
               [ "A "
-              , Link "http://nirum.org/" "Nirum"
+              , Link url "Nirum"
                      ["complex ", Emphasis ["link"]]
               , "."
               ]
@@ -78,9 +82,6 @@ sampleDocument' adjust =
                  ]
               )
         ]
-  where
-    img :: Inline
-    img = Image "img.jpg" ""
 
 spec :: Spec
 spec = do
@@ -123,3 +124,9 @@ spec = do
         trimTitle sampleDocument `shouldBe` sampleDocument' id
         -- No-op if there is no top-level heading:
         trimTitle (sampleDocument' id) `shouldBe` sampleDocument' id
+    specify "transformReferences" $
+        transformReferences (`snoc` '?') sampleDocument `shouldBe`
+            sampleDocument_
+                (sampleHeading :)
+                "http://nirum.org/?"
+                (Image "img.jpg?" "")

@@ -6,6 +6,7 @@ module Nirum.Targets.Docs ( Docs
                           , moduleTitle
                           ) where
 
+import Data.Char
 import Data.Maybe (mapMaybe)
 import GHC.Exts (IsList (fromList, toList))
 
@@ -41,6 +42,7 @@ import Nirum.Docs ( Block (..)
                   , Inline (..)
                   , extractTitle
                   , filterReferences
+                  , transformReferences
                   , trimTitle
                   )
 import Nirum.Docs.Html (render, renderInlines, renderLinklessInlines)
@@ -214,7 +216,24 @@ $forall (ident, decl) <- types'
     depth = length $ toList docsModulePath
 
 blockToHtml :: Block -> Html
-blockToHtml b = preEscapedToMarkup $ render b
+blockToHtml =
+    preEscapedToMarkup . render . transformReferences replaceUrl
+  where
+    replaceUrl :: T.Text -> T.Text
+    replaceUrl url
+      | isAbsoluteUrl url = url
+      | otherwise =
+            let (path, frag) = T.break (== '#') url
+            in T.pack (documentHtmlPath $ T.unpack path) `T.append` frag
+    isAbsoluteUrl :: T.Text -> Bool
+    isAbsoluteUrl url
+      | T.null rest = False
+      | T.null scheme = True
+      | otherwise = T.all testChar scheme && isAlpha (T.head scheme)
+      where
+        (scheme, rest) = T.break (== ':') url
+    testChar :: Char -> Bool
+    testChar c = (isAscii c && isAlphaNum c) || c == '.' || c == '-'
 
 typeDecl :: BoundModule Docs -> Identifier -> TD.TypeDeclaration -> Html
 typeDecl mod' ident
@@ -355,7 +374,7 @@ documentPage pkg filePath docs' =
     title' :: T.Text
     title' = documentTitleText filePath docs'
     content :: Html
-    content = preEscapedToMarkup $ render $ D.toBlock docs'
+    content = blockToHtml $ D.toBlock docs'
     depth :: Int
     depth = length (splitPath (documentHtmlPath filePath)) - 1
 
