@@ -32,6 +32,7 @@ module Nirum.Docs ( Block (..)
                   , trimTitle
                   ) where
 
+import Data.Char
 import Data.List.NonEmpty
 import Data.String (IsString (fromString))
 
@@ -41,6 +42,7 @@ import qualified Data.Text as T
 type Url = T.Text
 type Title = T.Text
 type Html = T.Text
+type AnchorId = T.Text
 
 -- | The level of heading.
 -- See also: http://spec.commonmark.org/0.25/#atx-heading
@@ -80,7 +82,7 @@ data Block = Document [Block]
            | BlockQuote [Block]
            | HtmlBlock Html
            | CodeBlock { infoString :: T.Text, code :: T.Text }
-           | Heading HeadingLevel [Inline]
+           | Heading HeadingLevel [Inline] (Maybe AnchorId)
            | List ListType ItemList
            | Table (NonEmpty TableColumn) (NonEmpty TableRow)
            deriving (Eq, Ord, Show)
@@ -119,7 +121,7 @@ data Inline
 
 -- | Extract the top-level first heading from the block, if it exists.
 extractTitle :: Block -> Maybe (HeadingLevel, [Inline])
-extractTitle (Document (Heading lv inlines : _)) = Just (lv, inlines)
+extractTitle (Document (Heading lv inlines _ : _)) = Just (lv, inlines)
 extractTitle _ = Nothing
 
 -- | Trim the top-level first heading from the block, if it exists.
@@ -143,7 +145,14 @@ parse =
             M.HTML_BLOCK rawHtml -> HtmlBlock rawHtml
             M.CUSTOM_BLOCK _ _ -> error $ "custom block is unsupported: " ++ n'
             M.CODE_BLOCK info codeText -> CodeBlock info codeText
-            M.HEADING lv -> Heading (headingLevelFromInt lv) inlineChildren
+            M.HEADING lv -> case extractAnchorId (last' children) of
+                Nothing ->
+                    Heading (headingLevelFromInt lv) inlineChildren Nothing
+                Just (initial, anchorId) ->
+                    Heading
+                        (headingLevelFromInt lv)
+                        (Prelude.init (fmap transInline children) ++ initial)
+                        (Just anchorId)
             M.LIST (M.ListAttributes listType' tight start delim) ->
                 List (case listType' of
                           M.BULLET_LIST -> BulletList
@@ -196,6 +205,27 @@ parse =
     transCell :: M.Node -> TableCell
     transCell (M.Node _ M.TABLE_CELL nodes) = fmap transInline nodes
     transCell node = error $ "expected a table cell, but got " ++ show node
+    extractAnchorId :: Maybe M.Node -> Maybe ([Inline], AnchorId)
+    extractAnchorId (Just (M.Node _ (M.TEXT text) []))
+      | T.null tail' = Nothing
+      | T.last tail' /= '}' = Nothing
+      | T.length tail' < 2 = Nothing
+      | otherwise =
+            let
+                aid = T.init tail'
+            in
+                if isValidId aid
+                     then Just ([Text $ T.stripEnd $ T.dropEnd 3 head'], aid)
+                     else Nothing
+      where
+        (head', tail') = T.breakOnEnd " {#" text
+        isValidId :: T.Text -> Bool
+        isValidId = T.all $ \ c ->
+            isAscii c && isAlphaNum c || c `elem` ['-', '_', '.']
+    extractAnchorId _ = Nothing
+    last' :: [a] -> Maybe a
+    last' [] = Nothing
+    last' l = Just $ Prelude.last l
 
 instance IsString Block where
     fromString = parse . T.pack

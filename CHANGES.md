@@ -17,6 +17,9 @@ To be released.
     from Nirum source codes.  It scans all CommonMark (i.e., _*.md_) files and
     transforms them to HTML pages.
  -  [CommonMark] in docstrings became to support [table syntax extension].
+ -  [CommonMark] in docstrings became to have a limited subset of
+    [special attributes extension].  It's only allowed to heading elements and
+    only anchor identifiers are supported (e.g., `{#header-id}`).
  -  Fixed an incorrect processing of [CommonMark] thight list items: it had
     crashed when a thight list item contains blocks other than paragraphs.
 
@@ -28,6 +31,7 @@ To be released.
 [#281]: https://github.com/spoqa/nirum/pull/281
 [CommonMark]: http://commonmark.org/
 [table syntax extension]: https://github.github.com/gfm/#tables-extension-
+[special attributes extension]: https://michelf.ca/projects/php-markdown/extra/#spe-attr
 
 
 Version 0.4.1

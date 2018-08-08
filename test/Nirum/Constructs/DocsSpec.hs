@@ -29,12 +29,13 @@ spec =
                     `shouldBe` Nothing
             it "returns Just Heading if its first block is a heading" $ do
                 title (Docs "# H1\n\nis its first block!") `shouldBe`
-                    Just (Heading H1 [Text "H1"])
+                    Just (Heading H1 [Text "H1"] Nothing)
                 title (Docs "## Not have to be H1\n\nAny lebel can be a title.")
-                    `shouldBe` Just (Heading H2 [Text "Not have to be H1"])
+                    `shouldBe`
+                        Just (Heading H2 [Text "Not have to be H1"] Nothing)
             specify "title block can other Inlines than Text" $
                 title (Docs "# `<code>`\n\nThe title can consist of.")
-                    `shouldBe` Just (Heading H1 [Code "<code>"])
+                    `shouldBe` Just (Heading H1 [Code "<code>"] Nothing)
         context "toCode" $ do
             it "has leading sharps every line" $ do
                 toCode (Docs "test") `shouldBe` "# test"

@@ -66,9 +66,12 @@ renderBlock (CodeBlock lang code') =
     if T.null lang
     then [qq|<pre><code>$code'</code></pre>|]
     else [qq|<pre><code class="language-$lang">$code'</code></pre>|]
-renderBlock (Heading level inlines) =
+renderBlock (Heading level inlines anchorId) =
     let lv = headingLevelInt level
-    in [qq|<h$lv>{renderInlines inlines}</h$lv>|]
+        id' = case anchorId of
+                Nothing -> ""
+                Just aid -> [qq| id="$aid"|] :: T.Text
+    in [qq|<h$lv$id'>{renderInlines inlines}</h$lv>|]
 renderBlock (List listType itemList) =
     let liList = case itemList of
                      TightItemList items ->

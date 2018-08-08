@@ -27,6 +27,9 @@ Loose list:
 
 A [complex *link*][1].
 
+Table example                                                   {#table-section}
+-------------
+
 | A     | B      | C            | D     |
 | ----- | :----- | :----------: | ----: |
 | foo   | bar    | baz          | bim   |
@@ -40,7 +43,7 @@ A [complex *link*][1].
 
 sampleHeading :: Block
 sampleHeading =
-    Heading H1 ["Hello"]
+    Heading H1 ["Hello"] Nothing
 
 sampleDocument :: Block
 sampleDocument =
@@ -64,6 +67,7 @@ sampleDocument' adjust =
                      ["complex ", Emphasis ["link"]]
               , "."
               ]
+        , Heading H2 ["Table example"] (Just "table-section")
         , Table
               (NotAligned :| [LeftAligned, CenterAligned, RightAligned])
               ( (["A"] :| [["B"], ["C"], ["D"]])
@@ -111,7 +115,7 @@ spec = do
                 , "."
                 ]
     specify "extractTitle" $ do
-        let Heading lv inlines = sampleHeading
+        let Heading lv inlines _ = sampleHeading
         extractTitle sampleDocument `shouldBe` Just (lv, inlines)
         extractTitle (sampleDocument' id) `shouldBe` Nothing
     specify "trimTitle" $ do

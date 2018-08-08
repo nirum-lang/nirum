@@ -436,7 +436,7 @@ moduleTitle Module { docs = docs' } = do
     d <- docs'
     t <- D.title d
     nodes <- case t of
-                 Heading _ inlines ->
+                 Heading _ inlines _ ->
                     Just $ filterReferences inlines
                  _ -> Nothing
     return $ preEscapedToMarkup $ renderInlines nodes

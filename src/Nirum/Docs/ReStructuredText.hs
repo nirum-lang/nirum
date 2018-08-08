@@ -103,9 +103,13 @@ renderBlock (CodeBlock lang code') =
              , "\n\n"
              , indent3 code'
              ]
-renderBlock (Heading level inlines) =
-    T.concat [text, "\n", T.pack [hChar | _ <- [1 .. (T.length text)]]]
+renderBlock (Heading level inlines anchorId) =
+    T.concat [ref, text, "\n", T.pack [hChar | _ <- [1 .. (T.length text)]]]
   where
+    ref :: ReStructuredText
+    ref = case anchorId of
+        Nothing -> ""
+        Just id' -> T.concat ["\n.. _", id', ":\n\n"]
     text :: ReStructuredText
     text = renderInlines inlines
     hChar :: Char

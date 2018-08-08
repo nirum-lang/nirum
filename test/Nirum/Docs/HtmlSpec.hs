@@ -21,6 +21,7 @@ expectedHtml = [q|<h1>Hello</h1>
 <li><p>b</p></li>
 </ol>
 <p>A <a href="http://nirum.org/" title="Nirum">complex <em>link</em></a>.</p>
+<h2 id="table-section">Table example</h2>
 <table>
 <thead>
 <tr>
