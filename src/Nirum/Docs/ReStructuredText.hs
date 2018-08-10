@@ -103,9 +103,13 @@ renderBlock (CodeBlock lang code') =
              , "\n\n"
              , indent3 code'
              ]
-renderBlock (Heading level inlines) =
-    T.concat [text, "\n", T.pack [hChar | _ <- [1 .. (T.length text)]]]
+renderBlock (Heading level inlines anchorId) =
+    T.concat [ref, text, "\n", T.pack [hChar | _ <- [1 .. (T.length text)]]]
   where
+    ref :: ReStructuredText
+    ref = case anchorId of
+        Nothing -> ""
+        Just id' -> T.concat ["\n.. _", id', ":\n\n"]
     text :: ReStructuredText
     text = renderInlines inlines
     hChar :: Char
@@ -117,13 +121,15 @@ renderBlock (Heading level inlines) =
         H5 -> '.'
         H6 -> '\''
 renderBlock (List BulletList (TightItemList items)) =
-    T.intercalate "\n" [[qq|- {renderInlines i}|] | i <- items]
+    T.intercalate "\n" [ [qq|- {T.drop 2 $ indent2 $ renderTightBlocks i}|]
+                       | i <- items
+                       ]
 renderBlock (List BulletList (LooseItemList items)) =
     T.intercalate "\n\n" [ [qq|- {T.drop 2 $ indent2 $ renderBlocks i}|]
                          | i <- items
                          ]
 renderBlock (List (OrderedList startNum _) (TightItemList items)) =
-    T.intercalate "\n" [ [qq|$n. {renderInlines i}|]
+    T.intercalate "\n" [ [qq|$n. {T.drop 3 $ indent3 $ renderTightBlocks i}|]
                        | (n, i) <- indexed startNum items
                        ]
 renderBlock (List (OrderedList startNum _) (LooseItemList items)) =
@@ -204,6 +210,14 @@ indexed start (x : xs) = (start, x) : indexed (succ start) xs
 
 renderBlocks :: [Block] -> ReStructuredText
 renderBlocks = T.intercalate "\n\n" . map renderBlock
+
+renderTightBlocks :: [Block] -> ReStructuredText
+renderTightBlocks blocks = T.intercalate "\n\n"
+    [ case b of
+        Paragraph inlines -> renderInlines inlines
+        b' -> renderBlock b'
+    | b <- blocks
+    ]
 
 render :: Block -> ReStructuredText
 render = renderBlock

@@ -7,6 +7,7 @@ import Data.Proxy (Proxy (Proxy))
 import Data.Text
 import System.IO.Error (isDoesNotExistError)
 
+import Data.Map.Strict (Map)
 import qualified Data.SemVer as SV
 import System.FilePath ((</>))
 import Test.Hspec.Meta
@@ -14,6 +15,7 @@ import Text.InterpolatedString.Perl6 (qq)
 import qualified Text.Parsec.Error as PE
 import Text.Parsec.Pos (sourceColumn, sourceLine)
 
+import Nirum.Constructs.Docs
 import Nirum.Constructs.Module
 import Nirum.Constructs.ModulePath (ModulePath)
 import Nirum.Package hiding (modules, target)
@@ -37,20 +39,29 @@ import Nirum.Parser (parseFile)
 import Nirum.Targets.Python (Python (Python))
 import Nirum.Targets.Python.CodeGen (minimumRuntime)
 
-createPackage :: Metadata t -> [(ModulePath, Module)] -> Package t
-createPackage metadata' modules' =
+createPackage :: Target t
+              => Metadata t
+              -> [(ModulePath, Module)]
+              -> Map FilePath Docs
+              -> Package t
+createPackage metadata' modules' documents' =
     case fromList modules' of
-        Right ms -> Package metadata' ms
+        Right ms -> Package metadata' ms documents'
         Left e -> error $ "errored: " ++ show e
 
-createValidPackage :: t -> Package t
-createValidPackage t = createPackage Metadata { version = SV.initial
-                                              , authors = []
-                                              , description = Nothing
-                                              , license = Nothing
-                                              , keywords = []
-                                              , target = t
-                                              } validModules
+createValidPackage :: forall t . Target t => t -> Package t
+createValidPackage t =
+    createPackage metadata' validModules []
+  where
+    metadata' :: Metadata t
+    metadata' = Metadata
+        { version = SV.initial
+        , authors = []
+        , description = Nothing
+        , license = Nothing
+        , keywords = []
+        , target = t
+        }
 
 spec :: Spec
 spec = do
@@ -100,15 +111,23 @@ testPackage target' = do
                               , (["address"], addressM)
                               , (["pdf-service"], pdfServiceM)
                               ] :: [(ModulePath, Module)]
-                    metadata' = Metadata { version = SV.version 0 3 0 [] []
+                let metadata' = Metadata { version = SV.version 0 3 0 [] []
                                          , authors = []
                                          , description = Nothing
                                          , license = Nothing
                                          , keywords = []
                                          , target = target'
                                          }
+                let documents' =
+                        [ ( "README.md"
+                          , Docs $ Data.Text.concat
+                                [ "# Nirum examples\n\nThis directory "
+                                , "contains a sample Nirum package.\n"
+                                ]
+                          )
+                        ]
                 metadata package `shouldBe` metadata'
-                package `shouldBe` createPackage metadata' modules
+                package `shouldBe` createPackage metadata' modules documents'
             let testDir = "." </> "test"
             it "returns ScanError if the directory lacks package.toml" $ do
                 scanResult <- scanPackage' $ testDir </> "scan_error"

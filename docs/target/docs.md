@@ -2,9 +2,11 @@ Docs target
 ===========
 
 This target does not generate any program code files, but HTML pages (and
-some extra assets like CSS).  It generates a kind of API reference docs for
-the given Nirum package: type definitions, union tags, enum members,
-service methods, and so on.
+some extra assets like CSS).  It generates two kinds of pages:
+
+ -  Reference docs from the docs comments in the source code: type definitions,
+    union tags, enum members, service methods, etc, and
+ -  Manual pages from CommonMark (i.e., _\*.md_) files.
 
 
 Docs comments
@@ -23,6 +25,14 @@ declarations that have a name, e.g., types, fields, members, services, methods,
 parameters, modules.
 
 You can find *examples/shapes.nrm* to see examples of docs comments.
+
+
+Manual pages
+------------
+
+The docs target scans all CommonMark (i.e., _\*.md_) files from the same level
+to *package.toml* manifest file and its subdirectories, and transforms them
+to HTML pages.
 
 
 Settings

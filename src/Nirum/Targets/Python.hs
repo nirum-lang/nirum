@@ -104,7 +104,7 @@ data Source = Source { sourcePackage :: Package'
                      } deriving (Eq, Ord, Show)
 
 sourceImportPath :: Source -> T.Text
-sourceImportPath (Source (Package MD.Metadata { MD.target = t } _) bm) =
+sourceImportPath (Source (Package MD.Metadata { MD.target = t } _ _) bm) =
     toImportPath t (BM.modulePath bm)
 
 sourceDirectory :: PythonVersion -> T.Text

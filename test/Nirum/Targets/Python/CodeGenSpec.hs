@@ -74,6 +74,7 @@ makeDummySource' pathPrefix m renames =
                   Nothing
               )
             ]
+            []
 
 makeDummySource :: Module -> Source
 makeDummySource m = makeDummySource' [] m []
