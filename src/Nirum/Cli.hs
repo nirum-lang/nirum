@@ -37,11 +37,12 @@ import Nirum.Package.ModuleSet ( ImportError ( CircularImportError
                                              , MissingModulePathError
                                              )
                                )
-import Nirum.Targets ( BuildError (CompileError, PackageError, TargetNameError)
-                     , BuildResult
-                     , buildPackage
-                     , targetNames
-                     )
+import Nirum.Targets
+    ( BuildError (..)
+    , BuildResult
+    , buildPackageFromFilePath
+    , targetNames
+    )
 import Nirum.Version (versionString)
 
 type TFlag = TVar Bool
@@ -136,7 +137,7 @@ build options@AppOptions { packagePath = src
                          , outputPath = outDir
                          , targetLanguage = target
                          } = do
-    result <- buildPackage target src
+    result <- buildPackageFromFilePath target src
     case result of
         Left (TargetNameError targetName') ->
             tryDie' [qq|Couldn't find "$targetName'" target.
