@@ -10,6 +10,7 @@ To be released.
 
  -  The `uri` type has completly gone; use `url` instead.
     [[#126], [#281] by Jonghun Park]
+ -  Added constraints for numeric unboxed types. [[#206], [#271]]
 
 ### Docs target
 
@@ -45,6 +46,8 @@ To be released.
     (from [spoqa/nirum](https://hub.docker.com/r/spoqa/nirum/)).
 
 [#126]: https://github.com/nirum-lang/nirum/issues/126
+[#206]: https://github.com/nirum-lang/nirum/issues/206
+[#271]: https://github.com/nirum-lang/nirum/pull/271
 [#281]: https://github.com/nirum-lang/nirum/pull/281
 [#283]: https://github.com/spoqa/nirum/pull/283
 [#297]: https://github.com/nirum-lang/nirum/issues/297

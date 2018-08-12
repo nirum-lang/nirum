@@ -18,7 +18,7 @@ module Nirum.Targets.Python
 import Control.Monad (forM)
 import Control.Monad.State (modify)
 import qualified Data.List as L
-import Data.Maybe (catMaybes, fromMaybe)
+import Data.Maybe (catMaybes, fromMaybe, isJust)
 import GHC.Exts (IsList (toList))
 
 import qualified Data.ByteString.Lazy
@@ -685,12 +685,33 @@ compileTypeDeclaration src d@TypeDeclaration { typename = typename'
     |]
 compileTypeDeclaration src d@TypeDeclaration { typename = typename'
                                              , type' = UnboxedType itype
+                                             , typeAnnotations = annots
                                              } = do
     let className = toClassName' typename'
     itypeExpr <- compileTypeExpression' src (Just itype)
     insertStandardImport "typing"
     pyVer <- getPythonVersion
-    Validator typePred valueValidators' <- compileValidator' src itype "value"
+    Validator typePred valueValidatorsProto <-
+        compileValidator' src itype "value"
+    valueValidators' <- case A.lookup "numeric-constraints" annots of
+        Just A.Annotation { A.arguments = args } -> do
+            let constraintValidators =
+                    [ case (name', value) of
+                        ("min", Integer v) ->
+                            Just $ ValueValidator
+                                       [qq|value >= ($v)|]
+                                       [qq|value is less than $v|]
+                        ("max", Integer v) ->
+                            Just $ ValueValidator
+                                       [qq|value <= ($v)|]
+                                       [qq|value is greater than $v|]
+                        _ -> Nothing
+                    | (name', value) <- toList args
+                    ]
+            if all isJust constraintValidators
+            then return $ catMaybes constraintValidators
+            else fail "Unsupported arguments on @numeric-constraints"
+        Nothing -> return valueValidatorsProto
     deserializer <- compileDeserializer' src itype "value" "rv" "on_error"
     defaultErrorHandler <- defaultDeserializerErrorHandler
     return [compileText|
