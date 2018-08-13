@@ -42,3 +42,15 @@ Settings
 
 It goes to `<title>` elements of generated HTML pages.  It's usually a name of
 the Nirum package.
+
+
+### `style` (optional): Custom CSS
+
+It goes to very ending of the CSS file, which means it can override other
+predefined style rules.
+
+
+### `header`/`footer` (optional): Custom header & footer HTML
+
+It goes to the very beginning and ending of `<body>` contents.  It's usually
+used to customize HTML pages.

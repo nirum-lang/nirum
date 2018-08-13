@@ -7,7 +7,7 @@ module Nirum.Targets.Docs ( Docs
                           ) where
 
 import Data.Char
-import Data.Maybe (mapMaybe)
+import Data.Maybe
 import GHC.Exts (IsList (fromList, toList))
 
 import qualified Data.ByteString as BS
@@ -47,24 +47,16 @@ import Nirum.Docs ( Block (..)
                   )
 import Nirum.Docs.Html (render, renderInlines, renderLinklessInlines)
 import Nirum.Package
-import Nirum.Package.Metadata ( Author (Author, email, name, uri)
-                              , Metadata (authors)
-                              , Target ( CompileError
-                                       , CompileResult
-                                       , compilePackage
-                                       , parseTarget
-                                       , showCompileError
-                                       , targetName
-                                       , toByteString
-                                       )
-                              , stringField
-                              )
+import Nirum.Package.Metadata hiding (target)
 import qualified Nirum.Package.ModuleSet as MS
 import Nirum.TypeInstance.BoundModule
 import Nirum.Version (versionText)
 
-newtype Docs = Docs
+data Docs = Docs
     { docsTitle :: T.Text
+    , docsStyle :: T.Text
+    , docsHeader :: T.Text
+    , docsFooter :: T.Text
     } deriving (Eq, Ord, Show)
 
 type Error = T.Text
@@ -112,6 +104,7 @@ $doctype 5
             <meta name="author" content="#{name'}">
         <link rel="stylesheet" href="#{root}style.css">
     <body>
+        #{preEscapedToMarkup $ docsHeader $ target pkg}
         <nav>
             $if currentPage == IndexPage
                 <a class="index selected" href="#{root}index.html">
@@ -149,6 +142,7 @@ $doctype 5
         <article>#{body}
         $maybe f <- footer
             <footer>#{f}
+        #{preEscapedToMarkup $ docsFooter $ target pkg}
 |]
   where
     root :: T.Text
@@ -565,7 +559,7 @@ footer
 compilePackage' :: Package Docs -> Map FilePath (Either Error BS.ByteString)
 compilePackage' pkg@Package { documents = documents' } = unions
     [ fromList
-        [ ("style.css", Right $ encodeUtf8 $ TL.toStrict stylesheet)
+        [ ("style.css", Right $ encodeUtf8 css)
         , ("index.html", Right $ toStrict $ renderHtml $ contents pkg)
         ]
     , fromList
@@ -584,6 +578,7 @@ compilePackage' pkg@Package { documents = documents' } = unions
     paths' = MS.keys $ modules pkg
     modules' :: [BoundModule Docs]
     modules' = mapMaybe (`resolveBoundModule` pkg) paths'
+    css = T.concat [TL.toStrict stylesheet, "\n\n", docsStyle $ target pkg]
 
 instance Target Docs where
     type CompileResult Docs = BS.ByteString
@@ -591,7 +586,15 @@ instance Target Docs where
     targetName _ = "docs"
     parseTarget table = do
         title <- stringField "title" table
-        return Docs { docsTitle = title }
+        style <- optional $ stringField "style" table
+        header <- optional $ stringField "header" table
+        footer <- optional $ stringField "footer" table
+        return Docs
+            { docsTitle = title
+            , docsStyle = fromMaybe "" style
+            , docsHeader = fromMaybe "" header
+            , docsFooter = fromMaybe "" footer
+            }
     compilePackage = compilePackage'
     showCompileError _ = id
     toByteString _ = id
