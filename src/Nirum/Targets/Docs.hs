@@ -14,7 +14,7 @@ import GHC.Exts (IsList (fromList, toList))
 import qualified Data.ByteString as BS
 import Data.ByteString.Lazy (toStrict)
 import qualified Text.Email.Parser as E
-import Data.Map.Strict (Map, mapKeys, mapWithKey, toAscList, unions)
+import Data.Map.Strict (Map, mapKeys, mapWithKey, unions)
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
@@ -151,7 +151,13 @@ $doctype 5
     modulePairs :: [(ModulePath, Module)]
     modulePairs = MS.toAscList ms
     documentPairs :: [(FilePath, D.Docs)]
-    documentPairs = toAscList $ fst $ listDocuments pkg
+    documentPairs = Data.List.sortOn
+        documentSortKey
+        (toList $ fst $ listDocuments pkg)
+    documentSortKey :: (FilePath, D.Docs) -> (Bool, Int, FilePath)
+    documentSortKey ("", _) = (False, 0, "")
+    documentSortKey (fp@(fp1 : _), _) =
+        (isUpper fp1, length (filter (== pathSeparator) fp), fp)
 
 typeExpression :: BoundModule Docs -> TE.TypeExpression -> Html
 typeExpression _ expr = [shamlet|#{typeExpr expr}|]
