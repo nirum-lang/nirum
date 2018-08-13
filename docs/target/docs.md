@@ -2,8 +2,10 @@ Docs target
 ===========
 
 This target does not generate any program code files, but HTML pages (and
-some extra assets like CSS).  It generates two kinds of pages:
+some extra assets like CSS).  It generates three kinds of pages:
 
+ -  A home page that renders *README.md* file (if exists) or table of contents
+    (if there is no *README.md* file).
  -  Reference docs from the docs comments in the source code: type definitions,
     union tags, enum members, service methods, etc, and
  -  Manual pages from CommonMark (i.e., _\*.md_) files.

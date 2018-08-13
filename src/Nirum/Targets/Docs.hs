@@ -1,5 +1,5 @@
 {-# LANGUAGE QuasiQuotes, TypeFamilies #-}
-module Nirum.Targets.Docs ( Docs
+module Nirum.Targets.Docs ( Docs (..)
                           , blockToHtml
                           , makeFilePath
                           , makeUri
@@ -7,6 +7,7 @@ module Nirum.Targets.Docs ( Docs
                           ) where
 
 import Data.Char
+import qualified Data.List
 import Data.Maybe
 import GHC.Exts (IsList (fromList, toList))
 
@@ -88,7 +89,7 @@ layout' :: Package Docs
         -> Html
         -> Maybe Html
         -> Html
-layout' pkg@Package { metadata = md, modules = ms, documents = ds }
+layout' pkg@Package { metadata = md, modules = ms }
         dirDepth currentPage title body footer = [shamlet|
 $doctype 5
 <html>
@@ -150,7 +151,7 @@ $doctype 5
     modulePairs :: [(ModulePath, Module)]
     modulePairs = MS.toAscList ms
     documentPairs :: [(FilePath, D.Docs)]
-    documentPairs = toAscList ds
+    documentPairs = toAscList $ fst $ listDocuments pkg
 
 typeExpression :: BoundModule Docs -> TE.TypeExpression -> Html
 typeExpression _ expr = [shamlet|#{typeExpr expr}|]
@@ -361,6 +362,13 @@ showKind TD.TypeDeclaration { TD.type' = type'' } = case type'' of
     TD.PrimitiveType {} -> "primitive"
 showKind TD.Import {} = "import"
 
+readmePage :: Package Docs -> D.Docs -> Html
+readmePage pkg docs' =
+    layout pkg 0 IndexPage (docsTitle $ target pkg) content
+  where
+    content :: Html
+    content = blockToHtml $ D.toBlock docs'
+
 documentPage :: Package Docs -> FilePath -> D.Docs -> Html
 documentPage pkg filePath docs' =
     layout pkg depth (DocumentPage filePath) title' content
@@ -557,10 +565,14 @@ footer
     navWidth = PixelSize 300
 
 compilePackage' :: Package Docs -> Map FilePath (Either Error BS.ByteString)
-compilePackage' pkg@Package { documents = documents' } = unions
+compilePackage' pkg = unions
     [ fromList
         [ ("style.css", Right $ encodeUtf8 css)
-        , ("index.html", Right $ toStrict $ renderHtml $ contents pkg)
+        , ( "index.html"
+          , Right $ toStrict $ renderHtml $ case readme of
+                Nothing -> contents pkg
+                Just readme' -> readmePage pkg readme'
+          )
         ]
     , fromList
         [ ( makeFilePath $ modulePath m
@@ -579,6 +591,18 @@ compilePackage' pkg@Package { documents = documents' } = unions
     modules' :: [BoundModule Docs]
     modules' = mapMaybe (`resolveBoundModule` pkg) paths'
     css = T.concat [TL.toStrict stylesheet, "\n\n", docsStyle $ target pkg]
+    (documents', readme) = listDocuments pkg
+
+listDocuments :: Package Docs -> (Map FilePath D.Docs, Maybe D.Docs)
+listDocuments Package { documents = documents' } =
+    case Data.List.break (isReadme . fst) pairs of
+        (a, (_, readme) : b) -> (fromList (a ++ b), Just readme)
+        (a, []) -> (fromList a, Nothing)
+  where
+    isReadme :: FilePath -> Bool
+    isReadme fp = "readme.md" == map toLower (takeFileName fp)
+    pairs :: [(FilePath, D.Docs)]
+    pairs = toList documents'
 
 instance Target Docs where
     type CompileResult Docs = BS.ByteString
