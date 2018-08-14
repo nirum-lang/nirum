@@ -14,39 +14,42 @@ import Nirum.Package (PackageError (ImportError, MetadataError, ScanError))
 import Nirum.Package.Metadata (MetadataError (FormatError))
 import Nirum.Package.ModuleSet (ImportError (MissingModulePathError))
 import Nirum.Targets ( BuildError (PackageError, TargetNameError)
-                     , buildPackage
+                     , buildPackageFromFilePath
                      )
 
 spec :: Spec
 spec =
     describe "Targets" $
-        describe "buildPackage" $ do
+        describe "buildPackageFromFilePath" $ do
             it "returns Left TargetNameError if there's no such target" $ do
                 let path = "." </> "examples"
-                result <- buildPackage "unregisteredtarget" path
+                result <- buildPackageFromFilePath "unregisteredtarget" path
                 result `shouldBe` Left (TargetNameError "unregisteredtarget")
             it "returns Left PackageError if the given package is invalid" $ do
                 let testDir = "." </> "test"
                 -- ScanError
-                result <- buildPackage "python" $ testDir </> "scan_error"
+                result <- buildPackageFromFilePath "python" $
+                    testDir </> "scan_error"
                 result `shouldSatisfy` isLeft
                 let Left (PackageError (ScanError filePath ioError')) = result
                 filePath `shouldBe` testDir </> "scan_error" </> "package.toml"
                 ioError' `shouldSatisfy` isDoesNotExistError
                 -- MetadataError
-                result2 <- buildPackage "python" $ testDir </> "metadata_error"
+                result2 <- buildPackageFromFilePath "python" $
+                    testDir </> "metadata_error"
                 result2 `shouldSatisfy` isLeft
                 let Left (PackageError (MetadataError (FormatError e))) =
                         result2
                 sourceLine (PE.errorPos e) `shouldBe` 3
                 sourceColumn (PE.errorPos e) `shouldBe` 14
                 -- ImportError
-                result3 <- buildPackage "python" $ testDir </> "import_error"
+                result3 <- buildPackageFromFilePath "python" $
+                    testDir </> "import_error"
                 result3 `shouldSatisfy` isLeft
                 let Left (PackageError (ImportError l)) = result3
                 l `shouldBe` [MissingModulePathError ["import_error"] ["foo"]]
             it "returns Right BuildResult" $ do
-                result <- buildPackage "python" $ "." </> "examples"
+                result <- buildPackageFromFilePath "python" $ "." </> "examples"
                 result `shouldSatisfy` isRight
                 let Right buildResult = result
                 M.keysSet buildResult `shouldBe`

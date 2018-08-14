@@ -40,6 +40,7 @@ module Nirum.Package.Metadata ( Author (Author, email, name, uri)
                               , fieldType
                               , metadataFilename
                               , metadataPath
+                              , optional
                               , parseMetadata
                               , packageTarget
                               , prependMetadataErrorField

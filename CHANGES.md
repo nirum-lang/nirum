@@ -20,6 +20,8 @@ To be released.
  -  [CommonMark] in docstrings became to have a limited subset of
     [special attributes extension].  It's only allowed to heading elements and
     only anchor identifiers are supported (e.g., `{#header-id}`).
+ -  `style`, `header`, and `footer` options were added.  These options purpose
+    to customize the look and feel of the result pages.
  -  Fixed an incorrect processing of [CommonMark] thight list items: it had
     crashed when a thight list item contains blocks other than paragraphs.
 

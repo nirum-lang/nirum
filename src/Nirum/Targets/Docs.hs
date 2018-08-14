@@ -1,5 +1,5 @@
 {-# LANGUAGE QuasiQuotes, TypeFamilies #-}
-module Nirum.Targets.Docs ( Docs
+module Nirum.Targets.Docs ( Docs (..)
                           , blockToHtml
                           , makeFilePath
                           , makeUri
@@ -7,13 +7,14 @@ module Nirum.Targets.Docs ( Docs
                           ) where
 
 import Data.Char
-import Data.Maybe (mapMaybe)
+import qualified Data.List
+import Data.Maybe
 import GHC.Exts (IsList (fromList, toList))
 
 import qualified Data.ByteString as BS
 import Data.ByteString.Lazy (toStrict)
 import qualified Text.Email.Parser as E
-import Data.Map.Strict (Map, mapKeys, mapWithKey, toAscList, unions)
+import Data.Map.Strict (Map, mapKeys, mapWithKey, unions)
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
@@ -47,24 +48,16 @@ import Nirum.Docs ( Block (..)
                   )
 import Nirum.Docs.Html (render, renderInlines, renderLinklessInlines)
 import Nirum.Package
-import Nirum.Package.Metadata ( Author (Author, email, name, uri)
-                              , Metadata (authors)
-                              , Target ( CompileError
-                                       , CompileResult
-                                       , compilePackage
-                                       , parseTarget
-                                       , showCompileError
-                                       , targetName
-                                       , toByteString
-                                       )
-                              , stringField
-                              )
+import Nirum.Package.Metadata hiding (target)
 import qualified Nirum.Package.ModuleSet as MS
 import Nirum.TypeInstance.BoundModule
 import Nirum.Version (versionText)
 
-newtype Docs = Docs
+data Docs = Docs
     { docsTitle :: T.Text
+    , docsStyle :: T.Text
+    , docsHeader :: T.Text
+    , docsFooter :: T.Text
     } deriving (Eq, Ord, Show)
 
 type Error = T.Text
@@ -96,7 +89,7 @@ layout' :: Package Docs
         -> Html
         -> Maybe Html
         -> Html
-layout' pkg@Package { metadata = md, modules = ms, documents = ds }
+layout' pkg@Package { metadata = md, modules = ms }
         dirDepth currentPage title body footer = [shamlet|
 $doctype 5
 <html>
@@ -112,6 +105,7 @@ $doctype 5
             <meta name="author" content="#{name'}">
         <link rel="stylesheet" href="#{root}style.css">
     <body>
+        #{preEscapedToMarkup $ docsHeader $ target pkg}
         <nav>
             $if currentPage == IndexPage
                 <a class="index selected" href="#{root}index.html">
@@ -149,6 +143,7 @@ $doctype 5
         <article>#{body}
         $maybe f <- footer
             <footer>#{f}
+        #{preEscapedToMarkup $ docsFooter $ target pkg}
 |]
   where
     root :: T.Text
@@ -156,7 +151,13 @@ $doctype 5
     modulePairs :: [(ModulePath, Module)]
     modulePairs = MS.toAscList ms
     documentPairs :: [(FilePath, D.Docs)]
-    documentPairs = toAscList ds
+    documentPairs = Data.List.sortOn
+        documentSortKey
+        (toList $ fst $ listDocuments pkg)
+    documentSortKey :: (FilePath, D.Docs) -> (Bool, Int, FilePath)
+    documentSortKey ("", _) = (False, 0, "")
+    documentSortKey (fp@(fp1 : _), _) =
+        (isUpper fp1, length (filter (== pathSeparator) fp), fp)
 
 typeExpression :: BoundModule Docs -> TE.TypeExpression -> Html
 typeExpression _ expr = [shamlet|#{typeExpr expr}|]
@@ -367,6 +368,13 @@ showKind TD.TypeDeclaration { TD.type' = type'' } = case type'' of
     TD.PrimitiveType {} -> "primitive"
 showKind TD.Import {} = "import"
 
+readmePage :: Package Docs -> D.Docs -> Html
+readmePage pkg docs' =
+    layout pkg 0 IndexPage (docsTitle $ target pkg) content
+  where
+    content :: Html
+    content = blockToHtml $ D.toBlock docs'
+
 documentPage :: Package Docs -> FilePath -> D.Docs -> Html
 documentPage pkg filePath docs' =
     layout pkg depth (DocumentPage filePath) title' content
@@ -563,10 +571,14 @@ footer
     navWidth = PixelSize 300
 
 compilePackage' :: Package Docs -> Map FilePath (Either Error BS.ByteString)
-compilePackage' pkg@Package { documents = documents' } = unions
+compilePackage' pkg = unions
     [ fromList
-        [ ("style.css", Right $ encodeUtf8 $ TL.toStrict stylesheet)
-        , ("index.html", Right $ toStrict $ renderHtml $ contents pkg)
+        [ ("style.css", Right $ encodeUtf8 css)
+        , ( "index.html"
+          , Right $ toStrict $ renderHtml $ case readme of
+                Nothing -> contents pkg
+                Just readme' -> readmePage pkg readme'
+          )
         ]
     , fromList
         [ ( makeFilePath $ modulePath m
@@ -584,6 +596,19 @@ compilePackage' pkg@Package { documents = documents' } = unions
     paths' = MS.keys $ modules pkg
     modules' :: [BoundModule Docs]
     modules' = mapMaybe (`resolveBoundModule` pkg) paths'
+    css = T.concat [TL.toStrict stylesheet, "\n\n", docsStyle $ target pkg]
+    (documents', readme) = listDocuments pkg
+
+listDocuments :: Package Docs -> (Map FilePath D.Docs, Maybe D.Docs)
+listDocuments Package { documents = documents' } =
+    case Data.List.break (isReadme . fst) pairs of
+        (a, (_, readme) : b) -> (fromList (a ++ b), Just readme)
+        (a, []) -> (fromList a, Nothing)
+  where
+    isReadme :: FilePath -> Bool
+    isReadme fp = "readme.md" == map toLower (takeFileName fp)
+    pairs :: [(FilePath, D.Docs)]
+    pairs = toList documents'
 
 instance Target Docs where
     type CompileResult Docs = BS.ByteString
@@ -591,7 +616,15 @@ instance Target Docs where
     targetName _ = "docs"
     parseTarget table = do
         title <- stringField "title" table
-        return Docs { docsTitle = title }
+        style <- optional $ stringField "style" table
+        header <- optional $ stringField "header" table
+        footer <- optional $ stringField "footer" table
+        return Docs
+            { docsTitle = title
+            , docsStyle = fromMaybe "" style
+            , docsHeader = fromMaybe "" header
+            , docsFooter = fromMaybe "" footer
+            }
     compilePackage = compilePackage'
     showCompileError _ = id
     toByteString _ = id
