@@ -58,7 +58,7 @@ before_install:
   if [[ "$TRAVIS_OS_NAME" = "linux" ]]
   then
     curl -o "$HOME/.local/bin/checkmate" \
-         -L https://github.com/spoqa/checkmate/releases/download/0.3.2/checkmate-linux-x86_64
+         -L https://github.com/dahlia/checkmate/releases/download/0.3.2/checkmate-linux-x86_64
     chmod +x "$HOME/.local/bin/checkmate"
     checkmate --help
     token_encoded='gJvdss03HpHm1tCqhziBezjVi8Y='
@@ -127,7 +127,7 @@ after_script:
 - |
   # Since codecov-haskell doesn't work on Windows,
   # it should be added to extra-deps during only Travis CI build.
-  sed -i 's|^## *INSERT CODECOV HERE.*$|- {"git": "https://github.com/spoqa/codecov-haskell.git", "commit": "8448801f8d01624e4cd60420beb3fdc85c099576"}|' stack.yaml
+  sed -i 's|^## *INSERT CODECOV HERE.*$|- {"git": "https://github.com/nirum-lang/codecov-haskell.git", "commit": "8448801f8d01624e4cd60420beb3fdc85c099576"}|' stack.yaml
 - stack build --install-ghc --no-terminal --copy-bins codecov-haskell
 - find . -name '*.tix'
 - find . -name '*.mix'
@@ -143,7 +143,6 @@ notifications:
   webhooks:
     urls:
     - https://webhooks.gitter.im/e/29cc2477daa438db4e9d
-    - 'http://travis-auto-rebuilder.herokuapp.com/76caecf7-abe1-4122-9fcc-aa5226dc10f8/?jobs=1&subject-to=2&retries=5'
     on_success: change
     on_failure: always
     on_start: never

@@ -35,7 +35,7 @@ install:
     $env:PATH = $env:STACK_ROOT + ';C:\msys64\usr\bin;' + $env:PATH;
 - if not exist "%LOCALAPPDATA%\Programs\stack" ( stack --no-terminal --skip-msys setup )
 
-# https://github.com/spoqa/nirum/issues/226
+# https://github.com/nirum-lang/nirum/issues/226
 # https://github.com/tox-dev/tox/issues/114#issuecomment-349712050
 # https://tox.readthedocs.io/en/2.9.1/developers.html#id1
 - ps: |
@@ -67,7 +67,7 @@ deploy:
   provider: GitHub
   on: { appveyor_repo_tag: true }
   auth_token:
-    secure: FsK3lwqFkPdtwzbjZ8a4gLn1GOT74D9TqBvKveEwFB7hL6pEp/d7cNUTpy91JGGt
+    secure: 8Qon80pFZttL2HXHzjlZK93AGf1FvWhh2ZHgeSAzZWthjJfGT2usFgMfZ6MjxmsB
   release: "$(appveyor_repo_tag_name)"
   description: "$(appveyor_repo_tag_name)"
   artifact: /.*\.exe/
