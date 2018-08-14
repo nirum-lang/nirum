@@ -20,7 +20,7 @@ if [[ "${#@}" -lt 1 ]]; then
   # shellcheck disable=SC2016
   echo '               --volume `pwd`/build:/tmp/build '\\
   echo '               --rm -it '\\
-  echo '               spoqa/nirum '\\
+  echo '               nirumlang/nirum '\\
   echo '               -o /tmp/build /tmp/src'
   echo
 fi

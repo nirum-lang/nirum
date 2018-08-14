@@ -6,6 +6,12 @@ Version 0.4.2
 
 To be released.
 
+### Et cetera
+
+ -  The official Docker image repository was moved to
+    [nirumlang/nirum](https://hub.docker.com/r/nirumlang/nirum/)
+    (from [spoqa/nirum](https://hub.docker.com/r/spoqa/nirum/)).
+
 
 Version 0.4.1
 -------------
@@ -335,23 +341,23 @@ Released on May 25, 2018.
     Alpine Linux.  It's because Alpine Linux doesn't provide GHC 8.2 as of
     March 2018.
 
-[#13]: https://github.com/spoqa/nirum/issues/13
-[#100]: https://github.com/spoqa/nirum/issues/100
-[#126]: https://github.com/spoqa/nirum/issues/126
-[#178]: https://github.com/spoqa/nirum/issues/178
-[#217]: https://github.com/spoqa/nirum/issues/217
-[#220]: https://github.com/spoqa/nirum/issues/220
-[#227]: https://github.com/spoqa/nirum/pull/227
-[#253]: https://github.com/spoqa/nirum/pull/253
-[#254]: https://github.com/spoqa/nirum/pull/254
-[#255]: https://github.com/spoqa/nirum/pull/255
-[#257]: https://github.com/spoqa/nirum/pull/257
-[#258]: https://github.com/spoqa/nirum/pull/258
-[#259]: https://github.com/spoqa/nirum/pull/259
-[#267]: https://github.com/spoqa/nirum/pull/267
-[#269]: https://github.com/spoqa/nirum/pull/269
-[#272]: https://github.com/spoqa/nirum/pull/272
-[#277]: https://github.com/spoqa/nirum/pull/277
+[#13]: https://github.com/nirum-lang/nirum/issues/13
+[#100]: https://github.com/nirum-lang/nirum/issues/100
+[#126]: https://github.com/nirum-lang/nirum/issues/126
+[#178]: https://github.com/nirum-lang/nirum/issues/178
+[#217]: https://github.com/nirum-lang/nirum/issues/217
+[#220]: https://github.com/nirum-lang/nirum/issues/220
+[#227]: https://github.com/nirum-lang/nirum/pull/227
+[#253]: https://github.com/nirum-lang/nirum/pull/253
+[#254]: https://github.com/nirum-lang/nirum/pull/254
+[#255]: https://github.com/nirum-lang/nirum/pull/255
+[#257]: https://github.com/nirum-lang/nirum/pull/257
+[#258]: https://github.com/nirum-lang/nirum/pull/258
+[#259]: https://github.com/nirum-lang/nirum/pull/259
+[#267]: https://github.com/nirum-lang/nirum/pull/267
+[#269]: https://github.com/nirum-lang/nirum/pull/269
+[#272]: https://github.com/nirum-lang/nirum/pull/272
+[#277]: https://github.com/nirum-lang/nirum/pull/277
 [entry points]: https://setuptools.readthedocs.io/en/latest/pkg_resources.html#entry-points
 [python2-numbers-integral]: https://docs.python.org/2/library/numbers.html#numbers.Integral
 [python2-int]: https://docs.python.org/2/library/functions.html#int
@@ -391,7 +397,7 @@ Released on March 1, 2018.
  -  Fixed record/union deserializers to ignore unknown fields in data payload.
     Deserializers had raised `KeyError` before.  [[#232]]
 
-[#232]: https://github.com/spoqa/nirum/issues/232
+[#232]: https://github.com/nirum-lang/nirum/issues/232
 
 
 Version 0.3.0
@@ -495,80 +501,80 @@ Released on February 18, 2018.
  -  The Docker image became based and built on [Alpine Linux][] so that
     the image is now much lighter.
 
-[#10]: https://github.com/spoqa/nirum/issues/10
-[#38]: https://github.com/spoqa/nirum/issues/38
-[#50]: https://github.com/spoqa/nirum/issues/50
-[#68]: https://github.com/spoqa/nirum/issues/68
-[#70]: https://github.com/spoqa/nirum/issues/70
-[#83]: https://github.com/spoqa/nirum/pull/83
-[#85]: https://github.com/spoqa/nirum/pull/85
-[#91]: https://github.com/spoqa/nirum/issues/91
-[#92]: https://github.com/spoqa/nirum/issues/92
-[#93]: https://github.com/spoqa/nirum/issues/93
-[#99]: https://github.com/spoqa/nirum/pull/99
-[#97]: https://github.com/spoqa/nirum/issues/97
-[#100]: https://github.com/spoqa/nirum/issues/100
-[#102]: https://github.com/spoqa/nirum/issues/102
-[#104]: https://github.com/spoqa/nirum/pull/104
-[#105]: https://github.com/spoqa/nirum/pull/105
-[#106]: https://github.com/spoqa/nirum/pull/106
-[#108]: https://github.com/spoqa/nirum/pull/108
-[#111]: https://github.com/spoqa/nirum/pull/111
-[#113]: https://github.com/spoqa/nirum/pull/113
-[#114]: https://github.com/spoqa/nirum/pull/114
-[#116]: https://github.com/spoqa/nirum/pull/116
-[#117]: https://github.com/spoqa/nirum/pull/117
-[#118]: https://github.com/spoqa/nirum/issues/118
-[#119]: https://github.com/spoqa/nirum/pull/119
-[#121]: https://github.com/spoqa/nirum/pull/121
-[#123]: https://github.com/spoqa/nirum/pull/123
-[#128]: https://github.com/spoqa/nirum/pull/128
-[#125]: https://github.com/spoqa/nirum/issues/125
-[#127]: https://github.com/spoqa/nirum/pull/127
-[#131]: https://github.com/spoqa/nirum/pull/131
-[#138]: https://github.com/spoqa/nirum/issues/138
-[#141]: https://github.com/spoqa/nirum/pull/141
-[#146]: https://github.com/spoqa/nirum/pull/146
-[#149]: https://github.com/spoqa/nirum/pull/149
-[#152]: https://github.com/spoqa/nirum/pull/152
-[#153]: https://github.com/spoqa/nirum/issues/153
-[#154]: https://github.com/spoqa/nirum/pull/154
-[#155]: https://github.com/spoqa/nirum/pull/155
-[#160]: https://github.com/spoqa/nirum/issues/160
-[#165]: https://github.com/spoqa/nirum/pull/165
-[#167]: https://github.com/spoqa/nirum/pull/167
-[#168]: https://github.com/spoqa/nirum/issues/168
-[#170]: https://github.com/spoqa/nirum/pull/170
-[#174]: https://github.com/spoqa/nirum/pull/174
-[#178]: https://github.com/spoqa/nirum/issues/178
-[#179]: https://github.com/spoqa/nirum/issues/179
-[#180]: https://github.com/spoqa/nirum/pull/180
-[#183]: https://github.com/spoqa/nirum/pull/183
-[#184]: https://github.com/spoqa/nirum/issues/184
-[#185]: https://github.com/spoqa/nirum/issues/185
-[#188]: https://github.com/spoqa/nirum/pull/188
-[#189]: https://github.com/spoqa/nirum/pull/189
-[#190]: https://github.com/spoqa/nirum/pull/190
-[#192]: https://github.com/spoqa/nirum/pull/192
-[#193]: https://github.com/spoqa/nirum/pull/193
-[#194]: https://github.com/spoqa/nirum/pull/194
-[#197]: https://github.com/spoqa/nirum/pull/197
-[#199]: https://github.com/spoqa/nirum/pull/199
-[#201]: https://github.com/spoqa/nirum/pull/201
-[#202]: https://github.com/spoqa/nirum/pull/202
-[#203]: https://github.com/spoqa/nirum/pull/203
-[#204]: https://github.com/spoqa/nirum/pull/204
-[#216]: https://github.com/spoqa/nirum/issues/216
-[#218]: https://github.com/spoqa/nirum/issues/218
-[#222]: https://github.com/spoqa/nirum/pull/222
-[#223]: https://github.com/spoqa/nirum/pull/223
-[#224]: https://github.com/spoqa/nirum/pull/224
-[nirum-python #22]: https://github.com/spoqa/nirum-python/issues/22
-[nirum-python #34]: https://github.com/spoqa/nirum-python/issues/34
-[nirum-python #49]: https://github.com/spoqa/nirum-python/issues/49
-[nirum-python #79]: https://github.com/spoqa/nirum-python/issues/79
-[nirum-python #88]: https://github.com/spoqa/nirum-python/pull/88
-[nirum-python #92]: https://github.com/spoqa/nirum-python/pull/92
+[#10]: https://github.com/nirum-lang/nirum/issues/10
+[#38]: https://github.com/nirum-lang/nirum/issues/38
+[#50]: https://github.com/nirum-lang/nirum/issues/50
+[#68]: https://github.com/nirum-lang/nirum/issues/68
+[#70]: https://github.com/nirum-lang/nirum/issues/70
+[#83]: https://github.com/nirum-lang/nirum/pull/83
+[#85]: https://github.com/nirum-lang/nirum/pull/85
+[#91]: https://github.com/nirum-lang/nirum/issues/91
+[#92]: https://github.com/nirum-lang/nirum/issues/92
+[#93]: https://github.com/nirum-lang/nirum/issues/93
+[#99]: https://github.com/nirum-lang/nirum/pull/99
+[#97]: https://github.com/nirum-lang/nirum/issues/97
+[#100]: https://github.com/nirum-lang/nirum/issues/100
+[#102]: https://github.com/nirum-lang/nirum/issues/102
+[#104]: https://github.com/nirum-lang/nirum/pull/104
+[#105]: https://github.com/nirum-lang/nirum/pull/105
+[#106]: https://github.com/nirum-lang/nirum/pull/106
+[#108]: https://github.com/nirum-lang/nirum/pull/108
+[#111]: https://github.com/nirum-lang/nirum/pull/111
+[#113]: https://github.com/nirum-lang/nirum/pull/113
+[#114]: https://github.com/nirum-lang/nirum/pull/114
+[#116]: https://github.com/nirum-lang/nirum/pull/116
+[#117]: https://github.com/nirum-lang/nirum/pull/117
+[#118]: https://github.com/nirum-lang/nirum/issues/118
+[#119]: https://github.com/nirum-lang/nirum/pull/119
+[#121]: https://github.com/nirum-lang/nirum/pull/121
+[#123]: https://github.com/nirum-lang/nirum/pull/123
+[#128]: https://github.com/nirum-lang/nirum/pull/128
+[#125]: https://github.com/nirum-lang/nirum/issues/125
+[#127]: https://github.com/nirum-lang/nirum/pull/127
+[#131]: https://github.com/nirum-lang/nirum/pull/131
+[#138]: https://github.com/nirum-lang/nirum/issues/138
+[#141]: https://github.com/nirum-lang/nirum/pull/141
+[#146]: https://github.com/nirum-lang/nirum/pull/146
+[#149]: https://github.com/nirum-lang/nirum/pull/149
+[#152]: https://github.com/nirum-lang/nirum/pull/152
+[#153]: https://github.com/nirum-lang/nirum/issues/153
+[#154]: https://github.com/nirum-lang/nirum/pull/154
+[#155]: https://github.com/nirum-lang/nirum/pull/155
+[#160]: https://github.com/nirum-lang/nirum/issues/160
+[#165]: https://github.com/nirum-lang/nirum/pull/165
+[#167]: https://github.com/nirum-lang/nirum/pull/167
+[#168]: https://github.com/nirum-lang/nirum/issues/168
+[#170]: https://github.com/nirum-lang/nirum/pull/170
+[#174]: https://github.com/nirum-lang/nirum/pull/174
+[#178]: https://github.com/nirum-lang/nirum/issues/178
+[#179]: https://github.com/nirum-lang/nirum/issues/179
+[#180]: https://github.com/nirum-lang/nirum/pull/180
+[#183]: https://github.com/nirum-lang/nirum/pull/183
+[#184]: https://github.com/nirum-lang/nirum/issues/184
+[#185]: https://github.com/nirum-lang/nirum/issues/185
+[#188]: https://github.com/nirum-lang/nirum/pull/188
+[#189]: https://github.com/nirum-lang/nirum/pull/189
+[#190]: https://github.com/nirum-lang/nirum/pull/190
+[#192]: https://github.com/nirum-lang/nirum/pull/192
+[#193]: https://github.com/nirum-lang/nirum/pull/193
+[#194]: https://github.com/nirum-lang/nirum/pull/194
+[#197]: https://github.com/nirum-lang/nirum/pull/197
+[#199]: https://github.com/nirum-lang/nirum/pull/199
+[#201]: https://github.com/nirum-lang/nirum/pull/201
+[#202]: https://github.com/nirum-lang/nirum/pull/202
+[#203]: https://github.com/nirum-lang/nirum/pull/203
+[#204]: https://github.com/nirum-lang/nirum/pull/204
+[#216]: https://github.com/nirum-lang/nirum/issues/216
+[#218]: https://github.com/nirum-lang/nirum/issues/218
+[#222]: https://github.com/nirum-lang/nirum/pull/222
+[#223]: https://github.com/nirum-lang/nirum/pull/223
+[#224]: https://github.com/nirum-lang/nirum/pull/224
+[nirum-python #22]: https://github.com/nirum-lang/nirum-python/issues/22
+[nirum-python #34]: https://github.com/nirum-lang/nirum-python/issues/34
+[nirum-python #49]: https://github.com/nirum-lang/nirum-python/issues/49
+[nirum-python #79]: https://github.com/nirum-lang/nirum-python/issues/79
+[nirum-python #88]: https://github.com/nirum-lang/nirum-python/pull/88
+[nirum-python #92]: https://github.com/nirum-lang/nirum-python/pull/92
 [python-exception]: https://docs.python.org/3/library/exceptions.html#Exception
 [targets.python]: ./target/python.md
 [python-name-error]: https://docs.python.org/3/library/exceptions.html#NameError
@@ -595,15 +601,15 @@ Still unstable release.  Released on September 26, 2016.
  -  Fixed a parser bug which had referred to a wrong line/column position on
     syntax error message when a trailing semicolon is missing.  [[#64]]
 
-[#40]: https://github.com/spoqa/nirum/issues/40
-[#53]: https://github.com/spoqa/nirum/pull/53
-[#57]: https://github.com/spoqa/nirum/pull/57
-[#64]: https://github.com/spoqa/nirum/pull/64
-[#65]: https://github.com/spoqa/nirum/issues/65
-[#69]: https://github.com/spoqa/nirum/issues/69
-[#71]: https://github.com/spoqa/nirum/pull/71
-[#73]: https://github.com/spoqa/nirum/pull/73
-[#81]: https://github.com/spoqa/nirum/pull/81
+[#40]: https://github.com/nirum-lang/nirum/issues/40
+[#53]: https://github.com/nirum-lang/nirum/pull/53
+[#57]: https://github.com/nirum-lang/nirum/pull/57
+[#64]: https://github.com/nirum-lang/nirum/pull/64
+[#65]: https://github.com/nirum-lang/nirum/issues/65
+[#69]: https://github.com/nirum-lang/nirum/issues/69
+[#71]: https://github.com/nirum-lang/nirum/pull/71
+[#73]: https://github.com/nirum-lang/nirum/pull/73
+[#81]: https://github.com/nirum-lang/nirum/pull/81
 
 ### Python target
 
@@ -614,11 +620,11 @@ Still unstable release.  Released on September 26, 2016.
  -  Fixed a bug that a Python class generated from a parameterless tag had
     been broken.  [[#55], [#66]]
 
-[#52]: https://github.com/spoqa/nirum/pull/52
-[#75]: https://github.com/spoqa/nirum/issues/75
-[#76]: https://github.com/spoqa/nirum/pull/76
-[#66]: https://github.com/spoqa/nirum/pull/66
-[#55]: https://github.com/spoqa/nirum/issues/55
+[#52]: https://github.com/nirum-lang/nirum/pull/52
+[#75]: https://github.com/nirum-lang/nirum/issues/75
+[#76]: https://github.com/nirum-lang/nirum/pull/76
+[#66]: https://github.com/nirum-lang/nirum/pull/66
+[#55]: https://github.com/nirum-lang/nirum/issues/55
 
 ### Et cetera
 
@@ -626,7 +632,7 @@ Still unstable release.  Released on September 26, 2016.
     [spoqa/nirum](https://hub.docker.com/r/spoqa/nirum/).
     [[#48] by Minyoung Jeong]
 
-[#48]: https://github.com/spoqa/nirum/pull/48
+[#48]: https://github.com/nirum-lang/nirum/pull/48
 
 
 

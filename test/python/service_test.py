@@ -292,7 +292,7 @@ def test_service_client_payload_serialization(fx_method_args):
 
 
 def test_service_client_validation(fx_method_args):
-    """https://github.com/spoqa/nirum/issues/220"""
+    """https://github.com/nirum-lang/nirum/issues/220"""
     args, expected = fx_method_args
     t = DumbTransport()
     c = SampleService.Client(t)

@@ -64,8 +64,8 @@ changes breaking either testing cannot be merged.
 [![Build Status (Travis CI)][ci-svg]][ci]
 [![Build Status (AppVeyor)][ciw-svg]][ciw]
 
-[ci-svg]: https://travis-ci.org/spoqa/nirum.svg?branch=master
-[ci]: https://travis-ci.org/spoqa/nirum
+[ci-svg]: https://travis-ci.com/nirum-lang/nirum.svg?branch=master
+[ci]: https://travis-ci.com/nirum-lang/nirum
 [ciw-svg]: https://ci.appveyor.com/api/projects/status/jf9bsrnalcb1xrp0?svg=true
 [ciw]: https://ci.appveyor.com/project/dahlia/nirum-k5n5y
 

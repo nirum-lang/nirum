@@ -9,18 +9,18 @@ Nirum
 [![Total lines of code][loc]][repo]
 [![Gitter][chat-svg]][chat]
 
-[release-svg]: https://img.shields.io/github/release/spoqa/nirum/all.svg
-[releases]: https://github.com/spoqa/nirum/releases
-[docker]: https://hub.docker.com/r/spoqa/nirum/
-[docker-svg]: https://img.shields.io/docker/automated/spoqa/nirum.svg
-[ci-svg]: https://travis-ci.org/spoqa/nirum.svg?branch=master
-[ci]: https://travis-ci.org/spoqa/nirum
+[release-svg]: https://img.shields.io/github/release/nirum-lang/nirum/all.svg
+[releases]: https://github.com/nirum-lang/nirum/releases
+[docker]: https://hub.docker.com/r/nirumlang/nirum/
+[docker-svg]: https://img.shields.io/docker/automated/nirumlang/nirum.svg
+[ci-svg]: https://travis-ci.com/nirum-lang/nirum.svg?branch=master
+[ci]: https://travis-ci.com/nirum-lang/nirum
 [ciw-svg]: https://ci.appveyor.com/api/projects/status/jf9bsrnalcb1xrp0?svg=true
 [ciw]: https://ci.appveyor.com/project/dahlia/nirum-k5n5y
-[cov-svg]: https://codecov.io/gh/spoqa/nirum/branch/master/graph/badge.svg
-[cov]: https://codecov.io/gh/spoqa/nirum
-[loc]: https://tokei.rs/b1/github/spoqa/nirum
-[repo]: https://github.com/spoqa/nirum
+[cov-svg]: https://codecov.io/gh/nirum-lang/nirum/branch/master/graph/badge.svg
+[cov]: https://codecov.io/gh/nirum-lang/nirum
+[loc]: https://tokei.rs/b1/github/nirum-lang/nirum
+[repo]: https://github.com/nirum-lang/nirum
 [chat-svg]: https://badges.gitter.im/spoqa/nirum.svg
 [chat]: https://gitter.im/spoqa/nirum?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge
 
@@ -60,8 +60,8 @@ We provide official Docker images as well.  You can check the list of
 [released tags][docker-tags]. *Note that `latest` is for a nightly build which
 is unstable (see below).*
 
-[latest-release]: https://github.com/spoqa/nirum/releases/latest
-[docker-tags]: https://hub.docker.com/r/spoqa/nirum/tags/
+[latest-release]: https://github.com/nirum-lang/nirum/releases/latest
+[docker-tags]: https://hub.docker.com/r/nirumlang/nirum/tags/
 
 
 ### Nightly builds
@@ -73,7 +73,7 @@ its bleeding edge.  We provide nightly builds for this purpose.
 - [macOS (x86_64)](https://nightly-builds.nirum.org/travis-builds/nirum-darwin-x86_64)
 - [Windows (x64)](https://ci.appveyor.com/api/projects/dahlia/nirum-k5n5y/artifacts/nirum-win-x64.exe?job=Platform%3A%20x64&branch=master)
 - [Windows (x86)](https://ci.appveyor.com/api/projects/dahlia/nirum-k5n5y/artifacts/nirum-win-x86.exe?job=Platform%3A%20x86&branch=master)
-- [Docker (`spoqa/nirum:latest`)][docker]
+- [Docker (`nirumlang/nirum:latest`)][docker]
 
 Although we call it "nightly build," technically it is not built every night,
 but done every merge commit.
@@ -93,7 +93,7 @@ For more infomration, use `--help` option:
     Nirum: The IDL compiler and RPC/distributed object framework
 
     Usage: nirum [-v|--version] (-o|--output-dir DIR) (-t|--target TARGET) DIR
-      Nirum compiler 0.4.1
+      Nirum compiler 0.4.2
 
     Available options:
       -h,--help                Show this help text
@@ -132,28 +132,29 @@ Have you kicked off a new project related to Nirum?  Please add *nirum*
 
 ### Language runtimes
 
- -   [nirum-python](https://github.com/spoqa/nirum-python): The official Python
-     runtime library for Nirum.
-     -   [nirum-python-http](https://github.com/spoqa/nirum-python-http):
+ -   [nirum-python](https://github.com/nirum-lang/nirum-python): The official
+     Python runtime library for Nirum.
+     -   [nirum-python-http](https://github.com/nirum-lang/nirum-python-http):
          Nirum HTTP transport for Python.
-     -   [nirum-python-wsgi](https://github.com/spoqa/nirum-python-wsgi):
+     -   [nirum-python-wsgi](https://github.com/nirum-lang/nirum-python-wsgi):
          Adapt Nirum services to WSGI apps.
 
 ### Editor supports
 
- -   [nirum.tmbundle](https://github.com/spoqa/nirum.tmbundle): TextMate bundle
-     for Nirum.  Also can be used by IntelliJ IDEA (or any other JetBrain's
-     IDEs, e.g., PyCharm, WebStorm) through [TextMate bundles support].
- -   [nirum.vim](https://github.com/spoqa/nirum.vim): Nirum syntax highlighter for
-     Vim/Neovim.
- -   [sublime-nirum](https://github.com/spoqa/sublime-nirum): Nirum package for
-     Sublime Text 3.
+ -   [nirum.tmbundle](https://github.com/nirum-lang/nirum.tmbundle): TextMate
+     bundle for Nirum.
+     Also can be used by IntelliJ IDEA (or any other JetBrain's IDEs, e.g.,
+     PyCharm, WebStorm) through [TextMate bundles support].
+ -   [nirum.vim](https://github.com/nirum-lang/nirum.vim): Nirum syntax
+     highlighter for Vim/Neovim.
+ -   [sublime-nirum](https://github.com/nirum-lang/sublime-nirum): Nirum package
+     for Sublime Text 3.
  -   [nirum-syntax-highlighting](https://marketplace.visualstudio.com/items?itemName=Nirum.nirum-syntax-highlighting)
      for VS Code: Nirum syntax highlighter for VS Code.
 
 [related-projects]: https://github.com/search?q=topic:nirum+fork:false
 [github-topic]: https://github.com/blog/2309-introducing-topics
-[TextMate bundles support]: https://github.com/spoqa/nirum.tmbundle#installation-intellij-idea-pycharm-etc
+[TextMate bundles support]: https://github.com/nirum-lang/nirum.tmbundle#installation-intellij-idea-pycharm-etc
 
 
 Etymology
