@@ -35,30 +35,30 @@ if [[ "$(cat "$scanout")" != "" ]]; then
   exit 1
 fi
 
-if which shellcheck > /dev/null; then
+if command -v shellcheck > /dev/null; then
   shellcheck ./*.sh
 else
   echo "Seems shellcheck is not installed; skipped linting shell scripts..."
   echo "Recommend to install shellcheck:"
-  if which apt-get > /dev/null; then
+  if command -v apt-get > /dev/null; then
     echo "  apt-get install shellcheck"
-  elif which pacman > /dev/null; then
+  elif command -v pacman > /dev/null; then
     echo "  pacman -S shellcheck"
-  elif which brew > /dev/null; then
+  elif command -v brew > /dev/null; then
     echo "  brew install shellcheck"
   else
     echo "  https://github.com/koalaman/shellcheck"
   fi
 fi
 
-if which hadolint > /dev/null; then
+if command -v hadolint > /dev/null; then
   hadolint Dockerfile
 else
   echo "Seems hadolint is not installed; skipped linting Dockerfile..."
   echo "Recommend to install hadolint:"
-  if which pacman > /dev/null; then
+  if command -v pacman > /dev/null; then
     echo "  pacman -S hadolint-git"
-  elif which brew > /dev/null; then
+  elif command -v brew > /dev/null; then
     echo "  brew install hadolint"
   else
     echo "  https://github.com/hadolint/hadolint"
