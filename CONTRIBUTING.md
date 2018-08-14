@@ -64,8 +64,8 @@ changes breaking either testing cannot be merged.
 [![Build Status (Travis CI)][ci-svg]][ci]
 [![Build Status (AppVeyor)][ciw-svg]][ciw]
 
-[ci-svg]: https://travis-ci.org/spoqa/nirum.svg?branch=master
-[ci]: https://travis-ci.org/spoqa/nirum
+[ci-svg]: https://travis-ci.com/nirum-lang/nirum.svg?branch=master
+[ci]: https://travis-ci.com/nirum-lang/nirum
 [ciw-svg]: https://ci.appveyor.com/api/projects/status/jf9bsrnalcb1xrp0?svg=true
 [ciw]: https://ci.appveyor.com/project/dahlia/nirum-k5n5y
 
@@ -104,7 +104,7 @@ Changelog
 ---------
 
 We believe logging changes is a part of making software.
-So we have the policy that enforcing every pull request has a log to changelog
+So we have the policy enforcing every pull request to have an entry to changelog
 (i.e., a diff on *CHANGES.md* file) on the [CI][changelog-test-ci].
 
 Please put `[chagelog skip]` on commit message if your change is not related to
@@ -113,4 +113,4 @@ the Nirum compiler (e.g., fixing a typo).
 
 [lint]: https://en.wikipedia.org/wiki/Lint_(software)
 [hlint]: https://github.com/ndmitchell/hlint
-[changelog-test-ci]: https://github.com/spoqa/nirum/blob/454e4b6f9f934c8cae515b0e4c7a2acf6ba32891/.travis.yml#L45-L55
+[changelog-test-ci]: https://github.com/nirum-lang/nirum/blob/7dcd1bbaffacff05d8ad91bf2018898ffdc3f0a6/.travis.yml#L45-L55

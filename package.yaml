@@ -20,9 +20,9 @@ author: Nirum team
 maintainer: Nirum team
 copyright: (c) 2016–2018 Nirum team
 license: GPL-3
-homepage: http://nirum.org/
-git: git@github.com/spoqa/nirum.git
-bug-reports: https://github.com/spoqa/nirum/issues
+homepage: https://nirum.org/
+git: git://github.com/nirum-lang/nirum.git
+bug-reports: https://github.com/nirum-lang/nirum/issues
 extra-source-files:
 - CHANGES.md
 - README.md

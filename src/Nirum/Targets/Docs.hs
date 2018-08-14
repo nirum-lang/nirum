@@ -352,7 +352,7 @@ typeDecl mod' ident
 |]
 typeDecl _ _ TD.Import {} =
     error ("It shouldn't happen; please report it to Nirum's bug tracker:\n" ++
-           "https://github.com/spoqa/nirum/issues")
+           "https://github.com/nirum-lang/nirum/issues")
 
 nameText :: Name -> T.Text
 nameText = toNormalizedText . facialName
