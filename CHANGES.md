@@ -25,6 +25,12 @@ To be released.
  -  Fixed an incorrect processing of [CommonMark] thight list items: it had
     crashed when a thight list item contains blocks other than paragraphs.
 
+### Python target
+
+ -  Python 3.7 support. [[#298]]
+
+[#298]: https://github.com/nirum-lang/nirum/issues/298
+
 ### Et cetera
 
  -  Dropped 32-bit Windows support.
