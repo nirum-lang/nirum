@@ -26,6 +26,12 @@ To be released.
     crashed when a thight list item contains blocks other than paragraphs.
  -  Package's version became shown on the generated docs.  [[#297] by Jeong Ukjae]
 
+### Python target
+
+ -  Python 3.7 support. [[#298], [#300] by Alan D.J. Synn]
+
+[#298]: https://github.com/nirum-lang/nirum/issues/298
+
 ### Et cetera
 
  -  Dropped 32-bit Windows support.
@@ -36,6 +42,7 @@ To be released.
 [#126]: https://github.com/nirum-lang/nirum/issues/126
 [#281]: https://github.com/nirum-lang/nirum/pull/281
 [#297]: https://github.com/nirum-lang/nirum/issues/297
+[#300]: https://github.com/nirum-lang/nirum/pull/300
 [CommonMark]: http://commonmark.org/
 [table syntax extension]: https://github.github.com/gfm/#tables-extension-
 [special attributes extension]: https://michelf.ca/projects/php-markdown/extra/#spe-attr
