@@ -64,8 +64,11 @@ renderBlock (BlockQuote blocks) =
 renderBlock (HtmlBlock html) = html
 renderBlock (CodeBlock lang code') =
     if T.null lang
-    then [qq|<pre><code>$code'</code></pre>|]
-    else [qq|<pre><code class="language-$lang">$code'</code></pre>|]
+    then [qq|<pre><code>$escapedCode</code></pre>|]
+    else [qq|<pre><code class="language-$lang">$escapedCode</code></pre>|]
+  where
+    escapedCode :: Html
+    escapedCode = escape code'
 renderBlock (Heading level inlines anchorId) =
     let lv = headingLevelInt level
         id' = case anchorId of
