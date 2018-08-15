@@ -27,7 +27,7 @@ To be released.
 
 ### Python target
 
- -  Python 3.7 support. [[#298]]
+ -  Python 3.7 support. [[#298], [#300] by Alan D.J. Synn]
 
 [#298]: https://github.com/nirum-lang/nirum/issues/298
 
@@ -40,6 +40,7 @@ To be released.
 
 [#126]: https://github.com/nirum-lang/nirum/issues/126
 [#281]: https://github.com/nirum-lang/nirum/pull/281
+[#300]: https://github.com/nirum-lang/nirum/pull/300
 [CommonMark]: http://commonmark.org/
 [table syntax extension]: https://github.github.com/gfm/#tables-extension-
 [special attributes extension]: https://michelf.ca/projects/php-markdown/extra/#spe-attr
