@@ -86,7 +86,7 @@ In order to compile a Nirum package (`examples/`) to a Python package:
     $ mkdir out/  # directory to place generated Python files
     $ nirum -t python -o out/ examples/
 
-For more infomration, use `--help` option:
+For more information, use `--help` option:
 
     $ nirum --help
     Nirum: The IDL compiler and RPC/distributed object framework
