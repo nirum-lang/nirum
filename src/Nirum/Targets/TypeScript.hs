@@ -44,7 +44,7 @@ type CompileError' = Markup
 type Code = Markup
 
 data Source = Source { sourcePackage :: Package TypeScript
-                     , sourceModule :: BoundModule TypeScript
+                     , sourceModulePath :: ModulePath
                      } deriving (Eq, Ord, Show)
 
 instance ToJSON (Package TypeScript) where
@@ -107,33 +107,29 @@ compilePackage' package =
     toFilename sourceRootDirectory mp =
         joinPath $ unpack sourceRootDirectory : toTypeScriptFilename mp
     files :: [(FilePath, Either CompileError' Code)]
-    files = [ (toFilename "src" mp, compile (Source package boundModule))
+    files = [ (toFilename "src" mp, compile (Source package mp))
             | (mp, _) <- NMS.toList $ modules package
-            , Just boundModule <- [resolveBoundModule mp package]
             ]
 
 compile :: Source -> Either CompileError' Code
 compile source@Source { sourcePackage = package
-                      , sourceModule = boundModule' } = do
-    let (_, code) = CB.runBuilder package mp TC.empty (compileModule source)
+                      , sourceModulePath = mp' } = do
+    let (_, code) = CB.runBuilder package mp' TC.empty moduleBody
     return [compileText|"use strict";
 
 #{code}
 |]
   where
-    mp :: ModulePath
-    mp = BM.modulePath boundModule'
+    moduleBody :: CodeBuilder TypeScript ()
+    moduleBody = do
+        td <- CB.boundTypes
+        mapM_ compileTypeDeclaration $ DS.toList td
 
-compileModule :: Source -> CodeBuilder TypeScript ()
-compileModule s@Source { sourceModule = bm } =
-    mapM_ (compileTypeDeclaration s) $ DS.toList $ boundTypes bm
-
-compileTypeDeclaration :: Source
-                       -> TypeDeclaration
+compileTypeDeclaration :: TypeDeclaration
                        -> CodeBuilder TypeScript ()
-compileTypeDeclaration s TypeDeclaration { typename = n
-                                         , type' = RecordType fields'
-                                         } = compileRecordType s n fields'
+compileTypeDeclaration TypeDeclaration { typename = n
+                                       , type' = RecordType fields'
+                                       } = compileRecordType n fields'
 compileTypeDeclaration _ _ = CB.appendCode [compileText|
 /* ------ has to be implemented
 throw Error()
@@ -141,11 +137,10 @@ throw Error()
 
 |]  -- never used
 
-compileRecordType :: Source
-                  -> Name
+compileRecordType :: Name
                   -> DeclarationSet Field
                   -> CodeBuilder TypeScript ()
-compileRecordType Source { sourceModule = bm } (Name fName _) fs = do
+compileRecordType (Name fName _) fs = do
     fc <- mapM compileRecordField fields'
     CB.appendCode [compileText|export class #{className} {
 %{ forall f <- fc }
@@ -173,5 +168,5 @@ compileRecordType Source { sourceModule = bm } (Name fName _) fs = do
         toCamelCaseText fieldFacialName
     compileRecordField :: Field -> CodeBuilder TypeScript Markup
     compileRecordField fd@Field { fieldType = ft } = do
-        fieldType' <- compileTypeExpression bm ft
+        fieldType' <- compileTypeExpression $ Just ft
         return [compileText|#{toCamelCase' fd}: #{fieldType'}|]

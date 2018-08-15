@@ -17,8 +17,11 @@ import Data.Functor (Functor)
 import Data.Maybe (fromMaybe)
 import Text.Blaze
 
+import Nirum.Constructs.DeclarationSet hiding (empty)
+import qualified Nirum.Constructs.DeclarationSet as DS
 import Nirum.Constructs.Identifier (Identifier)
 import Nirum.Constructs.ModulePath (ModulePath)
+import Nirum.Constructs.TypeDeclaration
 import Nirum.Package.Metadata (Package (..), Target (..))
 import qualified Nirum.TypeInstance.BoundModule as BoundModule
 
@@ -92,3 +95,8 @@ runBuilder package modPath st (CodeBuilder a) = (ret, rendered)
 
 joinMarkup :: [Markup] -> Markup
 joinMarkup ms = foldMap contents ms
+
+boundTypes :: Target t -> CodeBuilder t (DeclarationSet TypeDeclaration)
+boundTypes = do
+    types <- fmap boundModule get'
+    return $ BoundModule.findInBoundModule types DS.empty
