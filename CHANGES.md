@@ -24,6 +24,7 @@ To be released.
     to customize the look and feel of the result pages.
  -  Fixed an incorrect processing of [CommonMark] thight list items: it had
     crashed when a thight list item contains blocks other than paragraphs.
+ -  Package's version became shown on the generated docs.  [[#297] by Jeong Ukjae]
 
 ### Python target
 
@@ -40,6 +41,7 @@ To be released.
 
 [#126]: https://github.com/nirum-lang/nirum/issues/126
 [#281]: https://github.com/nirum-lang/nirum/pull/281
+[#297]: https://github.com/nirum-lang/nirum/issues/297
 [#300]: https://github.com/nirum-lang/nirum/pull/300
 [CommonMark]: http://commonmark.org/
 [table syntax extension]: https://github.github.com/gfm/#tables-extension-

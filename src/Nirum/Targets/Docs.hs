@@ -18,6 +18,7 @@ import Data.Map.Strict (Map, mapKeys, mapWithKey, unions)
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
+import qualified Data.SemVer
 import System.FilePath
 import Text.Blaze (ToMarkup (preEscapedToMarkup))
 import Text.Blaze.Html.Renderer.Utf8 (renderHtml)
@@ -111,9 +112,11 @@ $doctype 5
                 <a class="index selected" href="#{root}index.html">
                     <strong>
                         #{docsTitle $ target pkg}
+                        #{Data.SemVer.toText $ version md}
             $else
                 <a class="index" href="#{root}index.html">
                     #{docsTitle $ target pkg}
+                    #{Data.SemVer.toText $ version md}
             <ul.manuals.toc>
                 $forall (documentPath, doc) <- documentPairs
                     $if currentPage == DocumentPage documentPath
