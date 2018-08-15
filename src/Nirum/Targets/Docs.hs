@@ -181,11 +181,10 @@ module' :: BoundModule Docs -> Html
 module' docsModule =
     layout pkg depth (ModulePage docsModulePath) path [shamlet|
 $maybe tit <- headingTitle
-    <h1>
-        <dfn><code>#{path}</code>
-        &#32;&mdash; #{tit}
+    <h1>#{path}
+    <p>#{tit}
 $nothing
-    <h1><code>#{path}</code>
+    <h1>#{path}
 $maybe m <- mod'
     $maybe d <- docsBlock m
         #{blockToHtml (trimTitle d)}
@@ -239,48 +238,53 @@ blockToHtml =
 typeDecl :: BoundModule Docs -> Identifier -> TD.TypeDeclaration -> Html
 typeDecl mod' ident
          tc@TD.TypeDeclaration { TD.type' = TD.Alias cname } = [shamlet|
-    <h2>
-        type <dfn><code>#{toNormalizedText ident}</code></dfn> = #
+    <h2 id="#{toNormalizedText ident}">
+        <code>type</code> <dfn>#{toNormalizedText ident}</dfn> = #
         <code.type>#{typeExpression mod' cname}</code>
+        <a class="anchor" href="##{toNormalizedText ident}">¶
     $maybe d <- docsBlock tc
         #{blockToHtml d}
 |]
 typeDecl mod' ident
          tc@TD.TypeDeclaration { TD.type' = TD.UnboxedType innerType } =
     [shamlet|
-        <h2>
-            unboxed
-            <dfn><code>#{toNormalizedText ident}</code>
+        <h2 id="#{toNormalizedText ident}">
+            <code>unboxed</code> <dfn>#{toNormalizedText ident}</dfn>
             (<code>#{typeExpression mod' innerType}</code>)
+            <a class="anchor" href="##{toNormalizedText ident}">¶
         $maybe d <- docsBlock tc
             #{blockToHtml d}
     |]
 typeDecl _ ident
          tc@TD.TypeDeclaration { TD.type' = TD.EnumType members } = [shamlet|
-    <h2>enum <dfn><code>#{toNormalizedText ident}</code></dfn>
+    <h2 id="#{toNormalizedText ident}">
+        <code>enum</code> <dfn>#{toNormalizedText ident}</dfn>
+        <a class="anchor" href="##{toNormalizedText ident}">¶
     $maybe d <- docsBlock tc
         #{blockToHtml d}
     <dl class="members">
         $forall decl <- DES.toList members
             <dt class="member-name">
-                <code>#{nameText $ DE.name decl}
+                #{nameText $ DE.name decl}
             <dd class="member-doc">
                 $maybe d <- docsBlock decl
                     #{blockToHtml d}
 |]
 typeDecl mod' ident
          tc@TD.TypeDeclaration { TD.type' = TD.RecordType fields } = [shamlet|
-    <h2>record <dfn><code>#{toNormalizedText ident}</code></dfn>
+    <h2 id="#{toNormalizedText ident}">
+        <code>record</code> <dfn>#{toNormalizedText ident}</dfn>
+        <a class="anchor" href="##{toNormalizedText ident}">¶
     $maybe d <- docsBlock tc
         #{blockToHtml d}
     <dl.fields>
         $forall fieldDecl@(TD.Field _ fieldType _) <- DES.toList fields
-            <dt>
+            <dt id="#{anchorText ident fieldDecl}">
                 <code.type>#{typeExpression mod' fieldType}
-                <var><code>#{nameText $ DE.name fieldDecl}</code>
-            <dd>
-                $maybe d <- docsBlock fieldDecl
-                    #{blockToHtml d}
+                <var>#{nameText $ DE.name fieldDecl}
+                <a class="anchor" href="##{anchorText ident fieldDecl}">¶
+            $maybe d <- docsBlock fieldDecl
+                <dd>#{blockToHtml d}
 |]
 typeDecl mod' ident
          tc@TD.TypeDeclaration
@@ -289,26 +293,30 @@ typeDecl mod' ident
                    }
              } =
     [shamlet|
-    <h2>union <dfn><code>#{toNormalizedText ident}</code></dfn>
+    <h2 id="#{toNormalizedText ident}">
+        <code>union</code> <dfn>#{toNormalizedText ident}</dfn>
+        <a class="anchor" href="##{toNormalizedText ident}">¶
     $maybe d <- docsBlock tc
         #{blockToHtml d}
     $forall (default_, tagDecl@(TD.Tag _ fields _)) <- tagList
-        <h3 .tag :default_:.default-tag>
-            $if default_
-                default tag #
-            $else
-                tag #
-            <dfn><code>#{nameText $ DE.name tagDecl}</code>
+        <h3 .tag :default_:.default-tag id="#{anchorText ident tagDecl}">
+            <code>
+                $if default_
+                    default tag
+                $else
+                    tag
+            <dfn>#{nameText $ DE.name tagDecl}
+            <a class="anchor" href="##{anchorText ident tagDecl}">¶
         $maybe d <- docsBlock tagDecl
             #{blockToHtml d}
         <dl.fields>
             $forall fieldDecl@(TD.Field _ fieldType _) <- DES.toList fields
-                <dt>
+                <dt id="#{anchorText ident fieldDecl}">
                     <code.type>#{typeExpression mod' fieldType}
-                    <var><code>#{nameText $ DE.name fieldDecl}</code>
-                <dd>
-                    $maybe d <- docsBlock fieldDecl
-                        #{blockToHtml d}
+                    <var>#{nameText $ DE.name fieldDecl}
+                    <a class="anchor" href="##{anchorText ident fieldDecl}">¶
+                $maybe d <- docsBlock fieldDecl
+                    <dd>#{blockToHtml d}
     |]
   where
     tagList :: [(Bool, TD.Tag)]
@@ -318,27 +326,28 @@ typeDecl mod' ident
         ]
 typeDecl _ ident
          TD.TypeDeclaration { TD.type' = TD.PrimitiveType {} } = [shamlet|
-    <h2>primitive <code>#{toNormalizedText ident}</code>
+    <h2 id="#{toNormalizedText ident}">
+        primitive <code>#{toNormalizedText ident}</code>
+        <a class="anchor" href="##{toNormalizedText ident}">¶
 |]
 typeDecl mod' ident
          tc@TD.ServiceDeclaration { TD.service = S.Service methods } =
     [shamlet|
-        <h2>service <dfn><code>#{toNormalizedText ident}</code></dfn>
+        <h2 id="#{toNormalizedText ident}">
+            <code>service</code>
+            <dfn>#{toNormalizedText ident}</dfn>
+            <a class="anchor" href="##{toNormalizedText ident}">¶
         $maybe d <- docsBlock tc
             #{blockToHtml d}
         $forall md@(S.Method _ ps ret err _) <- DES.toList methods
             <h3.method>
                 $maybe retType <- ret
                     <span.return>
-                        <code.type>#{typeExpression mod' retType}
-                        &#32;
-                <dfn>
-                    <code>#{nameText $ DE.name md}
-                    &#32;
-                <span.parentheses>()
+                        <code.type>#{typeExpression mod' retType}</code> #
+                <dfn>#{nameText $ DE.name md}</dfn> <span.parentheses>()</span>
                 $maybe errType <- err
                     <span.error>
-                        throws
+                        throws #
                         <code.error.type>#{typeExpression mod' errType}
             $maybe d <- docsBlock md
                 #{blockToHtml d}
@@ -356,6 +365,13 @@ typeDecl _ _ TD.Import {} =
 
 nameText :: Name -> T.Text
 nameText = toNormalizedText . facialName
+
+-- FIXME: TD.Field 대신 TD.Tag도 받을 수 있도록 해야 함
+anchorText :: Identifier -> TD.Field -> T.Text
+anchorText i d = T.concat [ toNormalizedText i
+                          , "."
+                          , nameText $ DE.name d
+                          ]
 
 showKind :: TD.TypeDeclaration -> T.Text
 showKind TD.ServiceDeclaration {} = "service"
@@ -498,6 +514,16 @@ h1, h2, h3, h4, h5, h6, dt
     font-weight: bold
     code
         font-weight: 400
+    a.anchor
+        text-decoration: none;
+        font-family: sans-serif
+        color: #{gray3}
+        display: none
+h1:hover, h2:hover, h3:hover, h4:hover, h5:hover, h6:hover, dt:hover
+    a.anchor
+        display: inline-block
+    a.anchor:hover
+        color: #{gray8}
 a
     text-decoration: none
 a:link
