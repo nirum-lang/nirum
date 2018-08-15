@@ -1,7 +1,7 @@
 Package
 =======
 
-Unlike many other RPC framworks/IDL compilers, Nirum's single unit of
+Unlike many other RPC frameworks/IDL compilers, Nirum's single unit of
 compilation is not a source file, but a package of source files.
 Each package is compiled to a package of target language (e.g. Python package
 with setup.py file).  The following example is an ordinary Nirum package:

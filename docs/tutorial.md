@@ -734,7 +734,7 @@ Method parameters
 The previous example was designed to minimize the complexity by intention.
 That's why `increment()` method has no parameters.
 
-In this chapter, the `counter` example slighly evolves.  Previously,
+In this chapter, the `counter` example slightly evolves.  Previously,
 `increment()` method only can increment the state by 1.  How about making
 it possible to increment the state by any delta?  If the previous one is
 like a microservice version of `++state` this one is like a microservice
