@@ -4,13 +4,9 @@
 module Nirum.CodeBuilder (
     -- * The CodeBuilder monad
     CodeBuilder,
+    appendCode,
     runBuilder,
-    -- * Builder operations
-    writeLine,
-    nest,
     lookupType,
-    -- * Examples
-    -- $examples
     ) where
 
 import Control.Applicative (Applicative)
@@ -19,13 +15,13 @@ import qualified Control.Monad.State as ST
 import Control.Monad.State (MonadState, State, state, runState)
 import Data.Functor (Functor)
 import Data.Maybe (fromMaybe)
-import Data.Monoid ((<>))
-import qualified Data.Text.Lazy.Builder as B
-import qualified Text.PrettyPrint as P
-import Text.PrettyPrint (($+$))
+import Text.Blaze
 
+import Nirum.Constructs.DeclarationSet hiding (empty)
+import qualified Nirum.Constructs.DeclarationSet as DS
 import Nirum.Constructs.Identifier (Identifier)
 import Nirum.Constructs.ModulePath (ModulePath)
+import Nirum.Constructs.TypeDeclaration
 import Nirum.Package.Metadata (Package (..), Target (..))
 import qualified Nirum.TypeInstance.BoundModule as BoundModule
 
@@ -40,7 +36,7 @@ newtype Target t => CodeBuilder t s a = CodeBuilder (State (BuildState t s) a)
              )
 
 data Target t => BuildState t s =
-    BuildState { output :: P.Doc
+    BuildState { output :: [Markup]
                , boundModule :: BoundModule.BoundModule t
                , innerState :: s
                }
@@ -63,29 +59,10 @@ modify' :: Target t
         -> CodeBuilder t s ()
 modify' = CodeBuilder . ST.modify
 
--- | Put the line below the builder output.
-writeLine :: Target t
-          => P.Doc               -- ^ The line to append
-          -> CodeBuilder t s ()
-writeLine code = modify' $ \ s -> s { output = output s $+$ code }
-
--- | Nest (or indent) an output of inner builder computation by a given number
--- of positions.
-nest :: Target t
-     => Integer            -- ^ indentation size (may also be negative)
-     -> CodeBuilder t s a  -- ^ inner builder computation to generate the
-                           --   nested document
-     -> CodeBuilder t s a
-nest n code = do
-    st <- get'
-    let st' = st { output = P.empty }
-    put' st'
-    ret <- code
-    after <- get'
-    modify' $ \ s -> s {
-        output = output st $+$ P.nest (fromIntegral n) (output after)
-    }
-    return ret
+appendCode :: Target t
+           => Markup
+           -> CodeBuilder t s ()
+appendCode code = modify' $ \ s -> s { output = output s ++ [code] }
 
 -- | Look up the actual type by the name from the context of the builder
 -- computation.
@@ -102,30 +79,24 @@ runBuilder :: Target t
            -> ModulePath
            -> s                  -- ^ initial state
            -> CodeBuilder t s a  -- ^ code builder computation to execute
-           -> (a, B.Builder)     -- ^ return value and build result
+           -> (a, Markup)     -- ^ return value and build result
 runBuilder package modPath st (CodeBuilder a) = (ret, rendered)
   where
-    mod' = fromMaybe (error "asdf")
+    mod' = fromMaybe (error "never happend")
                      (BoundModule.resolveBoundModule modPath package)
-    initialState = BuildState { output = P.empty
+    initialState = BuildState { output = []
                               , boundModule = mod'
                               , innerState = st
                               }
     (ret, finalState) = runState a initialState
     out' = output finalState
-    rendered = P.fullRender P.PageMode 80 1.5 concat' (B.singleton '\n') out'
-    concat' (P.Chr c) rest = B.singleton c <> rest
-    concat' (P.Str s) rest = B.fromString s <> rest
-    concat' (P.PStr s) rest = concat' (P.Str s) rest
+    rendered = joinMarkup out'
 
-{- $examples
 
-> import Text.PrettyPrint (colon, empty, parens, quotes, (<>), (<+>))
->
-> hello = do
->     writeLine $ "def" <+> "hello" <> parens empty <> colon
->     nest 4 $ do
->         writeLine $ "print" <> parens (quotes "Hello, world!")
->         writeLine $ "return" <+> "42"
+joinMarkup :: [Markup] -> Markup
+joinMarkup ms = foldMap contents ms
 
--}
+boundTypes :: Target t -> CodeBuilder t (DeclarationSet TypeDeclaration)
+boundTypes = do
+    types <- fmap boundModule get'
+    return $ BoundModule.findInBoundModule types DS.empty

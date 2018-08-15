@@ -45,10 +45,11 @@ whenCi block = do
 
 -- | Teget all targets.
 main :: IO ()
-main =
+main = do
     -- CHECK: If an added test suite requires any external programs
     -- list them in "External dependencies" section of CONTRIBUTING.md docs.
     python
+    typescript
 
 -- | Test Python target.
 python :: IO ()
@@ -57,3 +58,20 @@ python = do
     let tox = maybe "tox" T.pack toxEnv
     whenCi $ proc' tox ["-e", "devruntime"]
     proc' tox ["--skip-missing-interpreters"]
+
+
+typescript :: IO ()
+typescript = do
+    npmEnv <- lookupEnv "NPM"
+    let npm = maybe "npm" T.pack npmEnv
+    let prefix = "./test/typescript"
+    proc' npm ["--prefix", prefix, "install"]
+    proc' "stack" [ "exec"
+                  , "--"
+                  , "nirum"
+                  , "-o"
+                  , T.append prefix "/nirum_fixture"
+                  , "-t"
+                  , "typescript"
+                  , "test/nirum_fixture/"
+                  ]
