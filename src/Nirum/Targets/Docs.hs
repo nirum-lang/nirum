@@ -56,6 +56,7 @@ import Nirum.Version (versionText)
 
 data Docs = Docs
     { docsTitle :: T.Text
+    , docsOpenGraph :: [OpenGraph]
     , docsStyle :: T.Text
     , docsHeader :: T.Text
     , docsFooter :: T.Text
@@ -68,6 +69,11 @@ data CurrentPage
     | ModulePage ModulePath
     | DocumentPage FilePath
     deriving (Eq, Show)
+
+data OpenGraph = OpenGraph
+    { ogTag :: T.Text
+    , ogContent :: T.Text
+    } deriving (Eq, Ord, Show)
 
 makeFilePath :: ModulePath -> FilePath
 makeFilePath modulePath' = foldl (</>) "" $
@@ -104,6 +110,8 @@ $doctype 5
         <meta name="generator" content="Nirum #{versionText}">
         $forall Author { name = name' } <- authors md
             <meta name="author" content="#{name'}">
+        $forall OpenGraph { ogTag, ogContent } <- docsOpenGraph $ target pkg
+            <meta property="#{ogTag}" content="#{ogContent}">
         <link rel="stylesheet" href="#{root}style.css">
     <body>
         #{preEscapedToMarkup $ docsHeader $ target pkg}
@@ -619,11 +627,13 @@ instance Target Docs where
     targetName _ = "docs"
     parseTarget table = do
         title <- stringField "title" table
+        opengraphs <- optional $ opengraphsField "opengraphs" table
         style <- optional $ stringField "style" table
         header <- optional $ stringField "header" table
         footer <- optional $ stringField "footer" table
         return Docs
             { docsTitle = title
+            , docsOpenGraph = fromMaybe [] opengraphs
             , docsStyle = fromMaybe "" style
             , docsHeader = fromMaybe "" header
             , docsFooter = fromMaybe "" footer
@@ -631,3 +641,18 @@ instance Target Docs where
     compilePackage = compilePackage'
     showCompileError _ = id
     toByteString _ = id
+
+opengraphsField :: MetadataField -> Table -> Either MetadataError [OpenGraph]
+opengraphsField field' table = do
+    array <- tableArrayField field' table
+    opengraphs' <- mapM parseOpenGraph array
+    return $ toList opengraphs'
+  where
+    parseOpenGraph :: Table -> Either MetadataError OpenGraph
+    parseOpenGraph t = do
+      tag' <- stringField "tag" t
+      content' <- stringField "content" t
+      return OpenGraph
+          { ogTag = tag'
+          , ogContent = content'
+          }

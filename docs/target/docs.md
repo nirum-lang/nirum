@@ -46,6 +46,14 @@ It goes to `<title>` elements of generated HTML pages.  It's usually a name of
 the Nirum package.
 
 
+### `opengraphs` (optional): OpenGraph
+
+It goes to `<meta>` elements of generated HTML pages. It mostly purposes to
+generate [OpenGraph] objects, but can be used for other metadata as well.
+
+[OpenGraph]: http://ogp.me/
+
+
 ### `style` (optional): Custom CSS
 
 It goes to very ending of the CSS file, which means it can override other
