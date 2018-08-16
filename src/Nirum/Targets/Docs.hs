@@ -113,6 +113,9 @@ $doctype 5
         $forall OpenGraph { ogTag, ogContent } <- docsOpenGraph $ target pkg
             <meta property="#{ogTag}" content="#{ogContent}">
         <link rel="stylesheet" href="#{root}style.css">
+        <link rel="stylesheet" href="#{hljsCss}">
+        <script src="#{hljsJs}"></script>
+        <script>hljs.initHighlightingOnLoad();</script>
     <body>
         #{preEscapedToMarkup $ docsHeader $ target pkg}
         <nav>
@@ -169,6 +172,12 @@ $doctype 5
     documentSortKey ("", _) = (False, 0, "")
     documentSortKey (fp@(fp1 : _), _) =
         (isUpper fp1, length (filter (== pathSeparator) fp), fp)
+    hljsBase :: T.Text
+    hljsBase = "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/"
+    hljsCss :: T.Text
+    hljsCss = T.concat [hljsBase, "styles/github.min.css"]
+    hljsJs :: T.Text
+    hljsJs = T.concat [hljsBase, "highlight.min.js"]
 
 typeExpression :: BoundModule Docs -> TE.TypeExpression -> Html
 typeExpression _ expr = [shamlet|#{typeExpr expr}|]
@@ -498,7 +507,7 @@ strong code
 pre
     padding: 16px 10px
     background-color: #{gray1}
-    code
+    code, code.hljs
         background: none
 div
     border-top: 1px solid #{gray3}

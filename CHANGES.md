@@ -28,6 +28,8 @@ To be released.
     [[#297], [#304] by Jeong Ukjae]
  -  Added `opengraphs` option for [OpenGraph] objects on docs.
     [[#283], [#305] by GyuYong Jung]
+ -  Added syntax highlighting.
+    [[#310], [#311] by MinJune Kim]
 
 ### Python target
 
