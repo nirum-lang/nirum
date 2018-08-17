@@ -65,6 +65,12 @@ main = do
 
 style :: Text
 style = [q|
+h2 a {
+    visibility: hidden;
+}
+h2:hover a {
+    visibility: visible;
+}
 .github-corner:hover .octo-arm {
     animation: octocat-wave 560ms ease-in-out;
 }

@@ -24,6 +24,7 @@ import Text.Blaze (ToMarkup (preEscapedToMarkup))
 import Text.Blaze.Html.Renderer.Utf8 (renderHtml)
 import Text.Cassius
 import Text.Hamlet (Html, shamlet)
+import Text.InterpolatedString.Perl6 (q)
 
 import Nirum.Constructs (Construct (toCode))
 import Nirum.Constructs.Declaration (Documented (docsBlock))
@@ -114,6 +115,7 @@ $doctype 5
             <meta property="#{ogTag}" content="#{ogContent}">
         <link rel="stylesheet" href="#{root}style.css">
         <link rel="stylesheet" href="#{hljsCss}">
+        <script src="#{root}nirum.js"></script>
         <script src="#{hljsJs}"></script>
         <script>hljs.initHighlightingOnLoad();</script>
     <body>
@@ -261,7 +263,7 @@ blockToHtml =
 typeDecl :: BoundModule Docs -> Identifier -> TD.TypeDeclaration -> Html
 typeDecl mod' ident
          tc@TD.TypeDeclaration { TD.type' = TD.Alias cname } = [shamlet|
-    <h2>
+    <h2 id="#{toNormalizedText ident}">
         type <dfn><code>#{toNormalizedText ident}</code></dfn> = #
         <code.type>#{typeExpression mod' cname}</code>
     $maybe d <- docsBlock tc
@@ -270,7 +272,7 @@ typeDecl mod' ident
 typeDecl mod' ident
          tc@TD.TypeDeclaration { TD.type' = TD.UnboxedType innerType } =
     [shamlet|
-        <h2>
+        <h2 id="#{toNormalizedText ident}">
             unboxed
             <dfn><code>#{toNormalizedText ident}</code>
             (<code>#{typeExpression mod' innerType}</code>)
@@ -279,7 +281,8 @@ typeDecl mod' ident
     |]
 typeDecl _ ident
          tc@TD.TypeDeclaration { TD.type' = TD.EnumType members } = [shamlet|
-    <h2>enum <dfn><code>#{toNormalizedText ident}</code></dfn>
+    <h2 id="#{toNormalizedText ident}">
+        enum <dfn><code>#{toNormalizedText ident}</code></dfn>
     $maybe d <- docsBlock tc
         #{blockToHtml d}
     <dl class="members">
@@ -292,7 +295,8 @@ typeDecl _ ident
 |]
 typeDecl mod' ident
          tc@TD.TypeDeclaration { TD.type' = TD.RecordType fields } = [shamlet|
-    <h2>record <dfn><code>#{toNormalizedText ident}</code></dfn>
+    <h2 id="#{toNormalizedText ident}">
+        record <dfn><code>#{toNormalizedText ident}</code></dfn>
     $maybe d <- docsBlock tc
         #{blockToHtml d}
     <dl.fields>
@@ -311,7 +315,8 @@ typeDecl mod' ident
                    }
              } =
     [shamlet|
-    <h2>union <dfn><code>#{toNormalizedText ident}</code></dfn>
+    <h2 id="#{toNormalizedText ident}">
+        union <dfn><code>#{toNormalizedText ident}</code></dfn>
     $maybe d <- docsBlock tc
         #{blockToHtml d}
     $forall (default_, tagDecl@(TD.Tag _ fields _)) <- tagList
@@ -340,12 +345,14 @@ typeDecl mod' ident
         ]
 typeDecl _ ident
          TD.TypeDeclaration { TD.type' = TD.PrimitiveType {} } = [shamlet|
-    <h2>primitive <code>#{toNormalizedText ident}</code>
+    <h2 id="#{toNormalizedText ident}">
+        primitive <code>#{toNormalizedText ident}</code>
 |]
 typeDecl mod' ident
          tc@TD.ServiceDeclaration { TD.service = S.Service methods } =
     [shamlet|
-        <h2>service <dfn><code>#{toNormalizedText ident}</code></dfn>
+        <h2 id="#{toNormalizedText ident}">
+            service <dfn><code>#{toNormalizedText ident}</code></dfn>
         $maybe d <- docsBlock tc
             #{blockToHtml d}
         $forall md@(S.Method _ ps ret err _) <- DES.toList methods
@@ -520,6 +527,11 @@ h1, h2, h3, h4, h5, h6, dt
     font-weight: bold
     code
         font-weight: 400
+h2 a.pilcrow
+    visibility: hidden
+    margin-left: 10px
+h2:hover a.pilcrow
+    visibility: visible
 a
     text-decoration: none
 a:link
@@ -610,10 +622,24 @@ footer
     navWidth :: PixelSize
     navWidth = PixelSize 300
 
+javascript :: T.Text
+javascript = [q|
+window.addEventListener('load', function () {
+    document.querySelectorAll('h2[id]').forEach(function(node) {
+        var anchor = document.createElement("a");
+        anchor.className = "pilcrow";
+        anchor.text = "\xb6";
+        anchor.href = "#" + node.id;
+        node.appendChild(anchor);
+    });
+});
+|]
+
 compilePackage' :: Package Docs -> Map FilePath (Either Error BS.ByteString)
 compilePackage' pkg = unions
     [ fromList
         [ ("style.css", Right $ encodeUtf8 css)
+        , ("nirum.js", Right $ encodeUtf8 javascript)
         , ( "index.html"
           , Right $ toStrict $ renderHtml $ case readme of
                 Nothing -> contents pkg

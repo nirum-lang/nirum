@@ -30,6 +30,8 @@ To be released.
     [[#283], [#305] by GyuYong Jung]
  -  Added syntax highlighting.
     [[#310], [#311] by MinJune Kim]
+ -  Added anchor links to headings.
+    [[#225] by Park Hyunwoo]
 
 ### Python target
 
@@ -45,6 +47,7 @@ To be released.
     (from [spoqa/nirum](https://hub.docker.com/r/spoqa/nirum/)).
 
 [#126]: https://github.com/nirum-lang/nirum/issues/126
+[#225]: https://github.com/nirum-lang/nirum/issues/225
 [#281]: https://github.com/nirum-lang/nirum/pull/281
 [#283]: https://github.com/spoqa/nirum/pull/283
 [#297]: https://github.com/nirum-lang/nirum/issues/297
