@@ -200,7 +200,7 @@ if (#{builtins}.isinstance(#{vInput}, #{mAbc}.Sequence) and
         if #{builtins}.isinstance(#{pairInput}, #{mAbc}.Mapping):
             try:
                 (#{keyInput}) = #{pairInput}['key']
-            except KeyError:
+            except #{builtins}.KeyError:
                 (#{vError})(
                     '[{0}].key'.format(#{pairIndex}), 'Expected to exist.'
                 )
@@ -209,7 +209,7 @@ if (#{builtins}.isinstance(#{vInput}, #{mAbc}.Sequence) and
 #{indent "                " keyDeserializer}
             try:
                 (#{valueInput}) = #{pairInput}['value']
-            except KeyError:
+            except #{builtins}.KeyError:
                 (#{vError})(
                     '[{0}].value'.format(#{pairIndex}), 'Expected to exist.'
                 )
@@ -288,7 +288,7 @@ compilePrimitiveTypeDeserializer Bigint vInput vOutput vError = do
 if #{builtins}.isinstance(#{vInput}, #{baseString}):
     try:
         #{vOutput} = #{builtins}.int(#{vInput})
-    except ValueError:
+    except #{builtins}.ValueError:
         #{vError}(
             '',
             'Expected a string of decimal digits, '

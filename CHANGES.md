@@ -34,6 +34,16 @@ To be released.
 ### Python target
 
  -  Python 3.7 support. [[#298], [#300] by Alan D.J. Synn]
+ -  Fixed a bug that an uncaught `NameError` raises (instead of following
+    the standardized way to handle validation errors through `on_error`)
+    when a serialized value of a mapping lacks `"key"` or `"value"`
+    field and a type/union tag/service named `key-error` is defined in the same
+    module at the same time.  [[#318] by Dongwook Kim]
+ -  Fixed a bug that an uncaught `NameError` raises (instead of following
+    the standardized way to handle validation errors through `on_error`)
+    when a serialized value of a `bigint` is not an integral decimal string
+    and a type/union tag/service named `value-error` is defined in the same
+    module at the same time.  [[#318] by Dongwook Kim]
 
 [#298]: https://github.com/nirum-lang/nirum/issues/298
 
@@ -51,6 +61,7 @@ To be released.
 [#300]: https://github.com/nirum-lang/nirum/pull/300
 [#304]: https://github.com/nirum-lang/nirum/pull/304
 [#305]: https://github.com/nirum-lang/nirum/pull/305
+[#318]: https://github.com/nirum-lang/nirum/pull/318
 [CommonMark]: http://commonmark.org/
 [table syntax extension]: https://github.github.com/gfm/#tables-extension-
 [special attributes extension]: https://michelf.ca/projects/php-markdown/extra/#spe-attr
