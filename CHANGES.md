@@ -6,11 +6,21 @@ Version 0.4.2
 
 To be released.
 
+### Language
+
+ -  Fixed a bug that package.toml file had been failed to load when the system
+    locale does not use UTF-8. It's now independent from the system locale
+    settings.
+    [[#290], [#322]]
+
 ### Et cetera
 
  -  The official Docker image repository was moved to
     [nirumlang/nirum](https://hub.docker.com/r/nirumlang/nirum/)
     (from [spoqa/nirum](https://hub.docker.com/r/spoqa/nirum/)).
+
+[#290]: https://github.com/nirum-lang/nirum/issues/290
+[#322]: https://github.com/nirum-lang/nirum/pull/322
 
 
 Version 0.4.1
