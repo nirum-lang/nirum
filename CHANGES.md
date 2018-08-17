@@ -27,8 +27,10 @@ To be released.
 
 ### Python target
 
- -  Python 3.7 support. [[#298], [#300] by Alan D.J. Synn]
+ -  Python 3.7 support. [[#298], [#300] by Alan Synn]
+ -  Add annotation metadata `__nirum_annotations__` on record type. [[#273] by Alan Synn]
 
+[#273]: https://github.com/nirum-lang/nirum/issues/273
 [#298]: https://github.com/nirum-lang/nirum/issues/298
 
 ### Et cetera
