@@ -144,3 +144,8 @@ record name-shadowing-field-record (
 union optional-union = foo ( int32? bar )
                      | baz ( int32 qux )
                      ;
+
+union external-tag-union = tag ( int32 tag )
+                         | @external-tag
+                           etag ( int32 etag)
+                         ;

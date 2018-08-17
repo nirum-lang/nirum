@@ -37,7 +37,8 @@ union shape
           point upper-left,
           point lower-right
       )
-    | circle (point origin, offset radius)
+    | @external-tag
+      circle (point origin, offset radius)
     ;
 
 // This is comment.  Note that there are important differences between

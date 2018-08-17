@@ -436,7 +436,8 @@ class $funcName(object):
     |]
 
 compileUnionTag :: Source -> Name -> Tag -> CodeGen Markup
-compileUnionTag source parentname d@(Tag typename' fields' _) = do
+compileUnionTag source parentname d@(Tag typename' fields' annotations') = do
+    let hasExternalTag = M.member "external-tag" $ AI.annotations annotations'
     abc <- collectionsAbc
     fieldCodes <- toFieldCodes source
         (\ f -> [qq|value.get('{toBehindSnakeCaseText (fieldName f)}')|])
@@ -521,7 +522,7 @@ class #{className}(#{parentClass}):
 %{ endcase }
 
     def __nirum_serialize__(self):
-        return {
+        t = {
             '_type': '#{behindParentTypename}',
             '_tag': '#{behindTagName}',
 %{ forall fc@FieldCode { fcField = Field { fieldType = fType } } <- fieldCodes }
@@ -529,6 +530,10 @@ class #{className}(#{parentClass}):
 #{compileSerializer' source fType $ T.append "self." $ fcAttributeName fc},
 %{ endforall }
         }
+%{ if hasExternalTag }
+        t = {'#{behindTagName}': t}
+%{ endif }
+        return t
 
     @classmethod
 %{ case pyVer }
@@ -544,6 +549,13 @@ class #{className}(#{parentClass}):
     ) -> typing.Optional['#{className}']:
 %{ endcase }
         handle_error = #{defaultErrorHandler}(on_error)
+%{ if hasExternalTag }
+        try:
+            value = '#{toBehindSnakeCaseText typename'}'
+        except KeyError:
+            handle_error('.', 'Expected #{toBehindSnakeCaseText typename'} to exist.')
+            handle_error.raise_error()
+%{ endif }
         if isinstance(value, #{abc}.Mapping):
             try:
                 tag = value['_tag']

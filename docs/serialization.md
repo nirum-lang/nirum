@@ -250,6 +250,27 @@ It's represented in JSON to:
 In a similar way to a record type, undefined fields in a payload are ignored
 by deserializer.
 
+If '@external-tag' annotation is given on tag below example
+
+     union name =
+         @external-tag
+         east-asian-name ( text family-name, text given-name )
+         | ...
+         ;
+
+It's representated in JSON to:
+
+     {
+        {
+            "east-asian-name": {
+                    "_type": "name",
+                    "_tag": "east-asian-name",
+                    "family_name": "Hong",
+                    "given_name": "Minhee"
+                }
+            }
+        }
+    }
 
 Option type
 -----------
