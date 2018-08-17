@@ -847,9 +847,11 @@ class #{className}(enum.Enum):
 |]
 compileTypeDeclaration src d@TypeDeclaration { typename = Name tnFacial tnBehind
                                              , type' = RecordType fields'
+                                             , typeAnnotations = AnnotationSet { AI.annotations = annoMap } 
                                              } = do
     let className = toClassName tnFacial
     insertStandardImport "typing"
+    insertThirdPartyImportsA [("nirum.datastructures", [("map_type", "Map")])]
     abc <- collectionsAbc
     pyVer <- getPythonVersion
     fieldCodes <- toFieldCodes src
@@ -867,6 +869,23 @@ class #{className}(object):
 %{ endforall }
     )
     __nirum_type__ = 'record'
+    __nirum_annotations__ = map_type({
+%{ forall (annotationName, annotationArgument) <- M.toList annoMap }
+        '#{toAttributeName annotationName}': map_type({
+%{ forall (annotationArgumentName, annotationArgumentValue) <- M.toList annotationArgument }
+            '#{toAttributeName annotationArgumentName}': 
+%{ case annotationArgumentValue}
+%{ of AI.Text t }
+                '''#{t}
+                '''
+%{ of AI.Integer i }
+                #{i}
+%{ endcase }
+            ,
+%{ endforall }    
+        }),
+%{ endforall }
+    })
 
 %{ case pyVer }
 %{ of Python2 }
