@@ -10,6 +10,12 @@ To be released.
 
  -  The `uri` type has completly gone; use `url` instead.
     [[#126], [#281] by Jonghun Park]
+ -  Support [external_tag][etag] via '@external-tag' annotation.
+    [[#266], [#316] by JaeHyung Jang]
+
+[etag]: https://serde.rs/enum-representations.html
+[#266]: https://github.com/nirum-lang/nirum/issues/266
+[#316]: https://github.com/nirum-lang/nirum/pull/316
 
 ### Docs target
 

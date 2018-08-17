@@ -1,0 +1,18 @@
+{
+    "description": "Serialize into external tag when gives 'external-tag' annotation",
+    "type": "fixture.foo.etag",
+    "input": {
+        "etag": {
+            "_type": "external_tag_union",
+            "_tag": "etag",
+            "etag": 1
+        }
+    },
+    "normal": {
+        "etag": {
+            "_type": "external_tag_union",
+            "_tag": "etag",
+            "etag": 1
+        }
+    }
+}
