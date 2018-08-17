@@ -123,11 +123,12 @@ $doctype 5
                 <a class="index selected" href="#{root}index.html">
                     <strong>
                         #{docsTitle $ target pkg}
-                        #{Data.SemVer.toText $ version md}
+                    <small.version>#{Data.SemVer.toText $ version md}
             $else
                 <a class="index" href="#{root}index.html">
-                    #{docsTitle $ target pkg}
-                    #{Data.SemVer.toText $ version md}
+                    <span>
+                        #{docsTitle $ target pkg}
+                    <small.version>#{Data.SemVer.toText $ version md}
             $if not (null documentPairs)
                 <ul.manuals.toc>
                     $forall (docPath, doc) <- documentPairs
@@ -552,6 +553,20 @@ nav
         color: #{gray8}
     .selected > a, a.selected
         color: #{indigo8} !important
+    a.index
+        text-decoration: none
+        .version
+            margin-left: 0.2em
+            color: #{gray5}
+        .version:before
+            content: '('
+        .version:after
+            content: ')'
+    a.index.selected .version
+        color: #{indigo3}
+    a.index:hover
+        span, strong
+            text-decoration: underline
     ul.toc
         margin: 0
         padding: 0
@@ -582,10 +597,14 @@ footer
     gray2 = Color 0xe9 0xec 0xef
     gray3 :: Color
     gray3 = Color 0xde 0xe2 0xe6
+    gray5 :: Color
+    gray5 = Color 0xad 0xb5 0xbd
     gray8 :: Color
     gray8 = Color 0x34 0x3a 0x40
     graph8 :: Color
     graph8 = Color 0x9c 0x36 0xb5
+    indigo3 :: Color
+    indigo3 = Color 0x91 0xa7 0xff
     indigo8 :: Color
     indigo8 = Color 0x3b 0x5b 0xdb
     navWidth :: PixelSize
