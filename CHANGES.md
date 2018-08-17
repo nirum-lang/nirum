@@ -10,7 +10,9 @@ To be released.
 
  -  The `uri` type has completly gone; use `url` instead.
     [[#126], [#281] by Jonghun Park]
- -  Added constraints for numeric unboxed types. [[#206], [#271]]
+ -  Added [`@numeric-constraints`](docs/annotation.md#numeric-constraints)
+    annotation to constraint the range of unboxed types' values.
+    [[#206], [#271] by Seunghun Lee]
 
 ### Docs target
 
