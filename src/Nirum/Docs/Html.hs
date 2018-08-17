@@ -1,5 +1,14 @@
 {-# LANGUAGE OverloadedStrings, QuasiQuotes #-}
-module Nirum.Docs.Html (render, renderInline, renderInlines, renderBlock) where
+module Nirum.Docs.Html
+    ( render
+    , renderBlock
+    , renderInline
+    , renderInlines
+    , renderLinklessInlines
+    ) where
+
+import Data.List.NonEmpty
+import Prelude hiding (head, zip)
 
 import qualified Data.Text as T
 import Text.InterpolatedString.Perl6 (qq)
@@ -36,7 +45,15 @@ escapeChar '>' = "&gt;"
 escapeChar c = T.singleton c
 
 renderInlines :: [Inline] -> Html
-renderInlines = T.concat . map renderInline
+renderInlines = T.concat . fmap renderInline
+
+renderLinklessInlines :: [Inline] -> Html
+renderLinklessInlines inlines = T.concat
+    [ case i of
+        Link _ _ inlines' -> renderInlines inlines'
+        i' -> renderInline i'
+    | i <- inlines
+    ]
 
 renderBlock :: Block -> Html
 renderBlock (Document blocks) = renderBlocks blocks `T.snoc` '\n'
@@ -47,15 +64,21 @@ renderBlock (BlockQuote blocks) =
 renderBlock (HtmlBlock html) = html
 renderBlock (CodeBlock lang code') =
     if T.null lang
-    then [qq|<pre><code>$code'</code></pre>|]
-    else [qq|<pre><code class="language-$lang">$code'</code></pre>|]
-renderBlock (Heading level inlines) =
+    then [qq|<pre><code>$escapedCode</code></pre>|]
+    else [qq|<pre><code class="language-$lang">$escapedCode</code></pre>|]
+  where
+    escapedCode :: Html
+    escapedCode = escape code'
+renderBlock (Heading level inlines anchorId) =
     let lv = headingLevelInt level
-    in [qq|<h$lv>{renderInlines inlines}</h$lv>|]
+        id' = case anchorId of
+                Nothing -> ""
+                Just aid -> [qq| id="$aid"|] :: T.Text
+    in [qq|<h$lv$id'>{renderInlines inlines}</h$lv>|]
 renderBlock (List listType itemList) =
     let liList = case itemList of
                      TightItemList items ->
-                         [ [qq|<li>{renderInlines item}</li>|]
+                         [ [qq|<li>{renderTightBlocks item}</li>|]
                          | item <- items
                          ]
                      LooseItemList items ->
@@ -70,9 +93,36 @@ renderBlock (List listType itemList) =
         nl = '\n'
         liListT = T.intercalate "\n" liList
     in [qq|<$tag>$nl$liListT$nl</$tag>|]
+renderBlock (Table columns rows) =
+    [qq|<table>$lf<thead>$lf<tr>
+{T.concat (toList $ fmap th $ zip columns (head rows))}
+</tr>$lf</thead>
+<tbody>{T.concat (fmap tr $ Data.List.NonEmpty.tail rows)}</tbody></table>|]
+  where
+    lf :: Char
+    lf = '\n'
+    th :: (TableColumn, TableCell) -> Html
+    th (col, cell) = [qq|$lf<th{align col}>{renderInlines cell}</th>|]
+    align :: TableColumn -> Html
+    align NotAligned = ""
+    align LeftAligned = " align=\"left\""
+    align CenterAligned = " align=\"center\""
+    align RightAligned = " align=\"right\""
+    tr :: TableRow -> Html
+    tr cells = [qq|$lf<tr>{T.concat (toList $ fmap td cells)}</tr>|]
+    td :: TableCell -> Html
+    td inlines = [qq|$lf<td>{renderInlines inlines}</td>|]
 
 renderBlocks :: [Block] -> Html
-renderBlocks = T.intercalate "\n" . map renderBlock
+renderBlocks = T.intercalate "\n" . fmap renderBlock
+
+renderTightBlocks :: [Block] -> Html
+renderTightBlocks blocks = T.intercalate "\n"
+    [ case b of
+        Paragraph inlines -> renderInlines inlines
+        b' -> renderBlock b'
+    | b <- blocks
+    ]
 
 render :: Block -> Html
 render = renderBlock

@@ -44,6 +44,7 @@ package = Package { metadata = Metadata { version = SV.version 0 0 1 [] []
                                         , target = DummyTarget
                                         }
                   , modules = modules'
+                  , documents = M.empty
                   }
 
 run :: CodeBuilder DummyTarget () a -> L.Text

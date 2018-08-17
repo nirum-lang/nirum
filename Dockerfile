@@ -5,6 +5,8 @@ FROM bitnami/minideb:jessie AS build
 
 ARG APT_REPOSITORY
 
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 RUN if [ "${APT_REPOSITORY}" != "" ]; then \
         sed -i 's|http://httpredir\.debian\.org/debian|'"${APT_REPOSITORY}|" \
         /etc/apt/sources.list; \
@@ -48,4 +50,4 @@ COPY --from=build /src/nirum/docker-entrypoint.sh /bin/
 RUN chmod +x /bin/nirum /bin/docker-entrypoint.sh
 
 ENV CMD=/bin/nirum
-ENTRYPOINT /bin/docker-entrypoint.sh
+ENTRYPOINT ["/bin/docker-entrypoint.sh"]

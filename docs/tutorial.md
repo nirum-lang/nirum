@@ -121,7 +121,7 @@ Installing compiler
 The Nirum compiler works on the most major platforms like Linux, macOS, and
 Windows.  The [official releases page][] provides the prebuilt executable
 binaries for these three platforms.  Note that there is no stable version
-(i.e., v1.0.0 or higher) as of February 2018.
+(i.e., v1.0.0 or higher) as of May 2018.
 
 This tutorial assumes that you have:
 
@@ -135,7 +135,7 @@ a command-line prompt and it's consistent within this tutorial):
 
 ~~~~~~~~ sh
 $ nirum -v
-0.4.2
+0.5.0
 ~~~~~~~~
 
 [official releases page]: https://github.com/nirum-lang/nirum/releases
@@ -734,7 +734,7 @@ Method parameters
 The previous example was designed to minimize the complexity by intention.
 That's why `increment()` method has no parameters.
 
-In this chapter, the `counter` example slighly evolves.  Previously,
+In this chapter, the `counter` example slightly evolves.  Previously,
 `increment()` method only can increment the state by 1.  How about making
 it possible to increment the state by any delta?  If the previous one is
 like a microservice version of `++state` this one is like a microservice

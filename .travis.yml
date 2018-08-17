@@ -15,6 +15,7 @@ matrix:
         - python3.4
         - python3.5
         - python3.6
+        - python3.7
         - libgmp10
         - upx-ucl
         - shellcheck
@@ -126,6 +127,9 @@ script:
 - 'TOX="$(python3 -m site --user-base)/bin/tox" stack --no-terminal test -j4 --coverage'
 - ./lint.sh
 
+# Build website
+- stack runhaskell ./app/nirum-docs.hs /tmp/nirum.org/
+
 after_script:
 - |
   # Since codecov-haskell doesn't work on Windows,
@@ -141,6 +145,11 @@ after_script:
     --mix-dir ./.stack-work/dist/x86_64-*/Cabal-*/hpc/ \
     --token="$(echo $token_encoded | python -m base64 -d)" \
     spec
+
+# Used for making a commit into gh-pages (nirum.org website)
+- git log -n1 --format="format:%s%n%n$TRAVIS_COMMIT_RANGE" > /tmp/git-commit
+- git log -n1 --format="format:%an" > /tmp/git-author
+- git log -n1 --format="format:%ae" > /tmp/git-author-email
 
 notifications:
   webhooks:
@@ -234,3 +243,20 @@ after_deploy: |
     python -c 'import json, os; print(json.dumps({"username": os.environ["HACKAGE_USERNAME"], "password": os.environ["HACKAGE_PASSWORD"]}))' > ~/.stack/upload/credentials.json
     stack --no-terminal upload --ignore-check --no-signature .
   fi
+
+  # Upload website to nirum.org
+  echo "$NIRUM_GH_PAGES_KEY" | tr / '\n' > /tmp/nirum_org_ed25519
+  chmod 600 /tmp/nirum_org_ed25519
+  eval "$(ssh-agent -s)"
+  ssh-add /tmp/nirum_org_ed25519
+  pushd /tmp/nirum.org/
+  git init
+  git config user.name "$(cat /tmp/git-author)"
+  git config user.email "$(cat /tmp/git-author-email)"
+  echo nirum.org > CNAME
+  touch .nojekyll
+  git add .
+  git commit -a -F /tmp/git-commit
+  git push -f git@github.com:nirum-lang/nirum-lang.github.io.git master
+  popd
+  rm /tmp/nirum_org_ed25519

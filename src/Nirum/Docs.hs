@@ -1,14 +1,5 @@
-module Nirum.Docs ( Block ( BlockQuote
-                          , CodeBlock
-                          , Document
-                          , Heading
-                          , HtmlBlock
-                          , List
-                          , Paragraph
-                          , ThematicBreak
-                          , infoString
-                          , code
-                          )
+{-# LANGUAGE LambdaCase #-}
+module Nirum.Docs ( Block (..)
                   , HeadingLevel (H1, H2, H3, H4, H5, H6)
                   , Html
                   , Inline ( Code
@@ -29,25 +20,31 @@ module Nirum.Docs ( Block ( BlockQuote
                   , ItemList (LooseItemList, TightItemList)
                   , ListType (BulletList, OrderedList, startNumber, delimiter)
                   , ListDelimiter (Parenthesis, Period)
-                  , LooseItem
-                  , TightItem
-                  , Title
+                  , ListItem
+                  , TableCell
+                  , TableColumn (..)
+                  , TableRow
                   , Url
+                  , extractTitle
                   , filterReferences
                   , headingLevelFromInt
                   , headingLevelInt
                   , parse
+                  , transformReferences
                   , trimTitle
                   ) where
 
+import Data.Char
+import Data.List.NonEmpty
 import Data.String (IsString (fromString))
 
-import qualified CMark as M
+import qualified CMarkGFM as M
 import qualified Data.Text as T
 
 type Url = T.Text
 type Title = T.Text
 type Html = T.Text
+type AnchorId = T.Text
 
 -- | The level of heading.
 -- See also: http://spec.commonmark.org/0.25/#atx-heading
@@ -87,17 +84,28 @@ data Block = Document [Block]
            | BlockQuote [Block]
            | HtmlBlock Html
            | CodeBlock { infoString :: T.Text, code :: T.Text }
-           | Heading HeadingLevel [Inline]
+           | Heading HeadingLevel [Inline] (Maybe AnchorId)
            | List ListType ItemList
+           | Table (NonEmpty TableColumn) (NonEmpty TableRow)
            deriving (Eq, Ord, Show)
 
-data ItemList = LooseItemList [LooseItem]
-              | TightItemList [TightItem]
-              deriving (Eq, Ord, Show)
+data ItemList
+    = LooseItemList [ListItem]
+    | TightItemList [ListItem]
+    deriving (Eq, Ord, Show)
 
-type LooseItem = [Block]
+type ListItem = [Block]
 
-type TightItem = [Inline]
+data TableColumn
+    = NotAligned
+    | LeftAligned
+    | CenterAligned
+    | RightAligned
+    deriving (Eq, Ord, Show)
+
+type TableRow = NonEmpty TableCell
+
+type TableCell = [Inline]
 
 data Inline
     = Text T.Text
@@ -113,6 +121,11 @@ data Inline
     | Image { imageUrl :: Url, imageTitle :: Title }
     deriving (Eq, Ord, Show)
 
+-- | Extract the top-level first heading from the block, if it exists.
+extractTitle :: Block -> Maybe (HeadingLevel, [Inline])
+extractTitle (Document (Heading lv inlines _ : _)) = Just (lv, inlines)
+extractTitle _ = Nothing
+
 -- | Trim the top-level first heading from the block, if it exists.
 trimTitle :: Block -> Block
 trimTitle block =
@@ -122,7 +135,7 @@ trimTitle block =
 
 parse :: T.Text -> Block
 parse =
-    transBlock . M.commonmarkToNode [M.optNormalize, M.optSmart]
+    transBlock . M.commonmarkToNode [M.optSmart] [M.extTable]
   where
     transBlock :: M.Node -> Block
     transBlock n@(M.Node _ nodeType children) =
@@ -134,7 +147,14 @@ parse =
             M.HTML_BLOCK rawHtml -> HtmlBlock rawHtml
             M.CUSTOM_BLOCK _ _ -> error $ "custom block is unsupported: " ++ n'
             M.CODE_BLOCK info codeText -> CodeBlock info codeText
-            M.HEADING lv -> Heading (headingLevelFromInt lv) inlineChildren
+            M.HEADING lv -> case extractAnchorId (last' children) of
+                Nothing ->
+                    Heading (headingLevelFromInt lv) inlineChildren Nothing
+                Just (initial, anchorId) ->
+                    Heading
+                        (headingLevelFromInt lv)
+                        (Prelude.init (fmap transInline children) ++ initial)
+                        (Just anchorId)
             M.LIST (M.ListAttributes listType' tight start delim) ->
                 List (case listType' of
                           M.BULLET_LIST -> BulletList
@@ -144,20 +164,20 @@ parse =
                                               M.PERIOD_DELIM -> Period
                                               M.PAREN_DELIM -> Parenthesis
                      ) $
-                     if tight
-                        then TightItemList $ map stripParagraph listItems
-                        else LooseItemList $ map (map transBlock) listItems
+                     (if tight then TightItemList else LooseItemList) $
+                        fmap (fmap transBlock) listItems
+            M.TABLE cellAligns ->
+                Table
+                    (fromList $ fmap toTableColumn cellAligns)
+                    (fromList $ fmap transRow children)
             _ -> error $ "expected block, but got inline: " ++ n'
       where
         blockChildren :: [Block]
-        blockChildren = map transBlock children
+        blockChildren = fmap transBlock children
         inlineChildren :: [Inline]
-        inlineChildren = map transInline children
+        inlineChildren = fmap transInline children
         listItems :: [[M.Node]]
         listItems = [nodes | (M.Node _ M.ITEM nodes) <- children]
-        stripParagraph :: [M.Node] -> [Inline]
-        stripParagraph [M.Node _ M.PARAGRAPH nodes] = map transInline nodes
-        stripParagraph ns = error $ "expected a paragraph, but got " ++ show ns
         n' :: String
         n' = show n
     transInline :: M.Node -> Inline
@@ -175,7 +195,39 @@ parse =
             _ -> error $ "expected inline, but got block: " ++ show n
       where
         children :: [Inline]
-        children = map transInline childNodes
+        children = fmap transInline childNodes
+    toTableColumn :: M.TableCellAlignment -> TableColumn
+    toTableColumn M.NoAlignment = NotAligned
+    toTableColumn M.LeftAligned = LeftAligned
+    toTableColumn M.CenterAligned = CenterAligned
+    toTableColumn M.RightAligned = RightAligned
+    transRow :: M.Node -> TableRow
+    transRow (M.Node _ M.TABLE_ROW nodes) = fromList (fmap transCell nodes)
+    transRow node = error $ "expected a table row, but got " ++ show node
+    transCell :: M.Node -> TableCell
+    transCell (M.Node _ M.TABLE_CELL nodes) = fmap transInline nodes
+    transCell node = error $ "expected a table cell, but got " ++ show node
+    extractAnchorId :: Maybe M.Node -> Maybe ([Inline], AnchorId)
+    extractAnchorId (Just (M.Node _ (M.TEXT text) []))
+      | T.null tail' = Nothing
+      | T.last tail' /= '}' = Nothing
+      | T.length tail' < 2 = Nothing
+      | otherwise =
+            let
+                aid = T.init tail'
+            in
+                if isValidId aid
+                     then Just ([Text $ T.stripEnd $ T.dropEnd 3 head'], aid)
+                     else Nothing
+      where
+        (head', tail') = T.breakOnEnd " {#" text
+        isValidId :: T.Text -> Bool
+        isValidId = T.all $ \ c ->
+            isAscii c && isAlphaNum c || c `elem` ['-', '_', '.']
+    extractAnchorId _ = Nothing
+    last' :: [a] -> Maybe a
+    last' [] = Nothing
+    last' l = Just $ Prelude.last l
 
 instance IsString Block where
     fromString = parse . T.pack
@@ -190,3 +242,30 @@ filterReferences (Image { imageTitle = t } : ix) = Text t : filterReferences ix
 filterReferences (Link { linkContents = children } : ix) =
     children ++ filterReferences ix
 filterReferences (i : ix) = i : filterReferences ix
+
+transformReferences :: (Url -> Url) -> Block -> Block
+transformReferences replace = \ case
+    Document blocks ->
+        Document (transformReferences replace <$> blocks)
+    Paragraph inlines ->
+        Paragraph (transformInline <$> inlines)
+    BlockQuote blocks ->
+        BlockQuote (transformReferences replace <$> blocks)
+    Heading lv inlines anchorId ->
+        Heading lv (transformInline <$> inlines) anchorId
+    List lt (LooseItemList items) ->
+        List lt $ LooseItemList (fmap (transformReferences replace) <$> items)
+    List lt (TightItemList items) ->
+        List lt $ TightItemList (fmap (transformReferences replace) <$> items)
+    Table cols rows ->
+        Table cols (fmap (fmap transformInline) <$> rows)
+    block ->
+        block
+  where
+    transformInline :: Inline -> Inline
+    transformInline (Emphasis inlines) = Emphasis (transformInline <$> inlines)
+    transformInline (Strong inlines) = Strong (transformInline <$> inlines)
+    transformInline (Link url title inlines) =
+        Link (replace url) title (transformInline <$> inlines)
+    transformInline (Image url title) = Image (replace url) title
+    transformInline inline = inline

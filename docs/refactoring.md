@@ -240,9 +240,9 @@ to change it to a union:
 
 ~~~~~~~~ nirum
 union name
-    = wastern-name (text first-name, text? middle-name, text last-name)
+    = western-name (text first-name, text? middle-name, text last-name)
     | east-asian-name (text family-name, text given-name)
-    | culture-agnostice-name (text fullname)
+    | culture-agnostic-name (text fullname)
     ;
 ~~~~~~~~
 
@@ -256,9 +256,9 @@ In order to make union types possible to deserialize existing record data
 
 ~~~~~~~~ nirum
 union name
-    = wastern-name (text first-name, text? middle-name, text last-name)
+    = western-name (text first-name, text? middle-name, text last-name)
     | east-asian-name (text family-name, text given-name)
-    | default culture-agnostice-name (text fullname)
+    | default culture-agnostic-name (text fullname)
     ;
 ~~~~~~~~
 

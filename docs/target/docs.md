@@ -2,9 +2,13 @@ Docs target
 ===========
 
 This target does not generate any program code files, but HTML pages (and
-some extra assets like CSS).  It generates a kind of API reference docs for
-the given Nirum package: type definitions, union tags, enum members,
-service methods, and so on.
+some extra assets like CSS).  It generates three kinds of pages:
+
+ -  A home page that renders *README.md* file (if exists) or table of contents
+    (if there is no *README.md* file).
+ -  Reference docs from the docs comments in the source code: type definitions,
+    union tags, enum members, service methods, etc, and
+ -  Manual pages from CommonMark (i.e., _\*.md_) files.
 
 
 Docs comments
@@ -25,6 +29,14 @@ parameters, modules.
 You can find *examples/shapes.nrm* to see examples of docs comments.
 
 
+Manual pages
+------------
+
+The docs target scans all CommonMark (i.e., _\*.md_) files from the same level
+to *package.toml* manifest file and its subdirectories, and transforms them
+to HTML pages.
+
+
 Settings
 --------
 
@@ -32,3 +44,23 @@ Settings
 
 It goes to `<title>` elements of generated HTML pages.  It's usually a name of
 the Nirum package.
+
+
+### `opengraphs` (optional): OpenGraph
+
+It goes to `<meta>` elements of generated HTML pages. It mostly purposes to
+generate [OpenGraph] objects, but can be used for other metadata as well.
+
+[OpenGraph]: http://ogp.me/
+
+
+### `style` (optional): Custom CSS
+
+It goes to very ending of the CSS file, which means it can override other
+predefined style rules.
+
+
+### `header`/`footer` (optional): Custom header & footer HTML
+
+It goes to the very beginning and ending of `<body>` contents.  It's usually
+used to customize HTML pages.

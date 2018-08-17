@@ -1,10 +1,13 @@
-resolver: lts-11.15
+resolver: lts-12.2
 flags: {}
 packages:
 - '.'
 extra-deps:
 - uri-0.1.6.4
-  # No in the Stackage LTS 10.7
+  # No in the Stackage LTS 12.0
+- Win32-2.5.4.1
+  # While turtle-1.5.10 requires Win32 >=2.2.0.1 && <2.6 on Windows,
+  # Stackage LTS 12.0 has only Win32-2.6.1.0.
 ## INSERT CODECOV HERE -- DO NOT REMOVE THIS COMMENT. SEE ALSO ISSUE #156. ##
 extra-package-dbs: []
 ghc-options:

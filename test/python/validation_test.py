@@ -43,9 +43,9 @@ def test_datetime_value_error():
         DatetimeUnboxed(datetime.datetime(2018, 3, 11, 5, 27))
 
 
-def test_uri_value_error():
+def test_url_value_error():
     Product(name=u'', sale=True, url=None)  # url field is optional here
     Product(name=u'', sale=True, url='http://example.com/')
     with raises(ValueError):
-        # URI cannot contain new lines
+        # URL cannot contain new lines
         Product(name=u'', sale=True, url='http://example.com/\n')

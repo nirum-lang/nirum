@@ -1,22 +1,25 @@
 {-# LANGUAGE QuasiQuotes, TypeFamilies #-}
-module Nirum.Targets.Docs ( Docs
+module Nirum.Targets.Docs ( Docs (..)
                           , blockToHtml
                           , makeFilePath
                           , makeUri
                           , moduleTitle
                           ) where
 
-import Data.Maybe (mapMaybe)
+import Data.Char
+import qualified Data.List
+import Data.Maybe
 import GHC.Exts (IsList (fromList, toList))
 
 import qualified Data.ByteString as BS
 import Data.ByteString.Lazy (toStrict)
 import qualified Text.Email.Parser as E
-import Data.Map.Strict (Map, union)
+import Data.Map.Strict (Map, mapKeys, mapWithKey, unions)
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
-import System.FilePath ((</>))
+import qualified Data.SemVer
+import System.FilePath
 import Text.Blaze (ToMarkup (preEscapedToMarkup))
 import Text.Blaze.Html.Renderer.Utf8 (renderHtml)
 import Text.Cassius
@@ -37,30 +40,26 @@ import Nirum.Constructs.Name (Name (facialName))
 import qualified Nirum.Constructs.Service as S
 import qualified Nirum.Constructs.TypeDeclaration as TD
 import qualified Nirum.Constructs.TypeExpression as TE
-import Nirum.Docs ( Block (Heading)
+import Nirum.Docs ( Block (..)
+                  , Inline (..)
+                  , extractTitle
                   , filterReferences
+                  , transformReferences
                   , trimTitle
                   )
-import Nirum.Docs.Html (render, renderInlines)
+import Nirum.Docs.Html (render, renderInlines, renderLinklessInlines)
 import Nirum.Package
-import Nirum.Package.Metadata ( Author (Author, email, name, uri)
-                              , Metadata (authors)
-                              , Target ( CompileError
-                                       , CompileResult
-                                       , compilePackage
-                                       , parseTarget
-                                       , showCompileError
-                                       , targetName
-                                       , toByteString
-                                       )
-                              , stringField
-                              )
+import Nirum.Package.Metadata hiding (target)
 import qualified Nirum.Package.ModuleSet as MS
 import Nirum.TypeInstance.BoundModule
 import Nirum.Version (versionText)
 
-newtype Docs = Docs
+data Docs = Docs
     { docsTitle :: T.Text
+    , docsOpenGraph :: [OpenGraph]
+    , docsStyle :: T.Text
+    , docsHeader :: T.Text
+    , docsFooter :: T.Text
     } deriving (Eq, Ord, Show)
 
 type Error = T.Text
@@ -68,7 +67,13 @@ type Error = T.Text
 data CurrentPage
     = IndexPage
     | ModulePage ModulePath
+    | DocumentPage FilePath
     deriving (Eq, Show)
+
+data OpenGraph = OpenGraph
+    { ogTag :: T.Text
+    , ogContent :: T.Text
+    } deriving (Eq, Ord, Show)
 
 makeFilePath :: ModulePath -> FilePath
 makeFilePath modulePath' = foldl (</>) "" $
@@ -80,15 +85,14 @@ makeUri modulePath' =
     T.intercalate "/" $
                   map toNormalizedText (toList modulePath') ++ ["index.html"]
 
-layout :: ToMarkup m => Package Docs -> Int -> CurrentPage -> m -> Html -> Html
+layout :: Package Docs -> Int -> CurrentPage -> T.Text -> Html -> Html
 layout pkg dirDepth currentPage title body =
     layout' pkg dirDepth currentPage title body Nothing
 
-layout' :: ToMarkup m
-        => Package Docs
+layout' :: Package Docs
         -> Int
         -> CurrentPage
-        -> m
+        -> T.Text
         -> Html
         -> Maybe Html
         -> Html
@@ -98,24 +102,47 @@ $doctype 5
 <html>
     <head>
         <meta charset="utf-8">
-        <title>#{title}
+        <title>
+            $if (title == docsTitle (target pkg))
+                #{title}
+            $else
+                #{title} &mdash; #{docsTitle (target pkg)}
         <meta name="generator" content="Nirum #{versionText}">
         $forall Author { name = name' } <- authors md
             <meta name="author" content="#{name'}">
+        $forall OpenGraph { ogTag, ogContent } <- docsOpenGraph $ target pkg
+            <meta property="#{ogTag}" content="#{ogContent}">
         <link rel="stylesheet" href="#{root}style.css">
+        <link rel="stylesheet" href="#{hljsCss}">
+        <script src="#{hljsJs}"></script>
+        <script>hljs.initHighlightingOnLoad();</script>
     <body>
+        #{preEscapedToMarkup $ docsHeader $ target pkg}
         <nav>
             $if currentPage == IndexPage
                 <a class="index selected" href="#{root}index.html">
                     <strong>
                         #{docsTitle $ target pkg}
+                        #{Data.SemVer.toText $ version md}
             $else
                 <a class="index" href="#{root}index.html">
                     #{docsTitle $ target pkg}
-            <ul class="toc">
-                $forall (modulePath', mod) <- MS.toAscList ms
+                    #{Data.SemVer.toText $ version md}
+            <ul.manuals.toc>
+                $forall (documentPath, doc) <- documentPairs
+                    $if currentPage == DocumentPage documentPath
+                        <li.selected>
+                            <a href="#{root}#{documentHtmlPath documentPath}">
+                                <strong>
+                                    #{renderDocumentTitle documentPath doc}
+                    $else
+                        <li>
+                            <a href="#{root}#{documentHtmlPath documentPath}">
+                                #{renderDocumentTitle documentPath doc}
+            <ul.modules.toc>
+                $forall (modulePath', mod) <- modulePairs
                     $if currentPage == ModulePage modulePath'
-                        <li class="selected">
+                        <li.selected>
                             <a href="#{root}#{makeUri modulePath'}">
                                 <strong>
                                     <code>#{toCode modulePath'}</code>
@@ -130,10 +157,27 @@ $doctype 5
         <article>#{body}
         $maybe f <- footer
             <footer>#{f}
+        #{preEscapedToMarkup $ docsFooter $ target pkg}
 |]
   where
     root :: T.Text
     root = T.replicate dirDepth "../"
+    modulePairs :: [(ModulePath, Module)]
+    modulePairs = MS.toAscList ms
+    documentPairs :: [(FilePath, D.Docs)]
+    documentPairs = Data.List.sortOn
+        documentSortKey
+        (toList $ fst $ listDocuments pkg)
+    documentSortKey :: (FilePath, D.Docs) -> (Bool, Int, FilePath)
+    documentSortKey ("", _) = (False, 0, "")
+    documentSortKey (fp@(fp1 : _), _) =
+        (isUpper fp1, length (filter (== pathSeparator) fp), fp)
+    hljsBase :: T.Text
+    hljsBase = "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/"
+    hljsCss :: T.Text
+    hljsCss = T.concat [hljsBase, "styles/github.min.css"]
+    hljsJs :: T.Text
+    hljsJs = T.concat [hljsBase, "highlight.min.js"]
 
 typeExpression :: BoundModule Docs -> TE.TypeExpression -> Html
 typeExpression _ expr = [shamlet|#{typeExpr expr}|]
@@ -155,7 +199,7 @@ $case expr'
 
 module' :: BoundModule Docs -> Html
 module' docsModule =
-    layout pkg depth (ModulePage docsModulePath) title [shamlet|
+    layout pkg depth (ModulePage docsModulePath) path [shamlet|
 $maybe tit <- headingTitle
     <h1>
         <dfn><code>#{path}</code>
@@ -176,8 +220,6 @@ $forall (ident, decl) <- types'
     pkg = boundPackage docsModule
     path :: T.Text
     path = toCode docsModulePath
-    title :: T.Text
-    title = T.concat [path, " \8212 ", docsTitle $ target pkg]
     types' :: [(Identifier, TD.TypeDeclaration)]
     types' = [ (facialName $ DE.name decl, decl)
              | decl <- DES.toList $ boundTypes docsModule
@@ -195,7 +237,24 @@ $forall (ident, decl) <- types'
     depth = length $ toList docsModulePath
 
 blockToHtml :: Block -> Html
-blockToHtml b = preEscapedToMarkup $ render b
+blockToHtml =
+    preEscapedToMarkup . render . transformReferences replaceUrl
+  where
+    replaceUrl :: T.Text -> T.Text
+    replaceUrl url
+      | isAbsoluteUrl url = url
+      | otherwise =
+            let (path, frag) = T.break (== '#') url
+            in T.pack (documentHtmlPath $ T.unpack path) `T.append` frag
+    isAbsoluteUrl :: T.Text -> Bool
+    isAbsoluteUrl url
+      | T.null rest = False
+      | T.null scheme = True
+      | otherwise = T.all testChar scheme && isAlpha (T.head scheme)
+      where
+        (scheme, rest) = T.break (== ':') url
+    testChar :: Char -> Bool
+    testChar c = (isAscii c && isAlphaNum c) || c == '.' || c == '-'
 
 typeDecl :: BoundModule Docs -> Identifier -> TD.TypeDeclaration -> Html
 typeDecl mod' ident
@@ -329,6 +388,56 @@ showKind TD.TypeDeclaration { TD.type' = type'' } = case type'' of
     TD.PrimitiveType {} -> "primitive"
 showKind TD.Import {} = "import"
 
+readmePage :: Package Docs -> D.Docs -> Html
+readmePage pkg docs' =
+    layout pkg 0 IndexPage (docsTitle $ target pkg) content
+  where
+    content :: Html
+    content = blockToHtml $ D.toBlock docs'
+
+documentPage :: Package Docs -> FilePath -> D.Docs -> Html
+documentPage pkg filePath docs' =
+    layout pkg depth (DocumentPage filePath) title' content
+  where
+    title' :: T.Text
+    title' = documentTitleText filePath docs'
+    content :: Html
+    content = blockToHtml $ D.toBlock docs'
+    depth :: Int
+    depth = length (splitPath (documentHtmlPath filePath)) - 1
+
+documentHtmlPath :: FilePath -> FilePath
+documentHtmlPath = (-<.> "html")
+
+documentTitle :: FilePath -> D.Docs -> [Inline]
+documentTitle filePath document =
+    case extractTitle $ D.toBlock document of
+        Just (_, inlines) -> inlines
+        Nothing -> [Text $ T.pack filePath]
+
+renderDocumentTitle :: FilePath -> D.Docs -> Html
+renderDocumentTitle filePath =
+    preEscapedToMarkup . renderLinklessInlines . documentTitle filePath
+
+documentTitleText :: FilePath -> D.Docs -> T.Text
+documentTitleText filePath =
+    renderInlines' . documentTitle filePath
+  where
+    renderInline :: Inline -> T.Text
+    renderInline (Text t) = t
+    renderInline SoftLineBreak = "\n"
+    renderInline HardLineBreak = "\n"
+    renderInline (HtmlInline _) = ""
+    renderInline (Code code') = code'
+    renderInline (Emphasis inlines) = renderInlines inlines
+    renderInline (Strong inlines) = renderInlines inlines
+    renderInline (Link _ _ inlines) = renderInlines inlines
+    renderInline (Image _ title)
+      | T.null title = ""
+      | otherwise = title
+    renderInlines' :: [Inline] -> T.Text
+    renderInlines' = T.concat . fmap renderInline
+
 contents :: Package Docs -> Html
 contents pkg@Package { metadata = md
                      , modules = ms
@@ -374,7 +483,7 @@ moduleTitle Module { docs = docs' } = do
     d <- docs'
     t <- D.title d
     nodes <- case t of
-                 Heading _ inlines ->
+                 Heading _ inlines _ ->
                     Just $ filterReferences inlines
                  _ -> Nothing
     return $ preEscapedToMarkup $ renderInlines nodes
@@ -387,6 +496,8 @@ body
     margin: 0
     font-family: Source Sans Pro
     color: #{gray8}
+article
+    line-height: 1.3
 code
     font-family: Source Code Pro
     font-weight: 300
@@ -396,7 +507,7 @@ strong code
 pre
     padding: 16px 10px
     background-color: #{gray1}
-    code
+    code, code.hljs
         background: none
 div
     border-top: 1px solid #{gray3}
@@ -480,20 +591,44 @@ footer
     navWidth = PixelSize 300
 
 compilePackage' :: Package Docs -> Map FilePath (Either Error BS.ByteString)
-compilePackage' pkg =
-    fromList [ ("style.css", Right $ encodeUtf8 $ TL.toStrict stylesheet)
-             , ("index.html", Right $ toStrict $ renderHtml $ contents pkg)
-             ] `union`
-          (fromList [ ( makeFilePath $ modulePath m
-                      , Right $ toStrict $ renderHtml $ module' m
-                      )
-                    | m <- modules'
-                    ] :: Map FilePath (Either Error BS.ByteString))
+compilePackage' pkg = unions
+    [ fromList
+        [ ("style.css", Right $ encodeUtf8 css)
+        , ( "index.html"
+          , Right $ toStrict $ renderHtml $ case readme of
+                Nothing -> contents pkg
+                Just readme' -> readmePage pkg readme'
+          )
+        ]
+    , fromList
+        [ ( makeFilePath $ modulePath m
+          , Right $ toStrict $ renderHtml $ module' m
+          )
+        | m <- modules'
+        ]
+    , mapKeys documentHtmlPath $
+        fmap
+            (Right . toStrict . renderHtml)
+            (mapWithKey (documentPage pkg) documents')
+    ]
   where
     paths' :: [ModulePath]
     paths' = MS.keys $ modules pkg
     modules' :: [BoundModule Docs]
     modules' = mapMaybe (`resolveBoundModule` pkg) paths'
+    css = T.concat [TL.toStrict stylesheet, "\n\n", docsStyle $ target pkg]
+    (documents', readme) = listDocuments pkg
+
+listDocuments :: Package Docs -> (Map FilePath D.Docs, Maybe D.Docs)
+listDocuments Package { documents = documents' } =
+    case Data.List.break (isReadme . fst) pairs of
+        (a, (_, readme) : b) -> (fromList (a ++ b), Just readme)
+        (a, []) -> (fromList a, Nothing)
+  where
+    isReadme :: FilePath -> Bool
+    isReadme fp = "readme.md" == map toLower (takeFileName fp)
+    pairs :: [(FilePath, D.Docs)]
+    pairs = toList documents'
 
 instance Target Docs where
     type CompileResult Docs = BS.ByteString
@@ -501,7 +636,32 @@ instance Target Docs where
     targetName _ = "docs"
     parseTarget table = do
         title <- stringField "title" table
-        return Docs { docsTitle = title }
+        opengraphs <- optional $ opengraphsField "opengraphs" table
+        style <- optional $ stringField "style" table
+        header <- optional $ stringField "header" table
+        footer <- optional $ stringField "footer" table
+        return Docs
+            { docsTitle = title
+            , docsOpenGraph = fromMaybe [] opengraphs
+            , docsStyle = fromMaybe "" style
+            , docsHeader = fromMaybe "" header
+            , docsFooter = fromMaybe "" footer
+            }
     compilePackage = compilePackage'
     showCompileError _ = id
     toByteString _ = id
+
+opengraphsField :: MetadataField -> Table -> Either MetadataError [OpenGraph]
+opengraphsField field' table = do
+    array <- tableArrayField field' table
+    opengraphs' <- mapM parseOpenGraph array
+    return $ toList opengraphs'
+  where
+    parseOpenGraph :: Table -> Either MetadataError OpenGraph
+    parseOpenGraph t = do
+      tag' <- stringField "tag" t
+      content' <- stringField "content" t
+      return OpenGraph
+          { ogTag = tag'
+          , ogContent = content'
+          }

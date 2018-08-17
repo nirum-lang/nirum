@@ -1,11 +1,13 @@
 {-# LANGUAGE QuasiQuotes, ScopedTypeVariables, TemplateHaskell #-}
-module Nirum.Targets ( BuildError (CompileError, PackageError, TargetNameError)
-                     , BuildResult
-                     , Target (..)
-                     , TargetName
-                     , buildPackage
-                     , targetNames
-                     ) where
+module Nirum.Targets
+    ( BuildError (..)
+    , BuildResult
+    , Target (..)
+    , TargetName
+    , buildPackage
+    , buildPackageFromFilePath
+    , targetNames
+    ) where
 
 import Data.Either (partitionEithers)
 import Data.Maybe (fromMaybe)
@@ -48,34 +50,41 @@ type BuildResult = M.Map FilePath ByteString
 
 packageBuilders :: M.Map TargetName
                          (FilePath -> IO (Either BuildError BuildResult))
-packageBuilders = M.fromList $(targetProxyMapQ [e|buildPackage'|])
+packageBuilders = M.fromList $(targetProxyMapQ [e|buildPackageFromFilePath'|])
 
 targetNames :: Set TargetName
 targetNames = M.keysSet packageBuilders
 
-buildPackage :: TargetName -> FilePath -> IO (Either BuildError BuildResult)
-buildPackage targetName' =
+buildPackage :: forall t. Target t => Package t -> Either BuildError BuildResult
+buildPackage pkg@Package { metadata = Metadata { target = target' } } =
+    case partitionEithers eithers of
+        (errors@(_ : _), _) ->
+            Left $ CompileError $ M.fromList errors
+        ([], outs) -> Right $ M.fromList outs
+  where
+    results :: [(FilePath, Either (CompileError t) (CompileResult t))]
+    results = M.toList $ compilePackage pkg
+    eithers :: [Either (FilePath, Text) (FilePath, ByteString)]
+    eithers = [ case result of
+                    Left e -> Left (f, showCompileError target' e)
+                    Right r -> Right (f, toByteString target' r)
+              | (f, result) <- results
+              ]
+
+buildPackageFromFilePath :: TargetName
+                         -> FilePath
+                         -> IO (Either BuildError BuildResult)
+buildPackageFromFilePath targetName' =
     fromMaybe (\ _ -> return $ Left $ TargetNameError targetName') $
               M.lookup targetName' packageBuilders
 
-buildPackage' :: forall t. Target t
-              => Proxy t
-              -> FilePath
-              -> IO (Either BuildError BuildResult)
-buildPackage' _ packagePath = do
+buildPackageFromFilePath' :: forall t. Target t
+                          => Proxy t
+                          -> FilePath
+                          -> IO (Either BuildError BuildResult)
+buildPackageFromFilePath' _ packagePath = do
     scanResult <- scanPackage packagePath
     return $ case scanResult of
         Left e -> Left $ PackageError e
         Right (pkg :: Package t) ->
-            let Package { metadata = Metadata { target = target' } } = pkg
-                results = M.toList $ compilePackage pkg
-                eithers = [ case result of
-                                Left e -> Left (f, showCompileError target' e)
-                                Right r -> Right (f, toByteString target' r)
-                          | (f, result) <- results
-                          ] :: [Either (FilePath, Text) (FilePath, ByteString)]
-            in
-                case partitionEithers eithers of
-                    (errors@(_ : _), _) ->
-                        Left $ CompileError $ M.fromList errors
-                    ([], outs) -> Right $ M.fromList outs
+            buildPackage pkg

@@ -25,7 +25,7 @@ module Nirum.Package.Metadata ( Author (Author, email, name, uri)
                                      , VTable
                                      , VTArray
                                      )
-                              , Package (Package, metadata, modules)
+                              , Package (..)
                               , Table
                               , Target ( CompileError
                                        , CompileResult
@@ -40,6 +40,7 @@ module Nirum.Package.Metadata ( Author (Author, email, name, uri)
                               , fieldType
                               , metadataFilename
                               , metadataPath
+                              , optional
                               , parseMetadata
                               , packageTarget
                               , prependMetadataErrorField
@@ -47,6 +48,7 @@ module Nirum.Package.Metadata ( Author (Author, email, name, uri)
                               , readMetadata
                               , stringField
                               , tableField
+                              , tableArrayField
                               , textArrayField
                               , versionField
                               ) where
@@ -83,6 +85,7 @@ import Text.Toml.Types (Node ( VArray
                        )
 import Text.URI (URI, parseURI)
 
+import Nirum.Constructs.Docs (Docs)
 import Nirum.Package.ModuleSet (ModuleSet)
 
 -- | The filename of Nirum package metadata.
@@ -90,10 +93,11 @@ metadataFilename :: FilePath
 metadataFilename = "package.toml"
 
 -- | Represents a package which consists of modules.
-data Package t =
-    Package { metadata :: (Eq t, Ord t, Show t, Target t) => Metadata t
-            , modules :: ModuleSet
-            }
+data Package t = Package
+    { metadata :: (Eq t, Ord t, Show t, Target t) => Metadata t
+    , modules :: ModuleSet
+    , documents :: Map FilePath Docs
+    }
 
 deriving instance (Eq t, Target t) => Eq (Package t)
 deriving instance (Ord t, Target t) => Ord (Package t)

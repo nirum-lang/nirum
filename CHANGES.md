@@ -1,16 +1,60 @@
 Nirum changelog
 ===============
 
-Version 0.4.2
+Version 0.5.0
 -------------
 
 To be released.
 
+### Language
+
+ -  The `uri` type has completly gone; use `url` instead.
+    [[#126], [#281] by Jonghun Park]
+
+### Docs target
+
+ -  Docs target became to support manual pages besides reference docs extracted
+    from Nirum source codes.  It scans all CommonMark (i.e., _*.md_) files and
+    transforms them to HTML pages.
+ -  [CommonMark] in docstrings became to support [table syntax extension].
+ -  [CommonMark] in docstrings became to have a limited subset of
+    [special attributes extension].  It's only allowed to heading elements and
+    only anchor identifiers are supported (e.g., `{#header-id}`).
+ -  `style`, `header`, and `footer` options were added.  These options purpose
+    to customize the look and feel of the result pages.
+ -  Fixed an incorrect processing of [CommonMark] thight list items: it had
+    crashed when a thight list item contains blocks other than paragraphs.
+ -  Package's version became shown on the generated docs.
+    [[#297], [#304] by Jeong Ukjae]
+ -  Added `opengraphs` option for [OpenGraph] objects on docs.
+    [[#283], [#305] by GyuYong Jung]
+ -  Added syntax highlighting.
+    [[#310], [#311] by MinJune Kim]
+
+### Python target
+
+ -  Python 3.7 support. [[#298], [#300] by Alan D.J. Synn]
+
+[#298]: https://github.com/nirum-lang/nirum/issues/298
+
 ### Et cetera
 
+ -  Dropped 32-bit Windows support.
  -  The official Docker image repository was moved to
     [nirumlang/nirum](https://hub.docker.com/r/nirumlang/nirum/)
     (from [spoqa/nirum](https://hub.docker.com/r/spoqa/nirum/)).
+
+[#126]: https://github.com/nirum-lang/nirum/issues/126
+[#281]: https://github.com/nirum-lang/nirum/pull/281
+[#283]: https://github.com/spoqa/nirum/pull/283
+[#297]: https://github.com/nirum-lang/nirum/issues/297
+[#300]: https://github.com/nirum-lang/nirum/pull/300
+[#304]: https://github.com/nirum-lang/nirum/pull/304
+[#305]: https://github.com/nirum-lang/nirum/pull/305
+[CommonMark]: http://commonmark.org/
+[table syntax extension]: https://github.github.com/gfm/#tables-extension-
+[special attributes extension]: https://michelf.ca/projects/php-markdown/extra/#spe-attr
+[OpenGraph]: http://ogp.me/
 
 
 Version 0.4.1

@@ -1,7 +1,9 @@
 {-# LANGUAGE ExtendedDefaultRules, OverloadedStrings, QuasiQuotes #-}
 module Nirum.DocsSpec where
 
-import Data.Text (Text)
+import Data.List.NonEmpty (NonEmpty ((:|)))
+
+import Data.Text (Text, snoc)
 import Test.Hspec.Meta
 import Text.InterpolatedString.Perl6 (q)
 
@@ -25,13 +27,23 @@ Loose list:
 
 A [complex *link*][1].
 
+Table example                                                   {#table-section}
+-------------
+
+| A     | B      | C            | D     |
+| ----- | :----- | :----------: | ----: |
+| foo   | bar    | baz          | bim   |
+| qux   | quux   | ![](img.jpg) | quuz  |
+| corge | grault | garply       | waldo |
+| ga    | na     | da           | ra    |
+
 [1]: http://nirum.org/ "Nirum"
 
 |]
 
 sampleHeading :: Block
 sampleHeading =
-    Heading H1 ["Hello"]
+    Heading H1 ["Hello"] Nothing
 
 sampleDocument :: Block
 sampleDocument =
@@ -39,10 +51,14 @@ sampleDocument =
 
 sampleDocument' :: ([Block] -> [Block]) -> Block
 sampleDocument' adjust =
+    sampleDocument_ adjust "http://nirum.org/" (Image "img.jpg" "")
+
+sampleDocument_ :: ([Block] -> [Block]) -> Url -> Inline -> Block
+sampleDocument_ adjust url img =
     (Document . adjust)
         [ Paragraph ["Tight list:"]
-        , List BulletList $ TightItemList [ ["List test"]
-                                          , ["test2"]
+        , List BulletList $ TightItemList [ [Paragraph ["List test"]]
+                                          , [Paragraph ["test2"]]
                                           ]
         , Paragraph ["Loose list:"]
         , List (OrderedList 1 Period) $
@@ -51,10 +67,20 @@ sampleDocument' adjust =
                              ]
         , Paragraph
               [ "A "
-              , Link "http://nirum.org/" "Nirum"
+              , Link url "Nirum"
                      ["complex ", Emphasis ["link"]]
               , "."
               ]
+        , Heading H2 ["Table example"] (Just "table-section")
+        , Table
+              (NotAligned :| [LeftAligned, CenterAligned, RightAligned])
+              ( (["A"] :| [["B"], ["C"], ["D"]])
+              :| [ ["foo"] :| [["bar"], ["baz"], ["bim"]]
+                 , ["qux"] :| [["quux"], [img], ["quuz"]]
+                 , ["corge"] :| [["grault"], ["garply"], ["waldo"]]
+                 , ["ga"] :| [["na"], ["da"], ["ra"]]
+                 ]
+              )
         ]
 
 spec :: Spec
@@ -89,8 +115,18 @@ spec = do
                 , "image"
                 , "."
                 ]
+    specify "extractTitle" $ do
+        let Heading lv inlines _ = sampleHeading
+        extractTitle sampleDocument `shouldBe` Just (lv, inlines)
+        extractTitle (sampleDocument' id) `shouldBe` Nothing
     specify "trimTitle" $ do
         -- Remove the top-level heading if it exists:
         trimTitle sampleDocument `shouldBe` sampleDocument' id
         -- No-op if there is no top-level heading:
         trimTitle (sampleDocument' id) `shouldBe` sampleDocument' id
+    specify "transformReferences" $
+        transformReferences (`snoc` '?') sampleDocument `shouldBe`
+            sampleDocument_
+                (sampleHeading :)
+                "http://nirum.org/?"
+                (Image "img.jpg?" "")
