@@ -31,6 +31,7 @@ packageMetadata = Metadata
     , authors = [Author "Nirum team" Nothing Nothing]
     , Nirum.Package.Metadata.target = Docs
         { docsTitle = "Nirum"
+        , docsOpenGraph = []
         , docsStyle = style
         , docsHeader = ""
         , docsFooter = footer

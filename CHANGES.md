@@ -24,6 +24,12 @@ To be released.
     to customize the look and feel of the result pages.
  -  Fixed an incorrect processing of [CommonMark] thight list items: it had
     crashed when a thight list item contains blocks other than paragraphs.
+ -  Package's version became shown on the generated docs.
+    [[#297], [#304] by Jeong Ukjae]
+ -  Added `opengraphs` option for [OpenGraph] objects on docs.
+    [[#283], [#305] by GyuYong Jung]
+ -  Added syntax highlighting.
+    [[#310], [#311] by MinJune Kim]
 
 ### Python target
 
@@ -42,10 +48,15 @@ To be released.
 
 [#126]: https://github.com/nirum-lang/nirum/issues/126
 [#281]: https://github.com/nirum-lang/nirum/pull/281
+[#283]: https://github.com/spoqa/nirum/pull/283
+[#297]: https://github.com/nirum-lang/nirum/issues/297
 [#300]: https://github.com/nirum-lang/nirum/pull/300
+[#304]: https://github.com/nirum-lang/nirum/pull/304
+[#305]: https://github.com/nirum-lang/nirum/pull/305
 [CommonMark]: http://commonmark.org/
 [table syntax extension]: https://github.github.com/gfm/#tables-extension-
 [special attributes extension]: https://michelf.ca/projects/php-markdown/extra/#spe-attr
+[OpenGraph]: http://ogp.me/
 
 
 Version 0.4.1

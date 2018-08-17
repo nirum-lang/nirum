@@ -18,6 +18,7 @@ import Data.Map.Strict (Map, mapKeys, mapWithKey, unions)
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
+import qualified Data.SemVer
 import System.FilePath
 import Text.Blaze (ToMarkup (preEscapedToMarkup))
 import Text.Blaze.Html.Renderer.Utf8 (renderHtml)
@@ -55,6 +56,7 @@ import Nirum.Version (versionText)
 
 data Docs = Docs
     { docsTitle :: T.Text
+    , docsOpenGraph :: [OpenGraph]
     , docsStyle :: T.Text
     , docsHeader :: T.Text
     , docsFooter :: T.Text
@@ -67,6 +69,11 @@ data CurrentPage
     | ModulePage ModulePath
     | DocumentPage FilePath
     deriving (Eq, Show)
+
+data OpenGraph = OpenGraph
+    { ogTag :: T.Text
+    , ogContent :: T.Text
+    } deriving (Eq, Ord, Show)
 
 makeFilePath :: ModulePath -> FilePath
 makeFilePath modulePath' = foldl (</>) "" $
@@ -103,7 +110,12 @@ $doctype 5
         <meta name="generator" content="Nirum #{versionText}">
         $forall Author { name = name' } <- authors md
             <meta name="author" content="#{name'}">
+        $forall OpenGraph { ogTag, ogContent } <- docsOpenGraph $ target pkg
+            <meta property="#{ogTag}" content="#{ogContent}">
         <link rel="stylesheet" href="#{root}style.css">
+        <link rel="stylesheet" href="#{hljsCss}">
+        <script src="#{hljsJs}"></script>
+        <script>hljs.initHighlightingOnLoad();</script>
     <body>
         #{preEscapedToMarkup $ docsHeader $ target pkg}
         <nav>
@@ -111,20 +123,23 @@ $doctype 5
                 <a class="index selected" href="#{root}index.html">
                     <strong>
                         #{docsTitle $ target pkg}
+                        #{Data.SemVer.toText $ version md}
             $else
                 <a class="index" href="#{root}index.html">
                     #{docsTitle $ target pkg}
-            <ul.manuals.toc>
-                $forall (documentPath, doc) <- documentPairs
-                    $if currentPage == DocumentPage documentPath
-                        <li.selected>
-                            <a href="#{root}#{documentHtmlPath documentPath}">
-                                <strong>
-                                    #{renderDocumentTitle documentPath doc}
-                    $else
-                        <li>
-                            <a href="#{root}#{documentHtmlPath documentPath}">
-                                #{renderDocumentTitle documentPath doc}
+                    #{Data.SemVer.toText $ version md}
+            $if not (null documentPairs)
+                <ul.manuals.toc>
+                    $forall (docPath, doc) <- documentPairs
+                        $if currentPage == DocumentPage docPath
+                            <li.selected>
+                                <a href="#{root}#{documentHtmlPath docPath}">
+                                    <strong>
+                                        #{renderDocumentTitle docPath doc}
+                        $else
+                            <li>
+                                <a href="#{root}#{documentHtmlPath docPath}">
+                                    #{renderDocumentTitle docPath doc}
             <ul.modules.toc>
                 $forall (modulePath', mod) <- modulePairs
                     $if currentPage == ModulePage modulePath'
@@ -158,6 +173,12 @@ $doctype 5
     documentSortKey ("", _) = (False, 0, "")
     documentSortKey (fp@(fp1 : _), _) =
         (isUpper fp1, length (filter (== pathSeparator) fp), fp)
+    hljsBase :: T.Text
+    hljsBase = "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/"
+    hljsCss :: T.Text
+    hljsCss = T.concat [hljsBase, "styles/github.min.css"]
+    hljsJs :: T.Text
+    hljsJs = T.concat [hljsBase, "highlight.min.js"]
 
 typeExpression :: BoundModule Docs -> TE.TypeExpression -> Html
 typeExpression _ expr = [shamlet|#{typeExpr expr}|]
@@ -487,7 +508,7 @@ strong code
 pre
     padding: 16px 10px
     background-color: #{gray1}
-    code
+    code, code.hljs
         background: none
 div
     border-top: 1px solid #{gray3}
@@ -616,11 +637,13 @@ instance Target Docs where
     targetName _ = "docs"
     parseTarget table = do
         title <- stringField "title" table
+        opengraphs <- optional $ opengraphsField "opengraphs" table
         style <- optional $ stringField "style" table
         header <- optional $ stringField "header" table
         footer <- optional $ stringField "footer" table
         return Docs
             { docsTitle = title
+            , docsOpenGraph = fromMaybe [] opengraphs
             , docsStyle = fromMaybe "" style
             , docsHeader = fromMaybe "" header
             , docsFooter = fromMaybe "" footer
@@ -628,3 +651,18 @@ instance Target Docs where
     compilePackage = compilePackage'
     showCompileError _ = id
     toByteString _ = id
+
+opengraphsField :: MetadataField -> Table -> Either MetadataError [OpenGraph]
+opengraphsField field' table = do
+    array <- tableArrayField field' table
+    opengraphs' <- mapM parseOpenGraph array
+    return $ toList opengraphs'
+  where
+    parseOpenGraph :: Table -> Either MetadataError OpenGraph
+    parseOpenGraph t = do
+      tag' <- stringField "tag" t
+      content' <- stringField "content" t
+      return OpenGraph
+          { ogTag = tag'
+          , ogContent = content'
+          }

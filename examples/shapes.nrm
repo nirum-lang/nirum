@@ -2,7 +2,7 @@
 # ==============================================
 
 unboxed offset (float64);
-# The key difference between unboxed type and reocrd type consisting of a single
+# The key difference between unboxed type and record type consisting of a single
 # field is that the former has the same JSON representation to its target type,
 # while the latter has thicker JSON representation than its only field.
 #
