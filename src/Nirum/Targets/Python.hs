@@ -876,8 +876,7 @@ class #{className}(object):
             '#{toAttributeName annotationArgumentName}': 
 %{ case annotationArgumentValue}
 %{ of AI.Text t }
-                '''#{t}
-                '''
+                '''#{t}'''
 %{ of AI.Integer i }
                 #{i}
 %{ endcase }
