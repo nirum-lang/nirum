@@ -61,6 +61,8 @@ To be released.
 [#300]: https://github.com/nirum-lang/nirum/pull/300
 [#304]: https://github.com/nirum-lang/nirum/pull/304
 [#305]: https://github.com/nirum-lang/nirum/pull/305
+[#310]: https://github.com/nirum-lang/nirum/issues/310
+[#311]: https://github.com/nirum-lang/nirum/pull/311
 [#318]: https://github.com/nirum-lang/nirum/pull/318
 [CommonMark]: http://commonmark.org/
 [table syntax extension]: https://github.github.com/gfm/#tables-extension-
