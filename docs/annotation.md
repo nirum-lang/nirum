@@ -129,3 +129,32 @@ class FileNotFound(FileError):
 class FileNotReadable(FileError):
     ...
 ~~~~~~~~
+
+### `@numeric-constraints`                                {#numeric-constraints}
+
+`@numeric-constraints` annotation constrains the range of unboxed types' values.
+Currently, available annotation arguments are below:
+
+`min`
+:   Minimum input value; inclusive.
+
+`max`
+:   Maximum input value; inclusive.
+
+For example, the following first Nirum code is compiled to the second Python
+code:
+
+~~~~~~~~ nirum
+@numeric-constraints(min=1, max=12)
+unboxed month (int32);
+~~~~~~~~
+
+~~~~~~~~ python
+class Month:
+    def __init__(self, value: int) -> None:
+        if not value <= 12:
+            raise ValueError("value is greater than 12")
+        if not value >= 1:
+            raise ValueError("value is less than 1")
+        ...
+ ~~~~~~~~
