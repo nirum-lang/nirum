@@ -22,7 +22,7 @@ def test_setup_metadata():
     assert set(pkg['Provides']) == {
         'fixture', 'fixture.foo', 'fixture.foo.bar', 'fixture.qux',
         'fixture.reserved_keyword_enum', 'fixture.reserved_keyword_union',
-        'fixture.types', 'fixture.alias',
+        'fixture.types', 'fixture.alias', 'fixture.constraints',
         'renamed', 'renamed.foo', 'renamed.foo.bar',
         'fixture.datetime',
         'fixture.name',
@@ -46,6 +46,7 @@ def test_module_entry_points():
         'fixture.reserved-keyword-enum', 'fixture.reserved-keyword-union',
         'fixture.types',
         'fixture.alias',
+        'fixture.constraints',
         'renames.test.foo', 'renames.test.foo.bar',
         'fixture.datetime',
         'fixture.name',
