@@ -128,17 +128,18 @@ $doctype 5
                 <a class="index" href="#{root}index.html">
                     #{docsTitle $ target pkg}
                     #{Data.SemVer.toText $ version md}
-            <ul.manuals.toc>
-                $forall (documentPath, doc) <- documentPairs
-                    $if currentPage == DocumentPage documentPath
-                        <li.selected>
-                            <a href="#{root}#{documentHtmlPath documentPath}">
-                                <strong>
-                                    #{renderDocumentTitle documentPath doc}
-                    $else
-                        <li>
-                            <a href="#{root}#{documentHtmlPath documentPath}">
-                                #{renderDocumentTitle documentPath doc}
+            $if not (null documentPairs)
+                <ul.manuals.toc>
+                    $forall (docPath, doc) <- documentPairs
+                        $if currentPage == DocumentPage docPath
+                            <li.selected>
+                                <a href="#{root}#{documentHtmlPath docPath}">
+                                    <strong>
+                                        #{renderDocumentTitle docPath doc}
+                        $else
+                            <li>
+                                <a href="#{root}#{documentHtmlPath docPath}">
+                                    #{renderDocumentTitle docPath doc}
             <ul.modules.toc>
                 $forall (modulePath', mod) <- modulePairs
                     $if currentPage == ModulePage modulePath'

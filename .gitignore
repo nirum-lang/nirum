@@ -1,6 +1,7 @@
 
 __pycache__
 .cache
+.DS_Store
 .pytest_cache
 .stack-work
 *.tix
