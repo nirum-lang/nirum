@@ -63,6 +63,7 @@ import Data.Text (Text, append, snoc, unpack)
 import Data.Text.Encoding (encodeUtf8)
 import qualified Data.Text.IO as TIO
 import System.FilePath ((</>))
+import System.IO
 import Text.Email.Parser (EmailAddress)
 import qualified Text.Email.Validate as EV
 import Text.InterpolatedString.Perl6 (qq)
@@ -213,7 +214,9 @@ parseMetadata metadataPath' tomlText = do
 
 readMetadata :: Target t => FilePath -> IO (Either MetadataError (Metadata t))
 readMetadata metadataPath' = do
-    tomlText <- TIO.readFile metadataPath'
+    h <- openFile metadataPath' ReadMode
+    hSetEncoding h utf8
+    tomlText <- TIO.hGetContents h
     return $ parseMetadata metadataPath' tomlText
 
 metadataPath :: FilePath -> FilePath
