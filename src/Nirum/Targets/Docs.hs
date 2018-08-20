@@ -25,6 +25,7 @@ import Text.Blaze.Html.Renderer.Utf8 (renderHtml)
 import Text.Cassius
 import Text.Hamlet (Html, shamlet)
 import Text.InterpolatedString.Perl6 (q)
+import Text.Julius
 
 import Nirum.Constructs (Construct (toCode))
 import Nirum.Constructs.Declaration (Documented (docsBlock))
@@ -117,7 +118,7 @@ $doctype 5
         <link rel="stylesheet" href="#{hljsCss}">
         <script src="#{root}nirum.js"></script>
         <script src="#{hljsJs}"></script>
-        <script>hljs.initHighlightingOnLoad();</script>
+        <script src="#{root}nirumHighlight.js"></script>
     <body>
         #{preEscapedToMarkup $ docsHeader $ target pkg}
         <nav>
@@ -635,11 +636,82 @@ window.addEventListener('load', function () {
 });
 |]
 
+nirumHighlightJavascript :: TL.Text
+nirumHighlightJavascript = renderJavascript ([julius|
+hljs.registerLanguage('nirum', function(hljs) {
+    // Unfortunately CDN for highlight.js does not deliver
+    // non-bundled unminified source, so we minify it by hand.
+    // See also:
+    // https://github.com/highlightjs/highlight.js/blob/master/tools/utility.js
+    var begin = 'b';
+    var beginKeywords = 'bK';
+    var className = 'cN';
+    var contains = 'c';
+    var end = 'e';
+    var excludeEnd = 'eE';
+    var keywords = 'k';
+    var relevance = 'r';
+    var C_LINE_COMMENT_MODE = hljs.CLCM;
+    var HASH_COMMENT_MODE = hljs.HCM;
+    var APOS_STRING_MODE = hljs.ASM;
+    var QUOTE_STRING_MODE = hljs.QSM;
+    var NUMBER_MODE = hljs.NM;
+
+    var NIRUM_IDENTIFIER_RE = '(`)?[a-zA-Z][a-zA-Z0-9\\-_]*\\1';
+    var NIRUM_IDENTIFIER_MODE = {
+        [className]: 'title',
+        [begin]: NIRUM_IDENTIFIER_RE,
+        [relevance]: 0,
+    };
+
+    return {
+        [keywords]: {
+            keyword: 'record enum unboxed type union service' +
+                      ' import throws as default',
+            built_in: 'bigint decimal int32 int64 float32 float64' +
+                      ' text binary datetime date bool uuid uri',
+            literal: 'true false',
+        },
+        [contains]: [
+            // comments
+            C_LINE_COMMENT_MODE,
+            HASH_COMMENT_MODE,
+            // string literals
+            APOS_STRING_MODE,
+            QUOTE_STRING_MODE,
+            // number literals
+            NUMBER_MODE,
+            // annotations
+            {
+                [className]: 'meta',
+                [begin]: '@\\\s*' + NIRUM_IDENTIFIER_RE,
+            },
+            // typedefs
+            {
+                [className]: 'class',
+                [beginKeywords]: 'enum record union service',
+                [end]: '[\\(=]',
+                [excludeEnd]: true,
+                [contains]: [
+                    C_LINE_COMMENT_MODE,
+                    HASH_COMMENT_MODE,
+                    NIRUM_IDENTIFIER_MODE,
+                ]
+            },
+        ],
+    }
+});
+hljs.initHighlightingOnLoad();
+|] undefined :: Javascript)
+
 compilePackage' :: Package Docs -> Map FilePath (Either Error BS.ByteString)
 compilePackage' pkg = unions
     [ fromList
         [ ("style.css", Right $ encodeUtf8 css)
         , ("nirum.js", Right $ encodeUtf8 javascript)
+        , ( "nirumHighlight.js"
+          , Right $ encodeUtf8 $ TL.toStrict nirumHighlightJavascript
+          )
         , ( "index.html"
           , Right $ toStrict $ renderHtml $ case readme of
                 Nothing -> contents pkg
