@@ -250,7 +250,7 @@ It's represented in JSON to:
 In a similar way to a record type, undefined fields in a payload are ignored
 by deserializer.
 
-If '@external-tag' annotation is given on tag below example
+If '@external-tag' annotation is given on tag below example:
 
      union name =
          @external-tag
