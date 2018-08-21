@@ -31,8 +31,8 @@ To be released.
     [[#297], [#304] by Jeong Ukjae]
  -  Added `opengraphs` option for [OpenGraph] objects on docs.
     [[#283], [#305] by GyuYong Jung]
- -  Added syntax highlighting.
-    [[#310], [#311] by MinJune Kim]
+ -  Added syntax highlighting including Nirum.
+    [[#310], [#311], [#313], [#324] by MinJune Kim]
  -  Added anchor links to types.
     [[#225], [#321] by Park Hyunwoo]
 
@@ -71,8 +71,10 @@ To be released.
 [#305]: https://github.com/nirum-lang/nirum/pull/305
 [#310]: https://github.com/nirum-lang/nirum/issues/310
 [#311]: https://github.com/nirum-lang/nirum/pull/311
+[#313]: https://github.com/nirum-lang/nirum/issues/313
 [#318]: https://github.com/nirum-lang/nirum/pull/318
 [#321]: https://github.com/nirum-lang/nirum/pull/321
+[#324]: https://github.com/nirum-lang/nirum/pull/324
 [CommonMark]: http://commonmark.org/
 [table syntax extension]: https://github.github.com/gfm/#tables-extension-
 [special attributes extension]: https://michelf.ca/projects/php-markdown/extra/#spe-attr
