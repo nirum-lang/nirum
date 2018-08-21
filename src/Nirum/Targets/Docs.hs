@@ -670,7 +670,6 @@ hljs.registerLanguage('nirum', function(hljs) {
                       ' import throws as default',
             built_in: 'bigint decimal int32 int64 float32 float64' +
                       ' text binary datetime date bool uuid uri',
-            literal: 'true false',
         },
         [contains]: [
             // comments
