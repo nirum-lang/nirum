@@ -50,14 +50,9 @@ To be released.
     and a type/union tag/service named `value-error` is defined in the same
     module at the same time.  [[#318] by Dongwook Kim]
 
-[#298]: https://github.com/nirum-lang/nirum/issues/298
-
 ### Et cetera
 
  -  Dropped 32-bit Windows support.
- -  The official Docker image repository was moved to
-    [nirumlang/nirum](https://hub.docker.com/r/nirumlang/nirum/)
-    (from [spoqa/nirum](https://hub.docker.com/r/spoqa/nirum/)).
 
 [#126]: https://github.com/nirum-lang/nirum/issues/126
 [#206]: https://github.com/nirum-lang/nirum/issues/206
@@ -66,6 +61,7 @@ To be released.
 [#281]: https://github.com/nirum-lang/nirum/pull/281
 [#283]: https://github.com/spoqa/nirum/pull/283
 [#297]: https://github.com/nirum-lang/nirum/issues/297
+[#298]: https://github.com/nirum-lang/nirum/issues/298
 [#300]: https://github.com/nirum-lang/nirum/pull/300
 [#304]: https://github.com/nirum-lang/nirum/pull/304
 [#305]: https://github.com/nirum-lang/nirum/pull/305
@@ -79,6 +75,28 @@ To be released.
 [table syntax extension]: https://github.github.com/gfm/#tables-extension-
 [special attributes extension]: https://michelf.ca/projects/php-markdown/extra/#spe-attr
 [OpenGraph]: http://ogp.me/
+
+
+Version 0.4.2
+-------------
+
+Released on Aug 24, 2018.
+
+### Language
+
+ -  Fixed a bug that *package.toml* file had been failed to load when the system
+    locale does not use UTF-8. It's now independent from the system locale
+    settings.
+    [[#290], [#322] by Seunghun Lee]
+
+### Et cetera
+
+ -  The official Docker image repository was moved to
+    [nirumlang/nirum](https://hub.docker.com/r/nirumlang/nirum/)
+    (from [spoqa/nirum](https://hub.docker.com/r/spoqa/nirum/)).
+
+[#290]: https://github.com/nirum-lang/nirum/issues/290
+[#322]: https://github.com/nirum-lang/nirum/pull/322
 
 
 Version 0.4.1
