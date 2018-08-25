@@ -19,7 +19,7 @@ category: Language
 author: Nirum team
 maintainer: Nirum team
 copyright: (c) 2016–2018 Nirum team
-license: GPL-3
+license: GPL-3.0-or-later
 homepage: https://nirum.org/
 git: git://github.com/nirum-lang/nirum.git
 bug-reports: https://github.com/nirum-lang/nirum/issues
