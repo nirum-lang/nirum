@@ -217,7 +217,7 @@ after_deploy: |
   popd
 
   # sdist
-  sed -i 's/^- -Werror$//g' package.yaml   # Hackage disallows -Werror
+  sed -i -E 's/\s-Werror$/ -Wwarn/g' package.yaml   # Hackage disallows -Werror
   stack --no-terminal sdist --ignore-check
 
   # Upload sdist as well to GitHub Releases
