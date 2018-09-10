@@ -1,5 +1,5 @@
 from fixture.datetime import DatetimeService
-from fixture.foo import PingService, RpcError
+from fixture.foo import PingService, RpcError, UnionWithAnnotation
 from nirum.datastructures import Map
 
 
@@ -21,3 +21,14 @@ def test_annotation_int():
         'num_constraints': Map({'max': 12, 'min': 1}),
     })
     assert DatetimeService.__nirum_method_annotations__['delta_month'] == exp
+
+
+def test_annotation_union():
+    exp = Map({
+        'annot': Map({
+            'number_arg': 2,
+            'text_arg': u'Nirum \'\ub2c8\ub984\'',
+        }),
+        'docs': Map({'docs': u'Docs annotation.'}),
+    })
+    assert UnionWithAnnotation.__nirum_annotations__ == exp
