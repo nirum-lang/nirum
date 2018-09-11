@@ -402,9 +402,6 @@ toMethodParameterCode source vInput vOutput vError
         , mpcDeserializer = deserializer
         }
 
-escapeSingle :: T.Text -> T.Text
-escapeSingle = T.strip . T.replace "'" "\\'"
-
 defaultDeserializerErrorHandler :: CodeGen Code
 defaultDeserializerErrorHandler = do
     modify $ \ c@CodeGenContext { globalDefinitions = defs } ->
@@ -1079,7 +1076,7 @@ class #{className}(#{T.intercalate "," $ compileExtendClasses annotations}):
             '#{toAttributeName annoArgIdent}':
 %{ case annoArg }
 %{ of AI.Text t }
-                u'''#{escapeSingle t}''',
+                #{stringLiteral t},
 %{ of AI.Integer i }
                 #{i},
 %{ endcase }
@@ -1497,7 +1494,7 @@ if hasattr(#{className}.Client, '__qualname__'):
                 ]
       where
         annoArgToText :: AnnotationArgument -> T.Text
-        annoArgToText (AI.Text t) = [qq|u'''{escapeSingle t}'''|]
+        annoArgToText (AI.Text t) = stringLiteral t
         annoArgToText (Integer i) = T.pack $ show i
     compileMethodAnnotation :: Method -> T.Text
     compileMethodAnnotation Method { methodName = mName
