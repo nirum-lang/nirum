@@ -1069,6 +1069,22 @@ class #{className}(#{T.intercalate "," $ compileExtendClasses annotations}):
 
     __nirum_type__ = 'union'
 
+    __nirum_annotations__ = map_type({
+%{ forall (annoIdentifier, annoArgSet) <- M.toList $ A.annotations annotations }
+        '#{toAttributeName annoIdentifier}': map_type({
+%{ forall (annoArgIdent, annoArg) <- M.toList annoArgSet }
+            '#{toAttributeName annoArgIdent}':
+%{ case annoArg }
+%{ of AI.Text t }
+                #{stringLiteral t},
+%{ of AI.Integer i }
+                #{i},
+%{ endcase }
+%{ endforall }
+        }),
+%{ endforall }
+    })
+
     class Tag(enum.Enum):
 %{ forall (Tag tn _ _) <- tags' }
         #{toEnumMemberName tn} = '#{toBehindSnakeCaseText tn}'
@@ -1477,10 +1493,8 @@ if hasattr(#{className}.Client, '__qualname__'):
                 | (ident', value) <- M.toList annoArgument
                 ]
       where
-        escapeSingle :: T.Text -> T.Text
-        escapeSingle = T.strip . T.replace "'" "\\'"
         annoArgToText :: AnnotationArgument -> T.Text
-        annoArgToText (AI.Text t) = [qq|u'''{escapeSingle t}'''|]
+        annoArgToText (AI.Text t) = stringLiteral t
         annoArgToText (Integer i) = T.pack $ show i
     compileMethodAnnotation :: Method -> T.Text
     compileMethodAnnotation Method { methodName = mName

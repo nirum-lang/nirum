@@ -144,3 +144,10 @@ record name-shadowing-field-record (
 union optional-union = foo ( int32? bar )
                      | baz ( int32 qux )
                      ;
+
+@annot(number-arg=2, text-arg="Nirum '니름'")
+union union-with-annotation
+    # Docs annotation.
+    = union-tag-a ( int32 aaa )
+    | union-tag-b ( int32 bbb )
+    ;

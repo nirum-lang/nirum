@@ -6,6 +6,13 @@ Version 0.6.0
 
 To be released.
 
+### Python target
+
+ -  Added `__nirum_annotations__` static field on generated union type classes.
+    [[#273] by Jang Junha]
+
+[#273]: https://github.com/nirum-lang/nirum/issues/273
+
 
 Version 0.5.0
 -------------
